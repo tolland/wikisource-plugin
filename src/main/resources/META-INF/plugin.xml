@@ -11,11 +11,8 @@
       </ul>
       ]]></description>s
 
-    <depends>com.intellij.modules.lsp</depends>
     <depends>com.intellij.modules.lang</depends>
     <depends>com.redhat.devtools.lsp4ij</depends>
-
-    <resource-bundle>messages.MyMessageBundle</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
         <fileType

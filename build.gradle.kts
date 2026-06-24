@@ -1,5 +1,8 @@
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 
+group = "org.limepepper.lang.wikitext"
+version = "1.0"
+
 plugins {
     id("org.jetbrains.kotlin.jvm")
     id("org.jetbrains.changelog")
