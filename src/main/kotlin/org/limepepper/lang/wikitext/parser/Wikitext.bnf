@@ -1,0 +1,124 @@
+{
+  parserClass="org.limepepper.lang.wikitext.parser.WtParser"
+  parserUtilClass="org.limepepper.lang.wikitext.parser.WtParserUtil"
+  psiClassPrefix="Wt"
+  psiImplClassSuffix="Impl"
+
+  psiPackage="org.limepepper.lang.wikitext.psi"
+  psiImplPackage="org.limepepper.lang.wikitext.psi.impl"
+
+  elementTypeClass="org.limepepper.lang.wikitext.psi.WtElementType"
+  elementTypeHolderClass="org.limepepper.lang.wikitext.psi.WtTypes"
+  tokenTypeClass="org.limepepper.lang.wikitext.psi.WtTokenType"
+
+
+  tokens=[
+    LBRACK='['
+    RBRACK=']'
+
+    FIVE_APOS="regexp:'''''"
+    THREE_APOS="regexp:'''"
+    TWO_APOS="regexp:''"
+    SINGLE_APOS="regexp:'"
+
+    PIPE='|'
+    EQUALS='=' // Unified token for assignment AND H1 headings
+
+    // Block tokens (Assumed to be correctly identified by the Lexer at line boundaries)
+    H1_START='='
+    H2_START='=='
+    H3_START='==='
+    H4_START='===='
+    H5_START='====='
+    H6_START='======'
+
+    BULLET='*'
+    NUMBER='#'
+    INDENT=':'
+    DEF_TERM=';'
+
+    NEWLINE='regexp:\r?\n'
+    SPACE='regexp:\s+'
+    PLAIN_TEXT="regexp:[^\s\[\]{}|=']+"
+
+    HTML_TAG_CLOSE='regexp:</[a-zA-Z][a-zA-Z0-9]*\s*>'
+    HTML_TAG_OPEN='regexp:<[a-zA-Z][a-zA-Z0-9]*[^>]*>'
+    HTML_TAG_SELFCLOSE='regexp:<[a-zA-Z][a-zA-Z0-9]*[^>]*/>'
+    LINK_OPEN='[['
+    LINK_CLOSE=']]'
+    LINK_DISPLAY_TEXT='regexp:[^]{|<]+'
+    OPEN_TAG_HEAD='regexp:<[a-zA-Z][a-zA-Z0-9]*'
+    TABLE_CELL_SEP='|'
+    TABLE_CELL_TEXT='regexp:[^{}\[\]|<]+'
+    TABLE_CLOSE='|}'
+    TABLE_OPEN='{|'
+    TEMPLATE_CLOSE='}}'
+    TEMPLATE_EQUALS='='
+    TEMPLATE_NAME='regexp:[^{}|]+'
+    TEMPLATE_OPEN='{{'
+    TEMPLATE_PARAM_TEXT='regexp:[^{}|=\[<]+'
+    VERBATIM_CONTENT='regexp:[^<]+|<'
+
+
+//    string="regexp:('([^'\\]|\\.)*'|\"([^\"\\]|\\.)*\")"
+
+  ]
+}
+
+wikitextFile ::= item*
+
+private item ::= heading_line
+               | list_item
+               | template
+               | paragraph
+               | NEWLINE
+
+// --- Headings ---
+heading_line ::= heading6 | heading5 | heading4 | heading3 | heading2 | heading1
+
+heading1 ::= EQUALS (inline_item | PIPE)+ EQUALS {pin=1}
+heading2 ::= H2_START (inline_item | PIPE | EQUALS)+ H2_START {pin=1}
+heading3 ::= H3_START (inline_item | PIPE | EQUALS)+ H3_START {pin=1}
+heading4 ::= H4_START (inline_item | PIPE | EQUALS)+ H4_START {pin=1}
+heading5 ::= H5_START (inline_item | PIPE | EQUALS)+ H5_START {pin=1}
+heading6 ::= H6_START (inline_item | PIPE | EQUALS)+ H6_START {pin=1}
+
+// --- Lists ---
+list_item ::= (BULLET | NUMBER)+ (inline_item | PIPE | EQUALS)+ {pin=1}
+
+// --- Templates ---
+template ::= TEMPLATE_OPEN template_title (PIPE template_param)* TEMPLATE_CLOSE {pin=1}
+template_title ::= PLAIN_TEXT (SPACE PLAIN_TEXT)*
+template_param ::= [ param_name EQUALS ] param_value
+param_name ::= PLAIN_TEXT (SPACE PLAIN_TEXT)*
+param_value ::= inline_item*
+
+// --- Paragraphs ---
+paragraph ::= (inline_item | PIPE)+
+
+// --- Text Content & Formatting ---
+// Note: PIPE is excluded here so nested elements don't accidentally swallow structural dividers
+inline_item ::= bold_italic
+              | bold
+              | italic
+              | internal_link
+              | external_link
+              | template
+              | PLAIN_TEXT
+              | SPACE
+              | EQUALS
+              | SINGLE_APOS
+
+bold_italic ::= FIVE_APOS inline_item+ FIVE_APOS {pin=1}
+bold ::= THREE_APOS inline_item+ THREE_APOS {pin=1}
+italic ::= TWO_APOS inline_item+ TWO_APOS {pin=1}
+
+// --- Links ---
+// Internal Links: [[TargetPage]] or [[TargetPage|Display Text]]
+internal_link ::= LINK_OPEN link_target [ PIPE link_text ] LINK_CLOSE {pin=1}
+link_target ::= PLAIN_TEXT (SPACE PLAIN_TEXT)*
+link_text ::= (inline_item | EQUALS)+
+
+// External Links: [http://example.com Display Text]
+external_link ::= LBRACK URL [ SPACE link_text ] RBRACK {pin=1}
+URL ::= PLAIN_TEXT

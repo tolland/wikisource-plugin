@@ -1,0 +1,35 @@
+<idea-plugin>
+    <id>org.limepepper.lang.wikitext</id>
+    <name>Wikisource</name>
+
+    <vendor url="https://www.mycompany.com">The developer</vendor>
+
+    <description><![CDATA[
+    Support wikitext via lsp or laxer. <em>This stupid description must be at least 40 characters</em>
+        <ul>
+      <li>Default linting rules for this file are annoying</li>
+      </ul>
+      ]]></description>s
+
+    <depends>com.intellij.modules.lsp</depends>
+    <depends>com.intellij.modules.lang</depends>
+    <depends>com.redhat.devtools.lsp4ij</depends>
+
+    <resource-bundle>messages.MyMessageBundle</resource-bundle>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <fileType
+                name="Wikitext"
+                implementationClass="org.limepepper.lang.wikitext.WtFileType"
+                fieldName="INSTANCE"
+                language="Wikitext"
+                extensions="wt"
+        />
+
+        <lang.parserDefinition
+                language="Wikitext"
+                implementationClass="org.limepepper.lang.wikitext.parser.WtParserDefinition"/>
+
+    </extensions>
+
+</idea-plugin>
