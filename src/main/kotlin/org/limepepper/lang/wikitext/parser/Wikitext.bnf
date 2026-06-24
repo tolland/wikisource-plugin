@@ -58,10 +58,6 @@
     TEMPLATE_OPEN='{{'
     TEMPLATE_PARAM_TEXT='regexp:[^{}|=\[<]+'
     VERBATIM_CONTENT='regexp:[^<]+|<'
-
-
-//    string="regexp:('([^'\\]|\\.)*'|\"([^\"\\]|\\.)*\")"
-
   ]
 }
 

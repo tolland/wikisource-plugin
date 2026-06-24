@@ -1,15 +1,34 @@
 package org.limepepper.lang.wikitext.lexer
 
+import com.intellij.lexer.Lexer
 import com.intellij.psi.TokenType
-import org.junit.Test
+import com.intellij.testFramework.LexerTestCase
+import org.jetbrains.annotations.NonNls
 import org.limepepper.lang.wikitext.psi.WtTypes
 import org.limepepper.lang.wikitext.utils.LexerTestUtils
-import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
-class EndTokenTest {
-    @Test
-    fun pythonBlockIsSingleTokenUntilEnd() {
+class WtLexerTest : LexerTestCase() {
+    override fun createLexer(): Lexer = WtLexerAdapter()
+
+    override fun getDirPath(): String = "src/test/testData"
+
+    fun testSimple() = doTest("hello world!")
+
+    fun testSimpleString() {
+        val content = """
+            hello world!
+         """.trimIndent()
+
+        val tokens = LexerTestUtils.tokenize(content, WtLexer()).filter { it.type != TokenType.WHITE_SPACE }
+        LexerTestUtils.printTokens(tokens)
+    }
+
+    override fun doTest(text: @NonNls String) {
+        super.doTest(text)
+        checkCorrectRestart(text)
+    }
+
+    fun testSomeRandomWikitextToSeeIfitBreaks() {
         val content = """
             {{author
             | firstname    = Julien Offray
