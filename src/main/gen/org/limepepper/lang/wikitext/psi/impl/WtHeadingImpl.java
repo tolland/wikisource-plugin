@@ -46,4 +46,9 @@ public class WtHeadingImpl extends ASTWrapperPsiElement implements WtHeading {
     return findNotNullChildByType(H_START);
   }
 
+  @Override
+  public int getLevel() {
+    return WtPsiImplUtil.getLevel(this);
+  }
+
 }

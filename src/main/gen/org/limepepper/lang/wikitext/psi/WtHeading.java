@@ -16,8 +16,6 @@ public interface WtHeading extends PsiElement {
   @NotNull
   PsiElement getHStart();
 
-  //WARNING: getLevel(...) is skipped
-  //matching getLevel(WtHeading, ...)
-  //methods are not found in WtPsiImplUtil
+  int getLevel();
 
 }

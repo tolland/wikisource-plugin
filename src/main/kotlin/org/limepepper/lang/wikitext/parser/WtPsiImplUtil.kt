@@ -6,13 +6,13 @@ object WtPsiImplUtil {
 
     @JvmStatic
     fun getLevel(heading: WtHeading): Int {
-        val text = heading.headingLine.text
+        val text = heading.text
         return countLeadingEqualsPairs(text)
     }
 
     @JvmStatic
     fun getHeadingText(heading: WtHeading): String {
-        val text = heading.headingLine.text
+        val text = heading.text
         return extractHeaderText(text)
     }
 

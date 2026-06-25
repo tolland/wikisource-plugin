@@ -12,7 +12,8 @@
       ]]></description>s
 
     <depends>com.intellij.modules.lang</depends>
-    <depends>com.intellij.java</depends>
+<!--    <depends>com.intellij.java</depends>-->
+<!--    <depends>com.intellij.modules.lang</depends>-->
     <!--    <depends>com.redhat.devtools.lsp4ij</depends>-->
 
     <extensions defaultExtensionNs="com.intellij">
