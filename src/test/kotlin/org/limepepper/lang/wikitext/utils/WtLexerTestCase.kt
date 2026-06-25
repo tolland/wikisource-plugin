@@ -25,16 +25,17 @@ abstract class WtLexerTestCase : LexerTestCase() {
         LexerTestUtils.printTokens(tokens)
 
         val expectedFile = File(getDirPath(), "$name.txt")
+        val actual = printTokens(fileText, 0)
         if (!expectedFile.exists()) {
-            val result = printTokens(fileText, 0)
             println("Expected output file not found: ${expectedFile.absolutePath}")
-            println("Actual lexer output:\n$result")
+            println("Actual lexer output:\n$actual")
             expectedFile.parentFile?.mkdirs()
-            expectedFile.writeText(result)
+            expectedFile.writeText(actual)
             fail("No output text found. File ${expectedFile.absolutePath} created.")
         }
 
-        doTest(fileText)
+        val expected = expectedFile.readText(StandardCharsets.UTF_8)
+        assertEquals("Lexer output mismatch for $name", expected.trimEnd(), actual.trimEnd())
     }
 
 }
