@@ -7,10 +7,10 @@ import com.intellij.psi.PsiElement;
 
 public interface WtInternalLink extends PsiElement {
 
-  @Nullable
-  WtLinkTarget getLinkTarget();
+  @NotNull
+  List<WtInlineItem> getInlineItemList();
 
   @Nullable
-  WtLinkText getLinkText();
+  PsiElement getLinkTarget();
 
 }

@@ -1,0 +1,4 @@
+Wikitext File(0,13)
+  WtParagraphImpl(WtElementType.PARAGRAPH)(0,13)
+    WtInlineItemImpl(WtElementType.INLINE_ITEM)(0,13)
+      PsiElement(WtTokenType.PLAIN_TEXT)('Hello, World!')(0,13)

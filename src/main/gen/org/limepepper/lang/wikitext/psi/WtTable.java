@@ -5,12 +5,9 @@ import java.util.List;
 import org.jetbrains.annotations.*;
 import com.intellij.psi.PsiElement;
 
-public interface WtTemplate extends PsiElement {
+public interface WtTable extends PsiElement {
 
   @NotNull
   List<WtInlineItem> getInlineItemList();
-
-  @Nullable
-  PsiElement getTemplateName();
 
 }

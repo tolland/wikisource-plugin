@@ -10,6 +10,7 @@ import com.intellij.psi.util.PsiTreeUtil;
 import static org.limepepper.lang.wikitext.psi.WtTypes.*;
 import com.intellij.extapi.psi.ASTWrapperPsiElement;
 import org.limepepper.lang.wikitext.psi.*;
+import org.limepepper.lang.wikitext.parser.WtPsiImplUtil;
 
 public class WtParagraphImpl extends ASTWrapperPsiElement implements WtParagraph {
 

@@ -184,25 +184,26 @@ LINE_WS      = [ \t]
 EOL          = \r\n | \r | \n
 ANY          = [^]
 
-// A candidate heading line: 1-6 leading '=', SOME content, 1-6 trailing '=',
-// then only whitespace to end of line. We match the WHOLE line in one token
-// (HEADING_LINE) rather than separately tokenizing "H2_START" etc., because
-// validity (closing run of '=' must be followed by nothing but whitespace)
-// can't be known until we've seen the rest of the line -- by the time you've
-// scanned "=This is not H1=" you don't yet know if "because it has..." is
-// coming next. Greedily emitting H1_START up front and hoping the rest works
-// out is exactly the trap: "=This is not H1=because..." would wrongly start
-// a heading token that then has to be un-done. One whole-line lookahead
-// avoids that backtracking entirely.
-//
-// NOTE: JFlex does NOT support PCRE-style (?=...) lookahead. The trailing
-// '/' operator only allows fixed lookahead context, not arbitrary
-// alternation, so EOL-or-EOF can't go after '/'. Instead we match through
-// the EOL itself and strip it off in the action with yypushback, the same
-// technique markdown.flex uses in processEol() (see its WHITE_SPACE*
-// ({EOL} WHITE_SPACE*)+ rule, lines 261-274) and handlebars.flex's '~'
-// operator uses internally. EOF-terminated last line (no trailing
-// newline) is handled by a second, EOL-less alternative.
+/* A candidate heading line: 1-6 leading '=', SOME content, 1-6 trailing '=',
+ then only whitespace to end of line. We match the WHOLE line in one token
+ (HEADING_LINE) rather than separately tokenizing "H2_START" etc., because
+ validity (closing run of '=' must be followed by nothing but whitespace)
+ can't be known until we've seen the rest of the line -- by the time you've
+ scanned "=This is not H1=" you don't yet know if "because it has..." is
+ coming next. Greedily emitting H1_START up front and hoping the rest works
+ out is exactly the trap: "=This is not H1=because..." would wrongly start
+ a heading token that then has to be un-done. One whole-line lookahead
+ avoids that backtracking entirely.
+
+ NOTE: JFlex does NOT support PCRE-style (?=...) lookahead. The trailing
+ '/' operator only allows fixed lookahead context, not arbitrary
+ alternation, so EOL-or-EOF can't go after '/'. Instead we match through
+ the EOL itself and strip it off in the action with yypushback, the same
+ technique markdown.flex uses in processEol() (see its WHITE_SPACE*
+ ({EOL} WHITE_SPACE*)+ rule, lines 261-274) and handlebars.flex's '~'
+ operator uses internally. EOF-terminated last line (no trailing
+ newline) is handled by a second, EOL-less alternative.
+*/
 HEADING_LINE = {LINE_WS}{0,3} "="{1,6} [^\r\n]* "="{1,6} {LINE_WS}* {EOL}
 HEADING_LINE_EOF = {LINE_WS}{0,3} "="{1,6} [^\r\n]* "="{1,6} {LINE_WS}*
 
@@ -239,6 +240,7 @@ PLAIN_TEXT_RUN = {NOT_DELIM}+
 %state TABLE
 %state HTML_TAG
 %state VERBATIM_TAG
+%state AFTER_LINE_START
 
 %%
 

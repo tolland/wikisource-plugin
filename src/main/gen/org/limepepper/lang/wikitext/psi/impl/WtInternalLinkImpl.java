@@ -10,6 +10,7 @@ import com.intellij.psi.util.PsiTreeUtil;
 import static org.limepepper.lang.wikitext.psi.WtTypes.*;
 import com.intellij.extapi.psi.ASTWrapperPsiElement;
 import org.limepepper.lang.wikitext.psi.*;
+import org.limepepper.lang.wikitext.parser.WtPsiImplUtil;
 
 public class WtInternalLinkImpl extends ASTWrapperPsiElement implements WtInternalLink {
 
@@ -28,15 +29,15 @@ public class WtInternalLinkImpl extends ASTWrapperPsiElement implements WtIntern
   }
 
   @Override
-  @Nullable
-  public WtLinkTarget getLinkTarget() {
-    return findChildByClass(WtLinkTarget.class);
+  @NotNull
+  public List<WtInlineItem> getInlineItemList() {
+    return PsiTreeUtil.getChildrenOfTypeAsList(this, WtInlineItem.class);
   }
 
   @Override
   @Nullable
-  public WtLinkText getLinkText() {
-    return findChildByClass(WtLinkText.class);
+  public PsiElement getLinkTarget() {
+    return findChildByType(LINK_TARGET);
   }
 
 }

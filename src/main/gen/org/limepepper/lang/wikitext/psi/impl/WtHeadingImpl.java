@@ -12,14 +12,14 @@ import com.intellij.extapi.psi.ASTWrapperPsiElement;
 import org.limepepper.lang.wikitext.psi.*;
 import org.limepepper.lang.wikitext.parser.WtPsiImplUtil;
 
-public class WtTemplateImpl extends ASTWrapperPsiElement implements WtTemplate {
+public class WtHeadingImpl extends ASTWrapperPsiElement implements WtHeading {
 
-  public WtTemplateImpl(@NotNull ASTNode node) {
+  public WtHeadingImpl(@NotNull ASTNode node) {
     super(node);
   }
 
   public void accept(@NotNull WtVisitor visitor) {
-    visitor.visitTemplate(this);
+    visitor.visitHeading(this);
   }
 
   @Override
@@ -30,14 +30,18 @@ public class WtTemplateImpl extends ASTWrapperPsiElement implements WtTemplate {
 
   @Override
   @NotNull
-  public List<WtInlineItem> getInlineItemList() {
-    return PsiTreeUtil.getChildrenOfTypeAsList(this, WtInlineItem.class);
+  public PsiElement getHeadingLine() {
+    return findNotNullChildByType(HEADING_LINE);
   }
 
   @Override
-  @Nullable
-  public PsiElement getTemplateName() {
-    return findChildByType(TEMPLATE_NAME);
+  public int getLevel() {
+    return WtPsiImplUtil.getLevel(this);
+  }
+
+  @Override
+  public @NotNull String getHeadingText() {
+    return WtPsiImplUtil.getHeadingText(this);
   }
 
 }

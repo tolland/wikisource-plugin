@@ -5,12 +5,12 @@ import java.util.List;
 import org.jetbrains.annotations.*;
 import com.intellij.psi.PsiElement;
 
-public interface WtTemplate extends PsiElement {
-
-  @NotNull
-  List<WtInlineItem> getInlineItemList();
+public interface WtVerbatimTag extends PsiElement {
 
   @Nullable
-  PsiElement getTemplateName();
+  PsiElement getHtmlTagClose();
+
+  @NotNull
+  PsiElement getHtmlTagOpen();
 
 }

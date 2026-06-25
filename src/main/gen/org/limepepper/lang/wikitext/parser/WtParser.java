@@ -36,470 +36,131 @@ public class WtParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // PLAIN_TEXT
-  public static boolean URL(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "URL")) return false;
-    if (!nextTokenIs(b, PLAIN_TEXT)) return false;
+  // HEADING_LINE
+  public static boolean heading(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "heading")) return false;
+    if (!nextTokenIs(b, HEADING_LINE)) return false;
     boolean r;
     Marker m = enter_section_(b);
-    r = consumeToken(b, PLAIN_TEXT);
-    exit_section_(b, m, URL, r);
+    r = consumeToken(b, HEADING_LINE);
+    exit_section_(b, m, HEADING, r);
     return r;
   }
 
   /* ********************************************************** */
-  // THREE_APOS inline_item+ THREE_APOS
-  public static boolean bold(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "bold")) return false;
-    if (!nextTokenIs(b, THREE_APOS)) return false;
-    boolean r, p;
-    Marker m = enter_section_(b, l, _NONE_, BOLD, null);
-    r = consumeToken(b, THREE_APOS);
-    p = r; // pin = 1
-    r = r && report_error_(b, bold_1(b, l + 1));
-    r = p && consumeToken(b, THREE_APOS) && r;
-    exit_section_(b, l, m, r, p, null);
-    return r || p;
-  }
-
-  // inline_item+
-  private static boolean bold_1(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "bold_1")) return false;
+  // HTML_TAG_SELFCLOSE
+  //            | HTML_TAG_OPEN html_tag_content HTML_TAG_CLOSE
+  public static boolean html_tag(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "html_tag")) return false;
+    if (!nextTokenIs(b, "<html tag>", HTML_TAG_OPEN, HTML_TAG_SELFCLOSE)) return false;
     boolean r;
-    Marker m = enter_section_(b);
-    r = inline_item(b, l + 1);
-    while (r) {
-      int c = current_position_(b);
-      if (!inline_item(b, l + 1)) break;
-      if (!empty_element_parsed_guard_(b, "bold_1", c)) break;
-    }
-    exit_section_(b, m, null, r);
-    return r;
-  }
-
-  /* ********************************************************** */
-  // FIVE_APOS inline_item+ FIVE_APOS
-  public static boolean bold_italic(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "bold_italic")) return false;
-    if (!nextTokenIs(b, FIVE_APOS)) return false;
-    boolean r, p;
-    Marker m = enter_section_(b, l, _NONE_, BOLD_ITALIC, null);
-    r = consumeToken(b, FIVE_APOS);
-    p = r; // pin = 1
-    r = r && report_error_(b, bold_italic_1(b, l + 1));
-    r = p && consumeToken(b, FIVE_APOS) && r;
-    exit_section_(b, l, m, r, p, null);
-    return r || p;
-  }
-
-  // inline_item+
-  private static boolean bold_italic_1(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "bold_italic_1")) return false;
-    boolean r;
-    Marker m = enter_section_(b);
-    r = inline_item(b, l + 1);
-    while (r) {
-      int c = current_position_(b);
-      if (!inline_item(b, l + 1)) break;
-      if (!empty_element_parsed_guard_(b, "bold_italic_1", c)) break;
-    }
-    exit_section_(b, m, null, r);
-    return r;
-  }
-
-  /* ********************************************************** */
-  // LBRACK URL [ SPACE link_text ] RBRACK
-  public static boolean external_link(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "external_link")) return false;
-    if (!nextTokenIs(b, LBRACK)) return false;
-    boolean r, p;
-    Marker m = enter_section_(b, l, _NONE_, EXTERNAL_LINK, null);
-    r = consumeToken(b, LBRACK);
-    p = r; // pin = 1
-    r = r && report_error_(b, URL(b, l + 1));
-    r = p && report_error_(b, external_link_2(b, l + 1)) && r;
-    r = p && consumeToken(b, RBRACK) && r;
-    exit_section_(b, l, m, r, p, null);
-    return r || p;
-  }
-
-  // [ SPACE link_text ]
-  private static boolean external_link_2(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "external_link_2")) return false;
-    external_link_2_0(b, l + 1);
-    return true;
-  }
-
-  // SPACE link_text
-  private static boolean external_link_2_0(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "external_link_2_0")) return false;
-    boolean r;
-    Marker m = enter_section_(b);
-    r = consumeToken(b, SPACE);
-    r = r && link_text(b, l + 1);
-    exit_section_(b, m, null, r);
-    return r;
-  }
-
-  /* ********************************************************** */
-  // EQUALS (inline_item | PIPE)+ EQUALS
-  public static boolean heading1(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "heading1")) return false;
-    if (!nextTokenIs(b, EQUALS)) return false;
-    boolean r, p;
-    Marker m = enter_section_(b, l, _NONE_, HEADING_1, null);
-    r = consumeToken(b, EQUALS);
-    p = r; // pin = 1
-    r = r && report_error_(b, heading1_1(b, l + 1));
-    r = p && consumeToken(b, EQUALS) && r;
-    exit_section_(b, l, m, r, p, null);
-    return r || p;
-  }
-
-  // (inline_item | PIPE)+
-  private static boolean heading1_1(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "heading1_1")) return false;
-    boolean r;
-    Marker m = enter_section_(b);
-    r = heading1_1_0(b, l + 1);
-    while (r) {
-      int c = current_position_(b);
-      if (!heading1_1_0(b, l + 1)) break;
-      if (!empty_element_parsed_guard_(b, "heading1_1", c)) break;
-    }
-    exit_section_(b, m, null, r);
-    return r;
-  }
-
-  // inline_item | PIPE
-  private static boolean heading1_1_0(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "heading1_1_0")) return false;
-    boolean r;
-    r = inline_item(b, l + 1);
-    if (!r) r = consumeToken(b, PIPE);
-    return r;
-  }
-
-  /* ********************************************************** */
-  // H2_START (inline_item | PIPE | EQUALS)+ H2_START
-  public static boolean heading2(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "heading2")) return false;
-    if (!nextTokenIs(b, H2_START)) return false;
-    boolean r, p;
-    Marker m = enter_section_(b, l, _NONE_, HEADING_2, null);
-    r = consumeToken(b, H2_START);
-    p = r; // pin = 1
-    r = r && report_error_(b, heading2_1(b, l + 1));
-    r = p && consumeToken(b, H2_START) && r;
-    exit_section_(b, l, m, r, p, null);
-    return r || p;
-  }
-
-  // (inline_item | PIPE | EQUALS)+
-  private static boolean heading2_1(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "heading2_1")) return false;
-    boolean r;
-    Marker m = enter_section_(b);
-    r = heading2_1_0(b, l + 1);
-    while (r) {
-      int c = current_position_(b);
-      if (!heading2_1_0(b, l + 1)) break;
-      if (!empty_element_parsed_guard_(b, "heading2_1", c)) break;
-    }
-    exit_section_(b, m, null, r);
-    return r;
-  }
-
-  // inline_item | PIPE | EQUALS
-  private static boolean heading2_1_0(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "heading2_1_0")) return false;
-    boolean r;
-    r = inline_item(b, l + 1);
-    if (!r) r = consumeToken(b, PIPE);
-    if (!r) r = consumeToken(b, EQUALS);
-    return r;
-  }
-
-  /* ********************************************************** */
-  // H3_START (inline_item | PIPE | EQUALS)+ H3_START
-  public static boolean heading3(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "heading3")) return false;
-    if (!nextTokenIs(b, H3_START)) return false;
-    boolean r, p;
-    Marker m = enter_section_(b, l, _NONE_, HEADING_3, null);
-    r = consumeToken(b, H3_START);
-    p = r; // pin = 1
-    r = r && report_error_(b, heading3_1(b, l + 1));
-    r = p && consumeToken(b, H3_START) && r;
-    exit_section_(b, l, m, r, p, null);
-    return r || p;
-  }
-
-  // (inline_item | PIPE | EQUALS)+
-  private static boolean heading3_1(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "heading3_1")) return false;
-    boolean r;
-    Marker m = enter_section_(b);
-    r = heading3_1_0(b, l + 1);
-    while (r) {
-      int c = current_position_(b);
-      if (!heading3_1_0(b, l + 1)) break;
-      if (!empty_element_parsed_guard_(b, "heading3_1", c)) break;
-    }
-    exit_section_(b, m, null, r);
-    return r;
-  }
-
-  // inline_item | PIPE | EQUALS
-  private static boolean heading3_1_0(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "heading3_1_0")) return false;
-    boolean r;
-    r = inline_item(b, l + 1);
-    if (!r) r = consumeToken(b, PIPE);
-    if (!r) r = consumeToken(b, EQUALS);
-    return r;
-  }
-
-  /* ********************************************************** */
-  // H4_START (inline_item | PIPE | EQUALS)+ H4_START
-  public static boolean heading4(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "heading4")) return false;
-    if (!nextTokenIs(b, H4_START)) return false;
-    boolean r, p;
-    Marker m = enter_section_(b, l, _NONE_, HEADING_4, null);
-    r = consumeToken(b, H4_START);
-    p = r; // pin = 1
-    r = r && report_error_(b, heading4_1(b, l + 1));
-    r = p && consumeToken(b, H4_START) && r;
-    exit_section_(b, l, m, r, p, null);
-    return r || p;
-  }
-
-  // (inline_item | PIPE | EQUALS)+
-  private static boolean heading4_1(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "heading4_1")) return false;
-    boolean r;
-    Marker m = enter_section_(b);
-    r = heading4_1_0(b, l + 1);
-    while (r) {
-      int c = current_position_(b);
-      if (!heading4_1_0(b, l + 1)) break;
-      if (!empty_element_parsed_guard_(b, "heading4_1", c)) break;
-    }
-    exit_section_(b, m, null, r);
-    return r;
-  }
-
-  // inline_item | PIPE | EQUALS
-  private static boolean heading4_1_0(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "heading4_1_0")) return false;
-    boolean r;
-    r = inline_item(b, l + 1);
-    if (!r) r = consumeToken(b, PIPE);
-    if (!r) r = consumeToken(b, EQUALS);
-    return r;
-  }
-
-  /* ********************************************************** */
-  // H5_START (inline_item | PIPE | EQUALS)+ H5_START
-  public static boolean heading5(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "heading5")) return false;
-    if (!nextTokenIs(b, H5_START)) return false;
-    boolean r, p;
-    Marker m = enter_section_(b, l, _NONE_, HEADING_5, null);
-    r = consumeToken(b, H5_START);
-    p = r; // pin = 1
-    r = r && report_error_(b, heading5_1(b, l + 1));
-    r = p && consumeToken(b, H5_START) && r;
-    exit_section_(b, l, m, r, p, null);
-    return r || p;
-  }
-
-  // (inline_item | PIPE | EQUALS)+
-  private static boolean heading5_1(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "heading5_1")) return false;
-    boolean r;
-    Marker m = enter_section_(b);
-    r = heading5_1_0(b, l + 1);
-    while (r) {
-      int c = current_position_(b);
-      if (!heading5_1_0(b, l + 1)) break;
-      if (!empty_element_parsed_guard_(b, "heading5_1", c)) break;
-    }
-    exit_section_(b, m, null, r);
-    return r;
-  }
-
-  // inline_item | PIPE | EQUALS
-  private static boolean heading5_1_0(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "heading5_1_0")) return false;
-    boolean r;
-    r = inline_item(b, l + 1);
-    if (!r) r = consumeToken(b, PIPE);
-    if (!r) r = consumeToken(b, EQUALS);
-    return r;
-  }
-
-  /* ********************************************************** */
-  // H6_START (inline_item | PIPE | EQUALS)+ H6_START
-  public static boolean heading6(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "heading6")) return false;
-    if (!nextTokenIs(b, H6_START)) return false;
-    boolean r, p;
-    Marker m = enter_section_(b, l, _NONE_, HEADING_6, null);
-    r = consumeToken(b, H6_START);
-    p = r; // pin = 1
-    r = r && report_error_(b, heading6_1(b, l + 1));
-    r = p && consumeToken(b, H6_START) && r;
-    exit_section_(b, l, m, r, p, null);
-    return r || p;
-  }
-
-  // (inline_item | PIPE | EQUALS)+
-  private static boolean heading6_1(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "heading6_1")) return false;
-    boolean r;
-    Marker m = enter_section_(b);
-    r = heading6_1_0(b, l + 1);
-    while (r) {
-      int c = current_position_(b);
-      if (!heading6_1_0(b, l + 1)) break;
-      if (!empty_element_parsed_guard_(b, "heading6_1", c)) break;
-    }
-    exit_section_(b, m, null, r);
-    return r;
-  }
-
-  // inline_item | PIPE | EQUALS
-  private static boolean heading6_1_0(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "heading6_1_0")) return false;
-    boolean r;
-    r = inline_item(b, l + 1);
-    if (!r) r = consumeToken(b, PIPE);
-    if (!r) r = consumeToken(b, EQUALS);
-    return r;
-  }
-
-  /* ********************************************************** */
-  // heading6 | heading5 | heading4 | heading3 | heading2 | heading1
-  public static boolean heading_line(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "heading_line")) return false;
-    boolean r;
-    Marker m = enter_section_(b, l, _NONE_, HEADING_LINE, "<heading line>");
-    r = heading6(b, l + 1);
-    if (!r) r = heading5(b, l + 1);
-    if (!r) r = heading4(b, l + 1);
-    if (!r) r = heading3(b, l + 1);
-    if (!r) r = heading2(b, l + 1);
-    if (!r) r = heading1(b, l + 1);
+    Marker m = enter_section_(b, l, _NONE_, HTML_TAG, "<html tag>");
+    r = consumeToken(b, HTML_TAG_SELFCLOSE);
+    if (!r) r = html_tag_1(b, l + 1);
     exit_section_(b, l, m, r, false, null);
     return r;
   }
 
+  // HTML_TAG_OPEN html_tag_content HTML_TAG_CLOSE
+  private static boolean html_tag_1(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "html_tag_1")) return false;
+    boolean r;
+    Marker m = enter_section_(b);
+    r = consumeToken(b, HTML_TAG_OPEN);
+    r = r && html_tag_content(b, l + 1);
+    r = r && consumeToken(b, HTML_TAG_CLOSE);
+    exit_section_(b, m, null, r);
+    return r;
+  }
+
   /* ********************************************************** */
-  // bold_italic
-  //               | bold
-  //               | italic
-  //               | internal_link
-  //               | external_link
+  // (inline_item | PIPE)*
+  static boolean html_tag_content(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "html_tag_content")) return false;
+    while (true) {
+      int c = current_position_(b);
+      if (!html_tag_content_0(b, l + 1)) break;
+      if (!empty_element_parsed_guard_(b, "html_tag_content", c)) break;
+    }
+    return true;
+  }
+
+  // inline_item | PIPE
+  private static boolean html_tag_content_0(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "html_tag_content_0")) return false;
+    boolean r;
+    r = inline_item(b, l + 1);
+    if (!r) r = consumeToken(b, PIPE);
+    return r;
+  }
+
+  /* ********************************************************** */
+  // internal_link
+  //               | html_tag
+  //               | verbatim_tag
   //               | template
   //               | PLAIN_TEXT
-  //               | SPACE
-  //               | EQUALS
-  //               | SINGLE_APOS
+  //               | LINK_DISPLAY_TEXT
   public static boolean inline_item(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "inline_item")) return false;
     boolean r;
     Marker m = enter_section_(b, l, _NONE_, INLINE_ITEM, "<inline item>");
-    r = bold_italic(b, l + 1);
-    if (!r) r = bold(b, l + 1);
-    if (!r) r = italic(b, l + 1);
-    if (!r) r = internal_link(b, l + 1);
-    if (!r) r = external_link(b, l + 1);
+    r = internal_link(b, l + 1);
+    if (!r) r = html_tag(b, l + 1);
+    if (!r) r = verbatim_tag(b, l + 1);
     if (!r) r = template(b, l + 1);
     if (!r) r = consumeToken(b, PLAIN_TEXT);
-    if (!r) r = consumeToken(b, SPACE);
-    if (!r) r = consumeToken(b, EQUALS);
-    if (!r) r = consumeToken(b, SINGLE_APOS);
+    if (!r) r = consumeToken(b, LINK_DISPLAY_TEXT);
     exit_section_(b, l, m, r, false, null);
     return r;
   }
 
   /* ********************************************************** */
-  // LINK_OPEN link_target [ PIPE link_text ] LINK_CLOSE
+  // LINK_OPEN LINK_TARGET (PIPE link_display)? LINK_CLOSE
   public static boolean internal_link(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "internal_link")) return false;
     if (!nextTokenIs(b, LINK_OPEN)) return false;
     boolean r, p;
     Marker m = enter_section_(b, l, _NONE_, INTERNAL_LINK, null);
-    r = consumeToken(b, LINK_OPEN);
+    r = consumeTokens(b, 1, LINK_OPEN, LINK_TARGET);
     p = r; // pin = 1
-    r = r && report_error_(b, link_target(b, l + 1));
-    r = p && report_error_(b, internal_link_2(b, l + 1)) && r;
+    r = r && report_error_(b, internal_link_2(b, l + 1));
     r = p && consumeToken(b, LINK_CLOSE) && r;
     exit_section_(b, l, m, r, p, null);
     return r || p;
   }
 
-  // [ PIPE link_text ]
+  // (PIPE link_display)?
   private static boolean internal_link_2(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "internal_link_2")) return false;
     internal_link_2_0(b, l + 1);
     return true;
   }
 
-  // PIPE link_text
+  // PIPE link_display
   private static boolean internal_link_2_0(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "internal_link_2_0")) return false;
     boolean r;
     Marker m = enter_section_(b);
     r = consumeToken(b, PIPE);
-    r = r && link_text(b, l + 1);
+    r = r && link_display(b, l + 1);
     exit_section_(b, m, null, r);
     return r;
   }
 
   /* ********************************************************** */
-  // TWO_APOS inline_item+ TWO_APOS
-  public static boolean italic(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "italic")) return false;
-    if (!nextTokenIs(b, TWO_APOS)) return false;
-    boolean r, p;
-    Marker m = enter_section_(b, l, _NONE_, ITALIC, null);
-    r = consumeToken(b, TWO_APOS);
-    p = r; // pin = 1
-    r = r && report_error_(b, italic_1(b, l + 1));
-    r = p && consumeToken(b, TWO_APOS) && r;
-    exit_section_(b, l, m, r, p, null);
-    return r || p;
-  }
-
-  // inline_item+
-  private static boolean italic_1(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "italic_1")) return false;
-    boolean r;
-    Marker m = enter_section_(b);
-    r = inline_item(b, l + 1);
-    while (r) {
-      int c = current_position_(b);
-      if (!inline_item(b, l + 1)) break;
-      if (!empty_element_parsed_guard_(b, "italic_1", c)) break;
-    }
-    exit_section_(b, m, null, r);
-    return r;
-  }
-
-  /* ********************************************************** */
-  // heading_line
+  // heading
   //                | list_item
+  //                | table
   //                | template
   //                | paragraph
   //                | NEWLINE
   static boolean item(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "item")) return false;
     boolean r;
-    r = heading_line(b, l + 1);
+    r = heading(b, l + 1);
     if (!r) r = list_item(b, l + 1);
+    if (!r) r = table(b, l + 1);
     if (!r) r = template(b, l + 1);
     if (!r) r = paragraph(b, l + 1);
     if (!r) r = consumeToken(b, NEWLINE);
@@ -507,79 +168,40 @@ public class WtParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // PLAIN_TEXT (SPACE PLAIN_TEXT)*
-  public static boolean link_target(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "link_target")) return false;
-    if (!nextTokenIs(b, PLAIN_TEXT)) return false;
-    boolean r;
-    Marker m = enter_section_(b);
-    r = consumeToken(b, PLAIN_TEXT);
-    r = r && link_target_1(b, l + 1);
-    exit_section_(b, m, LINK_TARGET, r);
-    return r;
-  }
-
-  // (SPACE PLAIN_TEXT)*
-  private static boolean link_target_1(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "link_target_1")) return false;
+  // (inline_item | PIPE)*
+  static boolean link_display(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "link_display")) return false;
     while (true) {
       int c = current_position_(b);
-      if (!link_target_1_0(b, l + 1)) break;
-      if (!empty_element_parsed_guard_(b, "link_target_1", c)) break;
+      if (!link_display_0(b, l + 1)) break;
+      if (!empty_element_parsed_guard_(b, "link_display", c)) break;
     }
     return true;
   }
 
-  // SPACE PLAIN_TEXT
-  private static boolean link_target_1_0(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "link_target_1_0")) return false;
-    boolean r;
-    Marker m = enter_section_(b);
-    r = consumeTokens(b, 0, SPACE, PLAIN_TEXT);
-    exit_section_(b, m, null, r);
-    return r;
-  }
-
-  /* ********************************************************** */
-  // (inline_item | EQUALS)+
-  public static boolean link_text(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "link_text")) return false;
-    boolean r;
-    Marker m = enter_section_(b, l, _NONE_, LINK_TEXT, "<link text>");
-    r = link_text_0(b, l + 1);
-    while (r) {
-      int c = current_position_(b);
-      if (!link_text_0(b, l + 1)) break;
-      if (!empty_element_parsed_guard_(b, "link_text", c)) break;
-    }
-    exit_section_(b, l, m, r, false, null);
-    return r;
-  }
-
-  // inline_item | EQUALS
-  private static boolean link_text_0(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "link_text_0")) return false;
+  // inline_item | PIPE
+  private static boolean link_display_0(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "link_display_0")) return false;
     boolean r;
     r = inline_item(b, l + 1);
-    if (!r) r = consumeToken(b, EQUALS);
+    if (!r) r = consumeToken(b, PIPE);
     return r;
   }
 
   /* ********************************************************** */
-  // (BULLET | NUMBER)+ (inline_item | PIPE | EQUALS)+
+  // (BULLET | NUMBER | INDENT | DEF_TERM)+ paragraph_content
   public static boolean list_item(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "list_item")) return false;
-    if (!nextTokenIs(b, "<list item>", BULLET, NUMBER)) return false;
     boolean r, p;
     Marker m = enter_section_(b, l, _NONE_, LIST_ITEM, "<list item>");
     r = list_item_0(b, l + 1);
     p = r; // pin = 1
-    r = r && list_item_1(b, l + 1);
+    r = r && paragraph_content(b, l + 1);
     exit_section_(b, l, m, r, p, null);
     return r || p;
   }
 
-  // (BULLET | NUMBER)+
+  // (BULLET | NUMBER | INDENT | DEF_TERM)+
   private static boolean list_item_0(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "list_item_0")) return false;
     boolean r;
@@ -594,59 +216,47 @@ public class WtParser implements PsiParser, LightPsiParser {
     return r;
   }
 
-  // BULLET | NUMBER
+  // BULLET | NUMBER | INDENT | DEF_TERM
   private static boolean list_item_0_0(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "list_item_0_0")) return false;
     boolean r;
     r = consumeToken(b, BULLET);
     if (!r) r = consumeToken(b, NUMBER);
+    if (!r) r = consumeToken(b, INDENT);
+    if (!r) r = consumeToken(b, DEF_TERM);
     return r;
   }
 
-  // (inline_item | PIPE | EQUALS)+
-  private static boolean list_item_1(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "list_item_1")) return false;
+  /* ********************************************************** */
+  // paragraph_content
+  public static boolean paragraph(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "paragraph")) return false;
     boolean r;
-    Marker m = enter_section_(b);
-    r = list_item_1_0(b, l + 1);
-    while (r) {
-      int c = current_position_(b);
-      if (!list_item_1_0(b, l + 1)) break;
-      if (!empty_element_parsed_guard_(b, "list_item_1", c)) break;
-    }
-    exit_section_(b, m, null, r);
-    return r;
-  }
-
-  // inline_item | PIPE | EQUALS
-  private static boolean list_item_1_0(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "list_item_1_0")) return false;
-    boolean r;
-    r = inline_item(b, l + 1);
-    if (!r) r = consumeToken(b, PIPE);
-    if (!r) r = consumeToken(b, EQUALS);
+    Marker m = enter_section_(b, l, _NONE_, PARAGRAPH, "<paragraph>");
+    r = paragraph_content(b, l + 1);
+    exit_section_(b, l, m, r, false, null);
     return r;
   }
 
   /* ********************************************************** */
   // (inline_item | PIPE)+
-  public static boolean paragraph(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "paragraph")) return false;
+  static boolean paragraph_content(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "paragraph_content")) return false;
     boolean r;
-    Marker m = enter_section_(b, l, _NONE_, PARAGRAPH, "<paragraph>");
-    r = paragraph_0(b, l + 1);
+    Marker m = enter_section_(b);
+    r = paragraph_content_0(b, l + 1);
     while (r) {
       int c = current_position_(b);
-      if (!paragraph_0(b, l + 1)) break;
-      if (!empty_element_parsed_guard_(b, "paragraph", c)) break;
+      if (!paragraph_content_0(b, l + 1)) break;
+      if (!empty_element_parsed_guard_(b, "paragraph_content", c)) break;
     }
-    exit_section_(b, l, m, r, false, null);
+    exit_section_(b, m, null, r);
     return r;
   }
 
   // inline_item | PIPE
-  private static boolean paragraph_0(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "paragraph_0")) return false;
+  private static boolean paragraph_content_0(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "paragraph_content_0")) return false;
     boolean r;
     r = inline_item(b, l + 1);
     if (!r) r = consumeToken(b, PIPE);
@@ -654,64 +264,75 @@ public class WtParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // PLAIN_TEXT (SPACE PLAIN_TEXT)*
-  public static boolean param_name(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "param_name")) return false;
-    if (!nextTokenIs(b, PLAIN_TEXT)) return false;
-    boolean r;
-    Marker m = enter_section_(b);
-    r = consumeToken(b, PLAIN_TEXT);
-    r = r && param_name_1(b, l + 1);
-    exit_section_(b, m, PARAM_NAME, r);
-    return r;
+  // TABLE_OPEN table_cell* TABLE_CLOSE
+  public static boolean table(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "table")) return false;
+    if (!nextTokenIs(b, TABLE_OPEN)) return false;
+    boolean r, p;
+    Marker m = enter_section_(b, l, _NONE_, TABLE, null);
+    r = consumeToken(b, TABLE_OPEN);
+    p = r; // pin = 1
+    r = r && report_error_(b, table_1(b, l + 1));
+    r = p && consumeToken(b, TABLE_CLOSE) && r;
+    exit_section_(b, l, m, r, p, null);
+    return r || p;
   }
 
-  // (SPACE PLAIN_TEXT)*
-  private static boolean param_name_1(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "param_name_1")) return false;
+  // table_cell*
+  private static boolean table_1(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "table_1")) return false;
     while (true) {
       int c = current_position_(b);
-      if (!param_name_1_0(b, l + 1)) break;
-      if (!empty_element_parsed_guard_(b, "param_name_1", c)) break;
+      if (!table_cell(b, l + 1)) break;
+      if (!empty_element_parsed_guard_(b, "table_1", c)) break;
     }
     return true;
   }
 
-  // SPACE PLAIN_TEXT
-  private static boolean param_name_1_0(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "param_name_1_0")) return false;
+  /* ********************************************************** */
+  // TABLE_CELL_SEP table_cell_content
+  static boolean table_cell(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "table_cell")) return false;
+    if (!nextTokenIs(b, TABLE_CELL_SEP)) return false;
     boolean r;
     Marker m = enter_section_(b);
-    r = consumeTokens(b, 0, SPACE, PLAIN_TEXT);
+    r = consumeToken(b, TABLE_CELL_SEP);
+    r = r && table_cell_content(b, l + 1);
     exit_section_(b, m, null, r);
     return r;
   }
 
   /* ********************************************************** */
-  // inline_item*
-  public static boolean param_value(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "param_value")) return false;
-    Marker m = enter_section_(b, l, _NONE_, PARAM_VALUE, "<param value>");
+  // (inline_item | TABLE_CELL_TEXT)*
+  static boolean table_cell_content(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "table_cell_content")) return false;
     while (true) {
       int c = current_position_(b);
-      if (!inline_item(b, l + 1)) break;
-      if (!empty_element_parsed_guard_(b, "param_value", c)) break;
+      if (!table_cell_content_0(b, l + 1)) break;
+      if (!empty_element_parsed_guard_(b, "table_cell_content", c)) break;
     }
-    exit_section_(b, l, m, true, false, null);
     return true;
   }
 
+  // inline_item | TABLE_CELL_TEXT
+  private static boolean table_cell_content_0(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "table_cell_content_0")) return false;
+    boolean r;
+    r = inline_item(b, l + 1);
+    if (!r) r = consumeToken(b, TABLE_CELL_TEXT);
+    return r;
+  }
+
   /* ********************************************************** */
-  // TEMPLATE_OPEN template_title (PIPE template_param)* TEMPLATE_CLOSE
+  // TEMPLATE_OPEN TEMPLATE_NAME (PIPE template_param)* TEMPLATE_CLOSE
   public static boolean template(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "template")) return false;
     if (!nextTokenIs(b, TEMPLATE_OPEN)) return false;
     boolean r, p;
     Marker m = enter_section_(b, l, _NONE_, TEMPLATE, null);
-    r = consumeToken(b, TEMPLATE_OPEN);
+    r = consumeTokens(b, 1, TEMPLATE_OPEN, TEMPLATE_NAME);
     p = r; // pin = 1
-    r = r && report_error_(b, template_title(b, l + 1));
-    r = p && report_error_(b, template_2(b, l + 1)) && r;
+    r = r && report_error_(b, template_2(b, l + 1));
     r = p && consumeToken(b, TEMPLATE_CLOSE) && r;
     exit_section_(b, l, m, r, p, null);
     return r || p;
@@ -740,67 +361,75 @@ public class WtParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // [ param_name EQUALS ] param_value
-  public static boolean template_param(PsiBuilder b, int l) {
+  // [ TEMPLATE_PARAM_TEXT TEMPLATE_EQUALS ] template_param_value
+  static boolean template_param(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "template_param")) return false;
     boolean r;
-    Marker m = enter_section_(b, l, _NONE_, TEMPLATE_PARAM, "<template param>");
-    r = template_param_0(b, l + 1);
-    r = r && param_value(b, l + 1);
-    exit_section_(b, l, m, r, false, null);
-    return r;
-  }
-
-  // [ param_name EQUALS ]
-  private static boolean template_param_0(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "template_param_0")) return false;
-    template_param_0_0(b, l + 1);
-    return true;
-  }
-
-  // param_name EQUALS
-  private static boolean template_param_0_0(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "template_param_0_0")) return false;
-    boolean r;
     Marker m = enter_section_(b);
-    r = param_name(b, l + 1);
-    r = r && consumeToken(b, EQUALS);
+    r = template_param_0(b, l + 1);
+    r = r && template_param_value(b, l + 1);
     exit_section_(b, m, null, r);
     return r;
   }
 
-  /* ********************************************************** */
-  // PLAIN_TEXT (SPACE PLAIN_TEXT)*
-  public static boolean template_title(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "template_title")) return false;
-    if (!nextTokenIs(b, PLAIN_TEXT)) return false;
-    boolean r;
-    Marker m = enter_section_(b);
-    r = consumeToken(b, PLAIN_TEXT);
-    r = r && template_title_1(b, l + 1);
-    exit_section_(b, m, TEMPLATE_TITLE, r);
-    return r;
+  // [ TEMPLATE_PARAM_TEXT TEMPLATE_EQUALS ]
+  private static boolean template_param_0(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "template_param_0")) return false;
+    parseTokens(b, 0, TEMPLATE_PARAM_TEXT, TEMPLATE_EQUALS);
+    return true;
   }
 
-  // (SPACE PLAIN_TEXT)*
-  private static boolean template_title_1(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "template_title_1")) return false;
+  /* ********************************************************** */
+  // (inline_item | TEMPLATE_PARAM_TEXT)*
+  static boolean template_param_value(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "template_param_value")) return false;
     while (true) {
       int c = current_position_(b);
-      if (!template_title_1_0(b, l + 1)) break;
-      if (!empty_element_parsed_guard_(b, "template_title_1", c)) break;
+      if (!template_param_value_0(b, l + 1)) break;
+      if (!empty_element_parsed_guard_(b, "template_param_value", c)) break;
     }
     return true;
   }
 
-  // SPACE PLAIN_TEXT
-  private static boolean template_title_1_0(PsiBuilder b, int l) {
-    if (!recursion_guard_(b, l, "template_title_1_0")) return false;
+  // inline_item | TEMPLATE_PARAM_TEXT
+  private static boolean template_param_value_0(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "template_param_value_0")) return false;
     boolean r;
-    Marker m = enter_section_(b);
-    r = consumeTokens(b, 0, SPACE, PLAIN_TEXT);
-    exit_section_(b, m, null, r);
+    r = inline_item(b, l + 1);
+    if (!r) r = consumeToken(b, TEMPLATE_PARAM_TEXT);
     return r;
+  }
+
+  /* ********************************************************** */
+  // VERBATIM_CONTENT
+  static boolean verbatim_run(PsiBuilder b, int l) {
+    return consumeToken(b, VERBATIM_CONTENT);
+  }
+
+  /* ********************************************************** */
+  // HTML_TAG_OPEN verbatim_run* HTML_TAG_CLOSE
+  public static boolean verbatim_tag(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "verbatim_tag")) return false;
+    if (!nextTokenIs(b, HTML_TAG_OPEN)) return false;
+    boolean r, p;
+    Marker m = enter_section_(b, l, _NONE_, VERBATIM_TAG, null);
+    r = consumeToken(b, HTML_TAG_OPEN);
+    p = r; // pin = 1
+    r = r && report_error_(b, verbatim_tag_1(b, l + 1));
+    r = p && consumeToken(b, HTML_TAG_CLOSE) && r;
+    exit_section_(b, l, m, r, p, null);
+    return r || p;
+  }
+
+  // verbatim_run*
+  private static boolean verbatim_tag_1(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "verbatim_tag_1")) return false;
+    while (true) {
+      int c = current_position_(b);
+      if (!verbatim_run(b, l + 1)) break;
+      if (!empty_element_parsed_guard_(b, "verbatim_tag_1", c)) break;
+    }
+    return true;
   }
 
   /* ********************************************************** */

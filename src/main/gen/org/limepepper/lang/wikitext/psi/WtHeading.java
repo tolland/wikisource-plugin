@@ -5,12 +5,13 @@ import java.util.List;
 import org.jetbrains.annotations.*;
 import com.intellij.psi.PsiElement;
 
-public interface WtTemplate extends PsiElement {
+public interface WtHeading extends PsiElement {
 
   @NotNull
-  List<WtInlineItem> getInlineItemList();
+  PsiElement getHeadingLine();
 
-  @Nullable
-  PsiElement getTemplateName();
+  int getLevel();
+
+  @NotNull String getHeadingText();
 
 }

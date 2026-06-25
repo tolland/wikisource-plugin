@@ -1,5 +1,9 @@
 package org.limepepper.lang.wikitext.parser
 
 import com.intellij.lang.parser.GeneratedParserUtilBase
+import org.limepepper.lang.wikitext.psi.WtHeading
 
-class WtParserUtil : GeneratedParserUtilBase() {}
+object WtParserUtil : GeneratedParserUtilBase() {
+
+
+}

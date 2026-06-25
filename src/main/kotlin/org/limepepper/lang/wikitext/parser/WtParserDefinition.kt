@@ -14,6 +14,7 @@ import org.limepepper.lang.wikitext.WtLanguage
 import org.limepepper.lang.wikitext.lexer.WtLexerAdapter
 import org.limepepper.lang.wikitext.psi.WtTypes
 import org.limepepper.lang.wikitext.psi.WtFile
+import org.limepepper.lang.wikitext.psi.WtTokenSets
 
 /**
  * Parser definition for Wikitext language

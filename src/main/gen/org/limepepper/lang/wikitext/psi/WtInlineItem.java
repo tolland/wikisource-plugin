@@ -8,30 +8,21 @@ import com.intellij.psi.PsiElement;
 public interface WtInlineItem extends PsiElement {
 
   @Nullable
-  WtBold getBold();
-
-  @Nullable
-  WtBoldItalic getBoldItalic();
-
-  @Nullable
-  WtExternalLink getExternalLink();
+  WtHtmlTag getHtmlTag();
 
   @Nullable
   WtInternalLink getInternalLink();
 
   @Nullable
-  WtItalic getItalic();
-
-  @Nullable
   WtTemplate getTemplate();
 
   @Nullable
+  WtVerbatimTag getVerbatimTag();
+
+  @Nullable
+  PsiElement getLinkDisplayText();
+
+  @Nullable
   PsiElement getPlainText();
-
-  @Nullable
-  PsiElement getSingleApos();
-
-  @Nullable
-  PsiElement getSpace();
 
 }

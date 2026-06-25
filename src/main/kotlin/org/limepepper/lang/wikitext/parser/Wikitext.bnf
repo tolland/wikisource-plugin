@@ -1,6 +1,7 @@
 {
   parserClass="org.limepepper.lang.wikitext.parser.WtParser"
   parserUtilClass="org.limepepper.lang.wikitext.parser.WtParserUtil"
+  psiImplUtilClass="org.limepepper.lang.wikitext.parser.WtPsiImplUtil"
   psiClassPrefix="Wt"
   psiImplClassSuffix="Impl"
 
@@ -48,73 +49,141 @@
     LINK_CLOSE=']]'
     LINK_DISPLAY_TEXT='regexp:[^]{|<]+'
     OPEN_TAG_HEAD='regexp:<[a-zA-Z][a-zA-Z0-9]*'
+    // wikitable
     TABLE_CELL_SEP='|'
     TABLE_CELL_TEXT='regexp:[^{}\[\]|<]+'
     TABLE_CLOSE='|}'
     TABLE_OPEN='{|'
+    // template
     TEMPLATE_CLOSE='}}'
     TEMPLATE_EQUALS='='
-    TEMPLATE_NAME='regexp:[^{}|]+'
     TEMPLATE_OPEN='{{'
     TEMPLATE_PARAM_TEXT='regexp:[^{}|=\[<]+'
+    // <nowiki></nowiki>
     VERBATIM_CONTENT='regexp:[^<]+|<'
+
+    // Previously these collided with .bnf RULE names of the same text
+    // (heading_line, link_target, template_name) -- the root cause of the
+    // original bug. They are tokens now; no rule below may share these
+    // names (case-insensitively).
+    HEADING_LINE='regexp:[ \t]{0,3}={1,6}[^\r\n]*={1,6}[ \t]*'
+    LINK_TARGET='regexp:[^\|]+'
+    TEMPLATE_NAME='regexp:[^{}|]+'
   ]
 }
 
 wikitextFile ::= item*
 
-private item ::= heading_line
+private item ::= heading
                | list_item
+               | table
                | template
                | paragraph
                | NEWLINE
 
+// =========================================================================
 // --- Headings ---
-heading_line ::= heading6 | heading5 | heading4 | heading3 | heading2 | heading1
-
-heading1 ::= EQUALS (inline_item | PIPE)+ EQUALS {pin=1}
-heading2 ::= H2_START (inline_item | PIPE | EQUALS)+ H2_START {pin=1}
-heading3 ::= H3_START (inline_item | PIPE | EQUALS)+ H3_START {pin=1}
-heading4 ::= H4_START (inline_item | PIPE | EQUALS)+ H4_START {pin=1}
-heading5 ::= H5_START (inline_item | PIPE | EQUALS)+ H5_START {pin=1}
-heading6 ::= H6_START (inline_item | PIPE | EQUALS)+ H6_START {pin=1}
+// =========================================================================
+// The lexer matches an ENTIRE heading line (open '=' run, content, close
+// '=' run, trailing whitespace) as ONE token, HEADING_LINE -- see
+// WikitextLexer.flex's HEADING_LINE macro and its whole-line-validity
+// comment. It does this because heading validity can't be known until the
+// rest of the line has been seen (a closing '=' run must be followed by
+// nothing but whitespace, or the line isn't a heading at all). That means
+// level (1-6) and trimmed text are NOT separate lexer tokens -- they're
+// derived from HEADING_LINE's raw text via WtLexer.splitHeading() at PSI
+// access time (see methods= below), not parsed as child nodes.
+//
+// NOTE: H1_START..H6_START and the bare EQUALS-as-heading-delimiter design
+// from the old grammar are NOT used here -- the lexer never emits them.
+// Reintroduce them (and split the lexer to match) only if/when headings
+// need real nested PSI for inline markup -- see project discussion.
+heading ::= HEADING_LINE {
+  methods=[getLevel getHeadingText]
+}
 
 // --- Lists ---
-list_item ::= (BULLET | NUMBER)+ (inline_item | PIPE | EQUALS)+ {pin=1}
+// =========================================================================
+// BULLET/NUMBER/INDENT/DEF_TERM are real per-line-start tokens (lexer
+// matches "{LINE_WS}{0,3} markerChar+" as one token each). Mixed markers
+// like "*#" (bullet then sub-numbered) are represented as repeated marker
+// tokens of different kinds, hence the (BULLET | NUMBER | INDENT |
+// DEF_TERM)+ rather than assuming a single marker kind per line.
+list_item ::= (BULLET | NUMBER | INDENT | DEF_TERM)+ paragraph_content {pin=1}
 
+// =========================================================================
+// --- Tables ---
+// =========================================================================
+// Minimal nesting-only grammar: TABLE_OPEN/TABLE_CLOSE bracket TABLE_CELL_SEP
+// -delimited cells. Line-start-sensitive row/header syntax (|-, !, |+) is
+// NOT modeled yet -- the lexer's <TABLE> state doesn't distinguish them
+// from ordinary cell text, so they currently just fall into
+// TABLE_CELL_TEXT. Revisit once the lexer grows that sensitivity.
+table ::= TABLE_OPEN table_cell* TABLE_CLOSE {pin=1}
+private table_cell ::= TABLE_CELL_SEP table_cell_content
+private table_cell_content ::= (inline_item | TABLE_CELL_TEXT)*
+
+// =========================================================================
 // --- Templates ---
-template ::= TEMPLATE_OPEN template_title (PIPE template_param)* TEMPLATE_CLOSE {pin=1}
-template_title ::= PLAIN_TEXT (SPACE PLAIN_TEXT)*
-template_param ::= [ param_name EQUALS ] param_value
-param_name ::= PLAIN_TEXT (SPACE PLAIN_TEXT)*
-param_value ::= inline_item*
+// =========================================================================
+// The lexer's <TEMPLATE_NAME> state scans the name as ONE token
+// ([^{}|]+ -> TEMPLATE_NAME) rather than as PLAIN_TEXT/SPACE runs the
+// parser reassembles -- so template_name is consumed directly as a leaf
+// token here, NOT re-parsed as a composite of smaller tokens (that was
+// the old grammar's design, and it collided with this same TEMPLATE_NAME
+// identifier -- seethe header comment above).
+template ::= TEMPLATE_OPEN TEMPLATE_NAME (PIPE template_param)* TEMPLATE_CLOSE {pin=1}
+private template_param ::= [ TEMPLATE_PARAM_TEXT TEMPLATE_EQUALS ] template_param_value
+private template_param_value ::= (inline_item | TEMPLATE_PARAM_TEXT)*
 
-// --- Paragraphs ---
-paragraph ::= (inline_item | PIPE)+
+// =========================================================================
+// --- Paragraphs / generic inline content ---
+// =========================================================================
+paragraph ::= paragraph_content {pin=1}
+private paragraph_content ::= (inline_item | PIPE)+
 
-// --- Text Content & Formatting ---
-// Note: PIPE is excluded here so nested elements don't accidentally swallow structural dividers
-inline_item ::= bold_italic
-              | bold
-              | italic
-              | internal_link
-              | external_link
+// inline_item covers content that can appear inside templates, links,
+// tables, paragraphs, and HTML tag bodies alike -- i.e. "ordinary wikitext"
+// at any nesting depth. Bold/italic (apostrophe-counting) and external
+// links ([url text]) are NOT included: the lexer doesn't tokenize
+// FIVE_APOS/THREE_APOS/TWO_APOS/SINGLE_APOS or single LBRACK/RBRACK
+// anywhere yet (those tokens are declared above for forward-compatibility
+// with the lexer, but are currently dead -- see lexer/bnf cross-reference).
+// Add them here once WikitextLexer.flex actually emits them.
+inline_item ::= internal_link
+              | html_tag
+              | verbatim_tag
               | template
               | PLAIN_TEXT
-              | SPACE
-              | EQUALS
-              | SINGLE_APOS
+              | LINK_DISPLAY_TEXT
 
-bold_italic ::= FIVE_APOS inline_item+ FIVE_APOS {pin=1}
-bold ::= THREE_APOS inline_item+ THREE_APOS {pin=1}
-italic ::= TWO_APOS inline_item+ TWO_APOS {pin=1}
-
+// =========================================================================
 // --- Links ---
+// =========================================================================
 // Internal Links: [[TargetPage]] or [[TargetPage|Display Text]]
-internal_link ::= LINK_OPEN link_target [ PIPE link_text ] LINK_CLOSE {pin=1}
-link_target ::= PLAIN_TEXT (SPACE PLAIN_TEXT)*
-link_text ::= (inline_item | EQUALS)+
+// LINK_TARGET is matched whole by the lexer's <LINK_TARGET> state
+// ([^\]|]+ -> LINK_TARGET), consumed directly as a leaf -- same reasoning
+// as TEMPLATE_NAME above. link_display covers the post-PIPE portion,
+// which the lexer tokenizes as LINK_DISPLAY_TEXT runs interleaved with
+// nested constructs (links/templates/tags), hence reusing inline_item.
+internal_link ::= LINK_OPEN LINK_TARGET (PIPE link_display)? LINK_CLOSE {pin=1}
+private link_display ::= (inline_item | PIPE)*
 
-// External Links: [http://example.com Display Text]
-external_link ::= LBRACK URL [ SPACE link_text ] RBRACK {pin=1}
-URL ::= PLAIN_TEXT
+// =========================================================================
+// --- HTML / extension tags ---
+// =========================================================================
+// Self-closing tags (<ref name="x"/>) carry no content and push no lexer
+// frame -- single-token leaf.
+// Non-verbatim open/close pairs (<ref>...</ref>, <div>...</div>) wrap
+// ordinary wikitext content recursively, matching the lexer's behavior of
+// returning to the SAME state on open (see handleOpenTag in the .flex).
+html_tag ::= HTML_TAG_SELFCLOSE
+           | HTML_TAG_OPEN html_tag_content HTML_TAG_CLOSE {pin=1}
+private html_tag_content ::= (inline_item | PIPE)*
+
+// Verbatim tags (<nowiki>, <pre>, <syntaxhighlight>, etc.) -- content is
+// opaque VERBATIM_CONTENT runs, never re-parsed as wikitext, matching the
+// lexer's <VERBATIM_TAG> state which never pushes a recursive frame for
+// what's inside.
+verbatim_tag ::= HTML_TAG_OPEN verbatim_run* HTML_TAG_CLOSE {pin=1}
+private verbatim_run ::= VERBATIM_CONTENT

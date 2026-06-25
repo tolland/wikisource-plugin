@@ -1,0 +1,2 @@
+WtTokenType.HEADING_LINE ('== This is a wikitext header <math>e=mc^2</math> ==')
+WtTokenType.NEWLINE ('\n')

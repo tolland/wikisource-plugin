@@ -3,10 +3,12 @@ package org.limepepper.lang.wikitext.parser
 import com.intellij.psi.PsiFile
 import org.limepepper.lang.wikitext.utils.WtParsingTextCase
 import java.io.IOException
+import java.io.FileNotFoundException
 
 class WikiParsingTest : WtParsingTextCase() {
-    fun testHelloWorld() = doTest(true)
-    fun testNestedTemplates() = doTest(true)
+    fun testHelloWorld() = doTest()
+    fun testNestedTemplates() = doTest()
+    fun testWikiLinksSimple() = doTest()
 
     fun testParsingTestData() {
         doTestWithDump(true, true)
@@ -78,15 +80,16 @@ class WikiParsingTest : WtParsingTextCase() {
         try {
             val myFile = parseFile(name, loadFile("$name.$myFileExt"))
             println(toParseTreeText(myFile, true, includeRanges()))
-//            if (checkResult) {
-//                checkResult(name, myFile)
-//                if (ensureNoErrorElements) {
-//                    ensureNoErrorElements()
-//                }
+            checkResult(name, myFile)
+            ensureNoErrorElements()
+
 //            } else {
 //                toParseTreeText(myFile, skipSpaces(), includeRanges())
 //            }
             return myFile
+        } catch (e: FileNotFoundException) {
+            println("FileNotFoundException: name=$name, path=$name.$myFileExt")
+            throw RuntimeException(e)
         } catch (e: IOException) {
             throw RuntimeException(e)
         }

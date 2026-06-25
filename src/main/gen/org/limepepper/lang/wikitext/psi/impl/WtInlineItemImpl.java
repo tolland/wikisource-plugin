@@ -10,6 +10,7 @@ import com.intellij.psi.util.PsiTreeUtil;
 import static org.limepepper.lang.wikitext.psi.WtTypes.*;
 import com.intellij.extapi.psi.ASTWrapperPsiElement;
 import org.limepepper.lang.wikitext.psi.*;
+import org.limepepper.lang.wikitext.parser.WtPsiImplUtil;
 
 public class WtInlineItemImpl extends ASTWrapperPsiElement implements WtInlineItem {
 
@@ -29,20 +30,8 @@ public class WtInlineItemImpl extends ASTWrapperPsiElement implements WtInlineIt
 
   @Override
   @Nullable
-  public WtBold getBold() {
-    return findChildByClass(WtBold.class);
-  }
-
-  @Override
-  @Nullable
-  public WtBoldItalic getBoldItalic() {
-    return findChildByClass(WtBoldItalic.class);
-  }
-
-  @Override
-  @Nullable
-  public WtExternalLink getExternalLink() {
-    return findChildByClass(WtExternalLink.class);
+  public WtHtmlTag getHtmlTag() {
+    return findChildByClass(WtHtmlTag.class);
   }
 
   @Override
@@ -53,32 +42,26 @@ public class WtInlineItemImpl extends ASTWrapperPsiElement implements WtInlineIt
 
   @Override
   @Nullable
-  public WtItalic getItalic() {
-    return findChildByClass(WtItalic.class);
-  }
-
-  @Override
-  @Nullable
   public WtTemplate getTemplate() {
     return findChildByClass(WtTemplate.class);
   }
 
   @Override
   @Nullable
+  public WtVerbatimTag getVerbatimTag() {
+    return findChildByClass(WtVerbatimTag.class);
+  }
+
+  @Override
+  @Nullable
+  public PsiElement getLinkDisplayText() {
+    return findChildByType(LINK_DISPLAY_TEXT);
+  }
+
+  @Override
+  @Nullable
   public PsiElement getPlainText() {
     return findChildByType(PLAIN_TEXT);
-  }
-
-  @Override
-  @Nullable
-  public PsiElement getSingleApos() {
-    return findChildByType(SINGLE_APOS);
-  }
-
-  @Override
-  @Nullable
-  public PsiElement getSpace() {
-    return findChildByType(SPACE);
   }
 
 }

@@ -12,14 +12,14 @@ import com.intellij.extapi.psi.ASTWrapperPsiElement;
 import org.limepepper.lang.wikitext.psi.*;
 import org.limepepper.lang.wikitext.parser.WtPsiImplUtil;
 
-public class WtTemplateImpl extends ASTWrapperPsiElement implements WtTemplate {
+public class WtTableImpl extends ASTWrapperPsiElement implements WtTable {
 
-  public WtTemplateImpl(@NotNull ASTNode node) {
+  public WtTableImpl(@NotNull ASTNode node) {
     super(node);
   }
 
   public void accept(@NotNull WtVisitor visitor) {
-    visitor.visitTemplate(this);
+    visitor.visitTable(this);
   }
 
   @Override
@@ -32,12 +32,6 @@ public class WtTemplateImpl extends ASTWrapperPsiElement implements WtTemplate {
   @NotNull
   public List<WtInlineItem> getInlineItemList() {
     return PsiTreeUtil.getChildrenOfTypeAsList(this, WtInlineItem.class);
-  }
-
-  @Override
-  @Nullable
-  public PsiElement getTemplateName() {
-    return findChildByType(TEMPLATE_NAME);
   }
 
 }

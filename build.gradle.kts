@@ -3,11 +3,13 @@ import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 group = "org.limepepper.lang.wikitext"
 version = "1.0"
 
+val intellijPlatformVersion = providers.gradleProperty("intellijPlatformVersion").get()
+
 plugins {
-    id("org.jetbrains.kotlin.jvm")
-    id("org.jetbrains.changelog")
-    id("org.jetbrains.intellij.platform")
+    // id("org.jetbrains.changelog")
     id("org.jetbrains.grammarkit") version "2023.3.0.3"
+    id("org.jetbrains.intellij.platform")
+    id("org.jetbrains.kotlin.jvm")
 }
 
 repositories {
@@ -23,9 +25,10 @@ dependencies {
     testImplementation("org.jetbrains.kotlin:kotlin-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
     intellijPlatform {
-        intellijIdea("2025.3.5")
+        intellijIdea(intellijPlatformVersion)
         testFramework(TestFrameworkType.Platform)
-        plugin("com.redhat.devtools.lsp4ij", version="0.20.1")
+        // plugin("com.redhat.devtools.lsp4ij", version="0.20.1")
+        plugin("psiviewer", version="2026.1")
     }
 }
 
