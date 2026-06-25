@@ -12,7 +12,16 @@
   elementTypeHolderClass="org.limepepper.lang.wikitext.psi.WtTypes"
   tokenTypeClass="org.limepepper.lang.wikitext.psi.WtTokenType"
 
-
+  // ---------------------------------------------------------------------
+  // Token set below is the EXACT set WtLexer.flex actually returns -- see
+  // lexer_emitted_tokens.txt cross-reference. Every entry here has a
+  // corresponding `return WtTypes.X` somewhere in the .flex. Do not add a
+  // token here unless the lexer emits it; do not let any name here collide
+  // with a rule name below (Grammar-Kit generates both into the same
+  // WtTypes class, and a collision means the lexer's leaf token gets
+  // silently replaced by the rule's composite WtElementType -- this is
+  // the exact bug that motivated this rewrite: HEADING_LINE, LINK_TARGET,
+  // and TEMPLATE_NAME were previously BOTH lexer tokens AND rule names).
   tokens=[
     LBRACK='['
     RBRACK=']'
@@ -22,19 +31,16 @@
     TWO_APOS="regexp:''"
     SINGLE_APOS="regexp:'"
 
-    PIPE='|'
-    EQUALS='=' // Unified token for assignment AND H1 headings
-
-    // Block tokens (Assumed to be correctly identified by the Lexer at line boundaries)
-    H1_START='='
-    H2_START='=='
-    H3_START='==='
-    H4_START='===='
-    H5_START='====='
-    H6_START='======'
+    // NOTE: PIPE (flat), EQUALS, H1_START..H6_START, and NUMBER (old name
+    // for NUMBERED) were here as placeholders from the pre-frame-stack
+    // grammar. Removed entirely now that the lexer has real, working
+    // replacements (TEMPLATE_PIPE/LINK_PIPE/TABLE_CELL_SEP, H_START/H_END,
+    // NUMBERED) -- leaving superseded tokens declared was actively
+    // misleading, not just unused, since they describe a design the
+    // lexer no longer implements.
 
     BULLET='*'
-    NUMBER='#'
+    NUMBERED='#'
     INDENT=':'
     DEF_TERM=';'
 
@@ -63,12 +69,40 @@
     VERBATIM_CONTENT='regexp:[^<]+|<'
 
     // Previously these collided with .bnf RULE names of the same text
-    // (heading_line, link_target, template_name) -- the root cause of the
-    // original bug. They are tokens now; no rule below may share these
-    // names (case-insensitively).
-    HEADING_LINE='regexp:[ \t]{0,3}={1,6}[^\r\n]*={1,6}[ \t]*'
-    LINK_TARGET='regexp:[^\|]+'
+    // (link_target, template_name) -- the root cause of the original bug.
+    // They are tokens now; no rule below may share these names
+    // (case-insensitively).
+    LINK_TARGET='regexp:[^\]|]+'
     TEMPLATE_NAME='regexp:[^{}|]+'
+
+    // Heading open/close markers -- see WikitextLexer.flex's H_START macro
+    // comment for why headings are no longer matched as one whole-line
+    // HEADING_LINE token. H_START opens a HEADING frame; H_END only fires
+    // when that frame is on top of the stack AND immediately followed by
+    // line-end, so content (including nested templates/tags/links) is
+    // lexed with full frame-awareness rather than swallowed by a regex.
+    H_START='regexp:[ \t]{0,3}={1,6}'
+    H_END='regexp:={1,6}[ \t]*'
+
+    // PIPE now comes in three context-specific flavors, decided by
+    // WtLexer.pipeTokenForContext() based on which frame is on top of the
+    // stack -- see project discussion on why a flat PIPE can't disambiguate
+    // "next template param" vs "next link param" vs "next table cell".
+    TEMPLATE_PIPE='|'
+    LINK_PIPE='|'
+
+    // List marker, renamed from NUMBER to avoid ambiguity with numeric
+    // literal conventions elsewhere -- matches WtLexer.flex's "{LINE_WS}{0,3} '#'+" rule.
+
+    // Lexer-detected mismatched closing tag (e.g. stray </div> that
+    // doesn't match the currently-open tag's name) -- a DIFFERENT regex
+    // from HTML_TAG_CLOSE is given here on purpose (anchored differently)
+    // so Grammar-Kit's token-value dedup doesn't collapse them into one
+    // constant the way it did the first time this was tried; the real
+    // distinction is lexer-state-dependent, not regex-shape-dependent, so
+    // this regex is decorative -- WtLexer.flex's hand-written rule is what
+    // actually decides which of the two gets returned.
+    HTML_TAG_CLOSE_MISMATCHED='regexp:</[a-zA-Z][a-zA-Z0-9]*\s*>!mismatched'
   ]
 }
 
@@ -84,32 +118,49 @@ private item ::= heading
 // =========================================================================
 // --- Headings ---
 // =========================================================================
-// The lexer matches an ENTIRE heading line (open '=' run, content, close
-// '=' run, trailing whitespace) as ONE token, HEADING_LINE -- see
-// WikitextLexer.flex's HEADING_LINE macro and its whole-line-validity
-// comment. It does this because heading validity can't be known until the
-// rest of the line has been seen (a closing '=' run must be followed by
-// nothing but whitespace, or the line isn't a heading at all). That means
-// level (1-6) and trimmed text are NOT separate lexer tokens -- they're
-// derived from HEADING_LINE's raw text via WtLexer.splitHeading() at PSI
-// access time (see methods= below), not parsed as child nodes.
+// H_START opens a heading FRAME in the lexer (FrameKind.HEADING) and
+// H_END only ever gets emitted when that frame is the one on top of the
+// stack AND is immediately followed by line-end -- see WikitextLexer.flex's
+// H_START macro comment for the full reasoning (this replaces an earlier
+// design that matched a whole heading LINE as one opaque token via
+// whole-line regex; that approach broke on lines like
+// "===== header <code>e=mc^2</code> {{sc|x}}", where the '=' inside
+// <code> looked like a plausible closer to a naive regex but isn't one).
 //
-// NOTE: H1_START..H6_START and the bare EQUALS-as-heading-delimiter design
-// from the old grammar are NOT used here -- the lexer never emits them.
-// Reintroduce them (and split the lexer to match) only if/when headings
-// need real nested PSI for inline markup -- see project discussion.
-heading ::= HEADING_LINE {
-  methods=[getLevel getHeadingText]
+// Content between H_START and H_END is genuinely parsed via inline_item,
+// so templates/links/tags inside headings produce real nested PSI (e.g.
+// "== See [[Foo]] ==" gives you an actual internal_link child node, not
+// just opaque heading text) -- this is what makes future highlighting/
+// structure work on heading content possible.
+//
+// Level is derived from H_START's matched text length (number of '='
+// chars after leading whitespace) via getLevel(), not stored as a
+// separate token -- same "derive from leaf text in a generated accessor"
+// pattern as before, just now the leaf is JUST the marker, not the whole
+// line.
+//
+// An H_START with no matching H_END before NEWLINE/EOF is a genuine
+// PARSE ERROR under this grammar (unterminated heading) -- the lexer
+// already pops the HEADING frame and emits NEWLINE in that case (see
+// closeHeadingFrameUnterminated in the .flex), so the parser sees
+// "H_START inline_item* NEWLINE" with no H_END, which simply fails to
+// match this rule and gets reported as a syntax error by Grammar-Kit's
+// normal recovery -- which is exactly the desired fail-fast behavior,
+// not a special case to code for.
+heading ::= H_START inline_item* H_END {
+  pin=1
+  methods=[getLevel]
 }
 
+// =========================================================================
 // --- Lists ---
 // =========================================================================
-// BULLET/NUMBER/INDENT/DEF_TERM are real per-line-start tokens (lexer
+// BULLET/NUMBERED/INDENT/DEF_TERM are real per-line-start tokens (lexer
 // matches "{LINE_WS}{0,3} markerChar+" as one token each). Mixed markers
 // like "*#" (bullet then sub-numbered) are represented as repeated marker
-// tokens of different kinds, hence the (BULLET | NUMBER | INDENT |
+// tokens of different kinds, hence the (BULLET | NUMBERED | INDENT |
 // DEF_TERM)+ rather than assuming a single marker kind per line.
-list_item ::= (BULLET | NUMBER | INDENT | DEF_TERM)+ paragraph_content {pin=1}
+list_item ::= (BULLET | NUMBERED | INDENT | DEF_TERM)+ paragraph_content {pin=1}
 
 // =========================================================================
 // --- Tables ---
@@ -132,7 +183,7 @@ private table_cell_content ::= (inline_item | TABLE_CELL_TEXT)*
 // token here, NOT re-parsed as a composite of smaller tokens (that was
 // the old grammar's design, and it collided with this same TEMPLATE_NAME
 // identifier -- seethe header comment above).
-template ::= TEMPLATE_OPEN TEMPLATE_NAME (PIPE template_param)* TEMPLATE_CLOSE {pin=1}
+template ::= TEMPLATE_OPEN TEMPLATE_NAME (TEMPLATE_PIPE template_param)* TEMPLATE_CLOSE {pin=1}
 private template_param ::= [ TEMPLATE_PARAM_TEXT TEMPLATE_EQUALS ] template_param_value
 private template_param_value ::= (inline_item | TEMPLATE_PARAM_TEXT)*
 
@@ -140,7 +191,7 @@ private template_param_value ::= (inline_item | TEMPLATE_PARAM_TEXT)*
 // --- Paragraphs / generic inline content ---
 // =========================================================================
 paragraph ::= paragraph_content {pin=1}
-private paragraph_content ::= (inline_item | PIPE)+
+private paragraph_content ::= inline_item+
 
 // inline_item covers content that can appear inside templates, links,
 // tables, paragraphs, and HTML tag bodies alike -- i.e. "ordinary wikitext"
@@ -166,8 +217,8 @@ inline_item ::= internal_link
 // as TEMPLATE_NAME above. link_display covers the post-PIPE portion,
 // which the lexer tokenizes as LINK_DISPLAY_TEXT runs interleaved with
 // nested constructs (links/templates/tags), hence reusing inline_item.
-internal_link ::= LINK_OPEN LINK_TARGET (PIPE link_display)? LINK_CLOSE {pin=1}
-private link_display ::= (inline_item | PIPE)*
+internal_link ::= LINK_OPEN LINK_TARGET (LINK_PIPE link_display)? LINK_CLOSE {pin=1}
+private link_display ::= (inline_item | LINK_PIPE)*
 
 // =========================================================================
 // --- HTML / extension tags ---
@@ -179,7 +230,7 @@ private link_display ::= (inline_item | PIPE)*
 // returning to the SAME state on open (see handleOpenTag in the .flex).
 html_tag ::= HTML_TAG_SELFCLOSE
            | HTML_TAG_OPEN html_tag_content HTML_TAG_CLOSE {pin=1}
-private html_tag_content ::= (inline_item | PIPE)*
+private html_tag_content ::= inline_item*
 
 // Verbatim tags (<nowiki>, <pre>, <syntaxhighlight>, etc.) -- content is
 // opaque VERBATIM_CONTENT runs, never re-parsed as wikitext, matching the

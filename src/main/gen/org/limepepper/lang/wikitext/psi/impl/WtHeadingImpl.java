@@ -30,18 +30,20 @@ public class WtHeadingImpl extends ASTWrapperPsiElement implements WtHeading {
 
   @Override
   @NotNull
-  public PsiElement getHeadingLine() {
-    return findNotNullChildByType(HEADING_LINE);
+  public List<WtInlineItem> getInlineItemList() {
+    return PsiTreeUtil.getChildrenOfTypeAsList(this, WtInlineItem.class);
   }
 
   @Override
-  public int getLevel() {
-    return WtPsiImplUtil.getLevel(this);
+  @Nullable
+  public PsiElement getHEnd() {
+    return findChildByType(H_END);
   }
 
   @Override
-  public @NotNull String getHeadingText() {
-    return WtPsiImplUtil.getHeadingText(this);
+  @NotNull
+  public PsiElement getHStart() {
+    return findNotNullChildByType(H_START);
   }
 
 }

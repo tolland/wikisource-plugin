@@ -15,6 +15,7 @@ class WtLexerTest : WtLexerTestCase() {
     fun testWikiHeaderOneWithNewline() = doTest()
     fun testWikiHeaderTrailingChars() = doTest()
     fun testWikiHeaderWithEmbeddedTag() = doTest()
+    fun testHeaderMissingClosingEqualsChars() = doTest()
 
     // links
     fun testWikiLinksSimple() = doTest()

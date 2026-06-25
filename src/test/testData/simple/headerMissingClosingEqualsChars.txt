@@ -1,3 +1,2 @@
 WtTokenType.PLAIN_TEXT ('== header == trailing')
-WtTokenType.PLAIN_TEXT ('== header == trailing')
 WtTokenType.NEWLINE ('\n')

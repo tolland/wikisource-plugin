@@ -12,7 +12,7 @@ import org.limepepper.lang.wikitext.psi.WtTypes;
 %%
 
 %public
-%class WtLexer
+%class WtLexer3
 %implements FlexLexer
 %unicode
 %function advance
@@ -22,19 +22,11 @@ import org.limepepper.lang.wikitext.psi.WtTypes;
 
 %{
 
-  public WtLexer() {
+  public WtLexer3() {
     this((java.io.Reader)null);
   }
 
-  // ---- Frame-aware state stack -------------------------------------------
-  // Unlike a plain "return address" stack (markdown.flex's stateStack,
-  // handlebars.flex's yypushState/yypopState), each frame here also records
-  // *which* delimiter opened it. That's what lets PIPE mean "next template
-  // param" vs "next link param" vs "next table cell" depending on what's on
-  // top of the stack, and lets the close-matcher know which closer it's
-  // actually waiting for at the current depth.
-
-  enum FrameKind { TEMPLATE, TEMPLATE_PARAM, LINK, LINK_PARAM, TABLE, HTML_TAG, EXT_TAG, VERBATIM, HEADING }
+  enum FrameKind { TEMPLATE, TEMPLATE_PARAM, LINK, LINK_PARAM, TABLE, HTML_TAG, EXT_TAG, VERBATIM }
 
   static final class Frame {
     final int state;       // lexer state to restore on pop
@@ -57,9 +49,7 @@ import org.limepepper.lang.wikitext.psi.WtTypes;
     yybegin(newState);
   }
 
-  // Tags whose CONTENT is opaque text, not nested wikitext. The closer must
-  // match the SAME tag name -- </pre> must not terminate a <syntaxhighmight>
-  // frame, hence storing tagName per-frame rather than one global flag.
+  // Tags whose CONTENT is opaque text, not nested wikitext.
   private static final java.util.Set<String> VERBATIM_TAGS = new java.util.HashSet<String>(
       java.util.Arrays.asList("nowiki", "pre", "source", "syntaxhighlight", "score", "math", "templatedata"));
 
@@ -163,28 +153,15 @@ import org.limepepper.lang.wikitext.psi.WtTypes;
     return frames.isEmpty() ? null : frames.peek().tagName;
   }
 
-  private boolean inHeadingFrame() {
-    return currentKind() == FrameKind.HEADING;
-  }
-
-  // Called when EOL/EOF is hit while a HEADING frame is on top of the
-  // stack -- i.e. we opened a heading with a line-start '=' run but never
-  // found a matching closing '=' run immediately followed by line-end
-  // before the line ran out. This is NOT "fall back to plain text" --
-  // under the fail-fast design, an unterminated heading is a real error
-  // the PARSER should flag (same category as a missing '}}' or '</tag>'),
-  // not something the lexer silently papers over. We still pop the frame
-  // so lexing can continue sanely on the next line.
-  private void closeHeadingFrameUnterminated() {
-    popFrame();
-  }
+  // PIPE inside {{ }} vs [[ ]] vs {| |} all need different token types so
+  // the parser can build the right PSI without re-inspecting context.
   private IElementType pipeTokenForContext() {
     FrameKind k = currentKind();
     if (k == FrameKind.TEMPLATE || k == FrameKind.TEMPLATE_PARAM) {
-      return WtTypes.TEMPLATE_PIPE;
+      return WtTypes.PIPE;
     }
     if (k == FrameKind.LINK || k == FrameKind.LINK_PARAM) {
-      return WtTypes.LINK_PIPE;
+      return WtTypes.PIPE;
     }
     if (k == FrameKind.TABLE) {
       return WtTypes.TABLE_CELL_SEP;
@@ -197,35 +174,38 @@ LINE_WS      = [ \t]
 EOL          = \r\n | \r | \n
 ANY          = [^]
 
-// A line-start run of '=' opens a heading FRAME (FrameKind.HEADING) rather
-// than being matched as one whole-line token. We deliberately do NOT
-// pre-validate the whole line with a regex anymore: that approach greedily
-// matched through to the FIRST '=' that happened to be followed by
-// whitespace+EOL, which is wrong when an earlier '=' inside nested content
-// (e.g. "<code>e=mc^2</code>") looks like a plausible closer but isn't one
-// at all -- it's just inert text inside a tag, never evaluated as a
-// heading-closer candidate once that tag's frame is on top of the stack.
-//
-// Instead: H_START commits to heading-mode lexing optimistically; content
-// is lexed through the SAME frame-aware machinery as everywhere else
-// (templates, links, tags all just work inside headings); and the close-
-// matcher only accepts a trailing '=' run as the heading's closer when the
-// HEADING frame is the one ON TOP of the stack (i.e. we're not nested
-// inside some other construct) AND it's immediately followed by line-end.
-// Hitting EOL/EOF while still inside a HEADING frame is reported as an
-// unterminated heading -- a real error for the PARSER to flag, not a
-// silent reinterpretation as plain text (see closeHeadingFrameUnterminated
-// and project discussion on fail-fast semantics).
-H_START = {LINE_WS}{0,3} "="{1,6}
+/* A candidate heading line: 1-6 leading '=', SOME content, 1-6 trailing '=',
+ then only whitespace to end of line. We match the WHOLE line in one token
+ (HEADING_LINE) rather than separately tokenizing "H2_START" etc., because
+ validity (closing run of '=' must be followed by nothing but whitespace)
+ can't be known until we've seen the rest of the line -- by the time you've
+ scanned "=This is not H1=" you don't yet know if "because it has..." is
+ coming next. Greedily emitting H1_START up front and hoping the rest works
+ out is exactly the trap: "=This is not H1=because..." would wrongly start
+ a heading token that then has to be un-done. One whole-line lookahead
+ avoids that backtracking entirely.
+
+ NOTE: JFlex does NOT support PCRE-style (?=...) lookahead. The trailing
+ '/' operator only allows fixed lookahead context, not arbitrary
+ alternation, so EOL-or-EOF can't go after '/'. Instead we match through
+ the EOL itself and strip it off in the action with yypushback, the same
+ technique markdown.flex uses in processEol() (see its WHITE_SPACE*
+ ({EOL} WHITE_SPACE*)+ rule, lines 261-274) and handlebars.flex's '~'
+ operator uses internally. EOF-terminated last line (no trailing
+ newline) is handled by a second, EOL-less alternative.
+*/
+HEADING_LINE = {LINE_WS}{0,3} "="{1,6} [^\r\n]* "="{1,6} {LINE_WS}* {EOL}
+HEADING_LINE_EOF = {LINE_WS}{0,3} "="{1,6} [^\r\n]* "="{1,6} {LINE_WS}*
 
 // Coalesces runs of "boring" text into one token instead of one PLAIN_TEXT
 // per character (cf. markdown.flex's {ALPHANUM}+ run, handlebars.flex's
 // !([^]*"{{"[^]*) "everything up to X" pattern). Excludes every character
-// that starts a delimiter recognized in the body state: '{' '[' '<'
-// (templates/links/tags), '\r' '\n' (line boundaries), and '=' (heading
-// closer candidate, only actually meaningful while inside a HEADING frame,
-// but excluding it unconditionally just means a bare mid-text '=' becomes
-// its own single-char token when it turns out not to close anything).
+// that starts a delimiter recognized in YYINITIAL: '{' '[' '<' (templates/
+// links/tags), '\r' '\n' (line boundaries), and '=' '*' '#' ':' ';' (only
+// MEANINGFUL at line-start, but excluding them unconditionally just means
+// the run stops one char early there and a single-char PLAIN_TEXT token
+// covers it when it turns out to be ordinary -- see note above on why this
+// is needed for correctness, not just style).
 NOT_DELIM = [^{}\[\]<\r\n=*#:;]
 PLAIN_TEXT_RUN = {NOT_DELIM}+
 
@@ -240,8 +220,9 @@ ATTR           = {WS}+ [a-zA-Z:-]+ ({WS}* "=" {WS}* (\"[^\"]*\" | '[^']*' | [^ \
 OPEN_TAG_SELFCLOSE = {OPEN_TAG_HEAD} {ATTR}* {WS}* "/>"
 OPEN_TAG_FULL      = {OPEN_TAG_HEAD} {ATTR}* {WS}* ">"
 CLOSE_TAG          = "</" {TAG_NAME_CHARS} {WS}* ">"
+NOT_DELIM = [^{}\[\]<\r\n]
+PLAIN_TEXT_RUN = {NOT_DELIM}+
 
-%state WIKI_TEXT
 %state TEMPLATE
 %state TEMPLATE_NAME
 %state LINK
@@ -249,106 +230,47 @@ CLOSE_TAG          = "</" {TAG_NAME_CHARS} {WS}* ">"
 %state TABLE
 %state HTML_TAG
 %state VERBATIM_TAG
-%state AFTER_LINE_START
+%state INLINE_TEXT
 
 %%
 
-// =========================================================================
-// YYINITIAL -- LINE-START GATE ONLY. This state is re-entered after every
-// NEWLINE (see WIKI_TEXT's {EOL} rule below) and is where the file starts.
-// It recognizes ONLY the things that are syntactically meaningful at line
-// start (headings, list markers, table-open) and otherwise falls straight
-// through into WIKI_TEXT, which is where ordinary content -- templates,
-// links, tags, plain text -- actually lives. This split is what fixes the
-// earlier bug where "{|" / "==" / list markers were being recognized
-// mid-paragraph: those rules simply don't exist in WIKI_TEXT at all, so
-// e.g. a stray "{|" mid-sentence is just two ordinary characters there.
-//
-// IMPORTANT: nothing here pushes a "return to YYINITIAL" frame for the
-// ordinary case -- once we fall through to WIKI_TEXT we STAY there
-// (mid-paragraph, mid-template, wherever) until an actual NEWLINE is
-// lexed, at which point WIKI_TEXT's {EOL} rule sends us back here. This
-// mirrors markdown.flex's YYINITIAL/AFTER_LINE_START split (its
-// resetState()/popState() pair) but we don't need an explicit stack for
-// it because there's only ever one "body" state to return to, not a
-// frame-specific one -- the REAL nesting (templates/links/tables/tags)
-// is still tracked by the existing `frames` stack, completely orthogonal
-// to this line-start/body distinction.
-// =========================================================================
-
+// as YYINITIAL is the start of a line, we push back here to
+// indicate a newline, and capture elmeents that must start a line
 <YYINITIAL> {
-  "{|"   { pushFrame(TABLE, FrameKind.TABLE); return WtTypes.TABLE_OPEN; }
-
-  // Heading open marker. Optimistically commits to heading-mode lexing --
-  // see the H_START macro comment above for why we no longer pre-validate
-  // the whole line. Content is lexed via WIKI_TEXT (full frame-awareness:
-  // templates/tags/links inside headings just work), and the close-match
-  // happens in WIKI_TEXT's own '=' rule, gated on the HEADING frame being
-  // on top of the stack.
-  {H_START} {
-    pushFrame(WIKI_TEXT, FrameKind.HEADING);
-    return WtTypes.H_START;
+  "{|"   { pushFrame(TABLE, FrameKind.TABLE);            return WtTypes.TABLE_OPEN; }
+  {HEADING_LINE} {
+    // push the EOL back so it's tokenized on its own as NEWLINE -- keeps
+    // line-boundary bookkeeping uniform for every line, heading or not.
+    int eolLen = (yycharat(yylength() - 2) == '\r' && yycharat(yylength() - 1) == '\n') ? 2 : 1;
+    yypushback(eolLen);
+    return WtTypes.HEADING_LINE;
   }
-
   // List markers ARE safe as simple line-start prefix tokens (unlike '='),
   // because they have no closing delimiter to disambiguate against -- a
   // bullet just IS a bullet, nothing later in the line un-makes it.
-  {LINE_WS}{0,3} "*"+ { yybegin(WIKI_TEXT); return WtTypes.BULLET; }
-  {LINE_WS}{0,3} "#"+ { yybegin(WIKI_TEXT); return WtTypes.NUMBERED; }
-  {LINE_WS}{0,3} ":"+ { yybegin(WIKI_TEXT); return WtTypes.INDENT; }
-  {LINE_WS}{0,3} ";"+ { yybegin(WIKI_TEXT); return WtTypes.DEF_TERM; }
+  {LINE_WS}{0,3} "*"+ { return WtTypes.BULLET; }
+  {LINE_WS}{0,3} "#"+ { return WtTypes.NUMBER; }
+  {LINE_WS}{0,3} ":"+ { return WtTypes.INDENT; }
+  {LINE_WS}{0,3} ";"+ { return WtTypes.DEF_TERM; }
 
-  {EOL}  { return WtTypes.NEWLINE; } // blank line
-  {ANY}  { yypushback(1); yybegin(WIKI_TEXT); } // not a line-start construct -- fall through, re-lex same char in WIKI_TEXT
 }
 
-// =========================================================================
-// WIKI_TEXT -- the body state. Everything that ISN'T line-start-gated
-// syntax lives here: templates, links, HTML/extension tags, plain text,
-// and the heading CLOSE-match (since heading content is lexed in this
-// same state once H_START has pushed a HEADING frame).
-// =========================================================================
 
-<WIKI_TEXT> {
+<YYINITIAL> {
   "{{"   { pushFrame(TEMPLATE_NAME, FrameKind.TEMPLATE); return WtTypes.TEMPLATE_OPEN; }
   "[["   { pushFrame(LINK_TARGET, FrameKind.LINK);       return WtTypes.LINK_OPEN; }
+
 
   {OPEN_TAG_SELFCLOSE} { return handleOpenTag(true); }
   {OPEN_TAG_FULL}       { return handleOpenTag(false); }
   {CLOSE_TAG}           { return handleCloseTag(); }
 
-  // Heading close-match: a run of '=' immediately followed by line-end,
-  // but ONLY when the HEADING frame is the one on top of the stack (i.e.
-  // we're not nested inside a template/link/tag opened since the heading
-  // started -- "<code>e=mc^2</code>" never offers '=' as a close
-  // candidate here because while inside <code>'s frame, THAT frame is on
-  // top, not HEADING, so this rule doesn't even fire for that '='; it
-  // falls through to the bare-'=' rule below as ordinary text instead).
-  "="+ {LINE_WS}* / {EOL} {
-    if (inHeadingFrame()) {
-      popFrame(); // back to YYINITIAL for the NEWLINE that follows
-      return WtTypes.H_END;
-    }
-    return WtTypes.PLAIN_TEXT; // '=' run at EOL outside any heading -- just text
-  }
 
-  {EOL} {
-    if (inHeadingFrame()) {
-      // Ran off the end of the line (or hit EOF via the EOF-safe EOL set)
-      // while still inside a HEADING frame -- no closing '=' run was ever
-      // found at this nesting depth. Fail-fast: this is reported as an
-      // unterminated heading, for the PARSER to flag as an error, not
-      // silently reinterpreted as a plain paragraph spanning the rest of
-      // the heading's content. We still emit NEWLINE and pop back to
-      // YYINITIAL so subsequent lines lex normally.
-      closeHeadingFrameUnterminated();
-    }
-    yybegin(YYINITIAL);
-    return WtTypes.NEWLINE;
-  }
+  {HEADING_LINE_EOF} { return WtTypes.HEADING_LINE; } // last line, no trailing newline
 
+  {EOL}  { return WtTypes.NEWLINE; }
   {PLAIN_TEXT_RUN} { return WtTypes.PLAIN_TEXT; }
-  {ANY}            { return WtTypes.PLAIN_TEXT; } // single leftover delimiter char (e.g. bare '=' not followed by EOL, or stray '}'/']' with no opener)
+  {ANY}  { return WtTypes.PLAIN_TEXT; }
 }
 
 // ---- Template: {{ name | param | key=value | {{nested}} }} -------------

@@ -8,10 +8,16 @@ import com.intellij.psi.PsiElement;
 public interface WtHeading extends PsiElement {
 
   @NotNull
-  PsiElement getHeadingLine();
+  List<WtInlineItem> getInlineItemList();
 
-  int getLevel();
+  @Nullable
+  PsiElement getHEnd();
 
-  @NotNull String getHeadingText();
+  @NotNull
+  PsiElement getHStart();
+
+  //WARNING: getLevel(...) is skipped
+  //matching getLevel(WtHeading, ...)
+  //methods are not found in WtPsiImplUtil
 
 }
