@@ -1,0 +1,14 @@
+<application>
+  <component name="Logs.Categories"><![CDATA[{
+    "categories": [
+      {
+        "category": "com.intellij.platform.backend.documentation",
+        "level": "TRACE"
+      },
+      {
+        "category": "org.limepepper.lang.gdb.docs",
+        "level": "TRACE"
+      }
+    ]
+  }]]></component>
+</application>
