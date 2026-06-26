@@ -5,7 +5,7 @@
                 implementationClass="org.limepepper.lang.wikitext.WtFileType"
                 fieldName="INSTANCE"
                 language="Wikitext"
-                extensions="wt"/>
+                extensions="wt;wiki"/>
 
         <lang.parserDefinition
                 language="Wikitext"
