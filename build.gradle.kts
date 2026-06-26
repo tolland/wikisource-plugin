@@ -17,6 +17,7 @@ dependencies {
         intellijIdea(intellijPlatformVersion)
         plugin("psiviewer", version = "2026.1")
         pluginModule(implementation(project(":wikitext-core")))
+        pluginModule(implementation(project(":wikitext-ui")))
         testFramework(TestFrameworkType.Platform)
     }
 }
