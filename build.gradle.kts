@@ -1,5 +1,8 @@
+import org.gradle.kotlin.dsl.assign
+import org.gradle.kotlin.dsl.withType
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+import org.jetbrains.intellij.platform.gradle.tasks.PrepareSandboxTask
 
 val intellijPlatformVersion = providers.gradleProperty("intellijPlatformVersion").get()
 
@@ -22,8 +25,52 @@ dependencies {
     }
 }
 
+intellijPlatform {
+    // Disable buildSearchableOptions for development
+    buildSearchableOptions = false
+}
 
 tasks {
+
+    withType<PrepareSandboxTask> {
+        sandboxDirectory = project.layout.buildDirectory.dir("custom-sandbox")
+        sandboxSuffix = ""
+
+        // Declare sandbox config files as inputs for configuration cache compatibility
+        inputs.files(
+            "sandbox-config/ide.general.xml",
+            "sandbox-config/ui.lnf.xml",
+            "sandbox-config/trusted-paths.xml"
+        )
+            .withPropertyName("sandboxConfigFiles")
+
+        doLast {
+            // Use Gradle's built-in copy operations instead of Files.copy for configuration cache compatibility
+            val optionsDir = sandboxConfigDirectory.file("options").get().asFile
+            optionsDir.mkdirs()
+
+            // Access files through the declared inputs
+            val ideGeneralFile = inputs.files.find { it.name == "ide.general.xml" }
+            val uiLnfFile = inputs.files.find { it.name == "ui.lnf.xml" }
+            val trustedPaths = inputs.files.find { it.name == "trusted-paths.xml" }
+
+            ideGeneralFile?.copyTo(
+                optionsDir.resolve("ide.general.xml"),
+                overwrite = true
+            )
+
+            uiLnfFile?.copyTo(
+                optionsDir.resolve("ui.lnf.xml"),
+                overwrite = true
+            )
+
+            trustedPaths?.copyTo(
+                optionsDir.resolve("trusted-paths.xml"),
+                overwrite = true
+            )
+        }
+    }
+
     runIde {
         jvmArgs = listOf(
             "-Djb.consents.confirmation.enabled=false",

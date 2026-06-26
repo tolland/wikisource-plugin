@@ -9,13 +9,6 @@ plugins {
 val intellijPlatformVersion = providers.gradleProperty("intellijPlatformVersion").get()
 val intellijPlatformLocalPath = providers.gradleProperty("intellijPlatformLocalPath")
 
-repositories {
-    mavenCentral()
-    intellijPlatform {
-        defaultRepositories()
-    }
-}
-
 dependencies {
     testImplementation(libs.junit)
     testImplementation("org.jetbrains.kotlin:kotlin-test")
@@ -54,5 +47,12 @@ tasks {
         pathToParser.set("org/limepepper/lang/wikitext/parser/WtParser.java")
         pathToPsiRoot.set("org/limepepper/lang/wikitext/psi")
         purgeOldFiles.set(true)
+    }
+
+    test {
+        systemProperty("LEXER_DEBUG", "true")
+        this.testLogging {
+            this.showStandardStreams = true
+        }
     }
 }
