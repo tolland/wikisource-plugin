@@ -1,0 +1,261 @@
+{
+  parserClass='org.intellij.prisma.lang.parser.PrismaParser'
+  parserUtilClass='org.intellij.prisma.lang.parser.PrismaParserUtil'
+
+  implements='org.intellij.prisma.lang.psi.PrismaElement'
+  extends='org.intellij.prisma.lang.psi.impl.PrismaElementImpl'
+
+  elementTypeHolderClass='org.intellij.prisma.lang.psi.PrismaElementTypes'
+  elementTypeClass='org.intellij.prisma.lang.psi.PrismaElementType'
+  tokenTypeClass='org.intellij.prisma.lang.psi.PrismaTokenType'
+
+  psiClassPrefix='Prisma'
+  psiImplClassSuffix='Impl'
+  psiPackage='org.intellij.prisma.lang.psi'
+  psiImplPackage='org.intellij.prisma.lang.psi.impl'
+
+  elementTypeFactory('KeyValue|(EnumValue|Enum|Field|Generator|Datasource|Type|View|Model)Declaration|TypeAlias')='org.intellij.prisma.lang.psi.stubs.PrismaStubElementTypeFactory.create'
+
+  tokens=[
+    MODEL           = 'model'
+    TYPE            = 'type'
+    VIEW            = 'view'
+    ENUM            = 'enum'
+    GENERATOR       = 'generator'
+    DATASOURCE      = 'datasource'
+
+    UNSUPPORTED     = 'Unsupported'
+
+    LBRACE          = '{'
+    RBRACE          = '}'
+    LPAREN          = '('
+    RPAREN          = ')'
+    LBRACKET        = '['
+    RBRACKET        = ']'
+    EQ              = '='
+    DOT             = '.'
+    COLON           = ':'
+    QUEST           = '?'
+    EXCL            = '!'
+    AT              = '@'
+    ATAT            = '@@'
+    COMMA           = ','
+
+    STRING_LITERAL  = 'regexp:\"([^\\\"\r\n]|\\[^\r\n])*\"?'
+    NUMERIC_LITERAL = 'regexp:-?\d+(\.\d+)?'
+    IDENTIFIER      = 'regexp:[a-zA-Z][a-zA-Z0-9\-_]*'
+    WHITE_SPACE     = 'regexp:\s+'
+
+    TRIPLE_COMMENT     = 'regexp:///.*'
+    DOUBLE_COMMENT     = 'regexp://.*'
+    BLOCK_COMMENT      = 'regexp:/\*([^*]|\*+[^*/])*(\*+/)?'
+  ]
+
+  extends('FunctionCall|ArrayExpression|LiteralExpression|PathExpression')=Expression
+
+  implements('(Model|Type|View|Enum|Datasource|Generator)Declaration|TypeAlias')='org.intellij.prisma.lang.psi.PrismaDeclaration'
+  implements('(Model|Type|View|Enum)Declaration|TypeAlias')='org.intellij.prisma.lang.psi.PrismaEntityDeclaration'
+  implements('(Datasource|Generator)Declaration')='org.intellij.prisma.lang.psi.PrismaKeyValueDeclaration'
+
+  implements('(Model|Type|View)Declaration')='org.intellij.prisma.lang.psi.PrismaTableEntityDeclaration'
+  pin('(Model|Type|View)Declaration')=1
+
+  implements('.*Block')='org.intellij.prisma.lang.psi.PrismaBlock'
+  mixin('.*Block')='org.intellij.prisma.lang.psi.impl.PrismaBlockMixin'
+
+  implements('FieldDeclaration|EnumValueDeclaration|KeyValue')='org.intellij.prisma.lang.psi.PrismaMemberDeclaration'
+  implements('(Field|Block)Attribute')='org.intellij.prisma.lang.psi.PrismaArgumentsOwner'
+
+  extends('NamedArgument|ValueArgument')=Argument
+
+  extends('UnsupportedOptionalListType|ListType|OptionalType|LegacyRequiredType|LegacyListType|SingleType')=FieldType
+
+  implements('FieldDeclaration')='org.intellij.prisma.lang.psi.PrismaTypeOwner'
+  implements('FieldDeclaration|EnumValueDeclaration')='org.intellij.prisma.lang.psi.PrismaFieldAttributeOwner'
+}
+
+Schema ::= Declaration*
+
+private Declaration ::=
+    ModelDeclaration
+    | EnumDeclaration
+    | ViewDeclaration
+    | DatasourceDeclaration
+    | GeneratorDeclaration
+    | TypeAlias
+    | TypeDeclaration
+    {
+        pin=1
+        recoverWhile=Declaration_recover
+    }
+private Declaration_recover ::= !TopLevelKeywords
+private TopLevelKeywords ::= MODEL | TYPE | VIEW | ENUM | GENERATOR | DATASOURCE
+
+ModelDeclaration ::= MODEL Identifier FieldDeclarationBlock {
+  mixin="org.intellij.prisma.lang.psi.impl.PrismaTableEntityDeclarationMixin<org.intellij.prisma.lang.psi.stubs.PrismaModelDeclarationStub>"
+  implements="com.intellij.psi.StubBasedPsiElement<org.intellij.prisma.lang.psi.stubs.PrismaModelDeclarationStub>"
+  stubClass="org.intellij.prisma.lang.psi.stubs.PrismaModelDeclarationStub"
+}
+TypeDeclaration ::= TYPE Identifier FieldDeclarationBlock {
+  mixin="org.intellij.prisma.lang.psi.impl.PrismaTableEntityDeclarationMixin<org.intellij.prisma.lang.psi.stubs.PrismaTypeDeclarationStub>"
+  implements="com.intellij.psi.StubBasedPsiElement<org.intellij.prisma.lang.psi.stubs.PrismaTypeDeclarationStub>"
+  stubClass="org.intellij.prisma.lang.psi.stubs.PrismaTypeDeclarationStub"
+}
+ViewDeclaration ::= VIEW Identifier FieldDeclarationBlock {
+  mixin="org.intellij.prisma.lang.psi.impl.PrismaTableEntityDeclarationMixin<org.intellij.prisma.lang.psi.stubs.PrismaViewDeclarationStub>"
+  implements="com.intellij.psi.StubBasedPsiElement<org.intellij.prisma.lang.psi.stubs.PrismaViewDeclarationStub>"
+  stubClass="org.intellij.prisma.lang.psi.stubs.PrismaViewDeclarationStub"
+}
+
+FieldDeclarationBlock ::= '{' FieldDeclarationBlockItem* '}' {
+}
+
+private FieldDeclarationBlockItem ::=
+    FieldDeclaration
+    | BlockAttribute
+    | <<consumeWithError '@' "parser.unexpected.field.attr">>
+    {
+        consumeTokenMethod="consumeTokenFast"
+    }
+
+FieldDeclaration ::= IDENTIFIER ':'? FieldType? FieldAttribute* {
+    mixin="org.intellij.prisma.lang.psi.impl.PrismaFieldDeclarationMixin"
+    implements="com.intellij.psi.StubBasedPsiElement<org.intellij.prisma.lang.psi.stubs.PrismaFieldDeclarationStub>"
+    pin=1
+    recoverWhile=UntilNewLine_recover
+    methods=[getNativeType]
+}
+
+EnumDeclaration ::= ENUM Identifier EnumDeclarationBlock {
+    mixin="org.intellij.prisma.lang.psi.impl.PrismaEnumDeclarationMixin"
+    implements="com.intellij.psi.StubBasedPsiElement<org.intellij.prisma.lang.psi.stubs.PrismaEnumDeclarationStub>"
+    pin=1
+}
+EnumDeclarationBlock ::= '{' (EnumValueDeclaration | BlockAttribute)* '}' {
+    pin=1
+}
+EnumValueDeclaration ::= Identifier FieldAttribute* {
+    mixin="org.intellij.prisma.lang.psi.impl.PrismaEnumValueDeclarationMixin"
+    implements="com.intellij.psi.StubBasedPsiElement<org.intellij.prisma.lang.psi.stubs.PrismaEnumValueDeclarationStub>"
+    pin=1
+    recoverWhile=UntilNewLine_recover
+}
+
+DatasourceDeclaration ::= DATASOURCE Identifier KeyValueBlock {
+    mixin="org.intellij.prisma.lang.psi.impl.PrismaKeyValueDeclarationMixin<org.intellij.prisma.lang.psi.stubs.PrismaDatasourceDeclarationStub>"
+    implements="com.intellij.psi.StubBasedPsiElement<org.intellij.prisma.lang.psi.stubs.PrismaDatasourceDeclarationStub>"
+    stubClass="org.intellij.prisma.lang.psi.stubs.PrismaDatasourceDeclarationStub"
+    pin=1
+}
+GeneratorDeclaration ::= GENERATOR Identifier KeyValueBlock {
+    mixin="org.intellij.prisma.lang.psi.impl.PrismaKeyValueDeclarationMixin<org.intellij.prisma.lang.psi.stubs.PrismaGeneratorDeclarationStub>"
+    implements="com.intellij.psi.StubBasedPsiElement<org.intellij.prisma.lang.psi.stubs.PrismaGeneratorDeclarationStub>"
+    stubClass="org.intellij.prisma.lang.psi.stubs.PrismaGeneratorDeclarationStub"
+    pin=1
+}
+
+KeyValueBlock ::= '{' KeyValue* '}' {
+    pin=1
+}
+KeyValue ::= Identifier '=' Expression {
+    mixin="org.intellij.prisma.lang.psi.impl.PrismaKeyValueMixin"
+    implements="com.intellij.psi.StubBasedPsiElement<org.intellij.prisma.lang.psi.stubs.PrismaKeyValueStub>"
+    pin=1
+    recoverWhile=UntilNewLine_recover
+}
+
+TypeAlias ::= TYPE Identifier '=' FieldType FieldAttribute* {
+    mixin="org.intellij.prisma.lang.psi.impl.PrismaTypeAliasMixin"
+    implements="com.intellij.psi.StubBasedPsiElement<org.intellij.prisma.lang.psi.stubs.PrismaTypeAliasStub>"
+    pin=3
+}
+
+/* Types */
+FieldType ::=
+    UnsupportedOptionalListType
+    | ListType
+    | OptionalType
+    | LegacyRequiredType
+    | LegacyListType
+    | SingleType
+    {
+        implements="org.intellij.prisma.lang.psi.PrismaTypeSignature"
+        mixin="org.intellij.prisma.lang.psi.impl.PrismaFieldTypeMixin"
+        methods=[getTypeReference]
+    }
+
+UnsupportedType ::= UNSUPPORTED '(' STRING_LITERAL ')' {
+    pin=1
+    recoverWhile=UnsupportedType_recover
+    methods=[identifier="UNSUPPORTED"]
+}
+private UnsupportedType_recover ::= !(')' | '}' | '@' | '@@' | IDENTIFIER | '?' | '[' | ']' | TopLevelKeywords)
+
+TypeReference ::= UnsupportedType | Identifier {
+    mixin="org.intellij.prisma.lang.psi.impl.PrismaTypeReferenceMixin"
+    implements="org.intellij.prisma.lang.psi.PrismaReferenceElement"
+}
+UnsupportedOptionalListType ::= TypeReference '[' ']' '?'
+ListType ::= TypeReference '[' ']'
+OptionalType ::= TypeReference '?'
+LegacyRequiredType ::= TypeReference '!'
+LegacyListType ::= '[' TypeReference ']'
+SingleType ::= TypeReference
+
+/* Attributes */
+BlockAttribute ::= '@@' !<<isWhiteSpace>> PathExpression ArgumentsList? {
+    pin=1
+}
+FieldAttribute ::= '@' !<<isWhiteSpace>> PathExpression ArgumentsList? {
+    pin=1
+}
+
+/* Arguments */
+ArgumentsList ::= '(' [Argument (',' Argument)*] ','? ')' {
+    mixin="org.intellij.prisma.lang.psi.impl.PrismaArgumentsListMixin"
+    methods=[
+        Arguments="Argument"
+        findArgumentByName
+    ]
+}
+Argument ::= NamedArgument | ValueArgument
+NamedArgument ::= Identifier ':' Expression {
+    pin=2
+    mixin="org.intellij.prisma.lang.psi.impl.PrismaNamedArgumentMixin"
+    implements="org.intellij.prisma.lang.psi.PrismaReferenceElement"
+}
+ValueArgument ::= Expression {
+    mixin="org.intellij.prisma.lang.psi.impl.PrismaValueArgumentMixin"
+    methods=[isDefault]
+}
+
+/* Expressions */
+Expression ::=
+    FunctionCall
+    | ArrayExpression
+    | LiteralExpression
+    | PathExpression
+
+FunctionCall ::= PathExpression ArgumentsList {
+    implements="org.intellij.prisma.lang.psi.PrismaArgumentsOwner"
+}
+ArrayExpression ::= '[' [Expression (',' Expression)* ','?] ']' {
+    pin=1
+}
+LiteralExpression ::= NUMERIC_LITERAL | STRING_LITERAL {
+    mixin="org.intellij.prisma.lang.psi.impl.PrismaLiteralExpressionMixin"
+    methods=[getValue]
+}
+PathExpression ::= !<<isNewLine>> Path PathMemberAccess* {
+    mixin="org.intellij.prisma.lang.psi.impl.PrismaPathExpressionMixin"
+    implements="org.intellij.prisma.lang.psi.PrismaQualifiedReferenceElement"
+}
+
+/* Path */
+Path ::= Identifier { elementType=PathExpression }
+left PathMemberAccess ::= '.' Identifier? { elementType=PathExpression }
+
+private Identifier ::= IDENTIFIER
+
+/* Utils */
+private UntilNewLine_recover ::= !<<isNewLine>>

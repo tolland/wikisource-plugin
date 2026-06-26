@@ -1,0 +1,34 @@
+<idea-plugin>
+    <id>org.limepepper.lang.wikitext</id>
+    <name>Wikisource</name>
+
+    <vendor url="https://www.mycompany.com">The developer</vendor>
+    <description><![CDATA[
+    Support wikitext via lsp or lexer. <em>This description must be at least 40 characters.</em>
+        ]]></description>
+
+    <depends>com.intellij.modules.lang</depends>
+
+    <resource-bundle>messages.MyMessageBundle</resource-bundle>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <fileType
+                name="Wikitext"
+                implementationClass="org.limepepper.lang.wikitext.WtFileType"
+                fieldName="INSTANCE"
+                language="Wikitext"
+                extensions="wt"/>
+
+        <lang.parserDefinition
+                language="Wikitext"
+                implementationClass="org.limepepper.lang.wikitext.parser.WtParserDefinition"/>
+
+        <lang.syntaxHighlighterFactory
+                language="Wikitext"
+                implementationClass="org.limepepper.lang.wikitext.highlighting.WtSyntaxHighlighterFactory"/>
+
+        <annotator
+                language="Wikitext"
+                implementationClass="org.limepepper.lang.wikitext.highlighting.WtAnnotator"/>
+    </extensions>
+</idea-plugin>

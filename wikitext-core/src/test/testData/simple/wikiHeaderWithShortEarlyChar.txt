@@ -1,0 +1,2 @@
+WtTokenType.PLAIN_TEXT ('a = This is a wikitext header one =')
+WtTokenType.NEWLINE ('\n')

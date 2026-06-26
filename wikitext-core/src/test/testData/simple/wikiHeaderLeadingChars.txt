@@ -1,0 +1,2 @@
+WtTokenType.PLAIN_TEXT ('leading == header ==')
+WtTokenType.NEWLINE ('\n')
