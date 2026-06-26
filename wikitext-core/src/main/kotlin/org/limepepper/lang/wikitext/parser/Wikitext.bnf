@@ -6,7 +6,9 @@
   psiImplClassSuffix="Impl"
 
   psiPackage="org.limepepper.lang.wikitext.psi"
+  extends = 'com.intellij.extapi.psi.ASTWrapperPsiElement'
   psiImplPackage="org.limepepper.lang.wikitext.psi.impl"
+  implements = 'com.intellij.psi.NavigatablePsiElement'
 
   elementTypeClass="org.limepepper.lang.wikitext.psi.WtElementType"
   elementTypeHolderClass="org.limepepper.lang.wikitext.psi.WtTypes"

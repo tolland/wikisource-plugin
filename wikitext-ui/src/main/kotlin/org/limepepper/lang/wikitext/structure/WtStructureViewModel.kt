@@ -7,10 +7,20 @@ import com.intellij.ide.util.treeView.smartTree.Sorter
 import com.intellij.openapi.editor.Editor
 import com.intellij.psi.PsiFile
 import org.limepepper.lang.wikitext.psi.WtInlineItem
+import org.limepepper.lang.wikitext.psi.WtParagraph
+import org.limepepper.lang.wikitext.psi.WtTemplate
+import kotlin.jvm.java
 
 
-class WtStructureViewModel(psiFile: PsiFile, editor: Editor?) :
-    StructureViewModelBase(psiFile, editor, WtStructureViewElement(psiFile)),
+class WtStructureViewModel(
+    psiFile: PsiFile,
+    editor: Editor?
+) :
+    StructureViewModelBase(
+        psiFile,
+        editor,
+        WtStructureViewElement(psiFile)
+    ),
     StructureViewModel.ElementInfoProvider {
 
     override fun isAlwaysShowsPlus(element: StructureViewTreeElement): Boolean = false
@@ -22,6 +32,10 @@ class WtStructureViewModel(psiFile: PsiFile, editor: Editor?) :
     }
 
     override fun getSuitableClasses(): Array<Class<*>> {
-        return arrayOf(WtInlineItem::class.java)
+        return arrayOf(
+            WtInlineItem::class.java,
+            WtParagraph::class.java,
+            WtTemplate::class.java
+        )
     }
 }

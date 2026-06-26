@@ -4,8 +4,9 @@ package org.limepepper.lang.wikitext.psi;
 import java.util.List;
 import org.jetbrains.annotations.*;
 import com.intellij.psi.PsiElement;
+import com.intellij.psi.NavigatablePsiElement;
 
-public interface WtVerbatimTag extends PsiElement {
+public interface WtVerbatimTag extends NavigatablePsiElement {
 
   @Nullable
   PsiElement getHtmlTagClose();

@@ -4,8 +4,9 @@ package org.limepepper.lang.wikitext.psi;
 import java.util.List;
 import org.jetbrains.annotations.*;
 import com.intellij.psi.PsiElement;
+import com.intellij.psi.NavigatablePsiElement;
 
-public interface WtInlineItem extends PsiElement {
+public interface WtInlineItem extends NavigatablePsiElement {
 
   @Nullable
   WtHtmlTag getHtmlTag();

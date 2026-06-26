@@ -1,13 +1,12 @@
-import org.gradle.kotlin.dsl.assign
 import org.gradle.kotlin.dsl.withType
-import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.intellij.platform.gradle.tasks.PrepareSandboxTask
 
 val intellijPlatformVersion = providers.gradleProperty("intellijPlatformVersion").get()
 
 plugins {
-    id("org.jetbrains.kotlin.jvm") apply false
+    idea
+    id("org.jetbrains.kotlin.jvm")
     id("org.jetbrains.intellij.platform")
     id("org.jetbrains.intellij.platform.module") apply false
     id("org.jetbrains.grammarkit") apply false

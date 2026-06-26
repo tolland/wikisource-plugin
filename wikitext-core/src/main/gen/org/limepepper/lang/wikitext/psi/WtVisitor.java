@@ -3,47 +3,47 @@ package org.limepepper.lang.wikitext.psi;
 
 import org.jetbrains.annotations.*;
 import com.intellij.psi.PsiElementVisitor;
-import com.intellij.psi.PsiElement;
+import com.intellij.psi.NavigatablePsiElement;
 
 public class WtVisitor extends PsiElementVisitor {
 
   public void visitHeading(@NotNull WtHeading o) {
-    visitPsiElement(o);
+    visitNavigatablePsiElement(o);
   }
 
   public void visitHtmlTag(@NotNull WtHtmlTag o) {
-    visitPsiElement(o);
+    visitNavigatablePsiElement(o);
   }
 
   public void visitInlineItem(@NotNull WtInlineItem o) {
-    visitPsiElement(o);
+    visitNavigatablePsiElement(o);
   }
 
   public void visitInternalLink(@NotNull WtInternalLink o) {
-    visitPsiElement(o);
+    visitNavigatablePsiElement(o);
   }
 
   public void visitListItem(@NotNull WtListItem o) {
-    visitPsiElement(o);
+    visitNavigatablePsiElement(o);
   }
 
   public void visitParagraph(@NotNull WtParagraph o) {
-    visitPsiElement(o);
+    visitNavigatablePsiElement(o);
   }
 
   public void visitTable(@NotNull WtTable o) {
-    visitPsiElement(o);
+    visitNavigatablePsiElement(o);
   }
 
   public void visitTemplate(@NotNull WtTemplate o) {
-    visitPsiElement(o);
+    visitNavigatablePsiElement(o);
   }
 
   public void visitVerbatimTag(@NotNull WtVerbatimTag o) {
-    visitPsiElement(o);
+    visitNavigatablePsiElement(o);
   }
 
-  public void visitPsiElement(@NotNull PsiElement o) {
+  public void visitNavigatablePsiElement(@NotNull NavigatablePsiElement o) {
     visitElement(o);
   }
 

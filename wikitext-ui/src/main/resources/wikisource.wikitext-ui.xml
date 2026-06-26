@@ -15,6 +15,7 @@
         />
 
         <defaultLiveTemplates file="/liveTemplates/Wikitext.xml"/>
+
         <liveTemplateContext
                 contextId="WIKITEXT"
                 implementation="org.limepepper.lang.wikitext.templates.WtContextType"
