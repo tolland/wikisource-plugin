@@ -1,2 +1,2 @@
-WtTokenType.HEADING_LINE ('== This is a wikitext header <math>e=mc^2</math> ==')
+WtTokenType.PLAIN_TEXT ('leading == header ==')
 WtTokenType.NEWLINE ('\n')

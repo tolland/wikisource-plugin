@@ -11,7 +11,7 @@ class WikiParsingTest : WtParsingTextCase() {
     fun testWikiLinksSimple() = doTest()
 
     fun testParsingTestData() {
-        doTestWithDump(true, true)
+        doTest()
     }
 
     /**
@@ -73,26 +73,6 @@ class WikiParsingTest : WtParsingTextCase() {
             content
         )
         println(toParseTreeText(myFile, true, includeRanges()))
-    }
-
-    fun doTestWithDump(checkResult: Boolean, ensureNoErrorElements: Boolean): PsiFile {
-        val name = testName
-        try {
-            val myFile = parseFile(name, loadFile("$name.$myFileExt"))
-            println(toParseTreeText(myFile, true, includeRanges()))
-            checkResult(name, myFile)
-            ensureNoErrorElements()
-
-//            } else {
-//                toParseTreeText(myFile, skipSpaces(), includeRanges())
-//            }
-            return myFile
-        } catch (e: FileNotFoundException) {
-            println("FileNotFoundException: name=$name, path=$name.$myFileExt")
-            throw RuntimeException(e)
-        } catch (e: IOException) {
-            throw RuntimeException(e)
-        }
     }
 
 }

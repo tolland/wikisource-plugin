@@ -61,4 +61,31 @@ tasks {
         pathToPsiRoot.set("org/limepepper/lang/wikitext/psi")
         purgeOldFiles.set(true)
     }
+
+    runIde {
+        // Configure IDE launch options for better development experience
+        jvmArgs = listOf(
+            "-Djb.consents.confirmation.enabled=false",
+            "-Djb.privacy.policy.text=\"<!--999.999-->\"", // Skip EULA
+            "-Didea.suppress.statistics.report=true",
+            "-Didea.is.internal=true",
+            "-Dide.ui.compact.mode=true",
+            "-Dide.main.menu.separate=true",
+            "-Didea.auto.reload.plugins=true",
+            "-XX:+UnlockDiagnosticVMOptions",
+            "-Dide.log.level=DEBUG",
+            // "-Dkotlinx.coroutines.debug=off"
+        )
+
+        args(listOf("nosplash"))
+
+        argumentProviders += CommandLineArgumentProvider {
+            listOf(
+                file("test-project").toString()
+            )
+        }
+
+        systemProperty("idea.auto.reload.plugins", "true")
+    }
+
 }

@@ -16,6 +16,7 @@ class WtLexerTest : WtLexerTestCase() {
     fun testWikiHeaderTrailingChars() = doTest()
     fun testWikiHeaderWithEmbeddedTag() = doTest()
     fun testHeaderMissingClosingEqualsChars() = doTest()
+    fun testWikiHeaderWithShortEarlyChar() = doTest()
 
     // links
     fun testWikiLinksSimple() = doTest()
@@ -24,5 +25,6 @@ class WtLexerTest : WtLexerTestCase() {
     fun testWikiTableLeadingChars() = doTest()
     fun testWikiTableSimple() = doTest()
     fun testTableWithMathTag() = doTest()
+
 
 }
