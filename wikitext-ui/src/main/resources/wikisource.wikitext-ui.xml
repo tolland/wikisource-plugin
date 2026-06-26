@@ -1,3 +1,17 @@
 <idea-plugin>
+    <dependencies>
+            <module name="wikisource.wikitext-core"/>
+    </dependencies>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <lang.syntaxHighlighterFactory
+                language="Wikitext"
+                implementationClass="org.limepepper.lang.wikitext.highlighting.WtSyntaxHighlighterFactory"/>
+
+        <annotator
+                language="Wikitext"
+                implementationClass="org.limepepper.lang.wikitext.highlighting.WtAnnotator"/>
+    </extensions>
+
 
 </idea-plugin>

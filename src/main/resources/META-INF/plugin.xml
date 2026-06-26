@@ -9,29 +9,6 @@
 
     <depends>com.intellij.modules.lang</depends>
 
-    <resource-bundle>messages.MyMessageBundle</resource-bundle>
-
-    <extensions defaultExtensionNs="com.intellij">
-        <fileType
-                name="Wikitext"
-                implementationClass="org.limepepper.lang.wikitext.WtFileType"
-                fieldName="INSTANCE"
-                language="Wikitext"
-                extensions="wt"/>
-
-        <lang.parserDefinition
-                language="Wikitext"
-                implementationClass="org.limepepper.lang.wikitext.parser.WtParserDefinition"/>
-
-        <lang.syntaxHighlighterFactory
-                language="Wikitext"
-                implementationClass="org.limepepper.lang.wikitext.highlighting.WtSyntaxHighlighterFactory"/>
-
-        <annotator
-                language="Wikitext"
-                implementationClass="org.limepepper.lang.wikitext.highlighting.WtAnnotator"/>
-    </extensions>
-
     <content>
         <module name="wikisource.wikitext-core" loading="required"/>
         <module name="wikisource.wikitext-ui"/>
