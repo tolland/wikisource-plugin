@@ -1,0 +1,17 @@
+<templateSet group="Wikitext">
+    <template name="{" value="[$TEXT$]($LINK$)$END$" description="SDK: New link reference" toReformat="false"
+              toShortenFQNames="false">
+        <variable name="TEXT" expression="" defaultValue="" alwaysStopAt="true"/>
+        <variable name="LINK" expression="complete()" defaultValue="" alwaysStopAt="true"/>
+        <context/>
+    </template>
+    <template name="{{" value="{{$NAME$|$PARAM$|$TEXT$}}$END$" description="open template transclusion" toReformat="false" toShortenFQNames="true">
+        <variable name="NAME" expression="" defaultValue="" alwaysStopAt="true" />
+        <variable name="PARAM" expression="" defaultValue="" alwaysStopAt="true" />
+        <variable name="TEXT" expression="" defaultValue="" alwaysStopAt="true" />
+        <context>
+            <option name="WIKITEXT" value="true"/>
+        </context>
+    </template>
+</templateSet>
+
