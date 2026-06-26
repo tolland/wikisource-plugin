@@ -1,72 +1,42 @@
+import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
-
-group = "org.limepepper.lang.wikitext"
-version = "1.0"
 
 val intellijPlatformVersion = providers.gradleProperty("intellijPlatformVersion").get()
 
 plugins {
-    // id("org.jetbrains.changelog")
-    id("org.jetbrains.grammarkit") version "2023.3.0.3"
+    id("org.jetbrains.kotlin.jvm") apply false
     id("org.jetbrains.intellij.platform")
-    id("org.jetbrains.kotlin.jvm")
+    id("org.jetbrains.intellij.platform.module") apply false
+    id("org.jetbrains.grammarkit") apply false
+    id("org.jetbrains.kotlin.plugin.serialization") apply false
 }
+subprojects {
+    apply(plugin = "org.jetbrains.intellij.platform.module")
+    apply(plugin = "org.jetbrains.kotlin.jvm")
+    apply(plugin = "org.jetbrains.kotlin.plugin.serialization")
 
-repositories {
-    mavenCentral()
-    intellijPlatform {
-        defaultRepositories()
+    dependencies {
+        intellijPlatform {
+            intellijIdea(intellijPlatformVersion)
+        }
     }
-
 }
 
 dependencies {
-    testImplementation(libs.junit)
-    testImplementation("org.jetbrains.kotlin:kotlin-test")
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
     intellijPlatform {
         intellijIdea(intellijPlatformVersion)
+        plugin("psiviewer", version = "2026.1")
+//        pluginModule(implementation(project(":wikitext-core")))
         testFramework(TestFrameworkType.Platform)
-        // plugin("com.redhat.devtools.lsp4ij", version="0.20.1")
-        plugin("psiviewer", version="2026.1")
     }
 }
 
-sourceSets {
-    main {
-        java {
-            srcDirs("src/main/gen")
-        }
-    }
-    test {
-        java {
-            srcDirs("src/main/gen")
-        }
-        kotlin {
-            srcDirs("src/test/kotlin")
-        }
-    }
-}
 
 tasks {
-    generateLexer {
-        sourceFile.set(file("src/main/kotlin/org/limepepper/lang/wikitext/lexer/WikitextLexer.flex"))
-        targetOutputDir.set(file("src/main/gen/org/limepepper/lang/wikitext/lexer"))
-    }
-
-    generateParser {
-        sourceFile.set(file("src/main/kotlin/org/limepepper/lang/wikitext/parser/Wikitext.bnf"))
-        targetRootOutputDir.set(file("src/main/gen"))
-        pathToParser.set("org/limepepper/lang/wikitext/parser/WtParser.java")
-        pathToPsiRoot.set("org/limepepper/lang/wikitext/psi")
-        purgeOldFiles.set(true)
-    }
-
     runIde {
-        // Configure IDE launch options for better development experience
         jvmArgs = listOf(
             "-Djb.consents.confirmation.enabled=false",
-            "-Djb.privacy.policy.text=\"<!--999.999-->\"", // Skip EULA
+            "-Djb.privacy.policy.text=\"<!--999.999-->\"",
             "-Didea.suppress.statistics.report=true",
             "-Didea.is.internal=true",
             "-Dide.ui.compact.mode=true",
@@ -74,18 +44,14 @@ tasks {
             "-Didea.auto.reload.plugins=true",
             "-XX:+UnlockDiagnosticVMOptions",
             "-Dide.log.level=DEBUG",
-            // "-Dkotlinx.coroutines.debug=off"
         )
 
         args(listOf("nosplash"))
 
         argumentProviders += CommandLineArgumentProvider {
-            listOf(
-                file("test-project").toString()
-            )
+            listOf(rootProject.file("test-project").toString())
         }
 
         systemProperty("idea.auto.reload.plugins", "true")
     }
-
 }

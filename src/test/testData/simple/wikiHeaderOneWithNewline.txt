@@ -1,4 +1,0 @@
-WtTokenType.H_START ('=')
-WtTokenType.PLAIN_TEXT (' This is a wikitext header one ')
-WtTokenType.H_END ('=')
-WtTokenType.NEWLINE ('\n')

@@ -1,3 +1,0 @@
-WtTokenType.H_START ('==')
-WtTokenType.PLAIN_TEXT (' header == trailing')
-WtTokenType.NEWLINE ('\n')

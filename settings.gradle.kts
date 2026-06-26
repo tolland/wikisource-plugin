@@ -3,8 +3,17 @@ import org.jetbrains.intellij.platform.gradle.extensions.intellijPlatform
 rootProject.name = "wikisource"
 
 pluginManagement {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+        maven("https://packages.jetbrains.team/maven/p/ij/intellij-dependencies/")
+    }
     plugins {
+        id("org.jetbrains.grammarkit") version "2023.3.0.3"
+        id("org.jetbrains.intellij.platform") version "2.16.0"
+        id("org.jetbrains.intellij.platform.module") version "2.16.0"
         id("org.jetbrains.kotlin.jvm") version "2.3.20"
+        id("org.jetbrains.kotlin.plugin.serialization") version "2.3.20"
     }
 }
 
@@ -23,4 +32,5 @@ dependencyResolutionManagement {
     }
 }
 
+include("wikitext-core")
 //include("wikitext-ui")

@@ -1,4 +1,0 @@
-WtTokenType.HTML_TAG_OPEN ('<h1>')
-WtTokenType.PLAIN_TEXT ('This is header one')
-WtTokenType.HTML_TAG_CLOSE ('</h1>')
-WtTokenType.NEWLINE ('\n')
