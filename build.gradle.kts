@@ -10,23 +10,13 @@ plugins {
     id("org.jetbrains.grammarkit") apply false
     id("org.jetbrains.kotlin.plugin.serialization") apply false
 }
-subprojects {
-    apply(plugin = "org.jetbrains.intellij.platform.module")
-    apply(plugin = "org.jetbrains.kotlin.jvm")
-    apply(plugin = "org.jetbrains.kotlin.plugin.serialization")
 
-    dependencies {
-        intellijPlatform {
-            intellijIdea(intellijPlatformVersion)
-        }
-    }
-}
 
 dependencies {
     intellijPlatform {
         intellijIdea(intellijPlatformVersion)
         plugin("psiviewer", version = "2026.1")
-//        pluginModule(implementation(project(":wikitext-core")))
+        pluginModule(implementation(project(":wikitext-core")))
         testFramework(TestFrameworkType.Platform)
     }
 }

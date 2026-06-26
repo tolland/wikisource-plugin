@@ -33,4 +33,4 @@ dependencyResolutionManagement {
 }
 
 include("wikitext-core")
-//include("wikitext-ui")
+include("wikitext-ui")
