@@ -19,6 +19,11 @@ class WtEditorWithPreview(
     "Wikitext Preview",
     Layout.SHOW_EDITOR_AND_PREVIEW,
 ) {
+    init {
+        // Initialize TextEditorWithPreview's lazy UI before disposal-sensitive editor switching can occur.
+        component
+    }
+
     override fun createRightToolbarActionGroup(): ActionGroup {
         return DefaultActionGroup(
             listOf(
