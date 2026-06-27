@@ -34,7 +34,7 @@ import org.limepepper.lang.wikitext.psi.WtTypes;
   // top of the stack, and lets the close-matcher know which closer it's
   // actually waiting for at the current depth.
 
-  enum FrameKind { TEMPLATE, TEMPLATE_PARAM, LINK, LINK_PARAM, TABLE, HTML_TAG, EXT_TAG, VERBATIM, HEADING }
+  enum FrameKind { TEMPLATE, TEMPLATE_PARAM, LINK, LINK_PARAM, TABLE, HTML_TAG, EXT_TAG, VERBATIM, HEADING, COMMENT }
 
   static final class Frame {
     final int state;       // lexer state to restore on pop
@@ -226,8 +226,37 @@ H_START = {LINE_WS}{0,3} "="{1,6}
 // closer candidate, only actually meaningful while inside a HEADING frame,
 // but excluding it unconditionally just means a bare mid-text '=' becomes
 // its own single-char token when it turns out not to close anything).
-NOT_DELIM = [^{}\[\]<\r\n=*#:;]
+NOT_DELIM = [^{}\[\]<\r\n=&*#:;]
 PLAIN_TEXT_RUN = {NOT_DELIM}+
+
+// HTML/XML character entity references -- &amp; &#39; &#x27; etc. Matched
+// as their own token (rather than swallowed into PLAIN_TEXT_RUN) since a
+// PageReader/transclusion consumer downstream may need to know "this is
+// an entity reference, decode it" rather than treat it as five literal
+// characters -- same reasoning as giving TEMPLATE_NAME its own token
+// instead of letting the parser reassemble it from PLAIN_TEXT runs.
+// Patterned directly on IntelliJ's bundled _HtmlLexer.flex (XML_CHAR_ENTITY_REF
+// / XML_ENTITY_REF_TOKEN rules) rather than re-deriving from scratch.
+ENTITY_NAME       = [a-zA-Z][a-zA-Z0-9]*
+CHAR_ENTITY_REF   = "&#" [0-9]+ ";" | "&#" [xX] [0-9a-fA-F]+ ";"
+ENTITY_REF        = "&" {ENTITY_NAME} ";"
+
+// HTML/XML-style comments. Unlike VERBATIM_TAGS (which match a SAME-NAME
+// open/close tag pair), comments use the fixed "<!--"/"-->" delimiter and
+// their content is NEVER rendered at all -- not even conditionally, unlike
+// noinclude/includeonly. A "{{template}}" inside a comment must not expand
+// or even tokenize as a template, so comment content is scanned as opaque
+// text, same VERBATIM-style treatment as <nowiki>/<pre> but keyed off a
+// fixed delimiter rather than a tag name. Pattern lifted from IntelliJ's
+// bundled _XmlLexer.flex/_HtmlLexer.flex COMMENT state: "[^\\-]|(-[^\\-])"
+// is the standard trick for "scan until the literal string '-->' without
+// a lookahead operator" -- it advances past any char that ISN'T '-', or
+// past a '-' that's immediately followed by a non-'-' char, so the ONLY
+// way to stop scanning is hitting "--" followed by '>' (matched by the
+// explicit "-->" rule below, tried first per JFlex's earlier-rule-wins-on-
+// tie semantics within an explicitly ordered alternative set).
+COMMENT_START = "<!--"
+COMMENT_END   = "-->"
 
 WS           = [ \t]
 TAG_NAME_CHARS = [a-zA-Z][a-zA-Z0-9]*
@@ -242,6 +271,7 @@ OPEN_TAG_FULL      = {OPEN_TAG_HEAD} {ATTR}* {WS}* ">"
 CLOSE_TAG          = "</" {TAG_NAME_CHARS} {WS}* ">"
 
 %state WIKI_TEXT
+%state COMMENT
 %state TEMPLATE
 %state TEMPLATE_NAME
 %state LINK
@@ -249,7 +279,6 @@ CLOSE_TAG          = "</" {TAG_NAME_CHARS} {WS}* ">"
 %state TABLE
 %state HTML_TAG
 %state VERBATIM_TAG
-%state AFTER_LINE_START
 
 %%
 
@@ -313,9 +342,14 @@ CLOSE_TAG          = "</" {TAG_NAME_CHARS} {WS}* ">"
   "{{"   { pushFrame(TEMPLATE_NAME, FrameKind.TEMPLATE); return WtTypes.TEMPLATE_OPEN; }
   "[["   { pushFrame(LINK_TARGET, FrameKind.LINK);       return WtTypes.LINK_OPEN; }
 
+  {COMMENT_START} { pushFrame(COMMENT, FrameKind.COMMENT); return WtTypes.COMMENT_START; }
+
   {OPEN_TAG_SELFCLOSE} { return handleOpenTag(true); }
   {OPEN_TAG_FULL}       { return handleOpenTag(false); }
   {CLOSE_TAG}           { return handleCloseTag(); }
+
+  {CHAR_ENTITY_REF} { return WtTypes.CHAR_ENTITY_REF; }
+  {ENTITY_REF}       { return WtTypes.ENTITY_REF; }
 
   // Heading close-match: a run of '=' immediately followed by line-end,
   // but ONLY when the HEADING frame is the one on top of the stack (i.e.
@@ -372,9 +406,14 @@ CLOSE_TAG          = "</" {TAG_NAME_CHARS} {WS}* ">"
   "|"         { return pipeTokenForContext(); } // next param at SAME depth
   "="         { return WtTypes.TEMPLATE_EQUALS; }
 
+  {COMMENT_START} { pushFrame(COMMENT, FrameKind.COMMENT); return WtTypes.COMMENT_START; }
+
   {OPEN_TAG_SELFCLOSE} { return handleOpenTag(true); }
   {OPEN_TAG_FULL}       { return handleOpenTag(false); }
   {CLOSE_TAG}           { return handleCloseTag(); }
+
+  {CHAR_ENTITY_REF} { return WtTypes.CHAR_ENTITY_REF; }
+  {ENTITY_REF}       { return WtTypes.ENTITY_REF; }
 
   [^{}|=\[<]+  { return WtTypes.TEMPLATE_PARAM_TEXT; }
   {ANY}       { return WtTypes.PLAIN_TEXT; }
@@ -395,11 +434,16 @@ CLOSE_TAG          = "</" {TAG_NAME_CHARS} {WS}* ">"
   "]]"        { popFrame(); return WtTypes.LINK_CLOSE; }
   "|"         { return pipeTokenForContext(); }
 
+  {COMMENT_START} { pushFrame(COMMENT, FrameKind.COMMENT); return WtTypes.COMMENT_START; }
+
   {OPEN_TAG_SELFCLOSE} { return handleOpenTag(true); }
   {OPEN_TAG_FULL}       { return handleOpenTag(false); }
   {CLOSE_TAG}           { return handleCloseTag(); }
 
-  [^\]{|<]+    { return WtTypes.LINK_DISPLAY_TEXT; }
+  {CHAR_ENTITY_REF} { return WtTypes.CHAR_ENTITY_REF; }
+  {ENTITY_REF}       { return WtTypes.ENTITY_REF; }
+
+  [^\]{|<&]+    { return WtTypes.LINK_DISPLAY_TEXT; }
   {ANY}       { return WtTypes.PLAIN_TEXT; }
 }
 
@@ -413,12 +457,40 @@ CLOSE_TAG          = "</" {TAG_NAME_CHARS} {WS}* ">"
   "|}"        { popFrame(); return WtTypes.TABLE_CLOSE; }
   "|"         { return pipeTokenForContext(); }
 
+  {COMMENT_START} { pushFrame(COMMENT, FrameKind.COMMENT); return WtTypes.COMMENT_START; }
+
   {OPEN_TAG_SELFCLOSE} { return handleOpenTag(true); }
   {OPEN_TAG_FULL}       { return handleOpenTag(false); }
   {CLOSE_TAG}           { return handleCloseTag(); }
 
+  {CHAR_ENTITY_REF} { return WtTypes.CHAR_ENTITY_REF; }
+  {ENTITY_REF}       { return WtTypes.ENTITY_REF; }
+
   [^{}\[\]|<]+ { return WtTypes.TABLE_CELL_TEXT; }
   {ANY}       { return WtTypes.PLAIN_TEXT; }
+}
+
+// ---- HTML/XML-style comments: <!-- ... --> --------------------------
+// Content is NEVER rendered (stricter than noinclude -- not even
+// conditionally transcluded), so it's scanned as opaque text, same as a
+// verbatim tag's content, but keyed off the fixed "<!--"/"-->" delimiter
+// rather than a matched tag name -- see the COMMENT_START/COMMENT_END
+// macro comment above for the "[^\\-]|(-[^\\-])" technique this borrows
+// directly from IntelliJ's bundled _XmlLexer.flex/_HtmlLexer.flex.
+
+<COMMENT> {
+  {COMMENT_END} { popFrame(); return WtTypes.COMMENT_END; }
+
+  // Advance past any char that ISN'T '-', or past a '-' immediately
+  // followed by a non-'-' char. The only way to stop is hitting "--"
+  // followed by '>', matched by {COMMENT_END} above (tried first).
+  [^\-]|("-"[^\-]) { return WtTypes.COMMENT_CONTENT; }
+
+  // lone trailing '-' at EOF with no closer -- still comment content;
+  // an unterminated comment falls through to {ANY} at file scope (BAD_CHARACTER)
+  // only if EOF arrives with this frame still open, same fail-fast
+  // treatment as other unterminated constructs in this lexer.
+  "-" { return WtTypes.COMMENT_CONTENT; }
 }
 
 // ---- Verbatim tags: <nowiki>, <pre>, <syntaxhighlight>, <source>, <math> --

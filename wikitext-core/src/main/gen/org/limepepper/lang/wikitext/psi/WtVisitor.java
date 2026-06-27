@@ -7,6 +7,10 @@ import com.intellij.psi.NavigatablePsiElement;
 
 public class WtVisitor extends PsiElementVisitor {
 
+  public void visitComment(@NotNull WtComment o) {
+    visitNavigatablePsiElement(o);
+  }
+
   public void visitHeading(@NotNull WtHeading o) {
     visitNavigatablePsiElement(o);
   }

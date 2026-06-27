@@ -30,6 +30,12 @@ public class WtInlineItemImpl extends ASTWrapperPsiElement implements WtInlineIt
 
   @Override
   @Nullable
+  public WtComment getComment() {
+    return findChildByClass(WtComment.class);
+  }
+
+  @Override
+  @Nullable
   public WtHtmlTag getHtmlTag() {
     return findChildByClass(WtHtmlTag.class);
   }
@@ -50,6 +56,18 @@ public class WtInlineItemImpl extends ASTWrapperPsiElement implements WtInlineIt
   @Nullable
   public WtVerbatimTag getVerbatimTag() {
     return findChildByClass(WtVerbatimTag.class);
+  }
+
+  @Override
+  @Nullable
+  public PsiElement getCharEntityRef() {
+    return findChildByType(CHAR_ENTITY_REF);
+  }
+
+  @Override
+  @Nullable
+  public PsiElement getEntityRef() {
+    return findChildByType(ENTITY_REF);
   }
 
   @Override

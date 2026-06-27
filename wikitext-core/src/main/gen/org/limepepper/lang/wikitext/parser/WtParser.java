@@ -36,6 +36,38 @@ public class WtParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
+  // COMMENT_START comment_run* COMMENT_END
+  public static boolean comment(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "comment")) return false;
+    if (!nextTokenIs(b, COMMENT_START)) return false;
+    boolean r, p;
+    Marker m = enter_section_(b, l, _NONE_, COMMENT, null);
+    r = consumeToken(b, COMMENT_START);
+    p = r; // pin = 1
+    r = r && report_error_(b, comment_1(b, l + 1));
+    r = p && consumeToken(b, COMMENT_END) && r;
+    exit_section_(b, l, m, r, p, null);
+    return r || p;
+  }
+
+  // comment_run*
+  private static boolean comment_1(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "comment_1")) return false;
+    while (true) {
+      int c = current_position_(b);
+      if (!comment_run(b, l + 1)) break;
+      if (!empty_element_parsed_guard_(b, "comment_1", c)) break;
+    }
+    return true;
+  }
+
+  /* ********************************************************** */
+  // COMMENT_CONTENT
+  static boolean comment_run(PsiBuilder b, int l) {
+    return consumeToken(b, COMMENT_CONTENT);
+  }
+
+  /* ********************************************************** */
   // H_START inline_item* H_END
   public static boolean heading(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "heading")) return false;
@@ -103,9 +135,12 @@ public class WtParser implements PsiParser, LightPsiParser {
   // internal_link
   //               | html_tag
   //               | verbatim_tag
+  //               | comment
   //               | template
   //               | PLAIN_TEXT
   //               | LINK_DISPLAY_TEXT
+  //               | CHAR_ENTITY_REF
+  //               | ENTITY_REF
   public static boolean inline_item(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "inline_item")) return false;
     boolean r;
@@ -113,9 +148,12 @@ public class WtParser implements PsiParser, LightPsiParser {
     r = internal_link(b, l + 1);
     if (!r) r = html_tag(b, l + 1);
     if (!r) r = verbatim_tag(b, l + 1);
+    if (!r) r = comment(b, l + 1);
     if (!r) r = template(b, l + 1);
     if (!r) r = consumeToken(b, PLAIN_TEXT);
     if (!r) r = consumeToken(b, LINK_DISPLAY_TEXT);
+    if (!r) r = consumeToken(b, CHAR_ENTITY_REF);
+    if (!r) r = consumeToken(b, ENTITY_REF);
     exit_section_(b, l, m, r, false, null);
     return r;
   }

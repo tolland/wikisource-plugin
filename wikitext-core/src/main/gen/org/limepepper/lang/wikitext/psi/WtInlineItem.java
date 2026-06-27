@@ -9,6 +9,9 @@ import com.intellij.psi.NavigatablePsiElement;
 public interface WtInlineItem extends NavigatablePsiElement {
 
   @Nullable
+  WtComment getComment();
+
+  @Nullable
   WtHtmlTag getHtmlTag();
 
   @Nullable
@@ -19,6 +22,12 @@ public interface WtInlineItem extends NavigatablePsiElement {
 
   @Nullable
   WtVerbatimTag getVerbatimTag();
+
+  @Nullable
+  PsiElement getCharEntityRef();
+
+  @Nullable
+  PsiElement getEntityRef();
 
   @Nullable
   PsiElement getLinkDisplayText();

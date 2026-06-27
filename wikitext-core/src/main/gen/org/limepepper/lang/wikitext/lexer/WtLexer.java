@@ -24,14 +24,14 @@ public class WtLexer implements FlexLexer {
   /** lexical states */
   public static final int YYINITIAL = 0;
   public static final int WIKI_TEXT = 2;
-  public static final int TEMPLATE = 4;
-  public static final int TEMPLATE_NAME = 6;
-  public static final int LINK = 8;
-  public static final int LINK_TARGET = 10;
-  public static final int TABLE = 12;
-  public static final int HTML_TAG = 14;
-  public static final int VERBATIM_TAG = 16;
-  public static final int AFTER_LINE_START = 18;
+  public static final int COMMENT = 4;
+  public static final int TEMPLATE = 6;
+  public static final int TEMPLATE_NAME = 8;
+  public static final int LINK = 10;
+  public static final int LINK_TARGET = 12;
+  public static final int TABLE = 14;
+  public static final int HTML_TAG = 16;
+  public static final int VERBATIM_TAG = 18;
 
   /**
    * ZZ_LEXSTATE[l] is the state in the DFA for the lexical state l
@@ -41,7 +41,7 @@ public class WtLexer implements FlexLexer {
    */
   private static final int ZZ_LEXSTATE[] = {
      0,  0,  1,  1,  2,  2,  3,  3,  4,  4,  5,  5,  6,  6,  7,  7, 
-     8,  8,  7, 7
+     8,  8,  9, 9
   };
 
   /**
@@ -78,11 +78,12 @@ public class WtLexer implements FlexLexer {
   private static final int [] ZZ_CMAP_BLOCKS = zzUnpackcmap_blocks();
 
   private static final String ZZ_CMAP_BLOCKS_PACKED_0 =
-    "\11\0\1\1\1\2\2\0\1\3\22\0\1\1\1\0"+
-    "\1\4\1\5\3\0\1\6\2\0\1\7\2\0\1\10"+
-    "\1\0\1\11\12\12\1\13\1\14\1\15\1\16\1\17"+
-    "\2\0\32\20\1\21\1\0\1\22\3\0\32\20\1\23"+
-    "\1\24\1\25\u0182\0";
+    "\11\0\1\1\1\2\2\0\1\3\22\0\1\1\1\4"+
+    "\1\5\1\6\2\0\1\7\1\10\2\0\1\11\2\0"+
+    "\1\12\1\0\1\13\12\14\1\15\1\16\1\17\1\20"+
+    "\1\21\2\0\6\22\21\23\1\24\2\23\1\25\1\0"+
+    "\1\26\3\0\6\22\21\23\1\24\2\23\1\27\1\30"+
+    "\1\31\u0182\0";
 
   private static int [] zzUnpackcmap_blocks() {
     int [] result = new int[512];
@@ -109,18 +110,20 @@ public class WtLexer implements FlexLexer {
   private static final int [] ZZ_ACTION = zzUnpackAction();
 
   private static final String ZZ_ACTION_PACKED_0 =
-    "\11\0\2\1\2\2\1\3\1\4\1\5\1\6\1\7"+
-    "\1\1\1\10\2\11\5\10\1\12\1\13\1\14\1\10"+
-    "\1\15\1\16\2\17\1\10\1\20\1\21\1\22\1\14"+
-    "\1\23\2\24\1\0\1\7\1\25\3\0\2\26\1\0"+
-    "\1\27\1\30\1\31\1\27\1\32\1\33\2\0\1\7"+
-    "\3\0\1\34\1\35\1\0\1\7\1\0\1\36\1\0"+
-    "\1\37\1\0\1\40\1\7\1\0\1\7\7\0\1\34"+
-    "\3\0\1\34\3\0\1\37\2\0\1\37\6\0\1\34"+
-    "\4\0\1\37\1\0";
+    "\12\0\2\1\2\2\1\3\1\4\1\5\1\6\1\7"+
+    "\1\1\1\10\2\11\6\10\2\12\2\13\1\14\1\15"+
+    "\1\10\1\16\1\17\2\20\1\10\1\21\1\22\2\23"+
+    "\1\15\1\24\2\25\1\0\1\7\1\26\6\0\2\27"+
+    "\1\0\1\30\1\31\1\0\2\13\1\32\1\30\1\33"+
+    "\2\23\1\34\2\0\1\7\2\0\1\35\4\0\1\36"+
+    "\1\37\1\40\2\13\1\35\2\23\1\35\1\0\1\7"+
+    "\1\41\1\0\1\42\1\0\1\43\1\0\1\44\1\41"+
+    "\1\13\1\41\1\23\1\0\1\45\1\7\1\0\1\7"+
+    "\7\0\1\36\3\0\1\36\3\0\1\44\2\0\1\44"+
+    "\6\0\1\36\4\0\1\44\1\0";
 
   private static int [] zzUnpackAction() {
-    int [] result = new int[109];
+    int [] result = new int[141];
     int offset = 0;
     offset = zzUnpackAction(ZZ_ACTION_PACKED_0, offset, result);
     return result;
@@ -145,23 +148,27 @@ public class WtLexer implements FlexLexer {
   private static final int [] ZZ_ROWMAP = zzUnpackRowMap();
 
   private static final String ZZ_ROWMAP_PACKED_0 =
-    "\0\0\0\26\0\54\0\102\0\130\0\156\0\204\0\232"+
-    "\0\260\0\306\0\334\0\306\0\362\0\u0108\0\u011e\0\u0134"+
-    "\0\u014a\0\u0160\0\u0176\0\u018c\0\306\0\u01a2\0\306\0\u01b8"+
-    "\0\u01ce\0\u01e4\0\u01fa\0\u0210\0\306\0\306\0\u0226\0\u023c"+
-    "\0\306\0\u0252\0\u0268\0\u027e\0\u0294\0\306\0\u02aa\0\u02c0"+
-    "\0\306\0\u02d6\0\u02ec\0\u0302\0\u0318\0\306\0\u032e\0\u0344"+
-    "\0\u035a\0\306\0\u0370\0\u01ce\0\306\0\306\0\306\0\u0252"+
-    "\0\306\0\306\0\u0386\0\u039c\0\u03b2\0\u03c8\0\u03de\0\u03f4"+
-    "\0\306\0\306\0\u040a\0\u0420\0\u0436\0\306\0\u044c\0\306"+
-    "\0\u0462\0\306\0\u0478\0\u048e\0\306\0\u04a4\0\u04ba\0\u04d0"+
-    "\0\u04e6\0\u04fc\0\u0512\0\u0528\0\u0512\0\u053e\0\u0554\0\u056a"+
-    "\0\u0554\0\u0580\0\u0596\0\u05ac\0\u0512\0\u05c2\0\u05d8\0\u0554"+
-    "\0\u05ee\0\u0604\0\u061a\0\u0630\0\u0646\0\u065c\0\u0646\0\u0672"+
-    "\0\u0688\0\u069e\0\u06b4\0\u0646\0\u06ca";
+    "\0\0\0\32\0\64\0\116\0\150\0\202\0\234\0\266"+
+    "\0\320\0\352\0\u0104\0\u011e\0\u0104\0\u0138\0\u0152\0\u016c"+
+    "\0\u0186\0\u01a0\0\u01ba\0\u01d4\0\u01ee\0\u0104\0\u0208\0\u0104"+
+    "\0\u0222\0\u023c\0\u0256\0\u0270\0\u028a\0\u0104\0\u02a4\0\u02be"+
+    "\0\u02d8\0\u0104\0\u0104\0\u02f2\0\u030c\0\u0104\0\u0326\0\u0340"+
+    "\0\u035a\0\u0374\0\u0104\0\u038e\0\u03a8\0\u03c2\0\u0104\0\u03dc"+
+    "\0\u03f6\0\u0410\0\u042a\0\u0104\0\u0444\0\u045e\0\u0478\0\u0492"+
+    "\0\u04ac\0\u04c6\0\u0104\0\u04e0\0\u0256\0\u0104\0\u0104\0\u04fa"+
+    "\0\u0514\0\u052e\0\u0104\0\u0326\0\u0104\0\u0548\0\u0562\0\u0104"+
+    "\0\u057c\0\u0596\0\u05b0\0\u05ca\0\u05e4\0\u0104\0\u05fe\0\u0618"+
+    "\0\u0632\0\u064c\0\u0104\0\u0104\0\u0104\0\u0666\0\u0680\0\u02be"+
+    "\0\u069a\0\u06b4\0\u038e\0\u06ce\0\u06e8\0\u0104\0\u0702\0\u0104"+
+    "\0\u071c\0\u0104\0\u0736\0\u0104\0\u02be\0\u0750\0\u038e\0\u076a"+
+    "\0\u0784\0\u0104\0\u079e\0\u07b8\0\u0104\0\u07d2\0\u07ec\0\u0806"+
+    "\0\u0820\0\u083a\0\u0854\0\u086e\0\u0854\0\u0888\0\u08a2\0\u08bc"+
+    "\0\u08a2\0\u08d6\0\u08f0\0\u090a\0\u0854\0\u0924\0\u093e\0\u08a2"+
+    "\0\u0958\0\u0972\0\u098c\0\u09a6\0\u09c0\0\u09da\0\u09c0\0\u09f4"+
+    "\0\u0a0e\0\u0a28\0\u0a42\0\u09c0\0\u0a5c";
 
   private static int [] zzUnpackRowMap() {
-    int [] result = new int[109];
+    int [] result = new int[141];
     int offset = 0;
     offset = zzUnpackRowMap(ZZ_ROWMAP_PACKED_0, offset, result);
     return result;
@@ -184,72 +191,91 @@ public class WtLexer implements FlexLexer {
   private static final int [] ZZ_TRANS = zzUnpacktrans();
 
   private static final String ZZ_TRANS_PACKED_0 =
-    "\1\12\1\13\1\14\1\15\1\12\1\16\1\12\1\17"+
-    "\3\12\1\20\1\21\1\12\1\22\4\12\1\23\2\12"+
-    "\2\24\1\25\1\26\1\24\1\27\1\24\1\27\3\24"+
-    "\2\27\1\30\1\31\2\24\1\32\1\27\1\33\1\24"+
-    "\1\27\15\34\1\30\1\35\2\34\1\32\1\34\1\33"+
-    "\1\36\1\37\23\40\1\33\1\41\1\37\15\42\1\30"+
-    "\3\42\1\43\1\44\1\33\1\36\1\42\22\45\1\44"+
-    "\1\45\1\46\1\45\15\47\1\30\3\47\1\32\1\27"+
-    "\1\33\1\50\1\27\26\51\15\52\1\53\10\52\27\0"+
-    "\1\54\3\0\1\16\1\0\1\17\3\0\1\20\1\21"+
-    "\1\0\1\22\11\0\1\14\30\0\1\16\27\0\1\17"+
-    "\31\0\1\20\26\0\1\21\27\0\1\55\33\0\1\56"+
-    "\1\0\2\24\2\0\1\24\1\0\1\24\1\0\3\24"+
-    "\4\0\2\24\3\0\1\24\3\0\1\25\34\0\1\57"+
-    "\6\0\1\60\6\0\1\61\1\62\1\63\12\0\1\64"+
-    "\30\0\1\65\27\0\1\66\2\0\15\34\2\0\2\34"+
-    "\1\0\1\34\30\0\1\67\23\40\3\0\15\42\1\0"+
-    "\4\42\3\0\16\42\1\0\3\42\1\70\3\0\1\42"+
-    "\22\0\1\71\3\0\22\45\1\0\1\45\1\0\1\45"+
-    "\15\47\1\0\3\47\32\0\1\72\15\52\1\0\10\52"+
-    "\11\0\1\73\15\0\1\74\3\0\1\16\1\0\1\17"+
-    "\3\0\1\20\1\21\1\0\1\22\25\0\1\75\27\0"+
-    "\1\76\6\0\1\77\7\0\1\100\1\60\4\0\1\101"+
-    "\1\60\6\0\1\61\1\62\1\63\24\0\1\102\43\0"+
-    "\1\103\12\0\1\16\1\0\1\17\3\0\1\20\1\21"+
-    "\1\0\1\22\25\0\1\104\10\0\1\105\10\0\1\76"+
-    "\4\0\1\106\1\76\6\0\1\77\6\0\1\107\1\100"+
-    "\1\0\1\107\3\0\1\101\1\107\24\0\1\110\7\0"+
-    "\1\111\10\0\1\103\4\0\1\112\1\103\23\0\1\113"+
-    "\10\0\1\105\15\0\1\106\7\0\1\107\6\0\1\107"+
-    "\1\100\1\0\1\107\2\0\1\114\1\101\1\107\6\0"+
-    "\1\111\15\0\1\112\24\0\1\115\7\0\1\116\1\114"+
-    "\1\0\1\116\1\117\1\116\1\120\10\116\1\0\7\116"+
-    "\1\77\1\0\6\116\1\121\5\116\1\101\6\116\1\117"+
-    "\1\122\1\123\1\117\1\116\4\117\1\124\5\117\1\125"+
-    "\6\117\1\120\1\126\1\127\3\120\1\116\2\120\1\130"+
-    "\5\120\1\131\6\120\1\116\1\77\1\0\6\116\1\121"+
-    "\5\116\1\110\6\116\1\123\1\122\2\123\1\132\3\123"+
-    "\1\133\1\134\1\123\1\133\3\123\1\125\1\133\11\123"+
-    "\1\132\21\123\1\117\1\122\1\123\1\117\1\116\4\117"+
-    "\1\124\5\117\1\135\6\117\1\127\1\126\4\127\1\132"+
-    "\1\127\1\136\1\137\1\127\1\136\3\127\1\131\1\136"+
-    "\13\127\1\132\17\127\1\120\1\126\1\127\3\120\1\116"+
-    "\2\120\1\130\5\120\1\140\6\120\1\0\1\77\7\0"+
-    "\1\100\5\0\1\101\6\0\1\123\1\133\2\123\1\132"+
-    "\3\123\1\133\1\134\1\123\1\133\2\123\1\141\1\125"+
-    "\1\133\11\123\1\132\12\123\1\135\6\123\1\127\1\136"+
-    "\4\127\1\132\1\127\1\136\1\137\1\127\1\136\2\127"+
-    "\1\142\1\131\1\136\13\127\1\132\10\127\1\140\6\127"+
-    "\1\117\1\141\1\123\3\117\1\143\10\117\1\123\6\117"+
-    "\1\120\1\142\1\127\1\120\1\143\12\120\1\127\6\120"+
-    "\1\143\1\144\1\145\1\143\1\120\1\143\1\117\2\143"+
-    "\1\146\5\143\1\147\6\143\1\145\1\144\2\145\1\150"+
-    "\1\145\1\151\1\145\1\152\1\153\1\145\1\152\3\145"+
-    "\1\147\1\152\11\145\1\150\1\145\1\151\17\145\1\143"+
-    "\1\144\1\145\1\143\1\120\1\143\1\117\2\143\1\146"+
-    "\5\143\1\154\6\143\1\127\1\126\4\127\1\132\2\127"+
-    "\1\137\5\127\1\131\6\127\1\123\1\122\2\123\1\132"+
-    "\4\123\1\134\5\123\1\125\6\123\1\145\1\152\2\145"+
-    "\1\150\1\145\1\151\1\145\1\152\1\153\1\145\1\152"+
-    "\2\145\1\155\1\147\1\152\11\145\1\150\1\145\1\151"+
-    "\10\145\1\154\6\145\1\143\1\155\1\145\14\143\1\145"+
-    "\6\143";
+    "\1\13\1\14\1\15\1\16\2\13\1\17\2\13\1\20"+
+    "\3\13\1\21\1\22\1\13\1\23\6\13\1\24\2\13"+
+    "\2\25\1\26\1\27\2\25\1\30\1\31\1\25\1\30"+
+    "\3\25\2\30\1\32\1\33\4\25\1\34\1\30\1\35"+
+    "\1\25\1\30\12\36\1\37\17\36\7\40\1\41\7\40"+
+    "\1\32\1\42\4\40\1\34\1\40\1\35\1\43\1\44"+
+    "\27\45\1\35\1\46\1\44\7\47\1\31\7\47\1\32"+
+    "\5\47\1\50\1\51\1\35\1\43\1\47\26\52\1\51"+
+    "\1\52\1\53\1\52\7\54\1\55\7\54\1\32\5\54"+
+    "\1\34\1\30\1\35\1\56\1\30\32\57\17\60\1\61"+
+    "\12\60\33\0\1\62\4\0\1\17\2\0\1\20\3\0"+
+    "\1\21\1\22\1\0\1\23\13\0\1\15\35\0\1\17"+
+    "\34\0\1\20\35\0\1\21\32\0\1\22\33\0\1\63"+
+    "\41\0\1\64\1\0\2\25\2\0\2\25\2\0\1\25"+
+    "\1\0\3\25\4\0\4\25\3\0\1\25\3\0\1\26"+
+    "\35\0\1\65\13\0\3\66\11\0\1\67\6\0\1\70"+
+    "\6\0\3\71\6\0\1\72\1\73\1\74\14\0\1\75"+
+    "\36\0\1\76\33\0\1\77\2\0\12\36\1\100\17\36"+
+    "\17\40\2\0\4\40\1\0\1\40\3\0\6\40\1\101"+
+    "\10\40\2\0\1\40\3\102\1\0\1\40\34\0\1\103"+
+    "\27\45\3\0\7\47\1\0\7\47\1\0\6\47\3\0"+
+    "\10\47\1\0\7\47\1\0\5\47\1\104\3\0\1\47"+
+    "\26\0\1\105\3\0\26\52\1\0\1\52\1\0\1\52"+
+    "\17\54\1\0\5\54\5\0\6\54\1\106\10\54\1\0"+
+    "\2\54\3\107\36\0\1\110\17\60\1\0\12\60\13\0"+
+    "\1\111\17\0\1\112\4\0\1\17\2\0\1\20\3\0"+
+    "\1\21\1\22\1\0\1\23\31\0\1\113\25\0\1\114"+
+    "\7\0\1\115\21\0\1\66\1\0\1\116\3\0\3\66"+
+    "\17\0\1\117\41\0\3\120\6\0\1\121\11\0\1\122"+
+    "\1\71\4\0\1\123\3\71\6\0\1\72\1\73\1\74"+
+    "\30\0\1\124\50\0\1\125\10\0\14\40\1\126\2\40"+
+    "\2\0\3\40\1\127\1\0\1\40\3\0\14\40\1\102"+
+    "\1\40\1\130\2\0\1\40\3\102\1\0\1\40\3\0"+
+    "\14\54\1\131\2\54\1\0\4\54\1\132\5\0\14\54"+
+    "\1\107\1\54\1\133\1\0\2\54\3\107\27\0\3\134"+
+    "\13\0\1\17\2\0\1\20\3\0\1\21\1\22\1\0"+
+    "\1\23\31\0\1\135\25\0\1\114\1\0\1\136\27\0"+
+    "\1\137\5\0\1\137\21\0\1\140\20\0\1\141\12\0"+
+    "\1\120\4\0\1\142\3\120\6\0\1\121\10\0\1\143"+
+    "\1\122\1\0\1\143\3\0\1\123\3\143\26\0\1\144"+
+    "\10\0\14\40\1\126\1\40\1\145\2\0\4\40\1\0"+
+    "\1\40\3\0\14\40\1\146\2\40\2\0\1\40\1\146"+
+    "\2\40\1\0\1\40\3\0\14\54\1\131\1\54\1\147"+
+    "\1\0\5\54\5\0\14\54\1\150\2\54\1\0\2\54"+
+    "\1\150\2\54\6\0\1\151\12\0\1\134\4\0\1\152"+
+    "\3\134\25\0\1\153\25\0\1\137\1\0\1\136\3\0"+
+    "\1\137\10\0\1\141\17\0\1\142\11\0\1\143\10\0"+
+    "\1\143\1\122\1\0\1\143\2\0\1\154\1\123\3\143"+
+    "\5\0\14\40\1\146\1\40\1\145\2\0\1\40\1\146"+
+    "\2\40\1\0\1\40\3\0\14\54\1\150\1\54\1\147"+
+    "\1\0\2\54\1\150\2\54\6\0\1\151\17\0\1\152"+
+    "\30\0\1\155\11\0\1\156\1\154\1\0\2\156\1\157"+
+    "\2\156\1\160\10\156\1\0\11\156\1\121\1\0\10\156"+
+    "\1\161\5\156\1\123\10\156\1\157\1\162\1\163\2\157"+
+    "\1\156\5\157\1\164\5\157\1\165\10\157\1\160\1\166"+
+    "\1\167\5\160\1\156\2\160\1\170\5\160\1\171\10\160"+
+    "\1\156\1\121\1\0\10\156\1\161\5\156\1\144\10\156"+
+    "\1\163\1\162\3\163\1\172\4\163\1\173\1\174\1\163"+
+    "\1\173\3\163\1\165\3\173\12\163\1\172\24\163\1\157"+
+    "\1\162\1\163\2\157\1\156\5\157\1\164\5\157\1\175"+
+    "\10\157\1\167\1\166\6\167\1\172\1\167\1\176\1\177"+
+    "\1\167\1\176\3\167\1\171\3\176\15\167\1\172\21\167"+
+    "\1\160\1\166\1\167\5\160\1\156\2\160\1\170\5\160"+
+    "\1\200\10\160\1\0\1\121\11\0\1\122\5\0\1\123"+
+    "\10\0\1\163\1\173\3\163\1\172\4\163\1\173\1\174"+
+    "\1\163\1\173\2\163\1\201\1\165\3\173\12\163\1\172"+
+    "\13\163\1\175\10\163\1\167\1\176\6\167\1\172\1\167"+
+    "\1\176\1\177\1\167\1\176\2\167\1\202\1\171\3\176"+
+    "\15\167\1\172\10\167\1\200\10\167\1\157\1\201\1\163"+
+    "\5\157\1\203\10\157\1\163\10\157\1\160\1\202\1\167"+
+    "\2\160\1\203\13\160\1\167\10\160\1\203\1\204\1\205"+
+    "\2\203\1\160\2\203\1\157\2\203\1\206\5\203\1\207"+
+    "\10\203\1\205\1\204\3\205\1\210\2\205\1\211\1\205"+
+    "\1\212\1\213\1\205\1\212\3\205\1\207\3\212\12\205"+
+    "\1\210\2\205\1\211\21\205\1\203\1\204\1\205\2\203"+
+    "\1\160\2\203\1\157\2\203\1\206\5\203\1\214\10\203"+
+    "\1\167\1\166\6\167\1\172\2\167\1\177\5\167\1\171"+
+    "\10\167\1\163\1\162\3\163\1\172\5\163\1\174\5\163"+
+    "\1\165\10\163\1\205\1\212\3\205\1\210\2\205\1\211"+
+    "\1\205\1\212\1\213\1\205\1\212\2\205\1\215\1\207"+
+    "\3\212\12\205\1\210\2\205\1\211\10\205\1\214\10\205"+
+    "\1\203\1\215\1\205\16\203\1\205\10\203";
 
   private static int [] zzUnpacktrans() {
-    int [] result = new int[1760];
+    int [] result = new int[2678];
     int offset = 0;
     offset = zzUnpacktrans(ZZ_TRANS_PACKED_0, offset, result);
     return result;
@@ -287,16 +313,18 @@ public class WtLexer implements FlexLexer {
   private static final int [] ZZ_ATTRIBUTE = zzUnpackAttribute();
 
   private static final String ZZ_ATTRIBUTE_PACKED_0 =
-    "\11\0\1\11\1\1\1\11\10\1\1\11\1\1\1\11"+
-    "\5\1\2\11\2\1\1\11\4\1\1\11\2\1\1\11"+
-    "\2\1\1\0\1\1\1\11\3\0\1\11\1\1\1\0"+
-    "\3\11\1\1\2\11\2\0\1\1\3\0\2\11\1\0"+
-    "\1\1\1\0\1\11\1\0\1\11\1\0\1\11\1\1"+
-    "\1\0\1\11\7\0\1\1\3\0\1\1\3\0\1\1"+
-    "\2\0\1\1\6\0\1\1\4\0\1\1\1\0";
+    "\12\0\1\11\1\1\1\11\10\1\1\11\1\1\1\11"+
+    "\5\1\1\11\3\1\2\11\2\1\1\11\4\1\1\11"+
+    "\3\1\1\11\2\1\1\0\1\1\1\11\6\0\1\11"+
+    "\1\1\1\0\2\11\1\0\2\1\1\11\1\1\1\11"+
+    "\2\1\1\11\2\0\1\1\2\0\1\11\4\0\3\11"+
+    "\6\1\1\0\1\1\1\11\1\0\1\11\1\0\1\11"+
+    "\1\0\1\11\4\1\1\0\1\11\1\1\1\0\1\11"+
+    "\7\0\1\1\3\0\1\1\3\0\1\1\2\0\1\1"+
+    "\6\0\1\1\4\0\1\1\1\0";
 
   private static int [] zzUnpackAttribute() {
-    int [] result = new int[109];
+    int [] result = new int[141];
     int offset = 0;
     offset = zzUnpackAttribute(ZZ_ATTRIBUTE_PACKED_0, offset, result);
     return result;
@@ -376,7 +404,7 @@ public class WtLexer implements FlexLexer {
   // top of the stack, and lets the close-matcher know which closer it's
   // actually waiting for at the current depth.
 
-  enum FrameKind { TEMPLATE, TEMPLATE_PARAM, LINK, LINK_PARAM, TABLE, HTML_TAG, EXT_TAG, VERBATIM, HEADING }
+  enum FrameKind { TEMPLATE, TEMPLATE_PARAM, LINK, LINK_PARAM, TABLE, HTML_TAG, EXT_TAG, VERBATIM, HEADING, COMMENT }
 
   static final class Frame {
     final int state;       // lexer state to restore on pop
@@ -793,43 +821,43 @@ public class WtLexer implements FlexLexer {
             { yypushback(1); yybegin(WIKI_TEXT);
             }
           // fall through
-          case 33: break;
+          case 38: break;
           case 2:
             { return WtTypes.NEWLINE;
             }
           // fall through
-          case 34: break;
+          case 39: break;
           case 3:
             { yybegin(WIKI_TEXT); return WtTypes.NUMBERED;
             }
           // fall through
-          case 35: break;
+          case 40: break;
           case 4:
             { yybegin(WIKI_TEXT); return WtTypes.BULLET;
             }
           // fall through
-          case 36: break;
+          case 41: break;
           case 5:
             { yybegin(WIKI_TEXT); return WtTypes.INDENT;
             }
           // fall through
-          case 37: break;
+          case 42: break;
           case 6:
             { yybegin(WIKI_TEXT); return WtTypes.DEF_TERM;
             }
           // fall through
-          case 38: break;
+          case 43: break;
           case 7:
             { pushFrame(WIKI_TEXT, FrameKind.HEADING);
     return WtTypes.H_START;
             }
           // fall through
-          case 39: break;
+          case 44: break;
           case 8:
             { return WtTypes.PLAIN_TEXT;
             }
           // fall through
-          case 40: break;
+          case 45: break;
           case 9:
             { if (inHeadingFrame()) {
       // Ran off the end of the line (or hit EOF via the EOF-safe EOL set)
@@ -845,68 +873,73 @@ public class WtLexer implements FlexLexer {
     return WtTypes.NEWLINE;
             }
           // fall through
-          case 41: break;
-          case 10:
-            { return WtTypes.TEMPLATE_PARAM_TEXT;
-            }
-          // fall through
-          case 42: break;
-          case 11:
-            { return WtTypes.TEMPLATE_EQUALS;
-            }
-          // fall through
-          case 43: break;
-          case 12:
-            { return pipeTokenForContext();
-            }
-          // fall through
-          case 44: break;
-          case 13:
-            { return WtTypes.TEMPLATE_NAME;
-            }
-          // fall through
-          case 45: break;
-          case 14:
-            { yybegin(TEMPLATE); return pipeTokenForContext();
-            }
-          // fall through
           case 46: break;
-          case 15:
-            { return WtTypes.LINK_DISPLAY_TEXT;
+          case 10:
+            { return WtTypes.COMMENT_CONTENT;
             }
           // fall through
           case 47: break;
-          case 16:
-            { return WtTypes.LINK_TARGET;
+          case 11:
+            { return WtTypes.TEMPLATE_PARAM_TEXT;
             }
           // fall through
           case 48: break;
-          case 17:
-            { yybegin(LINK); return pipeTokenForContext();
+          case 12:
+            { return WtTypes.TEMPLATE_EQUALS;
             }
           // fall through
           case 49: break;
-          case 18:
-            { return WtTypes.TABLE_CELL_TEXT;
+          case 13:
+            { return pipeTokenForContext();
             }
           // fall through
           case 50: break;
-          case 19:
-            { return BAD_CHARACTER;
+          case 14:
+            { return WtTypes.TEMPLATE_NAME;
             }
           // fall through
           case 51: break;
-          case 20:
-            { return WtTypes.VERBATIM_CONTENT;
+          case 15:
+            { yybegin(TEMPLATE); return pipeTokenForContext();
             }
           // fall through
           case 52: break;
-          case 21:
-            { pushFrame(TABLE, FrameKind.TABLE); return WtTypes.TABLE_OPEN;
+          case 16:
+            { return WtTypes.LINK_DISPLAY_TEXT;
             }
           // fall through
           case 53: break;
+          case 17:
+            { return WtTypes.LINK_TARGET;
+            }
+          // fall through
+          case 54: break;
+          case 18:
+            { yybegin(LINK); return pipeTokenForContext();
+            }
+          // fall through
+          case 55: break;
+          case 19:
+            { return WtTypes.TABLE_CELL_TEXT;
+            }
+          // fall through
+          case 56: break;
+          case 20:
+            { return BAD_CHARACTER;
+            }
+          // fall through
+          case 57: break;
+          case 21:
+            { return WtTypes.VERBATIM_CONTENT;
+            }
+          // fall through
+          case 58: break;
           case 22:
+            { pushFrame(TABLE, FrameKind.TABLE); return WtTypes.TABLE_OPEN;
+            }
+          // fall through
+          case 59: break;
+          case 23:
             // lookahead expression with fixed lookahead length
             zzMarkedPos = Character.offsetByCodePoints
                 (zzBufferL, zzMarkedPos, -1);
@@ -917,38 +950,43 @@ public class WtLexer implements FlexLexer {
     return WtTypes.PLAIN_TEXT; // '=' run at EOL outside any heading -- just text
             }
           // fall through
-          case 54: break;
-          case 23:
+          case 60: break;
+          case 24:
             { pushFrame(LINK_TARGET, FrameKind.LINK);       return WtTypes.LINK_OPEN;
             }
           // fall through
-          case 55: break;
-          case 24:
+          case 61: break;
+          case 25:
             { pushFrame(TEMPLATE_NAME, FrameKind.TEMPLATE); return WtTypes.TEMPLATE_OPEN;
             }
           // fall through
-          case 56: break;
-          case 25:
+          case 62: break;
+          case 26:
             { popFrame(); return WtTypes.TEMPLATE_CLOSE;
             }
           // fall through
-          case 57: break;
-          case 26:
+          case 63: break;
+          case 27:
             { popFrame(); return WtTypes.LINK_CLOSE;
             }
           // fall through
-          case 58: break;
-          case 27:
+          case 64: break;
+          case 28:
             { popFrame(); return WtTypes.TABLE_CLOSE;
             }
           // fall through
-          case 59: break;
-          case 28:
+          case 65: break;
+          case 29:
+            { return WtTypes.ENTITY_REF;
+            }
+          // fall through
+          case 66: break;
+          case 30:
             { return handleOpenTag(false);
             }
           // fall through
-          case 60: break;
-          case 29:
+          case 67: break;
+          case 31:
             // lookahead expression with fixed lookahead length
             zzMarkedPos = Character.offsetByCodePoints
                 (zzBufferL, zzMarkedPos, -2);
@@ -959,18 +997,33 @@ public class WtLexer implements FlexLexer {
     return WtTypes.PLAIN_TEXT; // '=' run at EOL outside any heading -- just text
             }
           // fall through
-          case 61: break;
-          case 30:
+          case 68: break;
+          case 32:
+            { popFrame(); return WtTypes.COMMENT_END;
+            }
+          // fall through
+          case 69: break;
+          case 33:
+            { return WtTypes.CHAR_ENTITY_REF;
+            }
+          // fall through
+          case 70: break;
+          case 34:
+            { pushFrame(COMMENT, FrameKind.COMMENT); return WtTypes.COMMENT_START;
+            }
+          // fall through
+          case 71: break;
+          case 35:
             { return handleCloseTag();
             }
           // fall through
-          case 62: break;
-          case 31:
+          case 72: break;
+          case 36:
             { return handleOpenTag(true);
             }
           // fall through
-          case 63: break;
-          case 32:
+          case 73: break;
+          case 37:
             { String name = extractClosingTagName(yytext());
     if (name.equalsIgnoreCase(currentTagName())) {
       popFrame();
@@ -981,7 +1034,7 @@ public class WtLexer implements FlexLexer {
     return WtTypes.VERBATIM_CONTENT;
             }
           // fall through
-          case 64: break;
+          case 74: break;
           default:
             zzScanError(ZZ_NO_MATCH);
           }

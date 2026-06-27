@@ -21,7 +21,7 @@ abstract class WtLexerTestCase : LexerTestCase() {
         }
         val fileText = FileUtil.loadFile(file, StandardCharsets.UTF_8)
 
-        val tokens = LexerTestUtils.tokenize(fileText, WtLexer()).filter { it.type != TokenType.WHITE_SPACE }
+        val tokens = LexerTestUtils.tokenizeWithAdapter(fileText, createLexer()).filter { it.type != TokenType.WHITE_SPACE }
         LexerTestUtils.printTokens(tokens)
 
         val expectedFile = File(getDirPath(), "$name.txt")

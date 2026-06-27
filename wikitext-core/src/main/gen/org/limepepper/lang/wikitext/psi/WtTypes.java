@@ -8,6 +8,7 @@ import org.limepepper.lang.wikitext.psi.impl.*;
 
 public interface WtTypes {
 
+  IElementType COMMENT = new WtElementType("COMMENT");
   IElementType HEADING = new WtElementType("HEADING");
   IElementType HTML_TAG = new WtElementType("HTML_TAG");
   IElementType INLINE_ITEM = new WtElementType("INLINE_ITEM");
@@ -19,7 +20,12 @@ public interface WtTypes {
   IElementType VERBATIM_TAG = new WtElementType("VERBATIM_TAG");
 
   IElementType BULLET = new WtTokenType("*");
+  IElementType CHAR_ENTITY_REF = new WtTokenType("CHAR_ENTITY_REF");
+  IElementType COMMENT_CONTENT = new WtTokenType("COMMENT_CONTENT");
+  IElementType COMMENT_END = new WtTokenType("COMMENT_END");
+  IElementType COMMENT_START = new WtTokenType("COMMENT_START");
   IElementType DEF_TERM = new WtTokenType(";");
+  IElementType ENTITY_REF = new WtTokenType("ENTITY_REF");
   IElementType FIVE_APOS = new WtTokenType("FIVE_APOS");
   IElementType HTML_TAG_CLOSE = new WtTokenType("HTML_TAG_CLOSE");
   IElementType HTML_TAG_CLOSE_MISMATCHED = new WtTokenType("HTML_TAG_CLOSE_MISMATCHED");
@@ -57,7 +63,10 @@ public interface WtTypes {
   class Factory {
     public static PsiElement createElement(ASTNode node) {
       IElementType type = node.getElementType();
-      if (type == HEADING) {
+      if (type == COMMENT) {
+        return new WtCommentImpl(node);
+      }
+      else if (type == HEADING) {
         return new WtHeadingImpl(node);
       }
       else if (type == HTML_TAG) {

@@ -105,6 +105,23 @@
     // this regex is decorative -- WtLexer.flex's hand-written rule is what
     // actually decides which of the two gets returned.
     HTML_TAG_CLOSE_MISMATCHED='regexp:</[a-zA-Z][a-zA-Z0-9]*\s*>!mismatched'
+
+    // HTML/XML character entity references -- &amp; &#39; &#x27; etc.
+    // See WikitextLexer.flex's ENTITY_REF/CHAR_ENTITY_REF macro comment
+    // for why these get real tokens instead of being swallowed into
+    // PLAIN_TEXT_RUN (downstream PageReader consumers may need to know
+    // "this is an entity, decode it" rather than five literal chars).
+    CHAR_ENTITY_REF='regexp:&#[0-9]+;|&#[xX][0-9a-fA-F]+;'
+    ENTITY_REF='regexp:&[a-zA-Z][a-zA-Z0-9]*;'
+
+    // HTML/XML-style comments <!-- ... -->. Content is NEVER rendered
+    // (stricter than noinclude) so it's opaque -- COMMENT_CONTENT is
+    // never re-parsed as wikitext, matching the lexer's COMMENT state
+    // which pushes no recursive frame for what's inside, same treatment
+    // as VERBATIM_CONTENT.
+    COMMENT_START='regexp:<!--'
+    COMMENT_END='regexp:-->'
+    COMMENT_CONTENT='regexp:[^-]+|-[^-]|-'
   ]
 }
 
@@ -206,9 +223,12 @@ private paragraph_content ::= inline_item+
 inline_item ::= internal_link
               | html_tag
               | verbatim_tag
+              | comment
               | template
               | PLAIN_TEXT
               | LINK_DISPLAY_TEXT
+              | CHAR_ENTITY_REF
+              | ENTITY_REF
 
 // =========================================================================
 // --- Links ---
@@ -240,3 +260,14 @@ private html_tag_content ::= inline_item*
 // what's inside.
 verbatim_tag ::= HTML_TAG_OPEN verbatim_run* HTML_TAG_CLOSE {pin=1}
 private verbatim_run ::= VERBATIM_CONTENT
+
+// =========================================================================
+// --- Comments ---
+// =========================================================================
+// <!-- ... --> content is opaque, never re-parsed as wikitext, matching
+// the lexer's COMMENT state (see WikitextLexer.flex). Unlike noinclude/
+// includeonly, comment content is NEVER rendered under any circumstance --
+// not even conditionally -- so there's no reason to parse a {{template}}
+// or [[link]] that happens to appear inside one.
+comment ::= COMMENT_START comment_run* COMMENT_END {pin=1}
+private comment_run ::= COMMENT_CONTENT

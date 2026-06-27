@@ -26,5 +26,6 @@ class WtLexerTest : WtLexerTestCase() {
     fun testWikiTableSimple() = doTest()
     fun testTableWithMathTag() = doTest()
 
-
+    // templates
+    fun testAuthorTemplate() = doTest()
 }
