@@ -10,6 +10,11 @@ class WikiParsingTest : WtParsingTextCase() {
     fun testNestedTemplates() = doTest()
     fun testWikiLinksSimple() = doTest()
 
+    // tables
+    fun testWikiTableLeadingChars() = doTest()
+    fun testWikiTableSimple() = doTest()
+    fun testTableWithMathTag() = doTest()
+
     fun testParsingTestData() {
         doTest()
     }

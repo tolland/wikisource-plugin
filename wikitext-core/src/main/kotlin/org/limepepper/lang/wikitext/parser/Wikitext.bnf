@@ -60,8 +60,8 @@
     // wikitable
     TABLE_CELL_SEP='|'
     TABLE_CELL_TEXT='regexp:[^{}\[\]|<]+'
-    TABLE_CLOSE='|}'
-    TABLE_OPEN='{|'
+    TABLE_CLOSE='TABLE_CLOSE["|}"]'
+    TABLE_OPEN='TABLE_OPEN["{|"]'
     // template
     TEMPLATE_CLOSE='}}'
     TEMPLATE_EQUALS='='
@@ -74,7 +74,7 @@
     // (link_target, template_name) -- the root cause of the original bug.
     // They are tokens now; no rule below may share these names
     // (case-insensitively).
-    LINK_TARGET='regexp:[^\]|]+'
+    LINK_TARGET='regexp:[^]|]+'
     TEMPLATE_NAME='regexp:[^{}|]+'
 
     // Heading open/close markers -- see WikitextLexer.flex's H_START macro
@@ -172,7 +172,7 @@ list_item ::= (BULLET | NUMBERED | INDENT | DEF_TERM)+ paragraph_content {pin=1}
 // NOT modeled yet -- the lexer's <TABLE> state doesn't distinguish them
 // from ordinary cell text, so they currently just fall into
 // TABLE_CELL_TEXT. Revisit once the lexer grows that sensitivity.
-table ::= TABLE_OPEN table_cell* TABLE_CLOSE {pin=1}
+table ::= TABLE_OPEN [ table_cell_content ] table_cell* TABLE_CLOSE {pin=1}
 private table_cell ::= TABLE_CELL_SEP table_cell_content
 private table_cell_content ::= (inline_item | TABLE_CELL_TEXT)*
 

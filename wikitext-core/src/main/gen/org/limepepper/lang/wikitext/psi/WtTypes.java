@@ -42,8 +42,8 @@ public interface WtTypes {
   IElementType SINGLE_APOS = new WtTokenType("SINGLE_APOS");
   IElementType TABLE_CELL_SEP = new WtTokenType("TABLE_CELL_SEP");
   IElementType TABLE_CELL_TEXT = new WtTokenType("TABLE_CELL_TEXT");
-  IElementType TABLE_CLOSE = new WtTokenType("|}");
-  IElementType TABLE_OPEN = new WtTokenType("{|");
+  IElementType TABLE_CLOSE = new WtTokenType("TABLE_CLOSE[\"|}\"]");
+  IElementType TABLE_OPEN = new WtTokenType("TABLE_OPEN[\"{|\"]");
   IElementType TEMPLATE_CLOSE = new WtTokenType("}}");
   IElementType TEMPLATE_EQUALS = new WtTokenType("=");
   IElementType TEMPLATE_NAME = new WtTokenType("TEMPLATE_NAME");

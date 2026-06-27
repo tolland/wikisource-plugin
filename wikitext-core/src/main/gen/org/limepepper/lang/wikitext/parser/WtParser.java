@@ -260,7 +260,7 @@ public class WtParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // TABLE_OPEN table_cell* TABLE_CLOSE
+  // TABLE_OPEN [ table_cell_content ] table_cell* TABLE_CLOSE
   public static boolean table(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "table")) return false;
     if (!nextTokenIs(b, TABLE_OPEN)) return false;
@@ -269,18 +269,26 @@ public class WtParser implements PsiParser, LightPsiParser {
     r = consumeToken(b, TABLE_OPEN);
     p = r; // pin = 1
     r = r && report_error_(b, table_1(b, l + 1));
+    r = p && report_error_(b, table_2(b, l + 1)) && r;
     r = p && consumeToken(b, TABLE_CLOSE) && r;
     exit_section_(b, l, m, r, p, null);
     return r || p;
   }
 
-  // table_cell*
+  // [ table_cell_content ]
   private static boolean table_1(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "table_1")) return false;
+    table_cell_content(b, l + 1);
+    return true;
+  }
+
+  // table_cell*
+  private static boolean table_2(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "table_2")) return false;
     while (true) {
       int c = current_position_(b);
       if (!table_cell(b, l + 1)) break;
-      if (!empty_element_parsed_guard_(b, "table_1", c)) break;
+      if (!empty_element_parsed_guard_(b, "table_2", c)) break;
     }
     return true;
   }
