@@ -4,10 +4,8 @@ plugins {
     id("org.jetbrains.kotlin.jvm")
     id("org.jetbrains.intellij.platform.module")
     id("org.jetbrains.grammarkit")
+    id("com.diffplug.spotless")
 }
-
-val intellijPlatformVersion = providers.gradleProperty("intellijPlatformVersion").get()
-val intellijPlatformLocalPath = providers.gradleProperty("intellijPlatformLocalPath")
 
 dependencies {
     testImplementation(libs.junit)
