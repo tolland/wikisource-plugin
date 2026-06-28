@@ -1,4 +1,3 @@
-import org.gradle.kotlin.dsl.withType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.intellij.platform.gradle.tasks.PrepareSandboxTask
 
@@ -11,6 +10,13 @@ plugins {
     id("org.jetbrains.intellij.platform.module") apply false
     id("org.jetbrains.grammarkit") apply false
     id("org.jetbrains.kotlin.plugin.serialization") apply false
+    id("com.diffplug.spotless")
+}
+
+idea {
+    module {
+        excludeDirs.add(file("some-generated-dir"))
+    }
 }
 
 

@@ -9,6 +9,7 @@ import com.intellij.ui.content.ContentFactory
 import javax.swing.JButton
 import kotlin.random.Random
 
+
 class MyToolWindowFactory : ToolWindowFactory {
     override fun shouldBeAvailable(project: Project) = true
 

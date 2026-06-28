@@ -14,6 +14,7 @@ pluginManagement {
         id("org.jetbrains.intellij.platform.module") version "2.16.0"
         id("org.jetbrains.kotlin.jvm") version "2.3.20"
         id("org.jetbrains.kotlin.plugin.serialization") version "2.3.20"
+        id("com.diffplug.spotless") version ("8.7.0")
     }
 }
 
@@ -36,3 +37,4 @@ dependencyResolutionManagement {
 
 include("wikitext-core")
 include("wikitext-ui")
+include("src-py")
