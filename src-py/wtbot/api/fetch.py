@@ -65,9 +65,8 @@ def create_fetch(
     # Index: fans out to hundreds of Page: children.
     factory = request.app.state.client_factory
     blob_root = request.app.state.blob_root
-    batch = 200
-    while run_pending(session, factory, blob_root=blob_root, limit=batch) == batch:
-        pass  # keep going until a batch comes back short (queue empty)
+    while run_pending(session, factory, blob_root=blob_root, limit=200) > 0:
+        pass  # keep draining until nothing is left pending
     session.refresh(req)
 
     page = session.exec(
