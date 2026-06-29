@@ -1,37 +1,35 @@
-from wtbot.model.sqlmodel import Page
+"""wtbot FastAPI application.
+
+This is the plugin-facing contract: a thin FastAPI app over the SQLite cache.
+Surfaces (VFS, cache-fill, commit) are described in ``src-py/DESIGN.md``; only a
+health check and a sites vertical slice are wired up so far.
+"""
+
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
-from sqlmodel import Field, SQLModel, create_engine, Session, select
-from wtbot.model import sqlmodel
+from sqlalchemy.engine import Engine
 
-sqlite_file_name = "database.db"
-sqlite_url = f"sqlite:///{sqlite_file_name}"
-
-engine = create_engine(sqlite_url, echo=True)
+from wtbot.api import health, sites
+from wtbot.db import create_db_engine, init_db
 
 
-def create_db_and_tables():
-    SQLModel.metadata.drop_all(engine)
-    SQLModel.metadata.create_all(engine)
+def create_app(engine: Engine | None = None) -> FastAPI:
+    """Build the app. Pass an ``engine`` to point at a different database (tests
+    use this to run against a throwaway SQLite file)."""
+    engine = engine or create_db_engine()
 
-app = FastAPI()
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        init_db(engine)
+        yield
 
+    app = FastAPI(title="wtbot", version="0.1.0", lifespan=lifespan)
+    app.state.engine = engine
 
-@app.on_event("startup")
-def on_startup():
-    create_db_and_tables()
-
-
-@app.post("/page/")
-def create_page(page: Page):
-    with Session(engine) as session:
-        session.add(page)
-        session.commit()
-        session.refresh(page)
-        return page
+    app.include_router(health.router)
+    app.include_router(sites.router)
+    return app
 
 
-@app.get("/pages/")
-def read_pages():
-    with Session(engine) as session:
-        pages = session.exec(select(Page)).all()
-        return pages
+app = create_app()

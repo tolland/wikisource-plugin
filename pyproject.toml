@@ -35,3 +35,8 @@ dev = [
     "black>=23.0",
     "ruff>=0.1.0",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["src-py"]
+testpaths = ["src-py/tests"]
+addopts = "-ra"

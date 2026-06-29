@@ -54,7 +54,7 @@ The lexer uses a frame/state stack to disambiguate context-dependent tokens (e.g
 
 `WtVirtualFileSystem` implements the `wikisource://` protocol. Currently serves a hardcoded in-memory dummy tree (one `Index:` with a few `Page:` children). The tool window (`MyToolWindowFactory`) follows the DataGrip Database Explorer pattern: a custom tree in a side panel, opening real editor tabs via `FileEditorManager` on double-click, which applies the full PSI/lexer/annotator stack.
 
-Real SQLite-backed VFS is planned — the schema is in `src-py/wtbot/schema/schema.sql`.
+Real SQLite-backed VFS is planned — the schema is defined by the SQLModel classes in `src-py/wtbot/sqlmodel/` (see `src-py/DESIGN.md`).
 
 ### SQLite IPC contract
 
@@ -65,14 +65,16 @@ PRAGMA journal_mode = WAL;
 PRAGMA busy_timeout = 5000;
 ```
 
-Writes must use `BEGIN IMMEDIATE` (not bare `BEGIN`) on both sides. The `fetch_requests` table is the job queue: the plugin inserts rows, pywikibot updates `status` as it works, child requests fan out from parent requests via `parent_request_id`. The `commits` table is the outbound log for edits pushed back to the wiki.
+Writes must use `BEGIN IMMEDIATE` (not bare `BEGIN`) on both sides. The `FetchRequest` table is the job queue: the plugin inserts rows, pywikibot updates `status` as it works, child requests fan out from parent requests via `parent_pk`. The `Commit` table is the outbound log for edits pushed back to the wiki; `EditJournal` is the local per-save transaction log.
 
 ### Python sidecar (`wtbot`)
 
-- `src-py/wtbot/main.py` — FastAPI app; also owns the SQLite engine
-- `src-py/wtbot/sqlmodel/` — SQLModel ORM models (`Site`, `Page`, `Revision`, …)
-- `src-py/wtbot/schema/schema.sql` — canonical schema, source of truth for table shapes
-- `src-py/wtbot/notebooks/` — Jupyter notebooks for exploratory pywikibot and SQLModel work
+- `src-py/wtbot/main.py` — FastAPI app factory (`create_app`)
+- `src-py/wtbot/db.py` — SQLite engine + WAL/`BEGIN IMMEDIATE` pragma discipline
+- `src-py/wtbot/sqlmodel/` — SQLModel ORM models, the **single source of truth** for the schema (`Site`, `Namespace`, `Page`, `Transclusion`, `FetchRequest`, `EditJournal`, `Commit`)
+- `src-py/wtbot/api/` — FastAPI routers (`health`, `sites`, …)
+- `src-py/DESIGN.md` — backend operations & data-model design
+- `src-py/tests/` — pytest suite (`uv run --extra dev pytest`)
 
 ### Tests
 

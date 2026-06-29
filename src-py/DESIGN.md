@@ -207,22 +207,24 @@ across works that share a scan.
 
 ### 6.1 Reconcile the two existing schemas
 
-There are currently two divergent definitions and they must converge:
+**Resolved.** There were two divergent definitions; they have been merged into
+the SQLModel classes under `wtbot/sqlmodel/`, which are now the **single source
+of truth**. The hand-written `schema/schema.sql` has been deleted — keeping a
+parallel DDL file split the authority of the model.
 
-- **`schema/schema.sql`** — rich, WAL-IPC-aware: `sites, pages, transclusions,
-  fetch_requests, commits`, FTS5 over bodies. Keyed on `host` / `api_url`.
-- **`sqlmodel/`** — minimal: `Site(family, code, articlepath)`, `Page`,
-  `Revision`, `Namespace`. Keyed on pywikibot `family` / `code`.
+What was carried across from the old `schema.sql`: the rich `pages` shape (inline
+remote-identity/conflict columns), `transclusions`, the fetch queue
+(`fetch_requests` → `FetchRequest`), and the outbound `commits` log (→ `Commit`).
+Site identity is the pywikibot `family`/`code` pair (the request vocabulary
+`title:x family:y code:z`); `host`/`api_url` are derived/optional columns, not the
+key. The old standalone `Revision` model was folded into `pages` (inline remote
+state, matching the original schema design) and `upserts.py` was removed as stale.
 
-**Proposal:** keep `schema.sql` as the architectural target (it already models
-the journal and the queue) but adopt the **pywikibot `family`/`code` site
-identity** from the SQLModel side as canonical, since that is the request
-vocabulary (`title:x family:y code:z`) and what pywikibot itself uses.
-`host` / `api_url` become derived/optional columns on `sites`, not the key.
-
-> Also note: `wtbot/main.py` imports `wtbot.model.sqlmodel` but the package is
-> `wtbot.sqlmodel` — stale import, currently broken. To be fixed when we wire the
-> real app.
+Two things deferred, not lost:
+- **FTS5** (`pages_fts`) for "search/replace across the whole work" — was a
+  virtual table in `schema.sql`; will return as a raw-DDL migration step, since
+  SQLModel doesn't model virtual tables.
+- A real **migration tool**; `init_db()` is create-if-absent for now.
 
 ### 6.2 New table — cache-fill requests (the explicit ask)
 
@@ -453,10 +455,19 @@ class RemoteLink(SQLModel, table=True):
     upstream_checked_at: datetime | None = None
 ```
 
-Links can be seeded automatically (same title on a designated upstream) or set
-explicitly when a staging page was renamed. They attach at the page level; an
-Index-level link plus matching `page_number`s lets the whole work be tracked from
-one assertion.
+Links are seeded by an explicit **clone** operation rather than guessed. The
+planned CLI form:
+
+```
+wikictl clone --src wikisource:en --dest mywikisource:en \
+              --index Index:some_book_of_interest.djvu
+```
+
+`clone` fetches the work from `--src`, writes it into `--dest`, and builds the
+`RemoteLink` rows (Index + each Page) as it goes — so correspondence is asserted
+at creation time, when titles and structure are known, and survives later
+renames in staging. Links attach at the page level; an Index-level link plus
+matching `page_number`s lets the whole work be tracked from one clone.
 
 ### The three-way state (drives pull / rebase / diff)
 

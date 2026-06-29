@@ -40,6 +40,17 @@ bin/
 ### Mac OS ###
 .DS_Store
 
+### Python (wtbot sidecar) ###
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+# SQLite cache DBs created at runtime
+*.db
+*.db-wal
+*.db-shm
+
 ### User added ###
 /.ctxsync/
 /src-py/wtbot/notebooks/
