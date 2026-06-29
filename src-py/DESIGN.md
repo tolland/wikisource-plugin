@@ -372,6 +372,48 @@ A loop, not yet implemented, that drives surface B:
 Concurrency uses the documented SQLite discipline: WAL, `busy_timeout=5000`,
 `BEGIN IMMEDIATE` for every write — on both the Python and Kotlin sides.
 
+### 7.1 Wiki access seam + config injection (implemented)
+
+pywikibot's tutorial flow wants a hand-written `user-config.py` plus family
+files. That doesn't fit a backend driven from three places — pytest, the Typer
+CLI, and an IntelliJ-launched process. So wiki access is behind an injectable
+seam (`wtbot/wiki/`):
+
+- **`WikiSettings`** (`wtbot/settings.py`) — the one config object: `family`,
+  `code`, optional `api_url`, `username`, `ca_bundle`, `config_dir`. Built inline
+  in tests, from flags/env in the CLI (`from_env`), or from a `Site` row
+  (`from_site`). Reads are anonymous; `username` is only for write-back.
+- **`configure_pywikibot()`** (`wtbot/wiki/config.py`) — applies settings
+  *programmatically*: `PYWIKIBOT_NO_USER_CONFIG=1` (no file on disk), an ephemeral
+  `PYWIKIBOT_DIR`, `REQUESTS_CA_BUNDLE` for a self-signed `.lan` cert, and
+  `Site(url=...)` (AutoFamily) so **no family file is needed**. pywikibot is
+  imported lazily, after the env is set.
+- **`WikiClient`** Protocol (`wtbot/wiki/client.py`) — `get_page` +
+  `download_file`. `PywikibotClient` is the real impl; `FakeWikiClient` is the
+  in-memory one tests/CLI use, so the fake path never imports pywikibot.
+
+### 7.2 Dispatch: trust content_model, special-case File (implemented)
+
+How a fetched object is handled is decided by its remote **`content_model`**, not
+by parsing the title ourselves: an Index reports `proofread-index`, a Page
+reports `proofread-page`, a plain article reports `wikitext`. We rely on
+pywikibot's ProofreadPage object model anyway, so the remote's own classification
+is the right source.
+
+The single override is the **File namespace**: a `File:` page's content_model is
+plain `wikitext` (that's its *description* page), but the payload we want is the
+binary scan — so the namespace decides before content_model does.
+`wtbot/wiki/dispatch.py`:
+
+```
+classify(content_model, namespace_role) -> Handling
+   namespace_role == file        -> FILE              (download the binary)
+   content_model 'proofread-index' -> PROOFREAD_INDEX (pagelist, File, fan out)
+   content_model 'proofread-page'  -> PROOFREAD_PAGE  (transcription + quality)
+   content_model 'wikitext'        -> WIKITEXT        (mainspace, Book, Author)
+   else                            -> UNKNOWN
+```
+
 ---
 
 ## 8. Open decisions

@@ -19,7 +19,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project.scripts]
-mqttbot = "wtbot.cli:run_cli"
+wtbot = "wtbot.cli:run_cli"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src-py/wtbot"]
