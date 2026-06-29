@@ -6,5 +6,9 @@
 
         <virtualFileSystem key="vcs-log" implementationClass="org.limepepper.lang.wikitext.vfs.WtVirtualFileSystem"/>
 
+        <applicationService
+            serviceImplementation="org.limepepper.lang.wikitext.vfs.backend.WtVfsService"
+        />
+
     </extensions>
 </idea-plugin>
