@@ -1,5 +1,6 @@
 <script>
   import VfsBrowser from './VfsBrowser.svelte';
+  import WikitextViewer from './WikitextViewer.svelte';
 
   let activeTab = $state('indexes');
 
@@ -117,7 +118,7 @@
                   <span>{selected.body_length.toLocaleString()} characters</span>
                 </div>
               </header>
-              <div class="wikitext">{selected.body}</div>
+              <WikitextViewer content={selected.body} />
             </article>
           {:else}
             <div class="empty">Select an Index page to inspect its cached body.</div>
@@ -230,20 +231,6 @@
 
   article { animation: enter 260ms ease both; }
   header { margin-bottom: 1.5rem; }
-
-  .wikitext {
-    min-height: 55vh;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    border: 1px solid rgba(72, 49, 31, 0.18);
-    border-radius: 24px;
-    background: rgba(255, 252, 240, 0.82);
-    box-shadow: 0 24px 70px rgba(62, 44, 30, 0.18);
-    padding: clamp(1rem, 3vw, 2rem);
-    font-family: "Berkeley Mono", "SFMono-Regular", Consolas, monospace;
-    font-size: 0.95rem;
-    line-height: 1.65;
-  }
 
   @keyframes enter {
     from { opacity: 0; transform: translateY(8px); }

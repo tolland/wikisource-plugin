@@ -1,4 +1,6 @@
 <script>
+  import WikitextViewer from './WikitextViewer.svelte';
+
   // Current path in the VFS tree (array of segments for breadcrumb)
   let pathParts = $state([]);
   let children = $state([]);
@@ -137,7 +139,7 @@
             {/if}
           </div>
         </header>
-        <div class="wikitext" class:stub={selectedFile.stub}>{selectedFile.content}</div>
+        <WikitextViewer content={selectedFile.content} stub={selectedFile.stub} />
       </article>
     {:else if !loading}
       <div class="empty">Select a file to read its wikitext.</div>
@@ -250,11 +252,6 @@
     font-size: clamp(1rem, 2.5vw, 1.8rem);
     word-break: break-all;
     max-width: 100%;
-  }
-
-  .wikitext.stub {
-    color: #73583d;
-    font-style: italic;
   }
 
   @media (max-width: 860px) {
