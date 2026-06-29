@@ -1,0 +1,17 @@
+default_install_hook_types:
+  - pre-commit
+  - pre-push
+
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check --fix
+        language: system
+        types_or: [python, pyi]
+      - id: black
+        name: black
+        entry: uv run black
+        language: system
+        types_or: [python, pyi]
