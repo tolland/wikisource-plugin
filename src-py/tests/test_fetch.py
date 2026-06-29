@@ -189,7 +189,7 @@ def test_index_fanout_creates_pages_and_children(app_with_index_fanout, engine):
     # Parent request ends done after all children drain.
     req = body["request"]
     assert req["status"] == FetchStatus.done.value
-    assert req["progress_total"] == 4   # 1 index + 3 pages
+    assert req["progress_total"] == 4  # 1 index + 3 pages
     assert req["progress_done"] == 4
 
     # Index page carries page_count (from <pagelist> wikitext).
@@ -244,13 +244,18 @@ def test_index_fanout_no_pagelist_creates_no_children(engine, tmp_path):
     with TestClient(app) as c:
         body = c.post(
             "/fetch/",
-            json={"title": _INDEX_TITLE, "family": "mywikisource", "code": "en", "depth": 1},
+            json={
+                "title": _INDEX_TITLE,
+                "family": "mywikisource",
+                "code": "en",
+                "depth": 1,
+            },
         ).json()
 
     assert body["request"]["status"] == FetchStatus.done.value
     with Session(engine) as s:
-        assert len(s.exec(select(FetchRequest)).all()) == 1   # just the parent
-        assert len(s.exec(select(Page)).all()) == 1           # just the index
+        assert len(s.exec(select(FetchRequest)).all()) == 1  # just the parent
+        assert len(s.exec(select(Page)).all()) == 1  # just the index
 
 
 def test_file_fetch_downloads_blob(engine, tmp_path):
@@ -268,7 +273,9 @@ def test_file_fetch_downloads_blob(engine, tmp_path):
         sha1="a" * 40,
         size=100,
     )
-    wiki = FakeWikiClient(pages={_FILE_TITLE: file_remote}, files={_FILE_TITLE: _FAKE_FILE_BYTES})
+    wiki = FakeWikiClient(
+        pages={_FILE_TITLE: file_remote}, files={_FILE_TITLE: _FAKE_FILE_BYTES}
+    )
     app = create_app(
         engine=engine,
         client_factory=lambda site: wiki,

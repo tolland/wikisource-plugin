@@ -32,9 +32,10 @@ Issues = "https://github.com/tolland/wikisource-plugin/issues"
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0",
-    "black>=23.0",
-    "ruff>=0.1.0",
+    "black>=26.0",
+    "pre-commit>=4.0",
+    "pytest>=9.1.1",
+    "ruff>=0.15",
     "vcrpy>=6.0",
 ]
 
@@ -42,3 +43,32 @@ dev = [
 pythonpath = ["src-py"]
 testpaths = ["src-py/tests"]
 addopts = "-ra -q --strict-markers"
+
+[tool.black]
+line-length = 88
+target-version = ["py313"]
+extend-exclude = '''
+/(
+    \.venv
+  | \.gradle
+  | build
+  | src-py/wtbot/notebooks
+)/
+'''
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+src = ["src-py"]
+extend-exclude = [
+    "src-py/wtbot/notebooks",
+]
+
+[tool.ruff.lint]
+select = [
+    "E4",
+    "E7",
+    "E9",
+    "F",
+    "I",
+]

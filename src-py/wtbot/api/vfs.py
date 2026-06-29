@@ -35,7 +35,9 @@ router = APIRouter(prefix="/vfs", tags=["vfs"])
 
 # --- A) Operations -------------------------------------------------------
 @router.get("/children", response_model=ListChildrenResponse)
-def list_children(path: str = Query(..., description="Parent node path")) -> ListChildrenResponse:
+def list_children(
+    path: str = Query(..., description="Parent node path")
+) -> ListChildrenResponse:
     """VFS getChildren(). Reads cached rows from SQLite; does not fetch from wiki."""
     raise NotImplementedError
 
@@ -67,7 +69,9 @@ def rename(req: RenameRequest) -> OperationResult:
 @router.post("/delete", response_model=OperationResult)
 def delete(req: DeleteRequest) -> OperationResult:
     """VFS deleteFile(). Likely returns status=unsupported for most namespaces."""
-    return OperationResult(status=OperationStatus.unsupported, message="delete not supported yet")
+    return OperationResult(
+        status=OperationStatus.unsupported, message="delete not supported yet"
+    )
 
 
 @router.post("/child", response_model=OperationResult)
@@ -79,7 +83,9 @@ def create_child(req: CreateChildRequest) -> OperationResult:
 # --- B) Change feed ------------------------------------------------------
 @router.get("/changes", response_model=ChangesSinceResponse)
 def changes_since(
-    cursor: str | None = Query(None, description="Opaque cursor from previous poll; None = from start"),
+    cursor: str | None = Query(
+        None, description="Opaque cursor from previous poll; None = from start"
+    ),
     limit: int = Query(100, ge=1, le=1000),
 ) -> ChangesSinceResponse:
     """Poll endpoint driving the plugin's refresh loop. Renames/moves are

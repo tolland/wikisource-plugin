@@ -48,9 +48,7 @@ class Namespace(SQLModel, table=True):
     Page from a 250-wiki and a Page from a 104-wiki be recognised as the same
     kind of object."""
 
-    __table_args__ = (
-        UniqueConstraint("site_pk", "key", name="uq_ns_site_key"),
-    )
+    __table_args__ = (UniqueConstraint("site_pk", "key", name="uq_ns_site_key"),)
 
     pk: int | None = Field(default=None, primary_key=True)
     site_pk: int = Field(foreign_key="site.pk")

@@ -6,7 +6,6 @@ testable with FakeWikiClient and reusable from either the API (inline, today) or
 a future background loop / ``wtbot worker`` command.
 """
 
-
 import re
 from collections.abc import Callable
 from pathlib import Path
@@ -23,8 +22,8 @@ from wtbot.sqlmodel import (
     Site,
     role_for_canonical,
 )
-from wtbot.sqlmodel.namespace import NsRole
 from wtbot.sqlmodel.fetch_request import FetchKind
+from wtbot.sqlmodel.namespace import NsRole
 from wtbot.timeutil import utcnow
 from wtbot.wiki.client import WikiClient, get_wiki_client
 from wtbot.wiki.types import PageNotFound, RemotePage
@@ -96,7 +95,9 @@ def _process(
             child_count = _fan_out_index(session, site, req, page, client, blob_root)
             req.progress_total = 1 + child_count
             req.progress_done = 1
-            req.status = FetchStatus.in_progress if child_count > 0 else FetchStatus.done
+            req.status = (
+                FetchStatus.in_progress if child_count > 0 else FetchStatus.done
+            )
         else:
             req.progress_total = 1
             req.progress_done = 1
@@ -113,7 +114,10 @@ def _process(
     session.add(req)
 
     # Propagate completion to the parent (if this is a child request).
-    if req.status in (FetchStatus.done, FetchStatus.error) and req.parent_pk is not None:
+    if (
+        req.status in (FetchStatus.done, FetchStatus.error)
+        and req.parent_pk is not None
+    ):
         _update_parent_progress(session, req)
 
     session.commit()
@@ -125,7 +129,10 @@ def _update_parent_progress(session: Session, child_req: FetchRequest) -> None:
     if parent is None:
         return
     parent.progress_done = (parent.progress_done or 0) + 1
-    if parent.progress_total is not None and parent.progress_done >= parent.progress_total:
+    if (
+        parent.progress_total is not None
+        and parent.progress_done >= parent.progress_total
+    ):
         parent.status = FetchStatus.done
     parent.updated_at = utcnow()
     session.add(parent)

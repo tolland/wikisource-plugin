@@ -35,19 +35,26 @@ class Node(BaseModel):
     """One entry as the VFS sees it. `stable_id` is the rename-survival key
     (MediaWiki pageid) -- distinct from `path`, which changes on rename."""
 
-    path: str = Field(..., description="wikisource://-relative path, uniquely identifies the node")
+    path: str = Field(
+        ..., description="wikisource://-relative path, uniquely identifies the node"
+    )
     name: str
     kind: NodeKind
     stable_id: int | None = Field(
-        None, description="MediaWiki pageid; survives renames. None until first remote fetch."
+        None,
+        description="MediaWiki pageid; survives renames. None until first remote fetch.",
     )
-    revid: int | None = Field(None, description="Revision id as of last fetch; the conflict token.")
+    revid: int | None = Field(
+        None, description="Revision id as of last fetch; the conflict token."
+    )
     timestamp: str | None = Field(
         None,
         description="Drives VirtualFile.getTimeStamp(). Reflects local_modified_at, "
         "NOT remote revision time -- see schema model notes.",
     )
-    length: int | None = Field(None, description="Content length in bytes; None for directories.")
+    length: int | None = Field(
+        None, description="Content length in bytes; None for directories."
+    )
     writable: bool = False
 
 
@@ -143,9 +150,9 @@ class OperationResult(BaseModel):
 class ChangeKind(str, Enum):
     create = "create"
     delete = "delete"
-    content = "content"   # body changed, identity/path unchanged
-    rename = "rename"     # path changed, identity (stable_id) preserved
-    move = "move"         # parent changed, identity preserved
+    content = "content"  # body changed, identity/path unchanged
+    rename = "rename"  # path changed, identity (stable_id) preserved
+    move = "move"  # parent changed, identity preserved
 
 
 class Change(BaseModel):
@@ -154,7 +161,8 @@ class Change(BaseModel):
 
     kind: ChangeKind
     stable_id: int | None = Field(
-        None, description="Identity key; ties a rename/move's old and new paths to one node."
+        None,
+        description="Identity key; ties a rename/move's old and new paths to one node.",
     )
     path: str = Field(..., description="New/current path of the affected node.")
     old_path: str | None = Field(
@@ -165,7 +173,8 @@ class Change(BaseModel):
     )
     revid: int | None = None
     requestor: str | None = Field(
-        None, description="Null if externally originated; set if this echoes a plugin-initiated op."
+        None,
+        description="Null if externally originated; set if this echoes a plugin-initiated op.",
     )
 
 
@@ -175,5 +184,7 @@ class ChangesSinceResponse(BaseModel):
     and replays the changes into the platform on the EDT in a write action."""
 
     changes: list[Change]
-    next_cursor: str = Field(..., description="Opaque; pass back as `cursor` on the next poll.")
+    next_cursor: str = Field(
+        ..., description="Opaque; pass back as `cursor` on the next poll."
+    )
     has_more: bool = False

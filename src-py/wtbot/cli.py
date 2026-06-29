@@ -16,7 +16,9 @@ app = typer.Typer(
 )
 
 
-def _settings(family: str, code: str, api_url: str | None, ca_bundle: str | None) -> WikiSettings:
+def _settings(
+    family: str, code: str, api_url: str | None, ca_bundle: str | None
+) -> WikiSettings:
     return WikiSettings(family=family, code=code, api_url=api_url, ca_bundle=ca_bundle)
 
 
@@ -37,7 +39,9 @@ def fetch_page(
     family: str = typer.Option("wikisource"),
     code: str = typer.Option("en"),
     api_url: str | None = typer.Option(None, help="action API URL stored on the Site"),
-    depth: int = typer.Option(1, help="expansion depth: 0=page only, 1=expand Index/File"),
+    depth: int = typer.Option(
+        1, help="expansion depth: 0=page only, 1=expand Index/File"
+    ),
     base_url: str = typer.Option(
         lambda: os.environ.get("WTBOT_API_URL", "http://127.0.0.1:8000"),
         help="wtbot API base URL",

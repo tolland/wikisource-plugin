@@ -30,7 +30,10 @@ def test_per_site_namespace_map(session):
     session.commit()
     # en.wikisource uses 106 for Index; a fresh ProofreadPage install uses 252.
     ns = Namespace(
-        site_pk=site.pk, key=106, canonical_name="Index", local_name="Index",
+        site_pk=site.pk,
+        key=106,
+        canonical_name="Index",
+        local_name="Index",
         role=role_for_canonical("Index"),
     )
     session.add(ns)

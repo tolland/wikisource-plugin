@@ -13,9 +13,7 @@ class Site(SQLModel, table=True):
     key, because pageids/revids from two independent wikis are not comparable.
     """
 
-    __table_args__ = (
-        UniqueConstraint("family", "code", name="uq_site_family_code"),
-    )
+    __table_args__ = (UniqueConstraint("family", "code", name="uq_site_family_code"),)
 
     pk: int | None = Field(default=None, primary_key=True)
 

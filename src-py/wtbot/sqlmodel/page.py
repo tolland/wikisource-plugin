@@ -26,9 +26,7 @@ class Page(SQLModel, table=True):
     this can't be ``pageid INTEGER PRIMARY KEY``.
     """
 
-    __table_args__ = (
-        UniqueConstraint("site_pk", "title", name="uq_page_site_title"),
-    )
+    __table_args__ = (UniqueConstraint("site_pk", "title", name="uq_page_site_title"),)
 
     pk: int | None = Field(default=None, primary_key=True)
     site_pk: int = Field(foreign_key="site.pk")

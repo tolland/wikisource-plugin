@@ -1,3 +1,6 @@
+# Don't add uv.lock as it contains local pypi mirror urls
+uv.lock
+
 .gradle
 build/
 !gradle/wrapper/gradle-wrapper.jar
@@ -50,6 +53,8 @@ __pycache__/
 *.db
 *.db-wal
 *.db-shm
+# File blobs created by the sidecar runtime cache
+/blobs/
 
 ### User added ###
 /.ctxsync/
