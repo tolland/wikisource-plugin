@@ -14,10 +14,10 @@ from sqlmodel import Session, select
 
 from wtbot.settings import WikiSettings
 from wtbot.sqlmodel import (
-    FileBlob,
     FetchRequest,
     FetchState,
     FetchStatus,
+    FileBlob,
     Page,
     Site,
     role_for_canonical,
