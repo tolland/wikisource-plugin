@@ -6,7 +6,6 @@ testable with FakeWikiClient and reusable from either the API (inline, today) or
 a future background loop / ``wtbot worker`` command.
 """
 
-from __future__ import annotations
 
 import re
 from collections.abc import Callable

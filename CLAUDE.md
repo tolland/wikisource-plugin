@@ -27,7 +27,7 @@ uv run fastapi dev src-py/wtbot/main.py   # start FastAPI dev server
 uv run pytest                              # run Python tests
 ```
 
-We are using modern python version 3.12 and above for generics, type aliases, better f-strings, and unpacking kwargs
+We are using modern python version 3.13 and above for generics, type aliases, better f-strings, and unpacking kwargs
 
 ## Architecture
 

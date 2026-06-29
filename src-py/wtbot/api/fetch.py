@@ -6,8 +6,6 @@ writes the page back to SQLite. The response carries the request row plus the
 resulting cached page.
 """
 
-from __future__ import annotations
-
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlmodel import Session, select
@@ -54,7 +52,10 @@ def create_fetch(
     site = _get_or_create_site(session, payload.family, payload.code, payload.api_url)
 
     req = FetchRequest(
-        site_pk=site.pk, title=payload.title, kind=payload.kind, depth=payload.depth
+        site_pk=site.pk,
+        title=payload.title,
+        kind=payload.kind,
+        depth=payload.depth,
     )
     session.add(req)
     session.commit()
