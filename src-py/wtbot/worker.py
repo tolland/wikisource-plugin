@@ -16,6 +16,7 @@ from sqlmodel import Session, select
 
 from wtbot.settings import WikiSettings
 from wtbot.sqlmodel import (
+    FileBlob,
     FetchRequest,
     FetchState,
     FetchStatus,
@@ -140,16 +141,38 @@ def _download_file_blob(
     client: WikiClient,
     blob_root: Path | None,
 ) -> None:
-    """Download the binary blob for a File: page and store the path on the row."""
+    """Fetch imageinfo + download binary for a File: page; upsert a FileBlob row."""
+    if page.pk is None:
+        return  # page must already be persisted
+
     dest = _blob_path(blob_root, site, file_title)
     try:
+        info = client.get_file_info(file_title)
         actual = client.download_file(file_title, dest)
-        page.file_ref = str(actual)
-        session.add(page)
-        session.commit()
-        session.refresh(page)
     except PageNotFound:
-        pass  # blob not available; proceed without file_ref
+        return  # blob not available; proceed without FileBlob
+
+    blob = session.exec(
+        select(FileBlob).where(FileBlob.page_pk == page.pk)
+    ).first()
+    if blob is None:
+        blob = FileBlob(page_pk=page.pk)
+
+    blob.file_sha1 = info.file_sha1
+    blob.size = info.size
+    blob.mime = info.mime
+    blob.url = info.url
+    blob.upload_timestamp = info.upload_timestamp
+    blob.uploader = info.uploader
+    blob.upload_comment = info.upload_comment
+    blob.page_count = info.page_count
+    blob.width = info.width
+    blob.height = info.height
+    blob.local_path = str(actual)
+    blob.downloaded_at = utcnow()
+
+    session.add(blob)
+    session.commit()
 
 
 def _fan_out_index(

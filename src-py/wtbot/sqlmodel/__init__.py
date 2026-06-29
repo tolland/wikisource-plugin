@@ -9,6 +9,7 @@ classes. See ``src-py/DESIGN.md`` for the rationale behind each table.
 from wtbot.sqlmodel.commit import Commit, CommitStatus
 from wtbot.sqlmodel.edit_journal import EditJournal
 from wtbot.sqlmodel.fetch_request import FetchKind, FetchRequest, FetchStatus
+from wtbot.sqlmodel.file_blob import FileBlob
 from wtbot.sqlmodel.namespace import Namespace, NsRole, role_for_canonical
 from wtbot.sqlmodel.page import FetchState, Page
 from wtbot.sqlmodel.site import Site
@@ -21,6 +22,7 @@ __all__ = [
     "role_for_canonical",
     "Page",
     "FetchState",
+    "FileBlob",
     "Transclusion",
     "FetchRequest",
     "FetchKind",

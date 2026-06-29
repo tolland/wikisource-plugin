@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
 from wtbot.main import create_app
-from wtbot.sqlmodel import FetchRequest, FetchStatus, Page
+from wtbot.sqlmodel import FetchRequest, FetchStatus, FileBlob, Page
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.types import RemotePage
 
@@ -192,16 +192,15 @@ def test_index_fanout_creates_pages_and_children(app_with_index_fanout, engine):
     assert req["progress_total"] == 4   # 1 index + 3 pages
     assert req["progress_done"] == 4
 
-    # Index page carries page_count and file_ref.
+    # Index page carries page_count (from <pagelist> wikitext).
     page = body["page"]
     assert page is not None
     assert page["page_count"] == 3
-    assert page["file_ref"] is not None
 
     # Blob was written to the configured blob_root.
-    blob = tmp_path / "blobs" / "mywikisource" / "en" / "Tractatus.djvu"
-    assert blob.exists()
-    assert blob.read_bytes() == _FAKE_FILE_BYTES
+    blob_file = tmp_path / "blobs" / "mywikisource" / "en" / "Tractatus.djvu"
+    assert blob_file.exists()
+    assert blob_file.read_bytes() == _FAKE_FILE_BYTES
 
     # 4 FetchRequests: the parent + 3 children.
     with Session(engine) as s:
@@ -220,6 +219,17 @@ def test_index_fanout_creates_pages_and_children(app_with_index_fanout, engine):
         assert _INDEX_TITLE in titles
         for n in range(1, 4):
             assert f"Page:Tractatus.djvu/{n}" in titles
+
+    # FileBlob row exists for the index (via the File: download).
+    with Session(engine) as s:
+        index_page = s.exec(select(Page).where(Page.title == _INDEX_TITLE)).one()
+        file_blobs = s.exec(select(FileBlob).where(FileBlob.page_pk == index_page.pk)).all()
+        assert len(file_blobs) == 1
+        fb = file_blobs[0]
+        assert fb.mime == "image/vnd.djvu"
+        assert fb.size == len(_FAKE_FILE_BYTES)
+        assert fb.local_path is not None
+        assert fb.local_path == str(blob_file)
 
 
 def test_index_fanout_no_pagelist_creates_no_children(engine, tmp_path):
@@ -274,8 +284,17 @@ def test_file_fetch_downloads_blob(engine, tmp_path):
     page = body["page"]
     assert page is not None
     assert page["namespace_role"] == "file"
-    assert page["file_ref"] is not None
 
-    blob = tmp_path / "blobs" / "mywikisource" / "en" / "Tractatus.djvu"
-    assert blob.exists()
-    assert blob.read_bytes() == _FAKE_FILE_BYTES
+    blob_file = tmp_path / "blobs" / "mywikisource" / "en" / "Tractatus.djvu"
+    assert blob_file.exists()
+    assert blob_file.read_bytes() == _FAKE_FILE_BYTES
+
+    # FileBlob carries the stat-like metadata.
+    with Session(engine) as s:
+        file_page = s.exec(select(Page).where(Page.title == _FILE_TITLE)).one()
+        fb = s.exec(select(FileBlob).where(FileBlob.page_pk == file_page.pk)).one()
+        assert fb.mime == "image/vnd.djvu"
+        assert fb.size == len(_FAKE_FILE_BYTES)
+        assert fb.file_sha1 is not None and len(fb.file_sha1) == 40
+        assert fb.local_path == str(blob_file)
+        assert fb.downloaded_at is not None

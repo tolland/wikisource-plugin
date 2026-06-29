@@ -61,8 +61,7 @@ class Page(SQLModel, table=True):
     quality_level: int | None = None  # ProofreadPage <pagequality level="N"/>, 0-4
 
     # Index-role specific (null otherwise)
-    file_ref: str | None = None  # path of the backing PDF/DjVu blob on disk
-    page_count: int | None = None  # total pages per the Index <pagelist>
+    page_count: int | None = None  # total pages per the Index <pagelist> (wikitext source)
 
     fetch_status: FetchState = FetchState.unfetched
     fetch_error: str | None = None

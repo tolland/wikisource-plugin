@@ -14,12 +14,14 @@ from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from wtbot.settings import WikiSettings
-from wtbot.wiki.types import PageNotFound, RemotePage
+from wtbot.wiki.types import PageNotFound, RemoteFileInfo, RemotePage
 
 
 @runtime_checkable
 class WikiClient(Protocol):
     def get_page(self, title: str) -> RemotePage: ...
+
+    def get_file_info(self, title: str) -> RemoteFileInfo: ...
 
     def download_file(self, title: str, dest: Path) -> Path: ...
 
@@ -60,6 +62,31 @@ class PywikibotClient:
             size=rev.size,
         )
 
+    def get_file_info(self, title: str) -> RemoteFileInfo:
+        filepage = self._pwb.FilePage(self.site, title)
+        if not filepage.exists():
+            raise PageNotFound(title)
+        fi = filepage.latest_file_info
+        # Metadata is a list of {name, value} dicts from the MediaWiki API.
+        metadata: dict[str, str] = {}
+        if fi.metadata:
+            for entry in fi.metadata:
+                metadata[entry.get("name", "")] = entry.get("value", "")
+        page_count_raw = metadata.get("PageCount") or metadata.get("pagecount")
+        return RemoteFileInfo(
+            title=title,
+            file_sha1=fi.sha1,
+            size=fi.size,
+            mime=fi.mime,
+            url=fi.url,
+            upload_timestamp=getattr(fi, "timestamp", None),
+            uploader=getattr(fi, "user", None),
+            upload_comment=getattr(fi, "comment", None),
+            page_count=int(page_count_raw) if page_count_raw else None,
+            width=getattr(fi, "width", None),
+            height=getattr(fi, "height", None),
+        )
+
     def download_file(self, title: str, dest: Path) -> Path:
         dest = Path(dest)
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -86,6 +113,29 @@ class FakeWikiClient:
             return self._pages[title]
         except KeyError:
             raise PageNotFound(title) from None
+
+    def get_file_info(self, title: str) -> RemoteFileInfo:
+        try:
+            data = self._files[title]
+        except KeyError:
+            raise PageNotFound(title) from None
+        import hashlib
+
+        sha1 = hashlib.sha1(data).hexdigest()
+        ext = title.rsplit(".", 1)[-1].lower() if "." in title else ""
+        mime = {
+            "djvu": "image/vnd.djvu",
+            "pdf": "application/pdf",
+            "png": "image/png",
+            "jpg": "image/jpeg",
+        }.get(ext, "application/octet-stream")
+        return RemoteFileInfo(
+            title=title,
+            file_sha1=sha1,
+            size=len(data),
+            mime=mime,
+            url=f"https://fake.wiki/images/{title.split(':', 1)[-1]}",
+        )
 
     def download_file(self, title: str, dest: Path) -> Path:
         try:
