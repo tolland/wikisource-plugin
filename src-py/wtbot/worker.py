@@ -23,6 +23,7 @@ from wtbot.sqlmodel import (
     Site,
     role_for_canonical,
 )
+from wtbot.sqlmodel.namespace import NsRole
 from wtbot.sqlmodel.fetch_request import FetchKind
 from wtbot.timeutil import utcnow
 from wtbot.wiki.client import WikiClient, get_wiki_client
@@ -82,7 +83,16 @@ def _process(
         remote = client.get_page(req.title)
         page = _upsert_page(session, site, remote)
 
-        if req.kind == FetchKind.index and req.depth > 0:
+        # Drive behaviour from what was actually fetched, not from req.kind.
+        role = role_for_canonical(remote.namespace_canonical or "")
+        if role == NsRole.file:
+            # File: pages report content_model='wikitext' (the description page)
+            # but the real payload is the binary blob — always download it.
+            _download_file_blob(session, site, page, remote.title, client, blob_root)
+            req.progress_total = 1
+            req.progress_done = 1
+            req.status = FetchStatus.done
+        elif remote.content_model == "proofread-index" and req.depth > 0:
             child_count = _fan_out_index(session, site, req, page, client, blob_root)
             req.progress_total = 1 + child_count
             req.progress_done = 1
@@ -122,6 +132,26 @@ def _update_parent_progress(session: Session, child_req: FetchRequest) -> None:
     # Caller commits.
 
 
+def _download_file_blob(
+    session: Session,
+    site: Site,
+    page: Page,
+    file_title: str,
+    client: WikiClient,
+    blob_root: Path | None,
+) -> None:
+    """Download the binary blob for a File: page and store the path on the row."""
+    dest = _blob_path(blob_root, site, file_title)
+    try:
+        actual = client.download_file(file_title, dest)
+        page.file_ref = str(actual)
+        session.add(page)
+        session.commit()
+        session.refresh(page)
+    except PageNotFound:
+        pass  # blob not available; proceed without file_ref
+
+
 def _fan_out_index(
     session: Session,
     site: Site,
@@ -135,17 +165,7 @@ def _fan_out_index(
     Returns the number of child FetchRequests created (0 if page count unknown).
     """
     file_title = _index_to_file_title(req.title)
-
-    # Try to download the backing file blob.
-    dest = _blob_path(blob_root, site, file_title)
-    try:
-        actual = client.download_file(file_title, dest)
-        index_page.file_ref = str(actual)
-        session.add(index_page)
-        session.commit()
-        session.refresh(index_page)
-    except PageNotFound:
-        pass  # file not available yet; proceed without blob
+    _download_file_blob(session, site, index_page, file_title, client, blob_root)
 
     page_count = _parse_page_count(index_page.body or "")
     if not page_count:

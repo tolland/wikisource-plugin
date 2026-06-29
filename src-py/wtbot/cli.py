@@ -37,6 +37,7 @@ def fetch_page(
     family: str = typer.Option("wikisource"),
     code: str = typer.Option("en"),
     api_url: str | None = typer.Option(None, help="action API URL stored on the Site"),
+    depth: int = typer.Option(1, help="expansion depth: 0=page only, 1=expand Index/File"),
     base_url: str = typer.Option(
         lambda: os.environ.get("WTBOT_API_URL", "http://127.0.0.1:8000"),
         help="wtbot API base URL",
@@ -46,6 +47,8 @@ def fetch_page(
 
     This calls the running wtbot server, which creates a FetchRequest, drains it
     (the worker makes the pywikibot call), and writes the page back to SQLite.
+    For Index: and File: pages depth=1 (the default) triggers full expansion:
+    blob download + per-page child requests.
     """
     import httpx
 
@@ -54,7 +57,7 @@ def fetch_page(
         "family": family,
         "code": code,
         "api_url": api_url,
-        "kind": "single",
+        "depth": depth,
     }
     resp = httpx.post(f"{base_url.rstrip('/')}/fetch/", json=payload, timeout=120.0)
     resp.raise_for_status()

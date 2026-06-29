@@ -171,7 +171,7 @@ def test_refetch_updates_in_place(app_with_fake, engine):
 
 
 def test_index_fanout_creates_pages_and_children(app_with_index_fanout, engine):
-    """kind=index with depth=1: index + 3 page children are all fetched."""
+    """depth=1 on a proofread-index: index + 3 page children are all fetched."""
     client, index_remote, tmp_path = app_with_index_fanout
     resp = client.post(
         "/fetch/",
@@ -179,8 +179,8 @@ def test_index_fanout_creates_pages_and_children(app_with_index_fanout, engine):
             "title": _INDEX_TITLE,
             "family": "mywikisource",
             "code": "en",
-            "kind": "index",
             "depth": 1,
+            # kind omitted — fan-out is driven by content_model, not kind
         },
     )
     assert resp.status_code == 202
@@ -234,10 +234,48 @@ def test_index_fanout_no_pagelist_creates_no_children(engine, tmp_path):
     with TestClient(app) as c:
         body = c.post(
             "/fetch/",
-            json={"title": _INDEX_TITLE, "family": "mywikisource", "code": "en", "kind": "index", "depth": 1},
+            json={"title": _INDEX_TITLE, "family": "mywikisource", "code": "en", "depth": 1},
         ).json()
 
     assert body["request"]["status"] == FetchStatus.done.value
     with Session(engine) as s:
         assert len(s.exec(select(FetchRequest)).all()) == 1   # just the parent
         assert len(s.exec(select(Page)).all()) == 1           # just the index
+
+
+def test_file_fetch_downloads_blob(engine, tmp_path):
+    """Fetching a File: page downloads the binary blob regardless of depth."""
+    file_remote = RemotePage(
+        title=_FILE_TITLE,
+        namespace_key=6,
+        namespace_canonical="File",
+        content_model="wikitext",  # MediaWiki reports wikitext for the description page
+        text="[[Category:DjVu files]]",
+        pageid=7,
+        revid=999,
+        user="uploader",
+        comment="upload",
+        sha1="a" * 40,
+        size=100,
+    )
+    wiki = FakeWikiClient(pages={_FILE_TITLE: file_remote}, files={_FILE_TITLE: _FAKE_FILE_BYTES})
+    app = create_app(
+        engine=engine,
+        client_factory=lambda site: wiki,
+        blob_root=tmp_path / "blobs",
+    )
+    with TestClient(app) as c:
+        body = c.post(
+            "/fetch/",
+            json={"title": _FILE_TITLE, "family": "mywikisource", "code": "en"},
+        ).json()
+
+    assert body["request"]["status"] == FetchStatus.done.value
+    page = body["page"]
+    assert page is not None
+    assert page["namespace_role"] == "file"
+    assert page["file_ref"] is not None
+
+    blob = tmp_path / "blobs" / "mywikisource" / "en" / "Tractatus.djvu"
+    assert blob.exists()
+    assert blob.read_bytes() == _FAKE_FILE_BYTES
