@@ -55,3 +55,5 @@ class RemotePage:
     comment: str | None = None
     sha1: str | None = None
     size: int | None = None
+    # ProofreadPage: total page count from IndexPage.num_pages (not <pagelist> parsing)
+    page_count: int | None = None

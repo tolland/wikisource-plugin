@@ -46,6 +46,18 @@ class PywikibotClient:
             raise PageNotFound(title)
         rev = page.latest_revision
         ns = page.namespace()
+
+        # For Index pages use IndexPage so we get num_pages from the ProofreadPage
+        # extension rather than parsing <pagelist> ourselves or relying on file
+        # imageinfo metadata (which is absent for many file types).
+        page_count = None
+        if page.content_model == "proofread-index":
+            try:
+                from pywikibot.proofreadpage import IndexPage as _IndexPage
+                page_count = _IndexPage(self.site, title).num_pages
+            except Exception:
+                pass
+
         return RemotePage(
             title=page.title(),
             namespace_key=ns.id,
@@ -60,6 +72,7 @@ class PywikibotClient:
             comment=getattr(rev, "comment", None),
             sha1=rev.sha1,
             size=rev.size,
+            page_count=page_count,
         )
 
     def get_file_info(self, title: str) -> RemoteFileInfo:

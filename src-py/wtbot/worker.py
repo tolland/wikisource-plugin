@@ -190,7 +190,9 @@ def _fan_out_index(
     file_title = _index_to_file_title(req.title)
     _download_file_blob(session, site, index_page, file_title, client, blob_root)
 
-    page_count = _parse_page_count(index_page.body or "")
+    # Prefer page_count set by _upsert_page (from IndexPage.num_pages via
+    # PywikibotClient); fall back to <pagelist> parsing for FakeWikiClient.
+    page_count = index_page.page_count or _parse_page_count(index_page.body or "")
     if not page_count:
         return 0
 
@@ -229,6 +231,10 @@ def _upsert_page(session: Session, site: Site, remote: RemotePage) -> Page:
     page.contributor = remote.user
     page.comment = remote.comment
     page.sha1 = remote.sha1
+    # page_count from IndexPage.num_pages (PywikibotClient) takes priority; the
+    # <pagelist> fallback in _fan_out_index covers FakeWikiClient in tests.
+    if remote.page_count is not None:
+        page.page_count = remote.page_count
     page.dirty = False
     page.fetch_status = FetchState.done
     page.fetch_error = None

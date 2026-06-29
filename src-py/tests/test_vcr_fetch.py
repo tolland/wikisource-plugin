@@ -91,7 +91,7 @@ _en_fanout = _skip_if_no_cassette("en_ws", "fanout_index")
 
 @_en_index
 def test_en_ws_get_index_page():
-    """Index: page has the right content_model and a non-empty pagelist."""
+    """Index: page has the right content_model, a <pagelist>, and page_count from IndexPage."""
     with _EN_VCR.use_cassette("get_index_page.yaml"):
         client = PywikibotClient(_EN_SETTINGS)
         remote = client.get_page(TRACTATUS_INDEX)
@@ -101,11 +101,14 @@ def test_en_ws_get_index_page():
     assert remote.revid is not None
     assert remote.sha1 is not None
     assert "<pagelist" in (remote.text or "")
+    # page_count comes from IndexPage.num_pages, not <pagelist> parsing.
+    assert remote.page_count is not None
+    assert 100 < remote.page_count < 300
 
 
 @_en_file_info
 def test_en_ws_get_file_info():
-    """File: imageinfo returns real sha1, size, mime, and page_count for the DjVu."""
+    """File: imageinfo returns real sha1, size, and mime for the DjVu blob."""
     with _EN_VCR.use_cassette("get_file_info.yaml"):
         client = PywikibotClient(_EN_SETTINGS)
         info = client.get_file_info(TRACTATUS_FILE)
@@ -113,9 +116,8 @@ def test_en_ws_get_file_info():
     assert info.mime == "image/vnd.djvu"
     assert info.size > 0
     assert len(info.file_sha1) == 40
-    # The Tractatus is ~224 pages; allow a range in case the wiki edition differs.
-    assert info.page_count is not None
-    assert 100 < info.page_count < 300
+    # page_count is not asserted here: it comes from IndexPage.num_pages (via
+    # get_page), not from imageinfo metadata, which is absent for many file types.
 
 
 @_en_page_1
@@ -201,7 +203,7 @@ _lan_fanout = _skip_if_no_cassette("lan", "fanout_index")
 
 @_lan_index
 def test_lan_get_index_page():
-    """Same Index: title on the local wiki."""
+    """Same Index: title on the local wiki — including page_count from IndexPage."""
     with _LAN_VCR.use_cassette("get_index_page.yaml"):
         client = PywikibotClient(_LAN_SETTINGS)
         remote = client.get_page(TRACTATUS_INDEX)
@@ -210,6 +212,8 @@ def test_lan_get_index_page():
     assert remote.namespace_canonical == "Index"
     assert remote.revid is not None
     assert "<pagelist" in (remote.text or "")
+    assert remote.page_count is not None
+    assert 100 < remote.page_count < 300
 
 
 @_lan_file_info
@@ -222,7 +226,6 @@ def test_lan_get_file_info():
     assert info.mime == "image/vnd.djvu"
     assert info.size > 0
     assert len(info.file_sha1) == 40
-    assert info.page_count is not None
 
 
 @_lan_page_1
