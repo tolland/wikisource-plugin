@@ -10,8 +10,6 @@ CI / offline playback:
     uv run pytest src-py/tests/test_vcr_fetch.py -v   # default: mode=none
 """
 
-from __future__ import annotations
-
 import os
 from pathlib import Path
 

@@ -1,3 +1,13 @@
+import os
+from pathlib import Path
+
+import pytest
+from vcr_config import FIXTURES_DIR, cassette_exists, make_vcr
+
+from wtbot.settings import WikiSettings
+from wtbot.sqlmodel import FetchStatus, FileBlob, Page
+from wtbot.wiki.client import PywikibotClient
+
 """VCR-backed integration tests for PywikibotClient.
 
 These tests exercise the real pywikibot code path against recorded HTTP cassettes,
@@ -12,16 +22,6 @@ Tests skip silently when a cassette doesn't exist yet.  Record with:
 
 See src-py/tests/cassettes/README.md for full instructions.
 """
-
-import os
-from pathlib import Path
-
-import pytest
-from vcr_config import FIXTURES_DIR, cassette_exists, make_vcr
-
-from wtbot.settings import WikiSettings
-from wtbot.sqlmodel import FetchStatus, FileBlob, Page
-from wtbot.wiki.client import PywikibotClient
 
 TRACTATUS_INDEX = "Index:Wittgenstein - Tractatus Logico-Philosophicus, 1922.djvu"
 TRACTATUS_FILE = "File:Wittgenstein - Tractatus Logico-Philosophicus, 1922.djvu"
@@ -51,7 +51,7 @@ def _skip_if_no_cassette(subdir: str, name: str):
     return pytest.mark.skipif(
         not cassette_exists(subdir, name) and not recording,
         reason=f"cassette {subdir}/{name}.yaml not recorded yet; "
-               f"run with VCR_RECORD_MODE=all to record",
+        f"run with VCR_RECORD_MODE=all to record",
     )
 
 
@@ -81,6 +81,7 @@ def pwb_clean_slate(monkeypatch):
     _clear_pwb_site_cache()
     try:
         from pywikibot import throttle as _throttle_mod
+
         monkeypatch.setattr(_throttle_mod.Throttle, "wait", lambda *a, **kw: None)
     except (ImportError, AttributeError):
         pass

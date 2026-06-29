@@ -5,8 +5,6 @@ must use WAL, a busy timeout, and ``BEGIN IMMEDIATE`` for writes. We enforce all
 three here for the Python side via SQLAlchemy connection events.
 """
 
-from __future__ import annotations
-
 from collections.abc import Iterator
 
 from sqlalchemy import event

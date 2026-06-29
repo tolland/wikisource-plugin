@@ -7,8 +7,6 @@ structural override is the **File namespace**: a File's content_model is plain
 binary scan, so the namespace decides before content_model does.
 """
 
-from __future__ import annotations
-
 from enum import Enum
 
 from wtbot.sqlmodel import NsRole, role_for_canonical

@@ -1,8 +1,6 @@
 """Typer CLI for wtbot. Thin demonstration of the wiki-access seam from the
 command line; the same WikiSettings injection works under tests and IntelliJ."""
 
-from __future__ import annotations
-
 import os
 
 import typer

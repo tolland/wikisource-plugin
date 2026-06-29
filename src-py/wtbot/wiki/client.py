@@ -8,8 +8,6 @@ and ``download_file`` are all the fetch path needs. Two implementations:
 - ``FakeWikiClient`` — in-memory, for tests/dev/CLI demos with no network.
 """
 
-from __future__ import annotations
-
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 

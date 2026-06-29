@@ -13,8 +13,6 @@ Path scheme (all relative to wikisource://):
 Write / rename / delete and the change feed are stubbed for now.
 """
 
-from __future__ import annotations
-
 import base64
 from datetime import datetime, timezone
 

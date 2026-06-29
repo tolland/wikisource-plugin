@@ -1,7 +1,5 @@
 """Populate the Namespace table from a live pywikibot Site object."""
 
-from __future__ import annotations
-
 from sqlmodel import Session, select
 
 from wtbot.sqlmodel import Namespace, Site

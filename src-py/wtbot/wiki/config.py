@@ -11,8 +11,6 @@ why the pywikibot import lives inside this function and inside the client, never
 at module import time.
 """
 
-from __future__ import annotations
-
 import os
 import tempfile
 from pathlib import Path

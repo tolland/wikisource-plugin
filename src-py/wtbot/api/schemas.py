@@ -16,8 +16,6 @@ remote rename. The FastAPI layer can see pageid continuity in SQLite that a
 raw path diff cannot, so it is the right place to classify this.
 """
 
-from __future__ import annotations
-
 from enum import Enum
 
 from pydantic import BaseModel, Field
