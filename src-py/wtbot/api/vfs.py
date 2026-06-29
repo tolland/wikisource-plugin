@@ -163,8 +163,32 @@ def stat(
             timestamp=_ts(index_page.local_modified_at or index_page.remote_timestamp),
         )
 
-    # Synthetic leaf nodes: last segment is "wikitext" or "blob" and the preceding
-    # segments form a File: title (e.g. rest = ["File:Foo.djvu", "wikitext"])
+    container = rest[0]
+
+    # Pages/ container or individual page beneath it
+    if container == "Pages":
+        if len(rest) == 1:
+            return Stat(path=path, exists=True, kind=NodeKind.directory)
+        page_title = "/".join(rest[1:])
+        page = session.exec(
+            select(Page).where(Page.site_pk == site.pk, Page.title == page_title)
+        ).first()
+        if page is None:
+            return Stat(path=path, exists=False)
+        body = page.text or ""
+        return Stat(
+            path=path, exists=True, kind=NodeKind.file,
+            stable_id=page.pageid, revid=page.revid,
+            timestamp=_ts(page.local_modified_at or page.remote_timestamp),
+            length=len(body.encode()),
+        )
+
+    # Stub containers
+    if container in ("Templates", "TranscludedFiles"):
+        return Stat(path=path, exists=True, kind=NodeKind.directory)
+
+    # File: directory or wikitext/blob leaf beneath it
+    file_title = "/".join(rest)
     if rest[-1] in ("wikitext", "blob") and "/".join(rest[:-1]).startswith("File:"):
         file_title = "/".join(rest[:-1])
         leaf = rest[-1]
@@ -176,57 +200,27 @@ def stat(
         if leaf == "wikitext":
             body = file_page.text or ""
             return Stat(
-                path=path,
-                exists=True,
-                kind=NodeKind.file,
-                stable_id=file_page.pageid,
-                revid=file_page.revid,
-                timestamp=_ts(
-                    file_page.local_modified_at or file_page.remote_timestamp
-                ),
+                path=path, exists=True, kind=NodeKind.file,
+                stable_id=file_page.pageid, revid=file_page.revid,
+                timestamp=_ts(file_page.local_modified_at or file_page.remote_timestamp),
                 length=len(body.encode()),
             )
         blob = session.exec(
             select(FileBlob).where(FileBlob.page_pk == file_page.pk)
         ).first()
-        return Stat(
-            path=path,
-            exists=True,
-            kind=NodeKind.file,
-            length=blob.size if blob else None,
-        )
+        return Stat(path=path, exists=True, kind=NodeKind.file,
+                    length=blob.size if blob else None)
 
-    child_title = "/".join(rest)
-
-    # File: title → directory node
-    if child_title.startswith("File:"):
+    if file_title.startswith("File:"):
         fp = session.exec(
-            select(Page).where(Page.site_pk == site.pk, Page.title == child_title)
+            select(Page).where(Page.site_pk == site.pk, Page.title == file_title)
         ).first()
         exists = fp is not None
-        return Stat(
-            path=path,
-            exists=exists,
-            kind=NodeKind.directory if exists else None,
-            stable_id=fp.pageid if fp else None,
-        )
+        return Stat(path=path, exists=exists,
+                    kind=NodeKind.directory if exists else None,
+                    stable_id=fp.pageid if fp else None)
 
-    # Page: or other wikitext title
-    page = session.exec(
-        select(Page).where(Page.site_pk == site.pk, Page.title == child_title)
-    ).first()
-    if page is None:
-        return Stat(path=path, exists=False)
-    body = page.text or ""
-    return Stat(
-        path=path,
-        exists=True,
-        kind=NodeKind.file,
-        stable_id=page.pageid,
-        revid=page.revid,
-        timestamp=_ts(page.local_modified_at or page.remote_timestamp),
-        length=len(body.encode()),
-    )
+    return Stat(path=path, exists=False)
 
 
 # ---------------------------------------------------------------------------
@@ -283,19 +277,12 @@ def list_children(
     if index_page is None:
         raise HTTPException(status_code=404, detail=f"index not found: {index_title}")
 
-    # /{family}/{code}/{Index title} → child Pages + File: subdir
+    container = rest[0] if rest else None
+
+    # /{family}/{code}/{Index title} → Pages/ + File:/ + Templates/ + TranscludedFiles/
     if not rest:
         children: list[Node] = []
-
-        pages = session.exec(
-            select(Page).where(
-                Page.site_pk == site.pk,
-                Page.namespace_role == NsRole.page,
-                Page.index_title == index_title,
-            )
-        ).all()
-        for p in sorted(pages, key=lambda p: p.page_number or 0):
-            children.append(_page_node(f"{index_path}/{p.title}", p))
+        children.append(_dir_node(f"{index_path}/Pages", "Pages"))
 
         file_title = _index_to_file_title(index_title)
         file_page = session.exec(
@@ -303,25 +290,50 @@ def list_children(
         ).first()
         if file_page is not None:
             children.append(
-                _dir_node(
-                    f"{index_path}/{file_title}", file_title, stable_id=file_page.pageid
-                )
+                _dir_node(f"{index_path}/{file_title}", file_title,
+                          stable_id=file_page.pageid)
             )
 
+        children.append(_dir_node(f"{index_path}/Templates", "Templates"))
+        children.append(_dir_node(f"{index_path}/TranscludedFiles", "TranscludedFiles"))
         return ListChildrenResponse(parent_path=index_path, children=children)
 
+    # /{family}/{code}/{Index title}/Pages → sorted Page: children
+    if container == "Pages":
+        pages_path = f"{index_path}/Pages"
+        if len(rest) == 1:
+            pages = session.exec(
+                select(Page).where(
+                    Page.site_pk == site.pk,
+                    Page.namespace_role == NsRole.page,
+                    Page.index_title == index_title,
+                )
+            ).all()
+            return ListChildrenResponse(
+                parent_path=pages_path,
+                children=[
+                    _page_node(f"{pages_path}/{p.title}", p)
+                    for p in sorted(pages, key=lambda p: p.page_number or 0)
+                ],
+            )
+        # individual page under Pages/
+        raise HTTPException(status_code=404, detail=f"not a directory: {path}")
+
+    # Stub containers
+    if container in ("Templates", "TranscludedFiles"):
+        return ListChildrenResponse(
+            parent_path=f"{index_path}/{container}", children=[]
+        )
+
     # /{family}/{code}/{Index title}/{File title} → wikitext + blob
-    # rest is the File: title segments (may be multi-part if File title has slashes,
-    # but in practice Wikisource File titles don't contain slashes)
     file_title = "/".join(rest)
     if file_title.startswith("File:"):
         file_page = session.exec(
             select(Page).where(Page.site_pk == site.pk, Page.title == file_title)
         ).first()
         if file_page is None:
-            raise HTTPException(
-                status_code=404, detail=f"file page not found: {file_title}"
-            )
+            raise HTTPException(status_code=404,
+                                detail=f"file page not found: {file_title}")
         blob = session.exec(
             select(FileBlob).where(FileBlob.page_pk == file_page.pk)
         ).first()
@@ -350,42 +362,43 @@ def read_content(
     if len(parts) < 4:
         raise HTTPException(status_code=400, detail="path does not refer to a file")
 
-    family, code, _index_title = parts[0], parts[1], parts[2]
+    family, code, index_title = parts[0], parts[1], parts[2]
     rest = parts[3:]
     site = _get_site(session, family, code)
-    # Detect synthetic "wikitext" / "blob" leaf under File: dir
+
+    container = rest[0] if rest else None
+
+    # Pages/{page title}
+    if container == "Pages" and len(rest) >= 2:
+        page_title = "/".join(rest[1:])
+        page = session.exec(
+            select(Page).where(Page.site_pk == site.pk, Page.title == page_title)
+        ).first()
+        if page is None:
+            raise HTTPException(status_code=404, detail=f"page not found: {page_title}")
+        return ReadContentResponse(
+            path=path, revid=page.revid,
+            content_base64=base64.b64encode((page.text or "").encode()).decode(),
+        )
+
+    # wikitext/blob leaf under File: dir
     if rest[-1] in ("wikitext", "blob") and "/".join(rest[:-1]).startswith("File:"):
         file_title = "/".join(rest[:-1])
         if rest[-1] == "blob":
-            raise HTTPException(
-                status_code=501, detail="blob streaming not yet implemented"
-            )
+            raise HTTPException(status_code=501,
+                                detail="blob streaming not yet implemented")
         page = session.exec(
             select(Page).where(Page.site_pk == site.pk, Page.title == file_title)
         ).first()
         if page is None:
-            raise HTTPException(
-                status_code=404, detail=f"file page not found: {file_title}"
-            )
-        body = (page.text or "").encode()
+            raise HTTPException(status_code=404,
+                                detail=f"file page not found: {file_title}")
         return ReadContentResponse(
-            path=path,
-            revid=page.revid,
-            content_base64=base64.b64encode(body).decode(),
+            path=path, revid=page.revid,
+            content_base64=base64.b64encode((page.text or "").encode()).decode(),
         )
 
-    child_title = "/".join(rest)
-    page = session.exec(
-        select(Page).where(Page.site_pk == site.pk, Page.title == child_title)
-    ).first()
-    if page is None:
-        raise HTTPException(status_code=404, detail=f"page not found: {child_title}")
-    body = (page.text or "").encode()
-    return ReadContentResponse(
-        path=path,
-        revid=page.revid,
-        content_base64=base64.b64encode(body).decode(),
-    )
+    raise HTTPException(status_code=400, detail="path does not refer to a file")
 
 
 # ---------------------------------------------------------------------------
