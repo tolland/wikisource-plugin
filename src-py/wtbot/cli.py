@@ -3,6 +3,8 @@ command line; the same WikiSettings injection works under tests and IntelliJ."""
 
 from __future__ import annotations
 
+import os
+
 import typer
 
 from wtbot.settings import WikiSettings
@@ -34,22 +36,42 @@ def fetch_page(
     title: str = typer.Argument(..., help="e.g. Index:Some_book.djvu"),
     family: str = typer.Option("wikisource"),
     code: str = typer.Option("en"),
-    api_url: str | None = typer.Option(None, help="action API URL; preferred"),
-    ca_bundle: str | None = typer.Option(None, help="CA cert for a self-signed wiki"),
+    api_url: str | None = typer.Option(None, help="action API URL stored on the Site"),
+    base_url: str = typer.Option(
+        lambda: os.environ.get("WTBOT_API_URL", "http://127.0.0.1:8000"),
+        help="wtbot API base URL",
+    ),
 ) -> None:
-    """Fetch one page from the wiki and print its identity (live network)."""
-    from wtbot.wiki.client import get_wiki_client
-    from wtbot.wiki.dispatch import classify_remote
+    """Enqueue a cache-fill via the wtbot API and report the result.
 
-    client = get_wiki_client(_settings(family, code, api_url, ca_bundle))
-    page = client.get_page(title)
-    handling = classify_remote(page)
+    This calls the running wtbot server, which creates a FetchRequest, drains it
+    (the worker makes the pywikibot call), and writes the page back to SQLite.
+    """
+    import httpx
+
+    payload = {
+        "title": title,
+        "family": family,
+        "code": code,
+        "api_url": api_url,
+        "kind": "single",
+    }
+    resp = httpx.post(f"{base_url.rstrip('/')}/fetch/", json=payload, timeout=120.0)
+    resp.raise_for_status()
+    data = resp.json()
+    req = data["request"]
+    page = data.get("page")
+
     typer.echo(
-        f"{page.title}\n"
-        f"  content_model = {page.content_model}\n"
-        f"  handling      = {handling.value}\n"
-        f"  revid/sha1    = {page.revid} / {page.sha1}"
+        f"request #{req['pk']}  status={req['status']}  "
+        f"progress={req['progress_done']}/{req['progress_total']}"
     )
+    if page:
+        typer.echo(f"  {page['title']}")
+        typer.echo(f"  content_model = {page['content_model']}")
+        typer.echo(f"  revid/sha1    = {page['revid']} / {page['sha1']}")
+    if req.get("error_message"):
+        typer.echo(f"  error = {req['error_message']}")
 
 
 def run_cli() -> None:

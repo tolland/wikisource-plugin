@@ -24,9 +24,11 @@ class RemotePage:
 
     text: str
 
+    pageid: int | None = None
     revid: int | None = None
     parentid: int | None = None
     timestamp: datetime | None = None
     user: str | None = None
+    comment: str | None = None
     sha1: str | None = None
     size: int | None = None

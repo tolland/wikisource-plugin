@@ -353,24 +353,33 @@ mark `committed=True` on success.
 
 ## 7. The fetch worker (pywikibot side)
 
-A loop, not yet implemented, that drives surface B:
+The worker (`wtbot/worker.py`) drives surface B:
 
 ```
-1. claim a pending FetchRequest (BEGIN IMMEDIATE, highest priority first)
-2. resolve Site via pywikibot (family, code, articlepath)
-3. dispatch on kind:
-     single  → fetch one page, upsert into `pages`
-     index   → fetch Index; read <pagelist>/page_count;
-               download File: to cache/blobs/...; set file_ref, page_count;
-               fan out N child `page` requests (parent_pk = this)
-     page    → fetch Page:.../N, upsert (+ pagequality level)
-     transclusion → scan mainspace transclusions, fan out
-4. update progress_done/total; roll parent's aggregate up
-5. status → done | error
+1. claim a pending FetchRequest (highest priority first) -> in_progress
+2. build a WikiClient for the request's Site (client factory; injectable)
+3. fetch the title, upsert into `pages` (body, content_model, revid, sha1, ...)
+4. [next] index fan-out: download File: to cache/blobs/...; read page_count;
+          create child `page` FetchRequests (parent_pk = this)
+5. update progress_done/total; status -> done | error
 ```
+
+**Implemented now:** steps 1-3 and 5 as `run_pending(session, client_factory)`,
+processing a single title per request and writing the page back. **Next:** the
+index fan-out (step 4) and the File: blob download, which slot into the marked
+point in `worker._process` and are fully testable via `FakeWikiClient`.
+
+**Who runs it.** Today the `POST /fetch` endpoint enqueues the request and then
+calls `run_pending` *inline*, so one HTTP call does enqueue → drain → write-back
+(the CLI's `fetch-page` just calls this endpoint over HTTP; it no longer touches
+pywikibot itself). `run_pending` is deliberately transport-agnostic so the same
+function backs a future background loop / `wtbot worker` command without change.
 
 Concurrency uses the documented SQLite discipline: WAL, `busy_timeout=5000`,
 `BEGIN IMMEDIATE` for every write — on both the Python and Kotlin sides.
+
+The wiki call goes through the injectable `client_factory` on `app.state`, so
+tests drive the whole endpoint with a `FakeWikiClient` and no network.
 
 ### 7.1 Wiki access seam + config injection (implemented)
 

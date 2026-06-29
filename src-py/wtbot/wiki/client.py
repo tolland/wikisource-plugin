@@ -50,10 +50,12 @@ class PywikibotClient:
             namespace_canonical=ns.canonical_name or "",
             content_model=page.content_model,
             text=page.text,
+            pageid=getattr(page, "pageid", None),
             revid=rev.revid,
             parentid=rev.parentid,
             timestamp=rev.timestamp,  # pywikibot Timestamp is a datetime subclass
             user=rev.user,
+            comment=getattr(rev, "comment", None),
             sha1=rev.sha1,
             size=rev.size,
         )

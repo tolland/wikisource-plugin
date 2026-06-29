@@ -36,6 +36,7 @@ class Page(SQLModel, table=True):
     title: str  # full title incl. namespace prefix, e.g. 'Page:Foo.djvu/171'
     namespace_role: NsRole = NsRole.other
     namespace_key: int | None = None  # site-local numeric ns id, informational
+    content_model: str | None = None  # remote contentmodel ('proofread-index', ...)
 
     # Remote identity / revision state -- this IS the conflict token. revid +
     # remote_timestamp are sent back as basetimestamp on save; a mismatch on save
