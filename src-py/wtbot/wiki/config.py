@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+from pathlib import Path
 
 from wtbot.settings import WikiSettings
 
@@ -29,13 +30,26 @@ def configure_pywikibot(settings: WikiSettings) -> str:
         # self-signed cert on a local .lan wiki without disabling verification.
         os.environ["REQUESTS_CA_BUNDLE"] = settings.ca_bundle
 
-    config_dir = settings.config_dir or tempfile.mkdtemp(prefix="wtbot-pwb-")
+    if settings.config_dir:
+        Path(settings.config_dir).mkdir(parents=True, exist_ok=True)
+        config_dir = settings.config_dir
+    else:
+        config_dir = tempfile.mkdtemp(prefix="wtbot-pwb-")
     os.environ["PYWIKIBOT_DIR"] = config_dir
 
     import pywikibot.config as pwbconfig
 
     pwbconfig.base_dir = config_dir
-    pwbconfig.put_throttle = 1  # be polite; tune per deployment
+
+    # We're read-only and anonymous; no need to throttle.
+    pwbconfig.put_throttle = 0
+    pwbconfig.get_throttle = 0
+
+    # Throttle.checkMultiplicity() reads this file to detect concurrent bots.
+    # It raises FileNotFoundError (not caught) when the file is absent, so we
+    # create it empty on first use of a fresh config dir.
+    throttle_ctrl = Path(config_dir) / "throttle.ctrl"
+    throttle_ctrl.touch(exist_ok=True)
 
     if settings.username:
         fam = pwbconfig.usernames.get(settings.family)
