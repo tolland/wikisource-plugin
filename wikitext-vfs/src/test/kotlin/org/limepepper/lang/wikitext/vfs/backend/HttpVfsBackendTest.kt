@@ -1,0 +1,119 @@
+package org.limepepper.lang.wikitext.vfs.backend
+
+import com.sun.net.httpserver.HttpServer
+import org.junit.After
+import org.junit.Assert.*
+import org.junit.Before
+import org.junit.Test
+import java.net.InetSocketAddress
+import java.util.Base64
+
+/**
+ * Tests [HttpVfsBackend] against an in-process stub HTTP server using the JDK
+ * com.sun.net.httpserver — no extra dependencies.
+ *
+ * Each test registers a handler that returns a canned JSON response, then
+ * calls the backend and asserts on the parsed result.
+ */
+class HttpVfsBackendTest {
+
+    private lateinit var server: HttpServer
+    private lateinit var backend: HttpVfsBackend
+
+    @Before fun setUp() {
+        server = HttpServer.create(InetSocketAddress(0), 0)
+        server.start()
+        backend = HttpVfsBackend("http://127.0.0.1:${server.address.port}")
+    }
+
+    @After fun tearDown() {
+        server.stop(0)
+    }
+
+    private fun handle(path: String, json: String) {
+        server.createContext(path) { ex ->
+            val body = json.toByteArray()
+            ex.sendResponseHeaders(200, body.size.toLong())
+            ex.responseBody.use { it.write(body) }
+        }
+    }
+
+    @Test fun `stat parses directory response`() {
+        handle("/vfs/stat", """
+            {"path":"/wikisource/en","exists":true,"kind":"directory",
+             "stable_id":42,"revid":null,"length":null,"timestamp":null,"writable":false}
+        """.trimIndent())
+
+        val r = backend.stat("/wikisource/en")
+        assertTrue(r.exists)
+        assertEquals(NodeKind.directory, r.kind)
+        assertEquals(42L, r.stableId)
+        assertNull(r.revid)
+    }
+
+    @Test fun `stat parses file response with length`() {
+        handle("/vfs/stat", """
+            {"path":"/wikisource/en/Index:Foo/Pages/Page:Foo/1","exists":true,"kind":"file",
+             "stable_id":1003,"revid":5003,"length":19,"timestamp":"1700000000000","writable":true}
+        """.trimIndent())
+
+        val r = backend.stat("/wikisource/en/Index:Foo/Pages/Page:Foo/1")
+        assertEquals(NodeKind.file, r.kind)
+        assertEquals(5003L, r.revid)
+        assertEquals(19L, r.length)
+        assertEquals("1700000000000", r.timestamp)
+        assertTrue(r.writable)
+    }
+
+    @Test fun `stat parses exists=false`() {
+        handle("/vfs/stat", """{"path":"/wikisource/en/Index:No","exists":false}""")
+        val r = backend.stat("/wikisource/en/Index:No")
+        assertFalse(r.exists)
+        assertNull(r.kind)
+    }
+
+    @Test fun `listChildren parses children array`() {
+        handle("/vfs/children", """
+            {"parent_path":"/wikisource/en/Index:Foo.djvu/Pages","children":[
+              {"path":"/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1",
+               "name":"Page:Foo.djvu/1","kind":"file","stable_id":1003,"revid":5003,
+               "length":19,"timestamp":null,"writable":true},
+              {"path":"/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/2",
+               "name":"Page:Foo.djvu/2","kind":"file","stable_id":1004,"revid":5004,
+               "length":20,"timestamp":null,"writable":true}
+            ]}
+        """.trimIndent())
+
+        val r = backend.listChildren("/wikisource/en/Index:Foo.djvu/Pages")
+        assertEquals(2, r.children.size)
+        assertEquals("Page:Foo.djvu/1", r.children[0].name)
+        assertEquals(NodeKind.file, r.children[0].kind)
+        assertEquals(1003L, r.children[0].stableId)
+    }
+
+    @Test fun `listChildren handles empty array`() {
+        handle("/vfs/children", """{"parent_path":"/wikisource/en/Index:Foo/Templates","children":[]}""")
+        val r = backend.listChildren("/wikisource/en/Index:Foo/Templates")
+        assertEquals(emptyList<ChildNode>(), r.children)
+    }
+
+    @Test fun `readContent decodes base64 text`() {
+        val encoded = Base64.getEncoder().encodeToString("{{recto}} Page one.".toByteArray())
+        handle("/vfs/content", """{"path":"/some/path","revid":5003,"content_base64":"$encoded"}""")
+
+        val r = backend.readContent("/some/path")
+        assertEquals("{{recto}} Page one.", r.decodeText())
+        assertEquals(5003L, r.revid)
+    }
+
+    @Test fun `throws VfsBackendException on HTTP error`() {
+        server.createContext("/vfs/stat") { ex ->
+            val body = """{"detail":"not found"}""".toByteArray()
+            ex.sendResponseHeaders(404, body.size.toLong())
+            ex.responseBody.use { it.write(body) }
+        }
+        assertThrows(VfsBackendException::class.java) {
+            backend.stat("/wikisource/en/Index:Missing")
+        }
+    }
+}
