@@ -60,8 +60,14 @@ def create_fetch(
     session.commit()
     session.refresh(req)
 
-    # Drain the queue now. The same run_pending will back a background worker later.
-    run_pending(session, request.app.state.client_factory, blob_root=request.app.state.blob_root)
+    # Drain the queue until empty (inline for now; a background worker replaces
+    # this loop later).  A single run_pending(limit=100) is not enough when an
+    # Index: fans out to hundreds of Page: children.
+    factory = request.app.state.client_factory
+    blob_root = request.app.state.blob_root
+    batch = 200
+    while run_pending(session, factory, blob_root=blob_root, limit=batch) == batch:
+        pass  # keep going until a batch comes back short (queue empty)
     session.refresh(req)
 
     page = session.exec(

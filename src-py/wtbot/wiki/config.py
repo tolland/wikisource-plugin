@@ -41,9 +41,12 @@ def configure_pywikibot(settings: WikiSettings) -> str:
 
     pwbconfig.base_dir = config_dir
 
-    # We're read-only and anonymous; no need to throttle.
-    pwbconfig.put_throttle = 0
-    pwbconfig.get_throttle = 0
+    # put_throttle controls inter-request delay (seconds).  Default to 1s for
+    # anonymous read-only use; callers can override via WikiSettings if needed.
+    # Tests suppress this entirely by patching Throttle.wait to a no-op.
+    if not hasattr(pwbconfig, "_wtbot_throttle_set"):
+        pwbconfig.put_throttle = 1
+        pwbconfig._wtbot_throttle_set = True
 
     # Throttle.checkMultiplicity() reads this file to detect concurrent bots.
     # It raises FileNotFoundError (not caught) when the file is absent, so we

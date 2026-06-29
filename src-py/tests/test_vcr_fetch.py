@@ -71,8 +71,21 @@ def _clear_pwb_site_cache() -> None:
 
 
 @pytest.fixture(autouse=True)
-def pwb_clean_slate():
+def pwb_clean_slate(monkeypatch):
+    """Reset pywikibot site cache and suppress throttle sleeps for each test.
+
+    VCR intercepts HTTP at the requests layer but pywikibot still calls
+    time.sleep() before each request via its Throttle.  With 224 pages that
+    adds minutes of pointless sleeping during cassette playback.  Patching
+    Throttle.wait to a no-op makes the VCR tests instant while leaving the
+    production code (and recording runs) unaffected.
+    """
     _clear_pwb_site_cache()
+    try:
+        from pywikibot import throttle as _throttle_mod
+        monkeypatch.setattr(_throttle_mod.Throttle, "wait", lambda *a, **kw: None)
+    except (ImportError, AttributeError):
+        pass
     yield
     _clear_pwb_site_cache()
 
