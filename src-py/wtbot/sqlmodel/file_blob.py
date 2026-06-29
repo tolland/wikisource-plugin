@@ -19,17 +19,17 @@ class FileBlob(SQLModel, table=True):
     page_pk: int = Field(foreign_key="page.pk", index=True)
 
     # MediaWiki imageinfo fields (pywikibot FileInfo attributes)
-    file_sha1: str | None = None         # SHA1 of the binary (not the wikitext rev)
-    size: int | None = None               # bytes
-    mime: str | None = None               # e.g. 'image/vnd.djvu', 'application/pdf'
-    url: str | None = None                # canonical download URL on the source wiki
+    file_sha1: str | None = None  # SHA1 of the binary (not the wikitext rev)
+    size: int | None = None  # bytes
+    mime: str | None = None  # e.g. 'image/vnd.djvu', 'application/pdf'
+    url: str | None = None  # canonical download URL on the source wiki
     upload_timestamp: datetime | None = None
     uploader: str | None = None
     upload_comment: str | None = None
-    page_count: int | None = None         # pages in a multi-page format (DjVu, PDF)
-    width: int | None = None              # pixels (raster images only)
-    height: int | None = None             # pixels (raster images only)
+    page_count: int | None = None  # pages in a multi-page format (DjVu, PDF)
+    width: int | None = None  # pixels (raster images only)
+    height: int | None = None  # pixels (raster images only)
 
     # Local filesystem state
-    local_path: str | None = None         # absolute path of the downloaded blob
+    local_path: str | None = None  # absolute path of the downloaded blob
     downloaded_at: datetime | None = None

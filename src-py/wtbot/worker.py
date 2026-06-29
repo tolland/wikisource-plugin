@@ -73,6 +73,7 @@ def _claim_next(session: Session) -> FetchRequest | None:
 def _maybe_sync_namespaces(session: Session, site: Site, client: WikiClient) -> None:
     """Sync siteinfo namespaces on first use of a site (no-op on subsequent calls)."""
     from wtbot.sqlmodel import Namespace
+
     already = session.exec(
         select(Namespace).where(Namespace.site_pk == site.pk)
     ).first()
@@ -174,9 +175,7 @@ def _download_file_blob(
     except PageNotFound:
         return  # blob not available; proceed without FileBlob
 
-    blob = session.exec(
-        select(FileBlob).where(FileBlob.page_pk == page.pk)
-    ).first()
+    blob = session.exec(select(FileBlob).where(FileBlob.page_pk == page.pk)).first()
     if blob is None:
         blob = FileBlob(page_pk=page.pk)
 
@@ -309,9 +308,9 @@ def _decompose_proofread_page(text: str) -> tuple[str, str, str]:
     if len(opens) < 2 or len(closes) < 2:
         return "", text, ""
 
-    header = text[opens[0].end():closes[0].start()]
-    body = text[closes[0].end():opens[-1].start()]
-    footer = text[opens[-1].end():closes[-1].start()]
+    header = text[opens[0].end() : closes[0].start()]
+    body = text[closes[0].end() : opens[-1].start()]
+    footer = text[opens[-1].end() : closes[-1].start()]
     return header, body, footer
 
 

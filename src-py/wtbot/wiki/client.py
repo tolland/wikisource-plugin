@@ -54,6 +54,7 @@ class PywikibotClient:
         if page.content_model == "proofread-index":
             try:
                 from pywikibot.proofreadpage import IndexPage as _IndexPage
+
                 page_count = _IndexPage(self.site, title).num_pages
             except Exception:
                 pass

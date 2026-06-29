@@ -39,38 +39,59 @@ def vfs_client(engine, tmp_path) -> TestClient:
         s.refresh(site)
 
         index_page = Page(
-            site_pk=site.pk, title=INDEX,
-            namespace_role=NsRole.index, content_model="proofread-index",
-            text=_INDEX_BODY, page_count=2, pageid=1001, revid=5001,
+            site_pk=site.pk,
+            title=INDEX,
+            namespace_role=NsRole.index,
+            content_model="proofread-index",
+            text=_INDEX_BODY,
+            page_count=2,
+            pageid=1001,
+            revid=5001,
         )
         s.add(index_page)
 
         file_page = Page(
-            site_pk=site.pk, title=FILE,
-            namespace_role=NsRole.file, content_model="wikitext",
-            text=_FILE_BODY, pageid=1002, revid=5002,
+            site_pk=site.pk,
+            title=FILE,
+            namespace_role=NsRole.file,
+            content_model="wikitext",
+            text=_FILE_BODY,
+            pageid=1002,
+            revid=5002,
         )
         s.add(file_page)
         s.commit()
         s.refresh(file_page)
 
         blob = FileBlob(
-            page_pk=file_page.pk, file_sha1="a" * 40,
-            size=4_200_000, mime="image/vnd.djvu",
+            page_pk=file_page.pk,
+            file_sha1="a" * 40,
+            size=4_200_000,
+            mime="image/vnd.djvu",
         )
         s.add(blob)
 
         p1 = Page(
-            site_pk=site.pk, title=PAGE_1,
-            namespace_role=NsRole.page, content_model="proofread-page",
-            text=_PAGE_1_BODY, pageid=1003, revid=5003,
-            index_title=INDEX, page_number=1,
+            site_pk=site.pk,
+            title=PAGE_1,
+            namespace_role=NsRole.page,
+            content_model="proofread-page",
+            text=_PAGE_1_BODY,
+            pageid=1003,
+            revid=5003,
+            index_title=INDEX,
+            page_number=1,
         )
         p2 = Page(
-            site_pk=site.pk, title=PAGE_2,
-            namespace_role=NsRole.page, content_model="proofread-page",
-            text=_PAGE_2_BODY, pageid=1004, revid=5004,
-            index_title=INDEX, page_number=2,
+            site_pk=site.pk,
+            title=PAGE_2,
+            namespace_role=NsRole.page,
+            content_model="proofread-page",
+            text=_PAGE_2_BODY,
+            pageid=1004,
+            revid=5004,
+            index_title=INDEX,
+            page_number=2,
         )
         s.add(p1)
         s.add(p2)
@@ -83,6 +104,7 @@ def vfs_client(engine, tmp_path) -> TestClient:
 # ---------------------------------------------------------------------------
 # stat
 # ---------------------------------------------------------------------------
+
 
 def test_stat_root(vfs_client):
     r = vfs_client.get("/vfs/stat", params={"path": "/"})
@@ -172,6 +194,7 @@ def test_stat_missing(vfs_client):
 # list_children
 # ---------------------------------------------------------------------------
 
+
 def test_list_root(vfs_client):
     r = vfs_client.get("/vfs/children", params={"path": "/"})
     assert r.status_code == 200
@@ -231,8 +254,9 @@ def test_list_templates_stub_empty(vfs_client):
 
 
 def test_list_transcluded_stub_empty(vfs_client):
-    r = vfs_client.get("/vfs/children",
-                       params={"path": f"{_INDEX_PATH}/TranscludedFiles"})
+    r = vfs_client.get(
+        "/vfs/children", params={"path": f"{_INDEX_PATH}/TranscludedFiles"}
+    )
     assert r.status_code == 200
     assert r.json()["children"] == []
 
@@ -250,10 +274,11 @@ def test_list_file_dir(vfs_client):
 # read_content
 # ---------------------------------------------------------------------------
 
+
 def test_read_page(vfs_client):
     import base64
-    r = vfs_client.get("/vfs/content",
-                       params={"path": f"{_PAGES_PATH}/{PAGE_1}"})
+
+    r = vfs_client.get("/vfs/content", params={"path": f"{_PAGES_PATH}/{PAGE_1}"})
     assert r.status_code == 200
     body = r.json()
     assert body["revid"] == 5003
@@ -262,8 +287,8 @@ def test_read_page(vfs_client):
 
 def test_read_file_wikitext(vfs_client):
     import base64
-    r = vfs_client.get("/vfs/content",
-                       params={"path": f"{_FILE_PATH}/wikitext"})
+
+    r = vfs_client.get("/vfs/content", params={"path": f"{_FILE_PATH}/wikitext"})
     assert r.status_code == 200
     assert base64.b64decode(r.json()["content_base64"]).decode() == _FILE_BODY
 
@@ -274,6 +299,5 @@ def test_read_blob_returns_501(vfs_client):
 
 
 def test_read_missing_page_returns_404(vfs_client):
-    r = vfs_client.get("/vfs/content",
-                       params={"path": f"{_PAGES_PATH}/Page:NoSuch/99"})
+    r = vfs_client.get("/vfs/content", params={"path": f"{_PAGES_PATH}/Page:NoSuch/99"})
     assert r.status_code == 404

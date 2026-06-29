@@ -177,8 +177,11 @@ def stat(
             return Stat(path=path, exists=False)
         body = page.text or ""
         return Stat(
-            path=path, exists=True, kind=NodeKind.file,
-            stable_id=page.pageid, revid=page.revid,
+            path=path,
+            exists=True,
+            kind=NodeKind.file,
+            stable_id=page.pageid,
+            revid=page.revid,
             timestamp=_ts(page.local_modified_at or page.remote_timestamp),
             length=len(body.encode()),
         )
@@ -200,25 +203,37 @@ def stat(
         if leaf == "wikitext":
             body = file_page.text or ""
             return Stat(
-                path=path, exists=True, kind=NodeKind.file,
-                stable_id=file_page.pageid, revid=file_page.revid,
-                timestamp=_ts(file_page.local_modified_at or file_page.remote_timestamp),
+                path=path,
+                exists=True,
+                kind=NodeKind.file,
+                stable_id=file_page.pageid,
+                revid=file_page.revid,
+                timestamp=_ts(
+                    file_page.local_modified_at or file_page.remote_timestamp
+                ),
                 length=len(body.encode()),
             )
         blob = session.exec(
             select(FileBlob).where(FileBlob.page_pk == file_page.pk)
         ).first()
-        return Stat(path=path, exists=True, kind=NodeKind.file,
-                    length=blob.size if blob else None)
+        return Stat(
+            path=path,
+            exists=True,
+            kind=NodeKind.file,
+            length=blob.size if blob else None,
+        )
 
     if file_title.startswith("File:"):
         fp = session.exec(
             select(Page).where(Page.site_pk == site.pk, Page.title == file_title)
         ).first()
         exists = fp is not None
-        return Stat(path=path, exists=exists,
-                    kind=NodeKind.directory if exists else None,
-                    stable_id=fp.pageid if fp else None)
+        return Stat(
+            path=path,
+            exists=exists,
+            kind=NodeKind.directory if exists else None,
+            stable_id=fp.pageid if fp else None,
+        )
 
     return Stat(path=path, exists=False)
 
@@ -290,8 +305,9 @@ def list_children(
         ).first()
         if file_page is not None:
             children.append(
-                _dir_node(f"{index_path}/{file_title}", file_title,
-                          stable_id=file_page.pageid)
+                _dir_node(
+                    f"{index_path}/{file_title}", file_title, stable_id=file_page.pageid
+                )
             )
 
         children.append(_dir_node(f"{index_path}/Templates", "Templates"))
@@ -332,8 +348,9 @@ def list_children(
             select(Page).where(Page.site_pk == site.pk, Page.title == file_title)
         ).first()
         if file_page is None:
-            raise HTTPException(status_code=404,
-                                detail=f"file page not found: {file_title}")
+            raise HTTPException(
+                status_code=404, detail=f"file page not found: {file_title}"
+            )
         blob = session.exec(
             select(FileBlob).where(FileBlob.page_pk == file_page.pk)
         ).first()
@@ -377,7 +394,8 @@ def read_content(
         if page is None:
             raise HTTPException(status_code=404, detail=f"page not found: {page_title}")
         return ReadContentResponse(
-            path=path, revid=page.revid,
+            path=path,
+            revid=page.revid,
             content_base64=base64.b64encode((page.text or "").encode()).decode(),
         )
 
@@ -385,16 +403,19 @@ def read_content(
     if rest[-1] in ("wikitext", "blob") and "/".join(rest[:-1]).startswith("File:"):
         file_title = "/".join(rest[:-1])
         if rest[-1] == "blob":
-            raise HTTPException(status_code=501,
-                                detail="blob streaming not yet implemented")
+            raise HTTPException(
+                status_code=501, detail="blob streaming not yet implemented"
+            )
         page = session.exec(
             select(Page).where(Page.site_pk == site.pk, Page.title == file_title)
         ).first()
         if page is None:
-            raise HTTPException(status_code=404,
-                                detail=f"file page not found: {file_title}")
+            raise HTTPException(
+                status_code=404, detail=f"file page not found: {file_title}"
+            )
         return ReadContentResponse(
-            path=path, revid=page.revid,
+            path=path,
+            revid=page.revid,
             content_base64=base64.b64encode((page.text or "").encode()).decode(),
         )
 

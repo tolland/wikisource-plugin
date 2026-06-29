@@ -223,7 +223,9 @@ def test_index_fanout_creates_pages_and_children(app_with_index_fanout, engine):
     # FileBlob row exists for the index (via the File: download).
     with Session(engine) as s:
         index_page = s.exec(select(Page).where(Page.title == _INDEX_TITLE)).one()
-        file_blobs = s.exec(select(FileBlob).where(FileBlob.page_pk == index_page.pk)).all()
+        file_blobs = s.exec(
+            select(FileBlob).where(FileBlob.page_pk == index_page.pk)
+        ).all()
         assert len(file_blobs) == 1
         fb = file_blobs[0]
         assert fb.mime == "image/vnd.djvu"

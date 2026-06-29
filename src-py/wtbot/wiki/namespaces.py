@@ -18,9 +18,7 @@ def sync_namespaces(session: Session, site: Site, namespaces) -> None:
         local = ns.custom_name or canonical
 
         existing = session.exec(
-            select(Namespace).where(
-                Namespace.site_pk == site.pk, Namespace.key == key
-            )
+            select(Namespace).where(Namespace.site_pk == site.pk, Namespace.key == key)
         ).first()
 
         row = existing or Namespace(site_pk=site.pk, key=key)

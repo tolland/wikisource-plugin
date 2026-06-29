@@ -17,16 +17,16 @@ class RemoteFileInfo:
 
     title: str
     file_sha1: str
-    size: int                     # bytes of the binary file
-    mime: str                     # e.g. 'image/vnd.djvu', 'application/pdf'
-    url: str                      # canonical download URL on the wiki
+    size: int  # bytes of the binary file
+    mime: str  # e.g. 'image/vnd.djvu', 'application/pdf'
+    url: str  # canonical download URL on the wiki
 
     upload_timestamp: datetime | None = None
     uploader: str | None = None
     upload_comment: str | None = None
     page_count: int | None = None  # for multi-page formats (DjVu, PDF)
-    width: int | None = None       # pixels (images only)
-    height: int | None = None      # pixels (images only)
+    width: int | None = None  # pixels (images only)
+    height: int | None = None  # pixels (images only)
 
 
 @dataclass(frozen=True)

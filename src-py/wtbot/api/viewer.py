@@ -33,9 +33,7 @@ def _summary(page: Page) -> IndexPageSummary:
 @router.get("/indexes", response_model=list[IndexPageSummary])
 def list_index_pages(session: Session = Depends(get_session)) -> list[IndexPageSummary]:
     pages = session.exec(
-        select(Page)
-        .where(Page.namespace_role == NsRole.index)
-        .order_by(Page.title)
+        select(Page).where(Page.namespace_role == NsRole.index).order_by(Page.title)
     ).all()
     return [_summary(page) for page in pages]
 
