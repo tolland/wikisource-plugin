@@ -362,7 +362,7 @@ def read_content(
     if len(parts) < 4:
         raise HTTPException(status_code=400, detail="path does not refer to a file")
 
-    family, code, index_title = parts[0], parts[1], parts[2]
+    family, code, _index_title = parts[0], parts[1], parts[2]
     rest = parts[3:]
     site = _get_site(session, family, code)
 
