@@ -61,7 +61,7 @@ def create_fetch(
     session.refresh(req)
 
     # Drain the queue now. The same run_pending will back a background worker later.
-    run_pending(session, request.app.state.client_factory)
+    run_pending(session, request.app.state.client_factory, blob_root=request.app.state.blob_root)
     session.refresh(req)
 
     page = session.exec(
