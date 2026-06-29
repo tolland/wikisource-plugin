@@ -26,6 +26,7 @@ from wtbot.sqlmodel.fetch_request import FetchKind
 from wtbot.sqlmodel.namespace import NsRole
 from wtbot.timeutil import utcnow
 from wtbot.wiki.client import WikiClient, get_wiki_client
+from wtbot.wiki.namespaces import sync_namespaces
 from wtbot.wiki.types import PageNotFound, RemotePage
 
 ClientFactory = Callable[[Site], WikiClient]
@@ -69,6 +70,20 @@ def _claim_next(session: Session) -> FetchRequest | None:
     return req
 
 
+def _maybe_sync_namespaces(session: Session, site: Site, client: WikiClient) -> None:
+    """Sync siteinfo namespaces on first use of a site (no-op on subsequent calls)."""
+    from wtbot.sqlmodel import Namespace
+    already = session.exec(
+        select(Namespace).where(Namespace.site_pk == site.pk)
+    ).first()
+    if already is not None:
+        return
+    ns_dict = client.get_namespaces()
+    if ns_dict is None:
+        return
+    sync_namespaces(session, site, ns_dict)
+
+
 def _process(
     session: Session,
     req: FetchRequest,
@@ -79,6 +94,7 @@ def _process(
     site = session.get(Site, req.site_pk)
     try:
         client = client_factory(site)
+        _maybe_sync_namespaces(session, site, client)
         remote = client.get_page(req.title)
         page = _upsert_page(session, site, remote)
 

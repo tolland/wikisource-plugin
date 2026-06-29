@@ -57,3 +57,6 @@ class Namespace(SQLModel, table=True):
     canonical_name: str  # 'Page', 'Index', 'File' -- stable across sites
     local_name: str  # display name on this wiki (may be localized)
     role: NsRole = NsRole.other
+    subpages: bool = False
+    content: bool = False  # True for main content namespaces
+    case: str | None = None  # 'first-letter' | 'case-sensitive'

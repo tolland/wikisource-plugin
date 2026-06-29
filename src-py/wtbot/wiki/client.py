@@ -25,6 +25,8 @@ class WikiClient(Protocol):
 
     def download_file(self, title: str, dest: Path) -> Path: ...
 
+    def get_namespaces(self): ...  # returns pwb NamespacesDict or None
+
 
 class PywikibotClient:
     def __init__(self, settings: WikiSettings):
@@ -109,6 +111,9 @@ class PywikibotClient:
         filepage.download(filename=str(dest))
         return dest
 
+    def get_namespaces(self):
+        return self.site.namespaces
+
 
 class FakeWikiClient:
     """Network-free WikiClient backed by in-memory dicts."""
@@ -159,6 +164,9 @@ class FakeWikiClient:
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(data)
         return dest
+
+    def get_namespaces(self):
+        return None
 
 
 def get_wiki_client(settings: WikiSettings) -> WikiClient:
