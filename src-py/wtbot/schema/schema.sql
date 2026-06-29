@@ -52,8 +52,8 @@ CREATE TABLE pages (
     -- separate metadata. `revid` + `remote_timestamp` are what gets sent
     -- back to the API as basetimestamp on save; a save that doesn't match
     -- what the server currently has is a real edit conflict, not a bug.
-    pageid          INTEGER,                   -- wiki-local page id, null until first fetch
-    revid           INTEGER,                   -- revision id as of last fetch
+    pageid          INTEGER,                   -- wiki-local page pk, null until first fetch
+    revid           INTEGER,                   -- revision pk as of last fetch
     remote_timestamp TEXT,                     -- MediaWiki revision timestamp (ISO 8601, UTC)
     contributor     TEXT,                      -- username of that revision's author
     comment         TEXT,                      -- edit summary of that revision

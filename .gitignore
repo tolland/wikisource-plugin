@@ -43,3 +43,4 @@ bin/
 ### User added ###
 /.ctxsync/
 /src-py/wtbot/notebooks/
+/user-config.py

@@ -4,11 +4,14 @@ version = "0.1.0"
 requires-python = ">=3.13"
 license = { text = "MIT" }
 dependencies = [
+    "fastapi[standard]>=0.138.1",
     "ipykernel>=7.3.0",
     "pywikibot>=11.4.2",
     "rich>=15.0.0",
     "sqlalchemy>=2.0.51",
+    "sqlmodel>=0.0.39",
     "typer>=0.26.8",
+    "uvicorn[standard]>=0.49.0",
 ]
 
 [build-system]

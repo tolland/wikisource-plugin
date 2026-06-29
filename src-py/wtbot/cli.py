@@ -1,16 +1,16 @@
 import typer
 
-# from mqttbot.callbacks import get_callback
-# from mqttbot.commands import dump_config, run
+# from wtbot.callbacks import get_callback
+# from wtbot.commands import dump_config, run
 #
-# """Command-line interface for MQTT bot."""
+# """Command-line interface for wiki filesystem service."""
 #
 #
 # def create_app() -> typer.Typer:
 #     callback = get_callback()
 #     app = typer.Typer(
-#         name="mqttbot",
-#         help="MQTT-based Minecraft bot automation with Baritone integration",
+#         sitename="wtbot",
+#         help="python service to implement the backing for a mediawiki wiki filesystem",
 #         add_completion=False,
 #         pretty_exceptions_enable=False,
 #     )

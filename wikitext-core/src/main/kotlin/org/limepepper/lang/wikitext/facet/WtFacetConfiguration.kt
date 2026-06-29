@@ -22,7 +22,7 @@ class WtFacetConfiguration : FacetConfiguration, PersistentStateComponent<WtFace
      * `null` value indicates that the returned state won't be stored, and
      * as a result previously stored state will be used.
      */
-    override fun getState(): WtFacetState? {
+    override fun getState(): WtFacetState {
         return myFacetState
     }
 

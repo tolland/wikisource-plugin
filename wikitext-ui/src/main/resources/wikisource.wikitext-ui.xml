@@ -39,6 +39,8 @@
         <fileEditorProvider
                 implementation="org.limepepper.lang.wikitext.preview.WtPreviewEditorProvider"
         />
+
+        <virtualFileSystem key="vcs-log" implementationClass="org.limepepper.lang.wikitext.vfs.WtVirtualFileSystem"/>
     </extensions>
 
 
