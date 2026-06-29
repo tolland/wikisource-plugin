@@ -1,4 +1,3 @@
-import org.gradle.kotlin.dsl.assign
 import org.gradle.kotlin.dsl.withType
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
@@ -18,7 +17,6 @@ plugins {
 
 idea {
     module {
-        excludeDirs.add(file("some-generated-dir"))
     }
 }
 
@@ -28,6 +26,7 @@ dependencies {
         intellijIdea(intellijPlatformVersion)
         plugin("psiviewer", version = "2026.1")
         pluginModule(implementation(project(":wikitext-core")))
+        pluginModule(implementation(project(":wikitext-vfs")))
         pluginModule(implementation(project(":wikitext-ui")))
         testFramework(TestFrameworkType.Platform)
     }

@@ -37,4 +37,5 @@ dependencyResolutionManagement {
 
 include("wikitext-core")
 include("wikitext-ui")
+include("wikitext-vfs")
 include("src-py")

@@ -11,6 +11,7 @@
 
     <content>
         <module name="wikisource.wikitext-core" loading="required"/>
+        <module name="wikisource.wikitext-vfs"/>
         <module name="wikisource.wikitext-ui"/>
     </content>
 </idea-plugin>

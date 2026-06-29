@@ -5,43 +5,40 @@
 
     <extensions defaultExtensionNs="com.intellij">
         <lang.syntaxHighlighterFactory
-                language="Wikitext"
-                implementationClass="org.limepepper.lang.wikitext.highlighting.WtSyntaxHighlighterFactory"
+            language="Wikitext"
+            implementationClass="org.limepepper.lang.wikitext.highlighting.WtSyntaxHighlighterFactory"
         />
 
         <annotator
-                language="Wikitext"
-                implementationClass="org.limepepper.lang.wikitext.highlighting.WtAnnotator"
+            language="Wikitext"
+            implementationClass="org.limepepper.lang.wikitext.highlighting.WtAnnotator"
         />
 
         <defaultLiveTemplates file="/liveTemplates/Wikitext.xml"/>
 
         <liveTemplateContext
-                contextId="WIKITEXT"
-                implementation="org.limepepper.lang.wikitext.templates.WtContextType"
+            contextId="WIKITEXT"
+            implementation="org.limepepper.lang.wikitext.templates.WtContextType"
         />
 
         <facetType
-                implementation="org.limepepper.lang.wikitext.facet.WtFacetType"
+            implementation="org.limepepper.lang.wikitext.facet.WtFacetType"
         />
 
         <toolWindow
-                id="MyToolWindow"
-                factoryClass="org.limepepper.lang.wikitext.tool.MyToolWindowFactory"
-                icon="AllIcons.Toolwindows.ToolWindowPalette"
+            id="MyToolWindow"
+            factoryClass="org.limepepper.lang.wikitext.tool.MyToolWindowFactory"
+            icon="AllIcons.Toolwindows.ToolWindowPalette"
         />
 
         <lang.psiStructureViewFactory
-                language="Wikitext"
-                implementationClass="org.limepepper.lang.wikitext.structure.WtStructureViewFactory"
+            language="Wikitext"
+            implementationClass="org.limepepper.lang.wikitext.structure.WtStructureViewFactory"
         />
 
         <fileEditorProvider
-                implementation="org.limepepper.lang.wikitext.preview.WtPreviewEditorProvider"
+            implementation="org.limepepper.lang.wikitext.preview.WtPreviewEditorProvider"
         />
 
-        <virtualFileSystem key="vcs-log" implementationClass="org.limepepper.lang.wikitext.vfs.WtVirtualFileSystem"/>
     </extensions>
-
-
 </idea-plugin>
