@@ -15,10 +15,10 @@ object WtTokenSets {
         WtTypes.NEWLINE
     )
 
-
-    // @TODO wikitext has comments we should parse them
     @JvmField
-    val COMMENTS = TokenSet.create()
+    val COMMENTS = TokenSet.create(
+        WtTypes.COMMENT
+    )
 
 
     @JvmField
