@@ -4,8 +4,11 @@ version = "0.1.0"
 requires-python = ">=3.13"
 license = { text = "MIT" }
 dependencies = [
+    "bs4>=0.0.2",
     "fastapi[standard]>=0.138.1",
     "ipykernel>=7.3.0",
+    "matplotlib>=3.11.0",
+    "pandas>=3.0.4",
     "pytest>=9.1.1",
     "pywikibot>=11.4.2",
     "rich>=15.0.0",
@@ -13,6 +16,7 @@ dependencies = [
     "sqlmodel>=0.0.39",
     "typer>=0.26.8",
     "uvicorn[standard]>=0.49.0",
+    "vcrpy>=8.2.1",
 ]
 
 [build-system]

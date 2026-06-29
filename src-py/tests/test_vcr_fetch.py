@@ -13,8 +13,6 @@ Tests skip silently when a cassette doesn't exist yet.  Record with:
 See src-py/tests/cassettes/README.md for full instructions.
 """
 
-from __future__ import annotations
-
 import os
 from pathlib import Path
 

@@ -1,0 +1,106 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Type:
+      - application/x-www-form-urlencoded
+      user-agent:
+      - /pytest Pywikibot/11.4.2 (-1 (unknown)) Python/3.13.1.final.0 requests/2.34.2
+    method: GET
+    uri: https://wikisource-debian-13.lan/w/api.php?titles=Page%3AWittgenstein+-+Tractatus+Logico-Philosophicus%2C+1922.djvu%2F1&inprop=protection&prop=info%7Cproofread&action=query&indexpageids=&meta=userinfo&uiprop=blockinfo%7Chasmsg&maxlag=5&format=json
+  response:
+    body:
+      string: '{"batchcomplete":"","query":{"pageids":["6133"],"pages":{"6133":{"pageid":6133,"ns":250,"title":"Page:Wittgenstein
+        - Tractatus Logico-Philosophicus, 1922.djvu/1","contentmodel":"proofread-page","pagelanguage":"en","pagelanguagehtmlcode":"en","pagelanguagedir":"ltr","touched":"2026-03-24T02:12:12Z","lastrevid":11534,"length":13,"protection":[],"restrictiontypes":["edit","move"],"proofread":{"quality":0,"quality_text":"Without
+        text"}}},"userinfo":{"id":0,"name":"192.168.10.10","anon":""}}}'
+    headers:
+      Access-Control-Allow-Origin:
+      - '*'
+      Cache-Control:
+      - private, must-revalidate, max-age=0
+      Connection:
+      - keep-alive
+      Content-Disposition:
+      - inline; filename=api-result.json
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Mon, 29 Jun 2026 08:50:56 GMT
+      Server:
+      - nginx
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      X-Request-Id:
+      - a086d0bb84cccd1bc8b0a0af
+    status:
+      code: 200
+      message: OK
+- request:
+    body: rvprop=comment%7Ccontentmodel%7Cflags%7Cids%7Cparsedcomment%7Csha1%7Csize%7Ctags%7Ctimestamp%7Cuser%7Cuserid%7Ccontent%7Croles&titles=Page%3AWittgenstein+-+Tractatus+Logico-Philosophicus%2C+1922.djvu%2F1&rvdir=older&prop=info%7Cproofread%7Crevisions&action=query&indexpageids=&rvslots=%2A&rvlimit=1&meta=userinfo&uiprop=blockinfo%7Chasmsg&maxlag=5&format=json
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '359'
+      Content-Type:
+      - application/x-www-form-urlencoded
+      user-agent:
+      - /pytest Pywikibot/11.4.2 (-1 (unknown)) Python/3.13.1.final.0 requests/2.34.2
+    method: POST
+    uri: https://wikisource-debian-13.lan/w/api.php
+  response:
+    body:
+      string: '{"continue":{"rvcontinue":"20220119144033|11533","continue":"||info|proofread|userinfo"},"query":{"pageids":["6133"],"pages":{"6133":{"pageid":6133,"ns":250,"title":"Page:Wittgenstein
+        - Tractatus Logico-Philosophicus, 1922.djvu/1","contentmodel":"proofread-page","pagelanguage":"en","pagelanguagehtmlcode":"en","pagelanguagedir":"ltr","touched":"2026-03-24T02:12:12Z","lastrevid":11534,"length":13,"proofread":{"quality":0,"quality_text":"Without
+        text"},"revisions":[{"revid":11534,"parentid":11533,"minor":"","user":"Admin","userid":1,"timestamp":"2026-03-23T21:42:14Z","size":13,"sha1":"fe99bbbfad07912ab02e069166b83895f47ac473","roles":["main"],"slots":{"main":{"contentmodel":"proofread-page","contentformat":"text/x-wiki","*":"<noinclude><pagequality
+        level=\"0\" user=\"Kathleen.wright5\" /></noinclude><noinclude><references/></noinclude>"}},"comment":"1
+        revision imported from [[:s:Page:Wittgenstein_-_Tractatus_Logico-Philosophicus,_1922.djvu/1]]:
+        Importing page from s","parsedcomment":"1 revision imported from <a href=\"https://en.wikisource.org/wiki/Page:Wittgenstein_-_Tractatus_Logico-Philosophicus,_1922.djvu/1\"
+        class=\"extiw\" title=\"s:Page:Wittgenstein - Tractatus Logico-Philosophicus,
+        1922.djvu/1\">s:Page:Wittgenstein_-_Tractatus_Logico-Philosophicus,_1922.djvu/1</a>:
+        Importing page from s","tags":[]}]}},"userinfo":{"id":0,"name":"192.168.10.10","anon":""}}}'
+    headers:
+      Access-Control-Allow-Origin:
+      - '*'
+      Cache-Control:
+      - private, must-revalidate, max-age=0
+      Connection:
+      - keep-alive
+      Content-Disposition:
+      - inline; filename=api-result.json
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Mon, 29 Jun 2026 08:50:56 GMT
+      Server:
+      - nginx
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      X-Request-Id:
+      - bb1ea9b316999a93c1a46144
+    status:
+      code: 200
+      message: OK
+version: 1
