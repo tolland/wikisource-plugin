@@ -26,7 +26,7 @@ def _summary(page: Page) -> IndexPageSummary:
         title=page.title,
         page_count=page.page_count,
         revid=page.revid,
-        body_length=len(page.body or ""),
+        body_length=len(page.text or ""),
     )
 
 
@@ -49,4 +49,4 @@ def get_index_page(
         raise HTTPException(status_code=404, detail="index page not found")
 
     summary = _summary(page)
-    return IndexPageDetail(**summary.model_dump(), body=page.body or "")
+    return IndexPageDetail(**summary.model_dump(), body=page.text or "")

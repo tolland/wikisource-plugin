@@ -48,7 +48,16 @@ class Page(SQLModel, table=True):
     sha1: str | None = None
 
     # Local editing state
-    body: str | None = None  # raw wikitext, null until fetched
+    # `text` is the full raw wikitext as returned by the MediaWiki API (page.text
+    # in pywikibot).  For ProofreadPage content models it is decomposed further:
+    #   header — everything between the first <div> open/close pair
+    #   body   — the human-readable transcription between header and footer divs
+    #   footer — everything after the last <div> pair
+    # These three are null for non-ProofreadPage content models (index, wikitext…).
+    text: str | None = None
+    header: str | None = None
+    body: str | None = None
+    footer: str | None = None
     local_modified_at: datetime | None = None  # when THIS row last changed locally;
     # deliberately distinct from remote_timestamp -- conflating them is a known bug class.
     dirty: bool = Field(default=False, index=True)

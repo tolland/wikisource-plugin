@@ -37,14 +37,14 @@ def vfs_client(engine, tmp_path) -> TestClient:
         index_page = Page(
             site_pk=site.pk, title=INDEX,
             namespace_role=NsRole.index, content_model="proofread-index",
-            body=_INDEX_BODY, page_count=2, pageid=1001, revid=5001,
+            text=_INDEX_BODY, page_count=2, pageid=1001, revid=5001,
         )
         s.add(index_page)
 
         file_page = Page(
             site_pk=site.pk, title=FILE,
             namespace_role=NsRole.file, content_model="wikitext",
-            body=_FILE_BODY, pageid=1002, revid=5002,
+            text=_FILE_BODY, pageid=1002, revid=5002,
         )
         s.add(file_page)
         s.commit()
@@ -59,13 +59,13 @@ def vfs_client(engine, tmp_path) -> TestClient:
         p1 = Page(
             site_pk=site.pk, title=PAGE_1,
             namespace_role=NsRole.page, content_model="proofread-page",
-            body=_PAGE_1_BODY, pageid=1003, revid=5003,
+            text=_PAGE_1_BODY, pageid=1003, revid=5003,
             index_title=INDEX, page_number=1,
         )
         p2 = Page(
             site_pk=site.pk, title=PAGE_2,
             namespace_role=NsRole.page, content_model="proofread-page",
-            body=_PAGE_2_BODY, pageid=1004, revid=5004,
+            text=_PAGE_2_BODY, pageid=1004, revid=5004,
             index_title=INDEX, page_number=2,
         )
         s.add(p1)

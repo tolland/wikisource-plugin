@@ -59,7 +59,7 @@ def _ts(dt: datetime | None) -> str | None:
 
 
 def _page_node(path: str, page: Page) -> Node:
-    body = page.body or ""
+    body = page.text or ""
     return Node(
         path=path,
         name=page.title,
@@ -176,7 +176,7 @@ def stat(
         if file_page is None:
             return Stat(path=path, exists=False)
         if leaf == "wikitext":
-            body = file_page.body or ""
+            body = file_page.text or ""
             return Stat(
                 path=path,
                 exists=True,
@@ -219,7 +219,7 @@ def stat(
     ).first()
     if page is None:
         return Stat(path=path, exists=False)
-    body = page.body or ""
+    body = page.text or ""
     return Stat(
         path=path,
         exists=True,
@@ -369,7 +369,7 @@ def read_content(
             raise HTTPException(
                 status_code=404, detail=f"file page not found: {file_title}"
             )
-        body = (page.body or "").encode()
+        body = (page.text or "").encode()
         return ReadContentResponse(
             path=path,
             revid=page.revid,
@@ -382,7 +382,7 @@ def read_content(
     ).first()
     if page is None:
         raise HTTPException(status_code=404, detail=f"page not found: {child_title}")
-    body = (page.body or "").encode()
+    body = (page.text or "").encode()
     return ReadContentResponse(
         path=path,
         revid=page.revid,

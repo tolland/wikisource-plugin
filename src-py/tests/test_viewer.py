@@ -6,7 +6,7 @@ from wtbot.api.viewer import get_index_page, list_index_pages
 from wtbot.sqlmodel import NsRole, Page, Site
 
 
-def _add_page(engine, title: str, role: NsRole, body: str | None) -> Page:
+def _add_page(engine, title: str, role: NsRole, text: str | None) -> Page:
     session = Session(engine)
     site = session.exec(
         select(Site).where(Site.family == "mywikisource", Site.code == "en")
@@ -21,7 +21,7 @@ def _add_page(engine, title: str, role: NsRole, body: str | None) -> Page:
         site_pk=site.pk,
         title=title,
         namespace_role=role,
-        body=body,
+        text=text,
         page_count=12 if role == NsRole.index else None,
         revid=123,
     )
@@ -57,7 +57,7 @@ def test_viewer_returns_index_page_body(engine):
     with Session(engine) as session:
         page = get_index_page(index_page.pk, session)
 
-    assert page.body == "{{Header}}"
+    assert page.body == "{{Header}}"  # viewer response field (not DB column)
 
 
 def test_viewer_404s_for_non_index_page(engine):
