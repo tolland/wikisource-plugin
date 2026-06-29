@@ -244,7 +244,8 @@ def _upsert_page(session: Session, site: Site, remote: RemotePage) -> Page:
         page = Page(site_pk=site.pk, title=remote.title)
 
     page.namespace_key = remote.namespace_key
-    page.namespace_role = role_for_canonical(remote.namespace_canonical or "")
+    ns_role = role_for_canonical(remote.namespace_canonical or "")
+    page.namespace_role = ns_role
     page.content_model = remote.content_model
     page.body = remote.text
     page.pageid = remote.pageid
@@ -257,6 +258,14 @@ def _upsert_page(session: Session, site: Site, remote: RemotePage) -> Page:
     # <pagelist> fallback in _fan_out_index covers FakeWikiClient in tests.
     if remote.page_count is not None:
         page.page_count = remote.page_count
+    # Derive index_title and page_number for ProofreadPage Page: rows.
+    # Title is always "Page:{basename}/{n}"; rsplit gives (basename, n).
+    if ns_role == NsRole.page and page.index_title is None:
+        after_ns = remote.title.split(":", 1)[-1]  # "Foo.pdf/3"
+        base, _, num = after_ns.rpartition("/")
+        if base and num.isdigit():
+            page.index_title = f"Index:{base}"
+            page.page_number = int(num)
     page.dirty = False
     page.fetch_status = FetchState.done
     page.fetch_error = None
