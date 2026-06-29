@@ -8,7 +8,7 @@ dependencies = [
     "fastapi[standard]>=0.138.1",
     "ipykernel>=7.3.0",
     "matplotlib>=3.11.0",
-    "pandas>=3.0.3",
+    "pandas==3.0.3",
     "pywikibot>=11.4.2",
     "rich>=15.0.0",
     "sqlalchemy>=2.0.51",
