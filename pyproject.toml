@@ -12,6 +12,7 @@ dependencies = [
     "pytest>=9.1.1",
     "pywikibot>=11.4.2",
     "rich>=15.0.0",
+    "ruff>=0.15.20",
     "sqlalchemy>=2.0.51",
     "sqlmodel>=0.0.39",
     "typer>=0.26.8",
