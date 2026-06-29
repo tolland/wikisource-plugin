@@ -18,6 +18,17 @@ dependencies = [
     "vcrpy>=8.2.1",
 ]
 
+[project.urls]
+Homepage = "https://github.com/tolland/wikisource-plugin"
+Repository = "https://github.com/tolland/wikisource-plugin"
+Issues = "https://github.com/tolland/wikisource-plugin/issues"
+
+
+[dependency-groups]
+test = [
+    "pytest>=9.1.1",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -27,11 +38,6 @@ wtbot = "wtbot.cli:run_cli"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src-py/wtbot"]
-
-[project.urls]
-Homepage = "https://github.com/tolland/wikisource-plugin"
-Repository = "https://github.com/tolland/wikisource-plugin"
-Issues = "https://github.com/tolland/wikisource-plugin/issues"
 
 [project.optional-dependencies]
 dev = [
