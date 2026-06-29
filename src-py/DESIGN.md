@@ -82,15 +82,32 @@ depth:  implied        # how aggressively to expand associated assets
 Wikisource is not flat. Certain titles imply a structured set of other objects,
 and the backend must understand this to fetch a *work*, not just a *page*.
 
-### Namespaces we care about
+### Namespaces we care about — by role, never by hardcoded id
 
-| Namespace      | ns id | Treatment                                              |
-|----------------|-------|-------------------------------------------------------|
-| `Index:`       | 106   | ProofreadPage index — root of a scanned work          |
-| `Page:`        | 104   | one scanned page's transcription (`Title.djvu/N`)      |
-| `File:`        | 6     | the backing DjVu/PDF — **stored as a file, not a row** |
-| main (article) | 0     | the composed work that transcludes Pages              |
-| `Book:` etc.   | site  | collection/landing pages                              |
+**Numeric namespace ids are per-site and must not be hardcoded.** When the
+ProofreadPage extension is reinstalled on a fresh wiki it gets deconflicted ids
+(`Page`=250, `Index`=252), whereas en.wikisource.org still runs the legacy ids
+(`Page`=104, `Index`=106). Custom namespaces (e.g. a dedicated `Book`=3100 for
+moving mainspace works) are operator-chosen and differ per install. So the only
+portable thing is the **canonical namespace name**, which *is* stable across
+sites — `Page`, `Index`, `File`, `Template`, `Module` are the same string
+everywhere; only the integer key moves.
+
+The backend therefore works in terms of a **role** (an enum), and resolves
+role → local numeric id per-site from `siteinfo`:
+
+| Role        | canonical name | en.ws | local (PRP reinstall) | Treatment                              |
+|-------------|----------------|-------|-----------------------|----------------------------------------|
+| `INDEX`     | `Index`        | 106   | 252                   | ProofreadPage index — root of a work   |
+| `PAGE`      | `Page`         | 104   | 250                   | one scan page's transcription (`…/N`)  |
+| `FILE`      | `File`         | 6     | 6                     | backing DjVu/PDF — **file, not a row** |
+| `MAIN`      | (empty)        | 0     | 0                     | article / composed work                |
+| `BOOK`*     | `Book`         | —     | 3100 (custom)         | collection/landing (site-configured)   |
+
+\* `BOOK` is not a standard Wikisource namespace; on en.ws works live in `MAIN`.
+It's an operator convention, so its name/id come from per-site config, not a
+global assumption. Role resolution falls back to "by name from siteinfo"; only
+genuinely custom roles need a per-site override.
 
 ### Implied-asset expansion
 
@@ -259,7 +276,50 @@ class FetchRequest(SQLModel, table=True):
 `parent_pk` gives the Index→Pages fan-out; the plugin polls the parent and reads
 aggregate `progress_done / progress_total`.
 
-### 6.3 The journal (separating saves from cached remote state)
+### 6.3 Per-site namespace map (role → local id)
+
+`Namespace` becomes **per-site** and role-aware. We never compare numeric ids
+across sites; we compare roles. The map is populated from each site's `siteinfo`
+on first contact.
+
+```python
+# wtbot/sqlmodel/namespace.py  (proposed — replaces the flat model)
+from enum import Enum
+from sqlmodel import SQLModel, Field
+from sqlalchemy import UniqueConstraint
+
+
+class NsRole(str, Enum):
+    main = "main"
+    page = "page"      # ProofreadPage Page:
+    index = "index"    # ProofreadPage Index:
+    file = "file"
+    template = "template"
+    module = "module"
+    book = "book"      # site-custom (operator convention)
+    author = "author"
+    other = "other"
+
+
+class Namespace(SQLModel, table=True):
+    __table_args__ = (
+        UniqueConstraint("site_pk", "key", name="uq_ns_site_key"),
+    )
+    pk: int | None = Field(default=None, primary_key=True)
+    site_pk: int = Field(foreign_key="site.pk")
+    key: int                      # the site-local numeric id (104 or 250 …)
+    canonical_name: str           # 'Page', 'Index', 'File' — stable across sites
+    local_name: str               # display name on this wiki (may be localized)
+    role: NsRole = NsRole.other   # resolved from canonical_name (+ site overrides)
+```
+
+`pages.namespace` should then store the **role** (or FK the `Namespace` row),
+not a bare integer, so a Page from a 250-wiki and a Page from a 104-wiki are
+recognisably the same kind of object. Roles are assigned by matching
+`canonical_name` against the standard set, with a small per-site override map for
+custom namespaces like `Book`.
+
+### 6.4 The journal (separating saves from cached remote state)
 
 Each IDE save must be kept distinct from the last-fetched remote revision — a
 local transaction log, not an in-place overwrite of the cached body. This serves
@@ -324,13 +384,118 @@ Concurrency uses the documented SQLite discipline: WAL, `busy_timeout=5000`,
    data. Current stack (SQLModel + FastAPI + Typer CLI) is lighter and already
    started. Recommendation: stay on SQLModel until the data model is settled
    (this doc), reassess once there's real cached data to inspect.
-3. **Namespace ids per site.** `Page:`=104 / `Index:`=106 are the common
-   Wikisource values but should be read from each site's `siteinfo`, not
-   hardcoded — store them on `sites` / `Namespace`.
+3. ~~Namespace ids per site.~~ **Resolved** (§3, §6.3): work in terms of a
+   role enum, resolve role → local numeric id from per-site `siteinfo`, never
+   hardcode `104`/`106`.
 
 ---
 
-## 9. Testing
+## 9. Cross-wiki correspondence (staging ↔ upstream)
+
+A central future use case: a local wiki is a **staging copy** of an upstream one.
+`https://wikisource-debian-13.lan/.../Index:…Tractatus…djvu` is the local staging
+of `https://en.wikisource.org/.../Index:…Tractatus…djvu`. We want to iterate
+locally, then later `fetch`/`pull`/diff/rebase against the canonical wiki, and
+surface that relationship to IntelliJ (compare staging vs canonical, pull
+updates, view diffs).
+
+This is intentionally **designed-for, not built-now** — but the foundations are
+already present and we just need to not paint ourselves into a corner.
+
+### Why this is hard, and why we're mostly OK
+
+The two trees are independent wikis. `pageid` and `revid` are wiki-local and
+**not comparable** across them (the schema already calls this out). What *is*
+comparable:
+
+- **Title** — the logical handle; usually identical on both sides, but may be
+  deliberately renamed in staging, so it can't be the sole link.
+- **`sha1`** — MediaWiki's content hash of revision text. Byte-identical content
+  yields the same `sha1` on *both* wikis regardless of revid. This is our
+  cross-wiki "same content" oracle.
+- **structure** — Index → Pages parent/child trees line up by `page_number`
+  within a work even when ids differ.
+
+So we don't try to reconcile ids. We assert correspondence explicitly and use
+`sha1` as the merge-base oracle — exactly git's model: a remote-tracking ref plus
+a recorded merge base.
+
+### The link object
+
+```python
+# wtbot/sqlmodel/remote_link.py  (proposed, future)
+from datetime import datetime
+from sqlmodel import SQLModel, Field
+from sqlalchemy import UniqueConstraint
+
+
+class RemoteLink(SQLModel, table=True):
+    """One local page's tracking relationship to the same logical object
+    on another site. Analogous to a git remote-tracking ref + merge base."""
+    __table_args__ = (
+        UniqueConstraint("local_page_pk", "upstream_site_pk", name="uq_link"),
+    )
+    pk: int | None = Field(default=None, primary_key=True)
+
+    local_page_pk: int = Field(foreign_key="page.pk")
+    upstream_site_pk: int = Field(foreign_key="site.pk")
+    upstream_title: str                     # may differ from the local title
+
+    # merge base: the upstream revision we last synced FROM. sha1 is the
+    # cross-wiki-stable token; revid/pageid are kept only as upstream-local hints.
+    base_sha1: str | None = None            # content we last reconciled against
+    base_revid: int | None = None           # upstream-local, informational
+    base_synced_at: datetime | None = None
+
+    # last seen upstream head (refreshed by a cheap metadata poll)
+    upstream_head_sha1: str | None = None
+    upstream_head_revid: int | None = None
+    upstream_checked_at: datetime | None = None
+```
+
+Links can be seeded automatically (same title on a designated upstream) or set
+explicitly when a staging page was renamed. They attach at the page level; an
+Index-level link plus matching `page_number`s lets the whole work be tracked from
+one assertion.
+
+### The three-way state (drives pull / rebase / diff)
+
+For a linked page, compare three content hashes — local body `sha1`,
+`base_sha1`, and freshly-fetched `upstream_head_sha1`:
+
+| local vs base | upstream vs base | meaning            | action exposed to IDE        |
+|---------------|------------------|--------------------|------------------------------|
+| same          | same             | in sync            | (nothing)                    |
+| changed       | same             | local-only edits   | ready to push upstream       |
+| same          | changed          | upstream advanced  | **fast-forward pull**        |
+| changed       | changed          | diverged           | **diff + 3-way merge/rebase**|
+
+Fast-forward updates `base_*` to the new upstream head. Divergence surfaces a
+diff in IntelliJ (it already does PSI-level wikitext); a "rebase" replays local
+journal edits onto the pulled upstream body. None of this needs id reconciliation
+— it's all `sha1` and body diffs.
+
+### Operations (future surface)
+
+```
+POST /link        { local_title, upstream:{family,code}, upstream_title }
+GET  /link/{page} → { state, base_sha1, upstream_head_sha1, diff_url? }
+POST /link/{page}/refresh    # cheap upstream metadata poll, update head sha1
+POST /link/{page}/pull       # ff if clean; else return diff for merge
+```
+
+### What we do now vs later
+
+- **Now:** keep `sha1` populated on every fetched revision (already in the
+  schema), keep titles and Index→Page structure intact, and don't assume ids are
+  global. That alone keeps the door open.
+- **Later:** add the `RemoteLink` table and the link/pull endpoints. No change to
+  the core `pages`/journal model is required to get there — `RemoteLink` is purely
+  additive.
+
+---
+
+## 10. Testing
 
 A local Wikisource runs at `https://wikisource-debian-13.lan` with a known work:
 
