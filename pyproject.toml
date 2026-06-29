@@ -6,8 +6,6 @@ license = { text = "MIT" }
 dependencies = [
     "bs4>=0.0.2",
     "fastapi[standard]>=0.138.1",
-    "ipykernel>=7.3.0",
-    "matplotlib>=3.11.0",
     "pandas==3.0.3",
     "pywikibot>=11.4.2",
     "rich>=15.0.0",
@@ -15,7 +13,6 @@ dependencies = [
     "sqlmodel>=0.0.39",
     "typer>=0.26.8",
     "uvicorn[standard]>=0.49.0",
-    "vcrpy>=8.2.1",
 ]
 
 [project.urls]
@@ -27,6 +24,15 @@ Issues = "https://github.com/tolland/wikisource-plugin/issues"
 [dependency-groups]
 test = [
     "pytest>=9.1.1",
+    "vcrpy>=8.2.1",
+]
+
+dev = [
+    { include-group = "test" },
+    "black>=26.0",
+    "ipykernel>=7.3.0",
+    "pre-commit>=4.0",
+    "ruff>=0.15",
 ]
 
 [build-system]
@@ -38,15 +44,6 @@ wtbot = "wtbot.cli:run_cli"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src-py/wtbot"]
-
-[project.optional-dependencies]
-dev = [
-    "black>=26.0",
-    "pre-commit>=4.0",
-    "pytest>=9.1.1",
-    "ruff>=0.15",
-    "vcrpy>=6.0",
-]
 
 [tool.pytest.ini_options]
 pythonpath = ["src-py"]
