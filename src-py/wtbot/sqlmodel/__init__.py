@@ -1,4 +1,3 @@
-from .base import Base
 from .page import Page
 from .revision import Revision
 from .namespace import Namespace
