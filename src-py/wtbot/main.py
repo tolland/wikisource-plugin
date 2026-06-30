@@ -5,7 +5,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from sqlalchemy.engine import Engine
 
-from wtbot.api import fetch, health, sites, vfs, viewer
+from wtbot.api import commit, fetch, health, sites, vfs, viewer
 from wtbot.db import create_db_engine, init_db
 from wtbot.worker import ClientFactory, make_client_for_site
 
@@ -50,6 +50,7 @@ def create_app(
     app.include_router(health.router)
     app.include_router(sites.router)
     app.include_router(fetch.router)
+    app.include_router(commit.router)
     app.include_router(vfs.router)
     app.include_router(viewer.router)
 

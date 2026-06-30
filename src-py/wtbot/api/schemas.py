@@ -108,6 +108,12 @@ class WriteResult(BaseModel):
     message: str | None = None
 
 
+class CommitRunResponse(BaseModel):
+    handled: int = Field(
+        ..., description="Number of pages whose pending local edits were pushed this run."
+    )
+
+
 class RenameRequest(BaseModel):
     path: str
     new_name: str
