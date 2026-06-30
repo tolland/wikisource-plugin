@@ -17,7 +17,6 @@ from sqlmodel import Session, select
 
 from wtbot.settings import WikiSettings
 from wtbot.sqlmodel import Commit, CommitStatus, EditJournal, Page, Site
-from wtbot.timeutil import utcnow
 from wtbot.wiki.client import WikiClient, get_wiki_client
 from wtbot.wiki.types import EditConflict
 
@@ -74,7 +73,9 @@ def _push_page(session: Session, page_pk: int, client_factory: ClientFactory) ->
 
     pending = session.exec(
         select(EditJournal)
-        .where(EditJournal.page_pk == page_pk, EditJournal.committed == False)  # noqa: E712
+        .where(
+            EditJournal.page_pk == page_pk, EditJournal.committed == False  # noqa: E712
+        )  # noqa: E712
         .order_by(EditJournal.saved_at)
     ).all()
     if not pending:
@@ -83,7 +84,9 @@ def _push_page(session: Session, page_pk: int, client_factory: ClientFactory) ->
     latest = pending[-1]
     commit = Commit(
         page_pk=page_pk,
-        base_revid=latest.base_revid if latest.base_revid is not None else (page.revid or 0),
+        base_revid=(
+            latest.base_revid if latest.base_revid is not None else (page.revid or 0)
+        ),
         submitted_body=latest.body,
         comment=latest.comment,
     )
@@ -118,7 +121,9 @@ def _push_page(session: Session, page_pk: int, client_factory: ClientFactory) ->
 
 def _drop_orphaned_journal(session: Session, page_pk: int) -> None:
     rows = session.exec(
-        select(EditJournal).where(EditJournal.page_pk == page_pk, EditJournal.committed == False)  # noqa: E712
+        select(EditJournal).where(
+            EditJournal.page_pk == page_pk, EditJournal.committed == False  # noqa: E712
+        )  # noqa: E712
     ).all()
     for row in rows:
         row.committed = True

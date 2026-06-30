@@ -1,6 +1,7 @@
 import json
 from typing import Callable
-from fastapi import FastAPI, Request, Response
+
+from fastapi import Request, Response
 from fastapi.routing import APIRoute
 
 

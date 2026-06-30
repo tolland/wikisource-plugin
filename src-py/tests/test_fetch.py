@@ -10,7 +10,6 @@ from wtbot.sqlmodel import FetchRequest, FetchStatus, FileBlob, Page, Site
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.types import RemotePage
 from wtbot.worker import run_pending
-from rich import inspect
 
 _INDEX_TITLE = "Index:Tractatus.djvu"
 _FILE_TITLE = "File:Tractatus.djvu"

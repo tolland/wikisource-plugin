@@ -13,7 +13,13 @@ from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from wtbot.settings import WikiSettings
-from wtbot.wiki.types import EditConflict, PageNotFound, RemoteFileInfo, RemotePage, SaveResult
+from wtbot.wiki.types import (
+    EditConflict,
+    PageNotFound,
+    RemoteFileInfo,
+    RemotePage,
+    SaveResult,
+)
 
 
 @runtime_checkable
