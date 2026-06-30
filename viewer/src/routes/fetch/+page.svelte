@@ -1,18 +1,53 @@
 <script lang="ts">
-  import { createFetch } from '$lib/api';
-  import type { FetchKind, FetchResponse } from '$lib/types';
+  import { onMount } from 'svelte';
+  import { createFetch, listSites } from '$lib/api';
+  import type { FetchKind, FetchResponse, Site } from '$lib/types';
 
   let title = $state('Index:');
   let family = $state('wikisource');
   let code = $state('en');
   let apiUrl = $state('https://en.wikisource.org/w/api.php');
+  let sites: Site[] = $state([]);
+  let selectedSitePk: number | null = $state(null);
   let kind: FetchKind = $state('single');
   let depth = $state(0);
+  let loadingSites = $state(true);
   let loading = $state(false);
   let error = $state('');
   let result: FetchResponse | null = $state(null);
 
+  function siteLabel(site: Site): string {
+    return site.label || `${site.family}:${site.code}`;
+  }
+
+  function selectedSite(): Site | null {
+    return sites.find((site) => site.pk === selectedSitePk) ?? null;
+  }
+
+  function applySelectedSite(): void {
+    const site = selectedSite();
+    if (!site) return;
+    family = site.family;
+    code = site.code;
+    apiUrl = site.api_url ?? '';
+  }
+
+  async function loadSites(): Promise<void> {
+    loadingSites = true;
+    error = '';
+    try {
+      sites = await listSites();
+      selectedSitePk = sites[0]?.pk ?? null;
+      applySelectedSite();
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Failed to load sites';
+    } finally {
+      loadingSites = false;
+    }
+  }
+
   async function submitFetch(): Promise<void> {
+    applySelectedSite();
     loading = true;
     error = '';
     result = null;
@@ -31,6 +66,8 @@
       loading = false;
     }
   }
+
+  onMount(loadSites);
 </script>
 
 <section class="page-heading">
@@ -48,21 +85,45 @@
     <input bind:value={title} required placeholder="Index:Example.djvu" />
   </label>
 
-  <div class="form-row">
+  {#if loadingSites}
+    <p class="state">Loading sites...</p>
+  {:else if sites.length > 1}
     <label>
-      <span>Family</span>
-      <input bind:value={family} required />
+      <span>Site</span>
+      <select
+        bind:value={selectedSitePk}
+        onchange={() => {
+          applySelectedSite();
+        }}
+      >
+        {#each sites as site}
+          <option value={site.pk}>{siteLabel(site)}</option>
+        {/each}
+      </select>
     </label>
-    <label>
-      <span>Code</span>
-      <input bind:value={code} required />
-    </label>
-  </div>
+  {:else if sites.length === 1}
+    <div class="site-summary">
+      <span>Site</span>
+      <strong>{siteLabel(sites[0])}</strong>
+      <small>{sites[0].api_url ?? sites[0].host ?? `${sites[0].family}:${sites[0].code}`}</small>
+    </div>
+  {:else}
+    <div class="form-row">
+      <label>
+        <span>Family</span>
+        <input bind:value={family} required />
+      </label>
+      <label>
+        <span>Code</span>
+        <input bind:value={code} required />
+      </label>
+    </div>
 
-  <label>
-    <span>API URL</span>
-    <input bind:value={apiUrl} placeholder="https://en.wikisource.org/w/api.php" />
-  </label>
+    <label>
+      <span>API URL</span>
+      <input bind:value={apiUrl} placeholder="https://en.wikisource.org/w/api.php" />
+    </label>
+  {/if}
 
   <div class="form-row">
     <label>
@@ -147,12 +208,33 @@
     gap: 1rem;
   }
 
+  .site-summary {
+    border: 1px solid rgba(72, 49, 31, 0.16);
+    border-radius: 14px;
+    background: rgba(255, 253, 245, 0.68);
+    display: grid;
+    gap: 0.25rem;
+    padding: 0.85rem 0.95rem;
+  }
+
+  .site-summary strong,
+  .site-summary small {
+    display: block;
+  }
+
+  .site-summary small {
+    color: #73583d;
+    font-family: "Avenir Next", "Gill Sans", sans-serif;
+    font-size: 0.82rem;
+  }
+
   label {
     display: grid;
     gap: 0.4rem;
   }
 
   label span,
+  .site-summary span,
   dt {
     color: #73583d;
     font-family: "Avenir Next", "Gill Sans", sans-serif;

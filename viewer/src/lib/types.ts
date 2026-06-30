@@ -28,6 +28,7 @@ export interface IndexPageSummary {
   title: string;
   page_count?: number | null;
   revid?: number | null;
+  content_model?: string | null;
   body_length: number;
 }
 
@@ -52,10 +53,23 @@ export interface CachedPage {
   site_pk: number;
   title: string;
   namespace_role: NamespaceRole;
-  body?: string | null;
+  namespace_key?: number | null;
+  content_model?: string | null;
+  text?: string | null;
+  pageid?: number | null;
   revid?: number | null;
+  remote_timestamp?: string | null;
+  contributor?: string | null;
+  comment?: string | null;
+  sha1?: string | null;
+  local_modified_at?: string | null;
   dirty: boolean;
+  index_title?: string | null;
+  page_number?: number | null;
+  quality_level?: number | null;
+  page_count?: number | null;
   fetch_status: string;
+  fetch_error?: string | null;
 }
 
 export interface FetchCreate {

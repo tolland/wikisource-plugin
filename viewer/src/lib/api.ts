@@ -4,6 +4,7 @@ import type {
   IndexPageDetail,
   IndexPageSummary,
   ListChildrenResponse,
+  CachedPage,
   ReadContentResponse,
   Site
 } from '$lib/types';
@@ -38,6 +39,15 @@ export function listIndexPages(): Promise<IndexPageSummary[]> {
 
 export function getIndexPage(pk: number): Promise<IndexPageDetail> {
   return getJson<IndexPageDetail>(`/viewer/indexes/${pk}`);
+}
+
+export function listPages(params: URLSearchParams = new URLSearchParams()): Promise<CachedPage[]> {
+  const suffix = params.size > 0 ? `?${params.toString()}` : '';
+  return getJson<CachedPage[]>(`/pages/${suffix}`);
+}
+
+export function getPage(pk: number): Promise<CachedPage> {
+  return getJson<CachedPage>(`/pages/${pk}`);
 }
 
 export function createFetch(payload: FetchCreate): Promise<FetchResponse> {

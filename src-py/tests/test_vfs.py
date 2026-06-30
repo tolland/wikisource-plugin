@@ -282,6 +282,7 @@ def test_read_page(vfs_client):
     assert r.status_code == 200
     body = r.json()
     assert body["revid"] == 5003
+    assert "content_model" not in body
     assert base64.b64decode(body["content_base64"]).decode() == _PAGE_1_BODY
 
 
@@ -334,7 +335,9 @@ def test_write_page_ok(vfs_client, engine):
         assert page.text == new_body
         assert page.dirty is True
 
-        journal = s.exec(select(EditJournal).where(EditJournal.page_pk == page.pk)).first()
+        journal = s.exec(
+            select(EditJournal).where(EditJournal.page_pk == page.pk)
+        ).first()
         assert journal is not None
         assert journal.body == new_body
         assert journal.base_revid == 5003

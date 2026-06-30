@@ -13,6 +13,7 @@ class IndexPageSummary(BaseModel):
     title: str
     page_count: int | None = None
     revid: int | None = None
+    content_model: str | None = None
     body_length: int
 
 
@@ -26,6 +27,7 @@ def _summary(page: Page) -> IndexPageSummary:
         title=page.title,
         page_count=page.page_count,
         revid=page.revid,
+        content_model=page.content_model,
         body_length=len(page.text or ""),
     )
 

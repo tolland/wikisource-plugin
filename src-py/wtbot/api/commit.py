@@ -1,20 +1,36 @@
-"""Sync-back endpoint (surface C).
-
-The plugin POSTs here to push pending local edits (EditJournal rows) to the
-wiki. Drains the queue inline, same shape as fetch.py's create_fetch -- a
-background worker can replace the inline loop later without changing the
-contract.
-"""
-
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlmodel import Session, select
 from fastapi import APIRouter, Depends, Request
 from sqlmodel import Session
 
 from wtbot.api.schemas import CommitRunResponse
 from wtbot.commit_worker import run_pending_commits
 from wtbot.deps import get_session
+from wtbot.sqlmodel import Commit, CommitStatus
 
-router = APIRouter(prefix="/commit", tags=["commit"])
+from fastapi import APIRouter, Depends, Request
+from sqlmodel import Session
 
+from wtbot.api.schemas import CommitRunResponse
+from wtbot.commit_worker import run_pending_commits
+
+router = APIRouter(prefix="/commits", tags=["commits"])
+
+
+@router.get("/", response_model=list[Commit])
+def list_commits(
+    session: Session = Depends(get_session),
+    page_pk: int | None = None,
+    status: CommitStatus | None = None,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+) -> list[Commit]:
+    statement = select(Commit).order_by(Commit.created_at).offset(offset).limit(limit)
+    if page_pk is not None:
+        statement = statement.where(Commit.page_pk == page_pk)
+    if status is not None:
+        statement = statement.where(Commit.status == status)
+    return list(session.exec(statement).all())
 
 @router.post("/", response_model=CommitRunResponse)
 def run_commits(
@@ -28,3 +44,10 @@ def run_commits(
         if n == 0:
             break
     return CommitRunResponse(handled=handled)
+
+@router.get("/{commit_pk}", response_model=Commit)
+def get_commit(commit_pk: int, session: Session = Depends(get_session)) -> Commit:
+    commit = session.get(Commit, commit_pk)
+    if commit is None:
+        raise HTTPException(status_code=404, detail="commit not found")
+    return commit

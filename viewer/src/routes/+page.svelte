@@ -48,6 +48,11 @@
     <strong>{loading ? '...' : indexes.length} Index pages</strong>
     <small>Open cached proofread indexes and inspect their source.</small>
   </a>
+  <a class="card" href="/pages">
+    <span class="card-kicker">Objects</span>
+    <strong>Cached pages</strong>
+    <small>Find any Page, Template, Book, or other cached title.</small>
+  </a>
   <a class="card" href="/vfs">
     <span class="card-kicker">Editor view</span>
     <strong>Virtual files</strong>
@@ -119,7 +124,7 @@
 
   .cards {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 1rem;
     margin: 2rem 0;
   }
@@ -218,6 +223,10 @@
   }
 
   @media (max-width: 880px) {
+    .cards {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .cards,
     .panel-grid {
       grid-template-columns: 1fr;
