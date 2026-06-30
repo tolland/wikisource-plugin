@@ -17,8 +17,30 @@ internal class JsonReader(private val json: String) {
         stringOrNull(key) ?: error("missing string field '$key' in JSON")
 
     fun stringOrNull(key: String): String? {
-        val pattern = Regex(""""$key"\s*:\s*"((?:[^"\\]|\\.)*)"""")
-        return pattern.find(json)?.groupValues?.get(1)
+        // Hand-rolled scan instead of a `(?:[^"\\]|\\.)*`-style regex: Java's
+        // regex engine recurses per repetition, and long values (e.g. a
+        // base64-encoded page body) blow the stack with that pattern.
+        val keyToken = "\"$key\""
+        var i = json.indexOf(keyToken)
+        if (i == -1) return null
+        i += keyToken.length
+        while (i < json.length && json[i].isWhitespace()) i++
+        if (i >= json.length || json[i] != ':') return null
+        i++
+        while (i < json.length && json[i].isWhitespace()) i++
+        if (i >= json.length || json[i] != '"') return null
+        i++
+        val sb = StringBuilder()
+        while (i < json.length && json[i] != '"') {
+            if (json[i] == '\\' && i + 1 < json.length) {
+                sb.append(json[i]).append(json[i + 1])
+                i += 2
+            } else {
+                sb.append(json[i])
+                i++
+            }
+        }
+        return sb.toString()
     }
 
     fun bool(key: String): Boolean =
