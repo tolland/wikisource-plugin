@@ -85,6 +85,44 @@ class TestConfigInjection:
         assert os.environ["PYWIKIBOT_NO_USER_CONFIG"] == "1"
         assert os.environ["REQUESTS_CA_BUNDLE"] == str(tmp_path / "ca.pem")
 
+    def test_configure_writes_bot_password_file(self, tmp_path):
+        import stat
+
+        from wtbot.wiki.config import configure_pywikibot
+
+        settings = WikiSettings(
+            family="mywikisource",
+            code="en",
+            username="Alice",
+            password="hunter2",
+            bot_name="wtbot",
+            config_dir=str(tmp_path / "pwb"),
+        )
+        configure_pywikibot(settings)
+
+        password_file = tmp_path / "pwb" / "user-password.py"
+        assert password_file.is_file()
+        assert oct(password_file.stat().st_mode & 0o777) == oct(stat.S_IRUSR | stat.S_IWUSR)
+        content = password_file.read_text()
+        assert "'Alice'" in content
+        assert "BotPassword('wtbot', 'hunter2')" in content
+
+        import pywikibot.config as pwbconfig
+
+        assert pwbconfig.password_file == str(password_file)
+
+    def test_configure_without_password_writes_no_file(self, tmp_path):
+        from wtbot.wiki.config import configure_pywikibot
+
+        settings = WikiSettings(
+            family="mywikisource",
+            code="en",
+            username="Alice",
+            config_dir=str(tmp_path / "pwb"),
+        )
+        configure_pywikibot(settings)
+        assert not (tmp_path / "pwb" / "user-password.py").exists()
+
 
 def test_from_env():
     s = WikiSettings.from_env(
@@ -92,3 +130,50 @@ def test_from_env():
     )
     assert s.family == "mywikisource"
     assert s.code == "en"
+
+
+def test_from_env_reads_credentials():
+    s = WikiSettings.from_env(
+        {
+            "WTBOT_WIKI_FAMILY": "mywikisource",
+            "WTBOT_WIKI_CODE": "en",
+            "WTBOT_WIKI_USERNAME": "Alice",
+            "WTBOT_WIKI_PASSWORD": "hunter2",
+            "WTBOT_WIKI_BOTNAME": "wtbot",
+        }
+    )
+    assert s.username == "Alice"
+    assert s.password == "hunter2"
+    assert s.bot_name == "wtbot"
+
+
+class _FakeSiteRow:
+    family = "mywikisource"
+    code = "en"
+    api_url = "https://wikisource-debian-13.lan/w/api.php"
+
+
+def test_from_site_picks_up_credentials_from_env(monkeypatch):
+    monkeypatch.setenv("WTBOT_WIKI_USERNAME", "Alice")
+    monkeypatch.setenv("WTBOT_WIKI_PASSWORD", "hunter2")
+    monkeypatch.setenv("WTBOT_WIKI_BOTNAME", "wtbot")
+
+    s = WikiSettings.from_site(_FakeSiteRow())
+
+    # Site row identity wins...
+    assert s.family == "mywikisource"
+    assert s.code == "en"
+    assert s.api_url == "https://wikisource-debian-13.lan/w/api.php"
+    # ...credentials come from env, since Site rows carry no secrets.
+    assert s.username == "Alice"
+    assert s.password == "hunter2"
+    assert s.bot_name == "wtbot"
+
+
+def test_from_site_explicit_overrides_win_over_env(monkeypatch):
+    monkeypatch.setenv("WTBOT_WIKI_USERNAME", "Alice")
+    monkeypatch.setenv("WTBOT_WIKI_PASSWORD", "hunter2")
+
+    s = WikiSettings.from_site(_FakeSiteRow(), username="Bob", password="swordfish")
+    assert s.username == "Bob"
+    assert s.password == "swordfish"

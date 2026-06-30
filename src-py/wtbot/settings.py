@@ -14,6 +14,11 @@ class WikiSettings:
     code: str
     api_url: str | None = None  # full action API endpoint; preferred over family files
     username: str | None = None
+    # Plain account password, or the bot password half of a BotPassword when
+    # bot_name is also set. Never persisted -- sourced from process env only,
+    # since Site rows (SQLite) deliberately carry no credentials.
+    password: str | None = None
+    bot_name: str | None = None  # BotPasswords "username@bot_name" suffix
     ca_bundle: str | None = None  # CA cert for a self-signed local wiki (.lan)
     config_dir: str | None = None  # PYWIKIBOT_DIR; ephemeral temp dir if None
 
@@ -25,17 +30,28 @@ class WikiSettings:
             code=e.get("WTBOT_WIKI_CODE", "en"),
             api_url=e.get("WTBOT_WIKI_API_URL") or None,
             username=e.get("WTBOT_WIKI_USERNAME") or None,
+            password=e.get("WTBOT_WIKI_PASSWORD") or None,
+            bot_name=e.get("WTBOT_WIKI_BOTNAME") or None,
             ca_bundle=e.get("WTBOT_WIKI_CA_BUNDLE") or None,
             config_dir=e.get("WTBOT_PWB_DIR") or None,
         )
 
     @classmethod
     def from_site(cls, site, **overrides) -> "WikiSettings":
-        """Build from a persisted Site row, with optional auth/TLS overrides."""
+        """Build from a persisted Site row. Credentials are never stored on the
+        Site row, so they're picked up from process env (same vars as
+        ``from_env``) and layered under the site's own identity/TLS fields,
+        which always win since they're the authoritative per-site values."""
+        env_defaults = cls.from_env()
         base = dict(
             family=site.family,
             code=site.code,
             api_url=site.api_url,
+            username=env_defaults.username,
+            password=env_defaults.password,
+            bot_name=env_defaults.bot_name,
+            ca_bundle=env_defaults.ca_bundle,
+            config_dir=env_defaults.config_dir,
         )
         base.update(overrides)
         return cls(**base)

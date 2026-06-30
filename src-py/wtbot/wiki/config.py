@@ -12,6 +12,7 @@ at module import time.
 """
 
 import os
+import stat
 import tempfile
 from pathlib import Path
 
@@ -58,4 +59,24 @@ def configure_pywikibot(settings: WikiSettings) -> str:
             pwbconfig.usernames[settings.family] = fam = {}
         fam[settings.code] = settings.username
 
+        if settings.password:
+            _write_password_file(config_dir, settings, pwbconfig)
+
     return config_dir
+
+
+def _write_password_file(config_dir: str, settings: WikiSettings, pwbconfig) -> None:
+    """Writes pywikibot's password file so login is headless -- no console
+    prompt. Uses the BotPasswords format (recommended: API-only credentials,
+    separate from the main account password) when bot_name is set, otherwise
+    a plain (username, password) line."""
+    if settings.bot_name:
+        line = f"({settings.username!r}, BotPassword({settings.bot_name!r}, {settings.password!r}))\n"
+    else:
+        line = f"({settings.username!r}, {settings.password!r})\n"
+
+    password_path = Path(config_dir) / "user-password.py"
+    password_path.write_text(line, encoding="utf-8")
+    password_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+
+    pwbconfig.password_file = str(password_path)
