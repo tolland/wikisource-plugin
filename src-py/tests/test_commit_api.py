@@ -66,7 +66,7 @@ def test_commit_endpoint_pushes_pending_edits(engine):
         assert write.status_code == 200
         assert write.json()["status"] == "ok"
 
-        resp = c.post("/commit/")
+        resp = c.post("/commits/")
         assert resp.status_code == 200
         assert resp.json()["handled"] == 1
 
@@ -77,7 +77,9 @@ def test_commit_endpoint_pushes_pending_edits(engine):
         assert updated.revid == 101
         assert updated.dirty is False
 
-        journal = s.exec(select(EditJournal).where(EditJournal.page_pk == page.pk)).all()
+        journal = s.exec(
+            select(EditJournal).where(EditJournal.page_pk == page.pk)
+        ).all()
         assert all(j.committed for j in journal)
 
         commit = s.exec(select(Commit).where(Commit.page_pk == page.pk)).first()
@@ -89,6 +91,6 @@ def test_commit_endpoint_noop_when_nothing_pending(engine):
     _setup(engine)
     app = create_app(engine=engine, client_factory=lambda site: FakeWikiClient())
     with TestClient(app) as c:
-        resp = c.post("/commit/")
+        resp = c.post("/commits/")
     assert resp.status_code == 200
     assert resp.json()["handled"] == 0

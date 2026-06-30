@@ -46,6 +46,7 @@ def test_viewer_lists_only_index_pages(engine):
             "title": "Index:Example.djvu",
             "page_count": 12,
             "revid": 123,
+            "content_model": None,
             "body_length": 10,
         }
     ]

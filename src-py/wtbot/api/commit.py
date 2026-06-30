@@ -1,18 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlmodel import Session, select
-from fastapi import APIRouter, Depends, Request
-from sqlmodel import Session
 
 from wtbot.api.schemas import CommitRunResponse
 from wtbot.commit_worker import run_pending_commits
 from wtbot.deps import get_session
 from wtbot.sqlmodel import Commit, CommitStatus
-
-from fastapi import APIRouter, Depends, Request
-from sqlmodel import Session
-
-from wtbot.api.schemas import CommitRunResponse
-from wtbot.commit_worker import run_pending_commits
 
 router = APIRouter(prefix="/commits", tags=["commits"])
 
@@ -32,6 +24,7 @@ def list_commits(
         statement = statement.where(Commit.status == status)
     return list(session.exec(statement).all())
 
+
 @router.post("/", response_model=CommitRunResponse)
 def run_commits(
     request: Request, session: Session = Depends(get_session)
@@ -44,6 +37,7 @@ def run_commits(
         if n == 0:
             break
     return CommitRunResponse(handled=handled)
+
 
 @router.get("/{commit_pk}", response_model=Commit)
 def get_commit(commit_pk: int, session: Session = Depends(get_session)) -> Commit:

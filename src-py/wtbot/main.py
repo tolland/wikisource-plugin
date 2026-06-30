@@ -19,7 +19,6 @@ from wtbot.api import (
     vfs,
     viewer,
 )
-from wtbot.api import commit, fetch, health, sites, vfs, viewer
 from wtbot.db import create_db_engine, init_db
 from wtbot.worker import ClientFactory, make_client_for_site
 
@@ -61,15 +60,14 @@ def create_app(
         else Path(os.environ.get("WTBOT_BLOB_ROOT", "./blobs"))
     )
 
+    app.include_router(commit_api.router)
+    app.include_router(edit_journal.router)
+    app.include_router(fetch.router)
+    app.include_router(file_blob.router)
     app.include_router(health.router)
-    app.include_router(sites.router)
     app.include_router(namespace.router)
     app.include_router(pages.router)
-    app.include_router(file_blob.router)
-    app.include_router(edit_journal.router)
-    app.include_router(commit_api.router)
-    app.include_router(fetch.router)
-    app.include_router(commit.router)
+    app.include_router(sites.router)
     app.include_router(vfs.router)
     app.include_router(viewer.router)
 
