@@ -165,6 +165,11 @@ class MyToolWindowFactory : ToolWindowFactory {
                 }
             } catch (e: VfsBackendException) {
                 LOG.warn("VFS children load failed for ${vFile.path}", e)
+                SwingUtilities.invokeLater {
+                    node.removeAllChildren()
+                    node.add(DefaultMutableTreeNode("⚠ ${e.message}"))
+                    model.reload(node)
+                }
             }
         }
     }

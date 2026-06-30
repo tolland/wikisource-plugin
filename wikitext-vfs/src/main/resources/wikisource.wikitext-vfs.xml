@@ -4,7 +4,7 @@
     </dependencies>
     <extensions defaultExtensionNs="com.intellij">
 
-        <virtualFileSystem key="vcs-log" implementationClass="org.limepepper.lang.wikitext.vfs.WtVirtualFileSystem"/>
+        <virtualFileSystem key="wikisource" implementationClass="org.limepepper.lang.wikitext.vfs.WtVirtualFileSystem"/>
 
         <applicationService
             serviceImplementation="org.limepepper.lang.wikitext.vfs.backend.WtVfsService"
