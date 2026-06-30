@@ -110,7 +110,8 @@ class WriteResult(BaseModel):
 
 class CommitRunResponse(BaseModel):
     handled: int = Field(
-        ..., description="Number of pages whose pending local edits were pushed this run."
+        ...,
+        description="Number of pages whose pending local edits were pushed this run.",
     )
 
 
