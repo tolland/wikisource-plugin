@@ -36,7 +36,7 @@ from wtbot.api.schemas import (
     WriteStatus,
 )
 from wtbot.deps import get_session
-from wtbot.sqlmodel import FileBlob, Page, Site
+from wtbot.sqlmodel import EditJournal, FileBlob, Page, Site
 from wtbot.sqlmodel.namespace import NsRole
 
 router = APIRouter(prefix="/vfs", tags=["vfs"])
@@ -428,10 +428,74 @@ def read_content(
 
 
 @router.post("/content", response_model=WriteResult)
-def write_content(req: WriteContentRequest) -> WriteResult:
-    return WriteResult(
-        path=req.path, status=WriteStatus.error, message="write not yet implemented"
+def write_content(
+    req: WriteContentRequest,
+    session: Session = Depends(get_session),
+) -> WriteResult:
+    """Local save only -- appends an EditJournal row and updates the cached
+    Page.text. Does not touch the wiki; that happens later when the commit
+    worker drains uncommitted journal rows via pywikibot."""
+    parts = _parse_path(req.path)
+    if len(parts) < 4:
+        return WriteResult(
+            path=req.path, status=WriteStatus.error, message="path is not a writable file"
+        )
+
+    family, code = parts[0], parts[1]
+    rest = parts[3:]
+
+    try:
+        site = _get_site(session, family, code)
+    except HTTPException as exc:
+        return WriteResult(path=req.path, status=WriteStatus.error, message=exc.detail)
+
+    page_title: str | None = None
+    if rest and rest[0] == "Pages" and len(rest) >= 2:
+        page_title = "/".join(rest[1:])
+    elif rest and rest[-1] == "wikitext" and "/".join(rest[:-1]).startswith("File:"):
+        page_title = "/".join(rest[:-1])
+
+    if page_title is None:
+        return WriteResult(
+            path=req.path, status=WriteStatus.error, message="path is not a writable file"
+        )
+
+    page = session.exec(
+        select(Page).where(Page.site_pk == site.pk, Page.title == page_title)
+    ).first()
+    if page is None:
+        return WriteResult(
+            path=req.path, status=WriteStatus.error, message=f"page not found: {page_title}"
+        )
+
+    if req.base_revid is not None and page.revid is not None and req.base_revid != page.revid:
+        return WriteResult(
+            path=req.path,
+            status=WriteStatus.conflict,
+            new_revid=page.revid,
+            message=f"remote revid is {page.revid}, edit was based on {req.base_revid}",
+        )
+
+    body = base64.b64decode(req.content_base64).decode()
+
+    journal = EditJournal(
+        page_pk=page.pk,
+        base_revid=req.base_revid if req.base_revid is not None else page.revid,
+        body=body,
+        comment=req.comment,
     )
+    session.add(journal)
+
+    page.text = body
+    page.dirty = True
+    page.local_modified_at = datetime.now(timezone.utc)
+    session.add(page)
+
+    session.commit()
+
+    # Local save succeeds without a new remote revid -- the page is still on
+    # page.revid until the commit worker pushes it.
+    return WriteResult(path=req.path, status=WriteStatus.ok, new_revid=page.revid)
 
 
 @router.post("/rename", response_model=OperationResult)

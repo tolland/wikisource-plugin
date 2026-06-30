@@ -64,4 +64,32 @@ class FakeVfsBackendTest {
             backend.readContent("/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/99")
         }
     }
+
+    @Test fun `writeContent succeeds and bumps revid`() {
+        val path = "/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1"
+        val newBase64 = java.util.Base64.getEncoder().encodeToString("edited.".toByteArray())
+        val result = backend.writeContent(path, newBase64, baseRevid = 5003L)
+        assertEquals(WriteStatus.ok, result.status)
+        assertEquals(5004L, result.newRevid)
+        assertEquals("edited.", backend.readContent(path).decodeText())
+    }
+
+    @Test fun `writeContent returns conflict on stale base revid`() {
+        val path = "/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1"
+        val newBase64 = java.util.Base64.getEncoder().encodeToString("edited.".toByteArray())
+        val result = backend.writeContent(path, newBase64, baseRevid = 1L)
+        assertEquals(WriteStatus.conflict, result.status)
+        assertEquals(5003L, result.newRevid)
+        // content unchanged
+        assertEquals("{{recto}} Page one.", backend.readContent(path).decodeText())
+    }
+
+    @Test fun `writeContent returns error for missing path`() {
+        val result = backend.writeContent(
+            "/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/99",
+            java.util.Base64.getEncoder().encodeToString("x".toByteArray()),
+            baseRevid = null,
+        )
+        assertEquals(WriteStatus.error, result.status)
+    }
 }

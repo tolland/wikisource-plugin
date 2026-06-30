@@ -6,8 +6,11 @@ import com.intellij.openapi.vfs.VirtualFileSystem
 import org.limepepper.lang.wikitext.WtFileType
 import org.limepepper.lang.wikitext.vfs.backend.NodeKind
 import org.limepepper.lang.wikitext.vfs.backend.StatResult
+import org.limepepper.lang.wikitext.vfs.backend.VfsBackendException
+import org.limepepper.lang.wikitext.vfs.backend.WriteStatus
 import org.limepepper.lang.wikitext.vfs.backend.WtVfsService
 import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
@@ -31,7 +34,7 @@ class WtVirtualFile(
     private val isDir: Boolean,
     private var _parent: WtVirtualFile? = null,
     val stableId: Long? = null,
-    val revid: Long? = null,
+    revid: Long? = null,
 ) : VirtualFile() {
 
     // Populated either eagerly by the tool window (BG thread) or lazily on
@@ -39,12 +42,17 @@ class WtVirtualFile(
     @Volatile var cachedChildren: Array<VirtualFile>? = null
     @Volatile var cachedContent: ByteArray? = null
 
+    // The revid this file's cached content is based on — the conflict token
+    // sent back as base_revid on save. Updated on every successful write.
+    @Volatile var revid: Long? = revid
+        private set
+
     fun setParent(p: WtVirtualFile) { _parent = p }
 
     override fun getName(): String = _name
     override fun getFileSystem(): VirtualFileSystem = fileSystem
     override fun getPath(): String = _path
-    override fun isWritable(): Boolean = false
+    override fun isWritable(): Boolean = !isDir
     override fun isDirectory(): Boolean = isDir
     override fun isValid(): Boolean = true
     override fun getParent(): VirtualFile? = _parent
@@ -84,7 +92,33 @@ class WtVirtualFile(
     override fun getInputStream(): InputStream = ByteArrayInputStream(contentsToByteArray())
 
     override fun getOutputStream(requestor: Any?, newModificationStamp: Long, newTimeStamp: Long): OutputStream {
-        throw IOException("wikisource:// files are read-only")
+        if (isDir) throw IOException("cannot write a directory: $_path")
+        return object : ByteArrayOutputStream() {
+            // IntelliJ calls close() once on save, off the EDT, after the
+            // editor has finished writing the new buffer into this stream.
+            override fun close() {
+                super.close()
+                val bytes = toByteArray()
+                val base64 = java.util.Base64.getEncoder().encodeToString(bytes)
+                val result = try {
+                    WtVfsService.instance.backend.writeContent(_path, base64, revid)
+                } catch (e: VfsBackendException) {
+                    throw IOException("save failed for $_path: ${e.message}", e)
+                }
+                when (result.status) {
+                    WriteStatus.ok -> {
+                        cachedContent = bytes
+                        revid = result.newRevid
+                    }
+                    WriteStatus.conflict -> throw IOException(
+                        "edit conflict saving $_path: ${result.message ?: "remote revision has changed"}"
+                    )
+                    WriteStatus.error -> throw IOException(
+                        "save failed for $_path: ${result.message ?: "unknown error"}"
+                    )
+                }
+            }
+        }
     }
 
     override fun getLength(): Long = cachedContent?.size?.toLong() ?: 0L

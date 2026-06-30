@@ -12,9 +12,9 @@ class FakeVfsBackend : VfsBackend {
         val path: String,
         val name: String,
         val kind: NodeKind,
-        val content: ByteArray = ByteArray(0),
+        var content: ByteArray = ByteArray(0),
         val stableId: Long? = null,
-        val revid: Long? = null,
+        var revid: Long? = null,
     )
 
     private val entries = mutableMapOf<String, Entry>()
@@ -84,5 +84,20 @@ class FakeVfsBackend : VfsBackend {
             revid = e.revid,
             contentBase64 = Base64.getEncoder().encodeToString(e.content),
         )
+    }
+
+    override fun writeContent(
+        path: String,
+        contentBase64: String,
+        baseRevid: Long?,
+        comment: String?,
+    ): WriteResult {
+        val e = entries[path] ?: return WriteResult(path, WriteStatus.error, message = "not found: $path")
+        if (baseRevid != null && e.revid != null && baseRevid != e.revid) {
+            return WriteResult(path, WriteStatus.conflict, newRevid = e.revid, message = "edit conflict")
+        }
+        e.content = Base64.getDecoder().decode(contentBase64)
+        e.revid = (e.revid ?: 0L) + 1
+        return WriteResult(path, WriteStatus.ok, newRevid = e.revid)
     }
 }

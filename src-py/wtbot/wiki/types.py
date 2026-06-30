@@ -6,6 +6,26 @@ class PageNotFound(Exception):
     """Raised by a WikiClient when a title does not exist on the wiki."""
 
 
+class EditConflict(Exception):
+    """Raised by WikiClient.save_page when the page changed remotely since
+    base_revid -- the edit was not applied."""
+
+    def __init__(self, title: str, base_revid: int, current_revid: int | None):
+        super().__init__(
+            f"edit conflict on {title}: based on revid {base_revid}, "
+            f"remote is now {current_revid}"
+        )
+        self.title = title
+        self.base_revid = base_revid
+        self.current_revid = current_revid
+
+
+@dataclass(frozen=True)
+class SaveResult:
+    revid: int
+    timestamp: datetime | None = None
+
+
 @dataclass(frozen=True)
 class RemoteFileInfo:
     """Binary-file metadata from MediaWiki's imageinfo API (pywikibot FileInfo).

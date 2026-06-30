@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import Session
+from sqlmodel import Session, select
 
-from wtbot.sqlmodel import FileBlob, Page, Site
+from wtbot.sqlmodel import EditJournal, FileBlob, Page, Site
 from wtbot.sqlmodel.namespace import NsRole
 
 FAMILY = "wikisource"
@@ -301,3 +301,69 @@ def test_read_blob_returns_501(vfs_client):
 def test_read_missing_page_returns_404(vfs_client):
     r = vfs_client.get("/vfs/content", params={"path": f"{_PAGES_PATH}/Page:NoSuch/99"})
     assert r.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# write_content
+# ---------------------------------------------------------------------------
+
+
+def _b64(s: str) -> str:
+    import base64
+
+    return base64.b64encode(s.encode()).decode()
+
+
+def test_write_page_ok(vfs_client, engine):
+    new_body = "{{recto}} Edited page one content."
+    r = vfs_client.post(
+        "/vfs/content",
+        json={
+            "path": f"{_PAGES_PATH}/{PAGE_1}",
+            "content_base64": _b64(new_body),
+            "base_revid": 5003,
+            "comment": "fix typo",
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == "ok"
+
+    with Session(engine) as s:
+        page = s.exec(select(Page).where(Page.title == PAGE_1)).first()
+        assert page.text == new_body
+        assert page.dirty is True
+
+        journal = s.exec(select(EditJournal).where(EditJournal.page_pk == page.pk)).first()
+        assert journal is not None
+        assert journal.body == new_body
+        assert journal.base_revid == 5003
+        assert journal.committed is False
+
+
+def test_write_page_conflict(vfs_client):
+    r = vfs_client.post(
+        "/vfs/content",
+        json={
+            "path": f"{_PAGES_PATH}/{PAGE_1}",
+            "content_base64": _b64("stale edit"),
+            "base_revid": 1,  # stale -- real revid is 5003
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == "conflict"
+    assert body["new_revid"] == 5003
+
+
+def test_write_missing_page_returns_error_status(vfs_client):
+    r = vfs_client.post(
+        "/vfs/content",
+        json={
+            "path": f"{_PAGES_PATH}/Page:NoSuch/99",
+            "content_base64": _b64("x"),
+            "base_revid": None,
+        },
+    )
+    assert r.status_code == 200
+    assert r.json()["status"] == "error"

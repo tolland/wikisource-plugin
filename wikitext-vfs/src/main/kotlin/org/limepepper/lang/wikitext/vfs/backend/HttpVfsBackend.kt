@@ -73,6 +73,29 @@ class HttpVfsBackend(
         }
     }
 
+    override fun writeContent(
+        path: String,
+        contentBase64: String,
+        baseRevid: Long?,
+        comment: String?,
+    ): WriteResult {
+        val body = buildJsonObject(
+            "path" to path,
+            "content_base64" to contentBase64,
+            "base_revid" to baseRevid,
+            "comment" to comment,
+        )
+        val json = post("/vfs/content", body)
+        return JsonReader(json).run {
+            WriteResult(
+                path = string("path"),
+                status = WriteStatus.valueOf(string("status")),
+                newRevid = longOrNull("new_revid"),
+                message = stringOrNull("message"),
+            )
+        }
+    }
+
     // -------------------------------------------------------------------------
 
     private fun get(endpoint: String, vararg params: Pair<String, String>): String {
@@ -89,6 +112,48 @@ class HttpVfsBackend(
             throw VfsBackendException("HTTP ${resp.statusCode()} from $uri: ${resp.body()}")
         }
         return resp.body()
+    }
+
+    private fun post(endpoint: String, jsonBody: String): String {
+        val uri = URI.create("$baseUrl$endpoint")
+        val req = HttpRequest.newBuilder(uri)
+            .timeout(timeout)
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+            .build()
+        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
+        if (resp.statusCode() !in 200..299) {
+            throw VfsBackendException("HTTP ${resp.statusCode()} from $uri: ${resp.body()}")
+        }
+        return resp.body()
+    }
+
+    /** Minimal JSON object writer — pairs of String key to String/Long/Boolean/null. */
+    private fun buildJsonObject(vararg fields: Pair<String, Any?>): String =
+        fields.joinToString(",", prefix = "{", postfix = "}") { (k, v) ->
+            "\"${escapeJson(k)}\":${jsonValue(v)}"
+        }
+
+    private fun jsonValue(v: Any?): String = when (v) {
+        null -> "null"
+        is String -> "\"${escapeJson(v)}\""
+        is Boolean, is Long, is Int -> v.toString()
+        else -> "\"${escapeJson(v.toString())}\""
+    }
+
+    private fun escapeJson(s: String): String {
+        val sb = StringBuilder(s.length)
+        for (c in s) {
+            when (c) {
+                '"' -> sb.append("\\\"")
+                '\\' -> sb.append("\\\\")
+                '\n' -> sb.append("\\n")
+                '\r' -> sb.append("\\r")
+                '\t' -> sb.append("\\t")
+                else -> if (c.code < 0x20) sb.append("\\u%04x".format(c.code)) else sb.append(c)
+            }
+        }
+        return sb.toString()
     }
 }
 

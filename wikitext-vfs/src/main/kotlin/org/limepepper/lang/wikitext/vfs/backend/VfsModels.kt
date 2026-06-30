@@ -44,3 +44,12 @@ data class ContentResult(
     fun decodeContent(): ByteArray = java.util.Base64.getDecoder().decode(contentBase64)
     fun decodeText(): String = String(decodeContent(), Charsets.UTF_8)
 }
+
+enum class WriteStatus { ok, conflict, error }
+
+data class WriteResult(
+    val path: String,
+    val status: WriteStatus,
+    val newRevid: Long? = null,
+    val message: String? = null,
+)

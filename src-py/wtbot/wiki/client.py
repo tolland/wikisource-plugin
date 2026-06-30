@@ -8,11 +8,12 @@ and ``download_file`` are all the fetch path needs. Two implementations:
 - ``FakeWikiClient`` — in-memory, for tests/dev/CLI demos with no network.
 """
 
+from dataclasses import replace
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from wtbot.settings import WikiSettings
-from wtbot.wiki.types import PageNotFound, RemoteFileInfo, RemotePage
+from wtbot.wiki.types import EditConflict, PageNotFound, RemoteFileInfo, RemotePage, SaveResult
 
 
 @runtime_checkable
@@ -24,6 +25,13 @@ class WikiClient(Protocol):
     def download_file(self, title: str, dest: Path) -> Path: ...
 
     def get_namespaces(self): ...  # returns pwb NamespacesDict or None
+
+    def save_page(
+        self, title: str, text: str, base_revid: int | None, comment: str | None
+    ) -> SaveResult:
+        """Push a new body for `title`. Raises EditConflict if the page's
+        current revid != base_revid (when base_revid is not None)."""
+        ...
 
 
 class PywikibotClient:
@@ -113,6 +121,19 @@ class PywikibotClient:
     def get_namespaces(self):
         return self.site.namespaces
 
+    def save_page(
+        self, title: str, text: str, base_revid: int | None, comment: str | None
+    ) -> SaveResult:
+        page = self._pwb.Page(self.site, title)
+        if base_revid is not None and page.exists():
+            current_revid = page.latest_revision.revid
+            if current_revid != base_revid:
+                raise EditConflict(title, base_revid, current_revid)
+        page.text = text
+        page.save(summary=comment or "")
+        rev = page.latest_revision
+        return SaveResult(revid=rev.revid, timestamp=rev.timestamp)
+
 
 class FakeWikiClient:
     """Network-free WikiClient backed by in-memory dicts."""
@@ -166,6 +187,30 @@ class FakeWikiClient:
 
     def get_namespaces(self):
         return None
+
+    def save_page(
+        self, title: str, text: str, base_revid: int | None, comment: str | None
+    ) -> SaveResult:
+        existing = self._pages.get(title)
+        current_revid = existing.revid if existing else None
+        if base_revid is not None and current_revid != base_revid:
+            raise EditConflict(title, base_revid, current_revid)
+        new_revid = (current_revid or 0) + 1
+        updated = (
+            replace(existing, text=text, revid=new_revid, comment=comment)
+            if existing is not None
+            else RemotePage(
+                title=title,
+                namespace_key=0,
+                namespace_canonical=None,
+                content_model="wikitext",
+                text=text,
+                revid=new_revid,
+                comment=comment,
+            )
+        )
+        self._pages[title] = updated
+        return SaveResult(revid=new_revid, timestamp=updated.timestamp)
 
 
 def get_wiki_client(settings: WikiSettings) -> WikiClient:
