@@ -1,6 +1,7 @@
 <idea-plugin>
     <dependencies>
         <module name="wikisource.wikitext-core"/>
+        <module name="wikisource.wikitext-vfs"/>
     </dependencies>
 
     <extensions defaultExtensionNs="com.intellij">

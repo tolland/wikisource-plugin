@@ -77,6 +77,7 @@ class MyToolWindowFactory : ToolWindowFactory {
         }
     }
 
+
     private fun loadRootAsync(
         rootNode: DefaultMutableTreeNode,
         loadingNode: DefaultMutableTreeNode,
@@ -124,6 +125,7 @@ class MyToolWindowFactory : ToolWindowFactory {
                     model.reload(parentNode)
                 }
             } catch (e: VfsBackendException) {
+
                 LOG.warn("VFS children load failed for $path", e)
 
 //                SwingUtilities.invokeLater {
@@ -147,6 +149,7 @@ class MyToolWindowFactory : ToolWindowFactory {
                 if (child.kind == NodeKind.directory) node.add(DefaultMutableTreeNode(PLACEHOLDER))
                 parentNode.add(node)
             }
+
         } catch (e: VfsBackendException) {
             LOG.warn("VFS prefetch failed for $path", e)
             parentNode.add(DefaultMutableTreeNode(PLACEHOLDER))
