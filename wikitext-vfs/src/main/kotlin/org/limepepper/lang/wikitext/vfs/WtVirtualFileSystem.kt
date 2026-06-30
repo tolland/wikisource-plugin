@@ -3,106 +3,89 @@ package org.limepepper.lang.wikitext.vfs
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileListener
 import com.intellij.openapi.vfs.VirtualFileSystem
+import org.limepepper.lang.wikitext.vfs.backend.NodeKind
+import org.limepepper.lang.wikitext.vfs.backend.VfsBackendException
+import org.limepepper.lang.wikitext.vfs.backend.WtVfsService
 import java.io.IOException
 import java.nio.file.Path
+import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Milestone version: serves a single hardcoded in-memory tree so the tool
- * window has something to render and open. No SQLite, no network.
+ * `wikisource://` [VirtualFileSystem] backed by the wtbot FastAPI sidecar.
  *
- * Protocol/path shape (as eventually intended):
- *   wikisource://<site-host>/<namespaced-title>
- * For the dummy tree we use a flat synthetic path under one fake site.
+ * Path scheme mirrors the VFS API:
+ *   /                                         root (all sites)
+ *   /{family}/{code}/                         site root
+ *   /{family}/{code}/{Index title}/           index directory
+ *   /{family}/{code}/{Index title}/Pages/     pages container
+ *   /{family}/{code}/{Index title}/Pages/{Page title}   page file
+ *   /{family}/{code}/{Index title}/{File title}/        file directory
+ *   /{family}/{code}/{Index title}/{File title}/wikitext
+ *   /{family}/{code}/{Index title}/{File title}/blob
  *
- * Registered application-level via `com.intellij.virtualFileSystem`; the EP
- * `key` must equal [PROTOCOL]. NOTE: needs sqlite-jdbc once real (currently
- * declared in :wikitext-ui) -- move or re-declare if this lands in core.
+ * [WtVirtualFile] instances are cached by path so callers always get the
+ * same instance for the same path (IntelliJ VFS contract).
  */
 class WtVirtualFileSystem : VirtualFileSystem() {
 
     companion object {
         const val PROTOCOL: String = "wikisource"
-
     }
 
-    /** Hardcoded dummy tree: one Index with a few Page children. */
-    val dummyRoot: WtVirtualFile by lazy { buildDummyTree() }
+    private val cache = ConcurrentHashMap<String, WtVirtualFile>()
 
-    private fun buildDummyTree(): WtVirtualFile {
-        val indexName = "Index:The principles of mechanics (Hertz, 1894).pdf"
-        val index = WtVirtualFile(
-            fileSystem = this,
-            name = indexName,
-            path = "/$indexName",
-            isDir = true,
-        )
-        for (n in listOf(1, 2, 3, 171, 172)) {
-            index.addChild(
-                WtVirtualFile(
-                    fileSystem = this,
-                    name = "Page $n",
-                    path = "/$indexName/$n",
-                    isDir = false,
-                    content = "== Dummy page $n ==\n\nSome '''wikitext''' for page $n.\n".toByteArray(),
-                )
+    /**
+     * Return an existing cached instance or create a new one. Does NOT hit
+     * the network — callers supply the metadata they already have.
+     */
+    fun getOrCreate(
+        path: String,
+        name: String,
+        isDir: Boolean,
+        parent: WtVirtualFile? = null,
+        stableId: Long? = null,
+        revid: Long? = null,
+    ): WtVirtualFile = cache.getOrPut(path) {
+        WtVirtualFile(this, name, path, isDir, parent, stableId, revid)
+    }.also { if (parent != null) it.setParent(parent) }
+
+    /** Stat the backend and return a [WtVirtualFile] if the path exists. */
+    override fun findFileByPath(path: String): VirtualFile? {
+        val cached = cache[path]
+        if (cached != null) return cached
+        return try {
+            val stat = WtVfsService.instance.backend.stat(path)
+            if (!stat.exists) return null
+            getOrCreate(
+                path = path,
+                name = path.substringAfterLast('/').ifEmpty { "/" },
+                isDir = stat.kind == NodeKind.directory,
+                stableId = stat.stableId,
+                revid = stat.revid,
             )
+        } catch (_: VfsBackendException) {
+            null
         }
-        return index
     }
 
     override fun getProtocol(): String = PROTOCOL
-
-    override fun findFileByPath(path: String): VirtualFile? {
-        if (path == dummyRoot.path) return dummyRoot
-        return dummyRoot.children.firstOrNull { it.path == path }
-    }
 
     override fun refresh(asynchronous: Boolean) {}
 
     override fun refreshAndFindFileByPath(path: String): VirtualFile? = findFileByPath(path)
 
     override fun addVirtualFileListener(listener: VirtualFileListener) {}
-
     override fun removeVirtualFileListener(listener: VirtualFileListener) {}
 
-    override fun deleteFile(requestor: Any?, vFile: VirtualFile) {
-        throw IOException("delete not supported yet")
-    }
-
-    override fun moveFile(requestor: Any?, vFile: VirtualFile, newParent: VirtualFile) {
-        throw IOException("move not supported yet")
-    }
-
-    override fun renameFile(requestor: Any?, vFile: VirtualFile, newName: String) {
-        throw IOException("rename not supported yet")
-    }
-
-    override fun createChildFile(requestor: Any?, vDir: VirtualFile, fileName: String): VirtualFile {
-        throw IOException("createChildFile not supported yet")
-    }
-
-    override fun createChildDirectory(requestor: Any?, vDir: VirtualFile, dirName: String): VirtualFile {
-        throw IOException("createChildDirectory not supported yet")
-    }
-
-    override fun copyFile(
-        requestor: Any?,
-        virtualFile: VirtualFile,
-        newParent: VirtualFile,
-        copyName: String,
-    ): VirtualFile {
-        throw IOException("copyFile not supported yet")
-    }
+    override fun deleteFile(requestor: Any?, vFile: VirtualFile) { throw IOException("delete not supported") }
+    override fun moveFile(requestor: Any?, vFile: VirtualFile, newParent: VirtualFile) { throw IOException("move not supported") }
+    override fun renameFile(requestor: Any?, vFile: VirtualFile, newName: String) { throw IOException("rename not supported") }
+    override fun createChildFile(requestor: Any?, vDir: VirtualFile, fileName: String): VirtualFile { throw IOException("createChildFile not supported") }
+    override fun createChildDirectory(requestor: Any?, vDir: VirtualFile, dirName: String): VirtualFile { throw IOException("createChildDirectory not supported") }
+    override fun copyFile(requestor: Any?, virtualFile: VirtualFile, newParent: VirtualFile, copyName: String): VirtualFile { throw IOException("copyFile not supported") }
 
     override fun isReadOnly(): Boolean = true
-
     override fun isCaseSensitive(): Boolean = true
-
     override fun isValidName(name: String): Boolean = name.isNotEmpty()
-
     override fun getNioPath(file: VirtualFile): Path? = null
 }
-
-// Convenience access for the tool window in this milestone. Real code
-// resolves via VirtualFileManager.getInstance().getFileSystem(PROTOCOL).
-val INSTANCE: WtVirtualFileSystem by lazy { WtVirtualFileSystem() }

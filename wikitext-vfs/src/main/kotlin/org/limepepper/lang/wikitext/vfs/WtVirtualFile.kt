@@ -2,81 +2,109 @@ package org.limepepper.lang.wikitext.vfs
 
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileSystem
+import org.limepepper.lang.wikitext.vfs.backend.NodeKind
+import org.limepepper.lang.wikitext.vfs.backend.StatResult
+import org.limepepper.lang.wikitext.vfs.backend.WtVfsService
 import java.io.ByteArrayInputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 
 /**
- * Minimal in-memory [VirtualFile] for the first wiring milestone. Holds its
- * own name, content, children, and parent directly -- no SQLite, no fetch.
+ * Backend-backed [VirtualFile] for the `wikisource://` protocol.
  *
- * This is deliberately hand-rolled rather than using the platform's
- * LightVirtualFile because LightVirtualFile is flat (no children) and the
- * whole point of this slice is proving the Index -> Page *hierarchy* renders
- * in a tree. Once SQLite backing is real, the content/children accessors here
- * become DB reads; the shape stays the same.
+ * Content and children are lazy: the first call to [contentsToByteArray] or
+ * [getChildren] hits the wtbot sidecar synchronously. Callers that need these
+ * on a background thread (e.g. the tool window's TreeWillExpandListener) can
+ * pre-populate [cachedChildren] / [cachedContent] before handing the instance
+ * to Swing to avoid blocking the EDT.
  *
- * Everything is read-only and writable=false for now.
+ * Instances are stable and cached by path in [WtVirtualFileSystem] —
+ * callers should always obtain them via the filesystem, not construct directly.
  */
 class WtVirtualFile(
     private val fileSystem: WtVirtualFileSystem,
-    private val name: String,
-    private val path: String,
+    private val _name: String,
+    private val _path: String,
     private val isDir: Boolean,
-    private val content: ByteArray = ByteArray(0),
-    private var parent: WtVirtualFile? = null,
-    private val childList: MutableList<WtVirtualFile> = mutableListOf(),
+    private var _parent: WtVirtualFile? = null,
+    val stableId: Long? = null,
+    val revid: Long? = null,
 ) : VirtualFile() {
 
-    init {
-        childList.forEach { it.parent = this }
-    }
+    // Populated either eagerly by the tool window (BG thread) or lazily on
+    // first access. Protected by `@Synchronized` on each accessor.
+    @Volatile var cachedChildren: Array<VirtualFile>? = null
+    @Volatile var cachedContent: ByteArray? = null
 
-    fun addChild(child: WtVirtualFile): WtVirtualFile {
-        child.parent = this
-        childList.add(child)
-        return child
-    }
+    fun setParent(p: WtVirtualFile) { _parent = p }
 
-    override fun getName(): String = name
-
+    override fun getName(): String = _name
     override fun getFileSystem(): VirtualFileSystem = fileSystem
-
-    override fun getPath(): String = path
-
+    override fun getPath(): String = _path
     override fun isWritable(): Boolean = false
-
     override fun isDirectory(): Boolean = isDir
-
     override fun isValid(): Boolean = true
+    override fun getParent(): VirtualFile? = _parent
 
-    override fun getParent(): VirtualFile? = parent
+    override fun getChildren(): Array<VirtualFile> {
+        if (!isDir) return emptyArray()
+        cachedChildren?.let { return it }
+        // Blocking fetch — should be called off the EDT.
+        val result = WtVfsService.instance.backend.listChildren(_path)
+        @Suppress("UNCHECKED_CAST")
+        val children = result.children.map { child ->
+            fileSystem.getOrCreate(
+                path = child.path,
+                name = child.name,
+                isDir = child.kind == NodeKind.directory,
+                parent = this,
+                stableId = child.stableId,
+                revid = child.revid,
+            )
+        }.toTypedArray() as Array<VirtualFile>
+        cachedChildren = children
+        return children
+    }
 
-    override fun getChildren(): Array<VirtualFile> = childList.toTypedArray()
+    override fun contentsToByteArray(): ByteArray {
+        if (isDir) return ByteArray(0)
+        val cached = cachedContent
+        if (cached != null) return cached
+        // Blocking fetch — IntelliJ calls this off the EDT via LoadTextUtil.
+        val bytes = WtVfsService.instance.backend.readContent(_path).decodeContent()
+        cachedContent = bytes
+        return bytes
+    }
 
-    override fun contentsToByteArray(): ByteArray = content
-
-    override fun getInputStream(): InputStream = ByteArrayInputStream(content)
+    override fun getInputStream(): InputStream = ByteArrayInputStream(contentsToByteArray())
 
     override fun getOutputStream(requestor: Any?, newModificationStamp: Long, newTimeStamp: Long): OutputStream {
-        // Read-only for this milestone. Real impl: write through to SQLite.
-        throw IOException("$PROTOCOL files are read-only in this milestone")
+        throw IOException("wikisource:// files are read-only")
     }
 
-    override fun getLength(): Long = content.size.toLong()
+    override fun getLength(): Long = cachedContent?.size?.toLong() ?: 0L
 
     override fun getTimeStamp(): Long = 0L
-
     override fun getModificationStamp(): Long = 0L
 
     override fun refresh(asynchronous: Boolean, recursive: Boolean, postRunnable: Runnable?) {
-        // No-op for in-memory dummy. Real impl: re-read row from SQLite, fire
-        // events if local_modified_at moved.
+        cachedChildren = null
+        cachedContent = null
         postRunnable?.run()
     }
 
     companion object {
         const val PROTOCOL: String = WtVirtualFileSystem.PROTOCOL
+
+        fun fromStat(fs: WtVirtualFileSystem, stat: StatResult): WtVirtualFile =
+            WtVirtualFile(
+                fileSystem = fs,
+                _name = stat.path.substringAfterLast('/').ifEmpty { "/" },
+                _path = stat.path,
+                isDir = stat.kind == NodeKind.directory,
+                stableId = stat.stableId,
+                revid = stat.revid,
+            )
     }
 }

@@ -2,41 +2,58 @@ package org.limepepper.lang.wikitext.tool
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.components.JBScrollPane
+import com.intellij.ui.components.JBTextArea
 import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.treeStructure.Tree
+import org.limepepper.lang.wikitext.vfs.WtVirtualFile
+import org.limepepper.lang.wikitext.vfs.WtVirtualFileSystem
 import org.limepepper.lang.wikitext.vfs.backend.ChildNode
 import org.limepepper.lang.wikitext.vfs.backend.NodeKind
 import org.limepepper.lang.wikitext.vfs.backend.VfsBackendException
 import org.limepepper.lang.wikitext.vfs.backend.WtVfsService
+import java.awt.BorderLayout
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
+import javax.swing.JButton
+import javax.swing.JLabel
+import javax.swing.JPanel
 import javax.swing.SwingUtilities
+import javax.swing.event.TreeExpansionEvent
+import javax.swing.event.TreeWillExpandListener
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeModel
 
 private val LOG = logger<MyToolWindowFactory>()
 
-/**
- * Tool window that renders the live VFS tree from the wtbot sidecar.
- *
- * Tree is populated on a background thread after the window opens; the root
- * shows "Loading…" until the first response arrives. Each directory node
- * lazy-loads its children on first expansion (via a placeholder child).
- *
- * Double-clicking a file node is intentionally a no-op for now — editor
- * integration comes after the VFS write wiring is complete.
- */
 class MyToolWindowFactory : ToolWindowFactory {
 
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
-        val rootNode = DefaultMutableTreeNode("wikisource://")
-        val loading = DefaultMutableTreeNode("Loading…")
-        rootNode.add(loading)
+        val contentFactory = ContentFactory.getInstance()
+        toolWindow.contentManager.addContent(
+            contentFactory.createContent(buildBrowserTab(project), "Browser", false)
+        )
+        toolWindow.contentManager.addContent(
+            contentFactory.createContent(buildDebugTab(), "Debug", false)
+        )
+    }
 
+    // -------------------------------------------------------------------------
+    // Tab 1 — VFS browser
+    // -------------------------------------------------------------------------
+
+    private fun buildBrowserTab(project: Project): JPanel {
+        val fs: WtVirtualFileSystem? = VirtualFileManager.getInstance()
+            .getFileSystem(WtVirtualFileSystem.PROTOCOL) as? WtVirtualFileSystem
+
+        val rootNode = DefaultMutableTreeNode("wikisource://")
+        rootNode.add(DefaultMutableTreeNode(LOADING))
         val model = DefaultTreeModel(rootNode)
         val tree = Tree(model)
         tree.isRootVisible = true
@@ -45,125 +62,192 @@ class MyToolWindowFactory : ToolWindowFactory {
             override fun mouseClicked(e: MouseEvent) {
                 if (e.clickCount != 2) return
                 val node = tree.lastSelectedPathComponent as? DefaultMutableTreeNode ?: return
-                val data = node.userObject as? ChildNode ?: return
-                if (data.kind == NodeKind.file) {
-                    // editor wiring comes in next slice
-                    LOG.info("VFS: selected file ${data.path}")
+                val vFile = node.userObject as? WtVirtualFile ?: return
+                if (!vFile.isDirectory) {
+                    FileEditorManager.getInstance(project).openFile(vFile, true)
                 }
             }
         })
 
-        // Lazy-load children when a directory node is expanded
-        tree.addTreeWillExpandListener(object : javax.swing.event.TreeWillExpandListener {
-            override fun treeWillExpand(event: javax.swing.event.TreeExpansionEvent) {
+        tree.addTreeWillExpandListener(object : TreeWillExpandListener {
+            override fun treeWillExpand(event: TreeExpansionEvent) {
                 val node = event.path.lastPathComponent as? DefaultMutableTreeNode ?: return
-                val data = node.userObject as? ChildNode ?: return
-                if (data.kind != NodeKind.directory) return
+                val vFile = node.userObject as? WtVirtualFile ?: return
+                if (!vFile.isDirectory) return
                 val firstChild = node.firstChild as? DefaultMutableTreeNode ?: return
                 if (firstChild.userObject != PLACEHOLDER) return
-                loadChildren(node, data.path, model)
+                expandNode(node, vFile, model, fs)
             }
-
-            override fun treeWillCollapse(event: javax.swing.event.TreeExpansionEvent) {}
+            override fun treeWillCollapse(event: TreeExpansionEvent) {}
         })
 
-        val content = ContentFactory.getInstance()
-            .createContent(JBScrollPane(tree), "", false)
-        toolWindow.contentManager.addContent(content)
+        val panel = JPanel(BorderLayout())
+        panel.add(JBScrollPane(tree), BorderLayout.CENTER)
 
-        // Kick off the initial root load in the background
         ApplicationManager.getApplication().executeOnPooledThread {
-            loadRootAsync(rootNode, loading, model)
+            populateRoot(rootNode, model, fs)
         }
+
+        return panel
     }
 
+    private fun toVFile(fs: WtVirtualFileSystem, child: ChildNode, parent: WtVirtualFile?): WtVirtualFile =
+        fs.getOrCreate(
+            path = child.path,
+            name = child.name,
+            isDir = child.kind == NodeKind.directory,
+            parent = parent,
+            stableId = child.stableId,
+            revid = child.revid,
+        )
 
-    private fun loadRootAsync(
+    private fun populateRoot(
         rootNode: DefaultMutableTreeNode,
-        loadingNode: DefaultMutableTreeNode,
         model: DefaultTreeModel,
+        fs: WtVirtualFileSystem?,
     ) {
         val backend = WtVfsService.instance.backend
         try {
             val result = backend.listChildren("/")
             SwingUtilities.invokeLater {
-                rootNode.remove(loadingNode)
+                rootNode.removeAllChildren()
                 for (child in result.children) {
-                    val siteNode = labelNode(child)
-                    // pre-populate one level so the expand arrow appears
-                    loadDirectChildren(siteNode, child.path, backend)
-                    rootNode.add(siteNode)
+                    val vFile: WtVirtualFile? = fs?.let { toVFile(it, child, null) }
+                    val node = fileNode(vFile, child.name)
+                    try {
+                        val sub = backend.listChildren(child.path)
+                        for (gc in sub.children) {
+                            val gvFile: WtVirtualFile? = fs?.let { toVFile(it, gc, vFile) }
+                            val gNode = fileNode(gvFile, gc.name)
+                            if (gc.kind == NodeKind.directory) gNode.add(DefaultMutableTreeNode(PLACEHOLDER))
+                            node.add(gNode)
+                        }
+                    } catch (_: VfsBackendException) {
+                        node.add(DefaultMutableTreeNode(PLACEHOLDER))
+                    }
+                    rootNode.add(node)
                 }
                 model.reload(rootNode)
             }
         } catch (e: VfsBackendException) {
             LOG.warn("VFS root load failed", e)
             SwingUtilities.invokeLater {
-                rootNode.remove(loadingNode)
+                rootNode.removeAllChildren()
                 rootNode.add(DefaultMutableTreeNode("⚠ sidecar not running (${e.message})"))
                 model.reload(rootNode)
             }
         }
     }
 
-    private fun loadChildren(
-        parentNode: DefaultMutableTreeNode,
-        path: String,
+    private fun expandNode(
+        node: DefaultMutableTreeNode,
+        vFile: WtVirtualFile,
         model: DefaultTreeModel,
+        fs: WtVirtualFileSystem?,
     ) {
-        val backend = WtVfsService.instance.backend
         ApplicationManager.getApplication().executeOnPooledThread {
             try {
-                val result = backend.listChildren(path)
+                val result = WtVfsService.instance.backend.listChildren(vFile.path)
+                val builtChildren = mutableListOf<WtVirtualFile>()
+                val childNodes = result.children.map { child ->
+                    val childFile: WtVirtualFile? = fs?.let { toVFile(it, child, vFile) }
+                    if (childFile != null) builtChildren.add(childFile)
+                    val childNode = fileNode(childFile, child.name)
+                    if (child.kind == NodeKind.directory) childNode.add(DefaultMutableTreeNode(PLACEHOLDER))
+                    childNode
+                }
+                @Suppress("UNCHECKED_CAST")
+                vFile.cachedChildren = builtChildren.toTypedArray() as Array<VirtualFile>
                 SwingUtilities.invokeLater {
-                    parentNode.removeAllChildren()
-                    for (child in result.children) {
-                        val node = labelNode(child)
-                        if (child.kind == NodeKind.directory) node.add(DefaultMutableTreeNode(PLACEHOLDER))
-                        parentNode.add(node)
-                    }
-                    model.reload(parentNode)
+                    node.removeAllChildren()
+                    childNodes.forEach { node.add(it) }
+                    model.reload(node)
                 }
             } catch (e: VfsBackendException) {
-
-                LOG.warn("VFS children load failed for $path", e)
-
-//                SwingUtilities.invokeLater {
-//                    parentNode.removeAllChildren()
-//                    parentNode.add(DefaultMutableTreeNode("⚠ failed to load children"))
-//                    model.reload(parentNode)
-//                }
+                LOG.warn("VFS children load failed for ${vFile.path}", e)
             }
         }
     }
 
-    private fun loadDirectChildren(
-        parentNode: DefaultMutableTreeNode,
-        path: String,
-        backend: org.limepepper.lang.wikitext.vfs.backend.VfsBackend,
-    ) {
+    // -------------------------------------------------------------------------
+    // Tab 2 — Debug panel
+    // -------------------------------------------------------------------------
+
+    private fun buildDebugTab(): JPanel {
+        val statusLabel = JLabel("Status: checking…")
+        val infoArea = JBTextArea(20, 60).apply {
+            isEditable = false
+            font = java.awt.Font(java.awt.Font.MONOSPACED, java.awt.Font.PLAIN, 12)
+        }
+        val refreshButton = JButton("Refresh").apply {
+            addActionListener {
+                ApplicationManager.getApplication().executeOnPooledThread {
+                    checkBackend(statusLabel, infoArea)
+                }
+            }
+        }
+        val top = JPanel(BorderLayout())
+        top.add(statusLabel, BorderLayout.CENTER)
+        top.add(refreshButton, BorderLayout.EAST)
+
+        val panel = JPanel(BorderLayout())
+        panel.add(top, BorderLayout.NORTH)
+        panel.add(JBScrollPane(infoArea), BorderLayout.CENTER)
+
+        ApplicationManager.getApplication().executeOnPooledThread {
+            checkBackend(statusLabel, infoArea)
+        }
+        return panel
+    }
+
+    private fun checkBackend(label: JLabel, area: JBTextArea) {
+        val backend = WtVfsService.instance.backend
         try {
-            val result = backend.listChildren(path)
-            for (child in result.children) {
-                val node = labelNode(child)
-                if (child.kind == NodeKind.directory) node.add(DefaultMutableTreeNode(PLACEHOLDER))
-                parentNode.add(node)
+            val root = backend.stat("/")
+            val sites = backend.listChildren("/")
+            val sb = StringBuilder()
+            sb.appendLine("stat /  →  exists=${root.exists}  kind=${root.kind}")
+            sb.appendLine()
+            sb.appendLine("Sites (${sites.children.size}):")
+            for (site in sites.children) {
+                sb.appendLine("  ${site.path}  [${site.kind}]  stableId=${site.stableId}")
+                try {
+                    val indexes = backend.listChildren(site.path)
+                    for (idx in indexes.children) {
+                        sb.appendLine("    ${idx.name}  [${idx.kind}]  stableId=${idx.stableId}")
+                        try {
+                            val containers = backend.listChildren(idx.path)
+                            for (c in containers.children) {
+                                sb.appendLine("      ${c.name}  [${c.kind}]")
+                            }
+                        } catch (_: VfsBackendException) {}
+                    }
+                } catch (_: VfsBackendException) {}
             }
-
+            SwingUtilities.invokeLater {
+                label.text = "Status: ✓ connected"
+                area.text = sb.toString()
+            }
         } catch (e: VfsBackendException) {
-            LOG.warn("VFS prefetch failed for $path", e)
-            parentNode.add(DefaultMutableTreeNode(PLACEHOLDER))
+            SwingUtilities.invokeLater {
+                label.text = "Status: ✗ offline — ${e.message}"
+                area.text = ""
+            }
         }
     }
+
+    // -------------------------------------------------------------------------
 
     companion object {
+        private const val LOADING = "Loading…"
         private const val PLACEHOLDER = "…"
 
-        private fun labelNode(child: ChildNode): DefaultMutableTreeNode =
-            object : DefaultMutableTreeNode(child) {
+        private fun fileNode(vFile: WtVirtualFile?, fallbackName: String): DefaultMutableTreeNode =
+            object : DefaultMutableTreeNode(vFile) {
                 override fun toString(): String {
-                    val icon = if (child.kind == NodeKind.directory) "📁 " else "📄 "
-                    return icon + child.name
+                    val f = userObject as? WtVirtualFile
+                    val icon = if (f?.isDirectory == true) "📁 " else "📄 "
+                    return icon + (f?.name ?: fallbackName)
                 }
             }
     }
