@@ -84,10 +84,22 @@ class PywikibotClient:
             page_count=page_count,
         )
 
-    def get_file_info(self, title: str) -> RemoteFileInfo:
+    def _resolve_file_page(self, title: str):
+        """Resolve a File: title to a FilePage, following the shared repo (e.g.
+        Commons) when the file isn't uploaded locally — the common case for
+        Wikisource works whose scans live on Wikimedia Commons."""
         filepage = self._pwb.FilePage(self.site, title)
-        if not filepage.exists():
-            raise PageNotFound(title)
+        if filepage.exists():
+            return filepage
+        shared = self.site.image_repository()
+        if shared is not None:
+            shared_filepage = self._pwb.FilePage(shared, title)
+            if shared_filepage.exists():
+                return shared_filepage
+        raise PageNotFound(title)
+
+    def get_file_info(self, title: str) -> RemoteFileInfo:
+        filepage = self._resolve_file_page(title)
         fi = filepage.latest_file_info
         # Metadata is a list of {name, value} dicts from the MediaWiki API.
         metadata: dict[str, str] = {}
@@ -112,9 +124,7 @@ class PywikibotClient:
     def download_file(self, title: str, dest: Path) -> Path:
         dest = Path(dest)
         dest.parent.mkdir(parents=True, exist_ok=True)
-        filepage = self._pwb.FilePage(self.site, title)
-        if not filepage.exists():
-            raise PageNotFound(title)
+        filepage = self._resolve_file_page(title)
         filepage.download(filename=str(dest))
         return dest
 

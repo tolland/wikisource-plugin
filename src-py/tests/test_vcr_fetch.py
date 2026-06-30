@@ -94,7 +94,6 @@ def pwb_clean_slate(monkeypatch):
 # ---------------------------------------------------------------------------
 
 _EN_SETTINGS = WikiSettings(family="wikisource", code="en")
-_EN_FILE_SETTINGS = WikiSettings(family="commons", code="commons")
 
 _en_index = _skip_if_no_cassette("en_ws", "get_index_page")
 _en_file_info = _skip_if_no_cassette("en_ws", "get_file_info")
@@ -121,9 +120,10 @@ def test_en_ws_get_index_page():
 
 @_en_file_info
 def test_en_ws_get_file_info():
-    """File: imageinfo returns real sha1, size, and mime for the Pdf blob."""
+    """File: imageinfo follows the Commons redirect — the file isn't uploaded
+    locally to en.wikisource, only to Wikimedia Commons (the shared image repo)."""
     with _EN_VCR.use_cassette("get_file_info.yaml"):
-        client = PywikibotClient(_EN_FILE_SETTINGS)
+        client = PywikibotClient(_EN_SETTINGS)
         info = client.get_file_info(PEIRCE_FILE)
 
     assert info.mime == "application/pdf"
