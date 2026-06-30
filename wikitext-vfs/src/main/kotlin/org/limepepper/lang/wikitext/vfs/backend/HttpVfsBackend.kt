@@ -105,6 +105,7 @@ class HttpVfsBackend(
         val uri = URI.create("$baseUrl$endpoint?$query")
         val req = HttpRequest.newBuilder(uri)
             .timeout(timeout)
+            .version(HttpClient.Version.HTTP_1_1) // avoid upgrade requests
             .GET()
             .build()
         val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
@@ -118,6 +119,7 @@ class HttpVfsBackend(
         val uri = URI.create("$baseUrl$endpoint")
         val req = HttpRequest.newBuilder(uri)
             .timeout(timeout)
+            .version(HttpClient.Version.HTTP_1_1) // avoid upgrade requests
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
             .build()

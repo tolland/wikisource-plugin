@@ -1,24 +1,10 @@
-"""VFS read endpoints — surface A.
-
-Path scheme (all relative to wikisource://):
-
-  /                                       root — all sites
-  /{family}/{code}/                       site root — Index pages for that site
-  /{family}/{code}/{Index title}/         index dir — Pages + File subdir
-  /{family}/{code}/{Index title}/{Page title}        page wikitext file
-  /{family}/{code}/{Index title}/{File title}/       file dir
-  /{family}/{code}/{Index title}/{File title}/wikitext   File: description wikitext
-  /{family}/{code}/{Index title}/{File title}/blob       binary (stub — 501)
-
-Write / rename / delete and the change feed are stubbed for now.
-"""
-
 import base64
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
 
+from wtbot.api.debug_loggig_route import DebugLoggingRoute
 from wtbot.api.schemas import (
     ChangesSinceResponse,
     CreateChildRequest,
@@ -39,7 +25,22 @@ from wtbot.deps import get_session
 from wtbot.sqlmodel import EditJournal, FileBlob, Page, Site
 from wtbot.sqlmodel.namespace import NsRole
 
-router = APIRouter(prefix="/vfs", tags=["vfs"])
+"""VFS read endpoints — surface A.
+
+Path scheme (all relative to wikisource://):
+
+  /                                       root — all sites
+  /{family}/{code}/                       site root — Index pages for that site
+  /{family}/{code}/{Index title}/         index dir — Pages + File subdir
+  /{family}/{code}/{Index title}/{Page title}        page wikitext file
+  /{family}/{code}/{Index title}/{File title}/       file dir
+  /{family}/{code}/{Index title}/{File title}/wikitext   File: description wikitext
+  /{family}/{code}/{Index title}/{File title}/blob       binary (stub — 501)
+
+Write / rename / delete and the change feed are stubbed for now.
+"""
+
+router = APIRouter(prefix="/vfs", tags=["vfs"], route_class=DebugLoggingRoute)
 
 
 # ---------------------------------------------------------------------------
@@ -438,7 +439,9 @@ def write_content(
     parts = _parse_path(req.path)
     if len(parts) < 4:
         return WriteResult(
-            path=req.path, status=WriteStatus.error, message="path is not a writable file"
+            path=req.path,
+            status=WriteStatus.error,
+            message="path is not a writable file",
         )
 
     family, code = parts[0], parts[1]
@@ -457,7 +460,9 @@ def write_content(
 
     if page_title is None:
         return WriteResult(
-            path=req.path, status=WriteStatus.error, message="path is not a writable file"
+            path=req.path,
+            status=WriteStatus.error,
+            message="path is not a writable file",
         )
 
     page = session.exec(
@@ -465,10 +470,16 @@ def write_content(
     ).first()
     if page is None:
         return WriteResult(
-            path=req.path, status=WriteStatus.error, message=f"page not found: {page_title}"
+            path=req.path,
+            status=WriteStatus.error,
+            message=f"page not found: {page_title}",
         )
 
-    if req.base_revid is not None and page.revid is not None and req.base_revid != page.revid:
+    if (
+        req.base_revid is not None
+        and page.revid is not None
+        and req.base_revid != page.revid
+    ):
         return WriteResult(
             path=req.path,
             status=WriteStatus.conflict,

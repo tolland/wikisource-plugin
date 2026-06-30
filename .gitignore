@@ -61,3 +61,4 @@ __pycache__/
 /src-py/wtbot/notebooks/
 /user-config.py
 /.gradle-codex/
+/my_first_notebook.ipynb

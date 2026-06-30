@@ -19,7 +19,7 @@ body {
 
 button { font: inherit; }
 
-/* Shared utility classes used in both App.svelte and VfsBrowser.svelte */
+/* Shared utility classes used across routed SvelteKit pages. */
 .eyebrow, .count, .meta {
   color: #73583d;
   font-family: "Avenir Next", "Gill Sans", sans-serif;
