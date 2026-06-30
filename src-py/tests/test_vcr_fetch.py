@@ -23,16 +23,16 @@ Tests skip silently when a cassette doesn't exist yet.  Record with:
 See src-py/tests/cassettes/README.md for full instructions.
 """
 
-TRACTATUS_INDEX = "Index:Wittgenstein - Tractatus Logico-Philosophicus, 1922.djvu"
-TRACTATUS_FILE = "File:Wittgenstein - Tractatus Logico-Philosophicus, 1922.djvu"
-TRACTATUS_PAGE_1 = "Page:Wittgenstein - Tractatus Logico-Philosophicus, 1922.djvu/1"
+PEIRCE_INDEX = "Index:NeglectedArgument.pdf"
+PEIRCE_FILE = "File:NeglectedArgument.pdf"
+PEIRCE_PAGE_1 = "Page:NeglectedArgument.pdf/1"
 
 # Real fixture blob — the user points TRACTATUS_DJVU_PATH at their local copy.
-# If absent the download assertions are skipped; metadata assertions still run.
-_TRACTATUS_DJVU = Path(
+# If absent, the download assertions are skipped; metadata assertions still run.
+_PEIRCE_NEGLECTED_PDF_PATH = Path(
     os.environ.get(
-        "TRACTATUS_DJVU_PATH",
-        FIXTURES_DIR / "Wittgenstein_-_Tractatus_Logico-Philosophicus,_1922.djvu",
+        "PEIRCE_NEGLECTED_PDF_PATH",
+        FIXTURES_DIR / "NeglectedArgument.pdf",
     )
 )
 
@@ -94,6 +94,7 @@ def pwb_clean_slate(monkeypatch):
 # ---------------------------------------------------------------------------
 
 _EN_SETTINGS = WikiSettings(family="wikisource", code="en")
+_EN_FILE_SETTINGS = WikiSettings(family="commons", code="commons")
 
 _en_index = _skip_if_no_cassette("en_ws", "get_index_page")
 _en_file_info = _skip_if_no_cassette("en_ws", "get_file_info")
@@ -106,7 +107,7 @@ def test_en_ws_get_index_page():
     """Index: page has the right content_model, a <pagelist>, and page_count from IndexPage."""
     with _EN_VCR.use_cassette("get_index_page.yaml"):
         client = PywikibotClient(_EN_SETTINGS)
-        remote = client.get_page(TRACTATUS_INDEX)
+        remote = client.get_page(PEIRCE_INDEX)
 
     assert remote.content_model == "proofread-index"
     assert remote.namespace_canonical == "Index"
@@ -115,17 +116,17 @@ def test_en_ws_get_index_page():
     assert "<pagelist" in (remote.text or "")
     # page_count comes from IndexPage.num_pages, not <pagelist> parsing.
     assert remote.page_count is not None
-    assert 100 < remote.page_count < 300
+    assert 20 < remote.page_count < 30
 
 
 @_en_file_info
 def test_en_ws_get_file_info():
-    """File: imageinfo returns real sha1, size, and mime for the DjVu blob."""
+    """File: imageinfo returns real sha1, size, and mime for the Pdf blob."""
     with _EN_VCR.use_cassette("get_file_info.yaml"):
-        client = PywikibotClient(_EN_SETTINGS)
-        info = client.get_file_info(TRACTATUS_FILE)
+        client = PywikibotClient(_EN_FILE_SETTINGS)
+        info = client.get_file_info(PEIRCE_FILE)
 
-    assert info.mime == "image/vnd.djvu"
+    assert info.mime == "application/pdf"
     assert info.size > 0
     assert len(info.file_sha1) == 40
     # page_count is not asserted here: it comes from IndexPage.num_pages (via
@@ -134,10 +135,10 @@ def test_en_ws_get_file_info():
 
 @_en_page_1
 def test_en_ws_get_page_1():
-    """Page:...djvu/1 is a proofread-page with wikitext body."""
+    """Page:...pdf/1 is a proofread-page with wikitext body."""
     with _EN_VCR.use_cassette("get_page_1.yaml"):
         client = PywikibotClient(_EN_SETTINGS)
-        remote = client.get_page(TRACTATUS_PAGE_1)
+        remote = client.get_page(PEIRCE_PAGE_1)
 
     assert remote.content_model == "proofread-page"
     assert remote.namespace_canonical == "Page"
@@ -167,7 +168,7 @@ def test_en_ws_fanout_index(engine, tmp_path):
             resp = http.post(
                 "/fetch/",
                 json={
-                    "title": TRACTATUS_INDEX,
+                    "title": PEIRCE_INDEX,
                     "family": "wikisource",
                     "code": "en",
                     "depth": 1,
@@ -187,10 +188,10 @@ def test_en_ws_fanout_index(engine, tmp_path):
         # index + all page children
         assert len(all_pages) == 1 + index_page["page_count"]
 
-        idx = next(p for p in all_pages if p.title == TRACTATUS_INDEX)
+        idx = next(p for p in all_pages if p.title == PEIRCE_INDEX)
         fb = s.exec(select(FileBlob).where(FileBlob.page_pk == idx.pk)).first()
         assert fb is not None
-        assert fb.mime == "image/vnd.djvu"
+        assert fb.mime == "application/pdf"
         assert len(fb.file_sha1) == 40
 
 
@@ -218,14 +219,14 @@ def test_lan_get_index_page():
     """Same Index: title on the local wiki — including page_count from IndexPage."""
     with _LAN_VCR.use_cassette("get_index_page.yaml"):
         client = PywikibotClient(_LAN_SETTINGS)
-        remote = client.get_page(TRACTATUS_INDEX)
+        remote = client.get_page(PEIRCE_INDEX)
 
     assert remote.content_model == "proofread-index"
     assert remote.namespace_canonical == "Index"
     assert remote.revid is not None
     assert "<pagelist" in (remote.text or "")
     assert remote.page_count is not None
-    assert 100 < remote.page_count < 300
+    assert 20 < remote.page_count < 30
 
 
 @_lan_file_info
@@ -233,9 +234,9 @@ def test_lan_get_file_info():
     """File: imageinfo on local wiki — sha1 should match en.ws if same file."""
     with _LAN_VCR.use_cassette("get_file_info.yaml"):
         client = PywikibotClient(_LAN_SETTINGS)
-        info = client.get_file_info(TRACTATUS_FILE)
+        info = client.get_file_info(PEIRCE_FILE)
 
-    assert info.mime == "image/vnd.djvu"
+    assert info.mime == "application/pdf"
     assert info.size > 0
     assert len(info.file_sha1) == 40
 
@@ -245,7 +246,7 @@ def test_lan_get_page_1():
     """Page 1 on local wiki is a proofread-page."""
     with _LAN_VCR.use_cassette("get_page_1.yaml"):
         client = PywikibotClient(_LAN_SETTINGS)
-        remote = client.get_page(TRACTATUS_PAGE_1)
+        remote = client.get_page(PEIRCE_PAGE_1)
 
     assert remote.content_model == "proofread-page"
     assert remote.revid is not None
@@ -269,7 +270,7 @@ def test_lan_fanout_index(engine, tmp_path):
             resp = http.post(
                 "/fetch/",
                 json={
-                    "title": TRACTATUS_INDEX,
+                    "title": PEIRCE_INDEX,
                     "family": "mywikisource",
                     "code": "en",
                     "api_url": _LAN_API,
@@ -289,7 +290,7 @@ def test_lan_fanout_index(engine, tmp_path):
         all_pages = s.exec(select(Page)).all()
         assert len(all_pages) == 1 + index_page["page_count"]
 
-        idx = next(p for p in all_pages if p.title == TRACTATUS_INDEX)
+        idx = next(p for p in all_pages if p.title == PEIRCE_INDEX)
         fb = s.exec(select(FileBlob).where(FileBlob.page_pk == idx.pk)).first()
         assert fb is not None
-        assert fb.mime == "image/vnd.djvu"
+        assert fb.mime == "application/pdf"

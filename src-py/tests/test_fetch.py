@@ -6,12 +6,13 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
 from wtbot.main import create_app
-from wtbot.sqlmodel import FetchRequest, FetchStatus, FileBlob, Page
+from wtbot.sqlmodel import FetchRequest, FetchStatus, FileBlob, Page, Site
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.types import RemotePage
+from wtbot.worker import run_pending
 
-_INDEX_TITLE = "Index:Tractatus.djvu"
-_FILE_TITLE = "File:Tractatus.djvu"
+_INDEX_TITLE = "Index:NeglectedArgument.pdf"
+_FILE_TITLE = "File:NeglectedArgument.pdf"
 _FAKE_FILE_BYTES = b"%PDF-fake"
 
 
@@ -219,6 +220,9 @@ def test_index_fanout_creates_pages_and_children(app_with_index_fanout, engine):
         assert _INDEX_TITLE in titles
         for n in range(1, 4):
             assert f"Page:Tractatus.djvu/{n}" in titles
+        page_one = next(p for p in pages if p.title == "Page:Tractatus.djvu/1")
+        assert page_one.text == "page 1 content"
+        assert page_one.content_model == "proofread-page"
 
     # FileBlob row exists for the index (via the File: download).
     with Session(engine) as s:
@@ -232,6 +236,42 @@ def test_index_fanout_creates_pages_and_children(app_with_index_fanout, engine):
         assert fb.size == len(_FAKE_FILE_BYTES)
         assert fb.local_path is not None
         assert fb.local_path == str(blob_file)
+
+
+def test_page_model_has_raw_text_not_proofread_sections(session):
+    text = (
+        '<noinclude><pagequality level="1" user="Admin" />'
+        '<div class="pagetext">Header</div></noinclude>'
+        "Body"
+        "<noinclude><div>Footer</div></noinclude>"
+    )
+    remote = RemotePage(
+        title="Page:Tractatus.djvu/1",
+        namespace_key=250,
+        namespace_canonical="Page",
+        content_model="proofread-page",
+        text=text,
+        pageid=101,
+        revid=1001,
+        sha1="b" * 40,
+        size=len(text),
+    )
+    wiki = FakeWikiClient(pages={remote.title: remote})
+    site = Site(family="mywikisource", code="en")
+    session.add(site)
+    session.commit()
+    session.refresh(site)
+    session.add(FetchRequest(site_pk=site.pk, title=remote.title))
+    session.commit()
+
+    assert run_pending(session, lambda _: wiki) == 1
+    page = session.exec(select(Page).where(Page.title == remote.title)).one()
+    dumped = page.model_dump()
+    assert dumped["text"] == text
+    assert dumped["content_model"] == "proofread-page"
+    assert "header" not in dumped
+    assert "body" not in dumped
+    assert "footer" not in dumped
 
 
 def test_index_fanout_no_pagelist_creates_no_children(engine, tmp_path):

@@ -5,27 +5,23 @@ Surfaces (VFS, cache-fill, commit) are described in ``src-py/DESIGN.md``; only a
 health check and a sites vertical slice are wired up so far.
 """
 
-import json
 import logging
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi import Request
-from rich import inspect
 from sqlalchemy.engine import Engine
 
 from wtbot.api import fetch, health, sites, vfs, viewer
-from wtbot.api.debug_loggig_route import DebugLoggingRoute
 from wtbot.db import create_db_engine, init_db
 from wtbot.worker import ClientFactory, make_client_for_site
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
+# logging.basicConfig(
+#     level=logging.INFO,
+#     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+#     datefmt="%Y-%m-%d %H:%M:%S",
+# )
 
 
 def create_app(
