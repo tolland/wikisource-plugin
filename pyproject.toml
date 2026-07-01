@@ -4,6 +4,7 @@ version = "0.1.0"
 requires-python = ">=3.13"
 license = { text = "MIT" }
 dependencies = [
+    "black[jupyter]>=26.5.1",
     "bs4>=0.0.2",
     "fastapi[standard]>=0.138.1",
     "pandas==3.0.3",
