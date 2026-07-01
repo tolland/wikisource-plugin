@@ -11,6 +11,7 @@ marked committed together once the push succeeds, so a rapid sequence of
 saves between commit-worker runs results in one wiki edit, not several.
 """
 
+import logging
 from collections.abc import Callable
 
 from sqlmodel import Session, select
@@ -72,6 +73,7 @@ def _push_page(session: Session, page_pk: int, client_factory: ClientFactory) ->
     if page is None:
         # Orphaned journal rows (page deleted locally) -- drop them rather
         # than spin forever on a page that no longer exists.
+        logging.debug("Orphaned journal row for page %s", page_pk)
         _drop_orphaned_journal(session, page_pk)
         return True  # removed from queue; not a retriable failure
 
