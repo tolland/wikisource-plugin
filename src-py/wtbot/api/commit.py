@@ -23,6 +23,15 @@ def list_commits(
     offset: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
 ) -> list[Commit]:
+    """
+
+    :param session:
+    :param page_pk:
+    :param status:
+    :param offset:
+    :param limit:
+    :return:
+    """
     statement = select(Commit).order_by(Commit.created_at).offset(offset).limit(limit)
     if page_pk is not None:
         statement = statement.where(Commit.page_pk == page_pk)
