@@ -31,9 +31,14 @@ def run_commits(
 ) -> CommitRunResponse:
     factory = request.app.state.client_factory
     handled = 0
+    exclude: set[int] = set()
     while True:
-        n = run_pending_commits(session, factory, limit=200)
+        n, failed = run_pending_commits(session, factory, limit=200, exclude=exclude)
         handled += n
+        # Accumulate failed pages into exclude so the next batch doesn't retry
+        # pages that already failed this sweep -- prevents the queue from cycling
+        # on persistent conflicts/errors until the HTTP request times out.
+        exclude |= failed
         if n == 0:
             break
     return CommitRunResponse(handled=handled)

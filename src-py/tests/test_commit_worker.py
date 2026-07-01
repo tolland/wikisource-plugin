@@ -50,7 +50,7 @@ def test_push_single_save_succeeds(engine):
         s.commit()
 
     with Session(engine) as s:
-        handled = run_pending_commits(s, _client_factory(fake))
+        handled, _failed = run_pending_commits(s, _client_factory(fake))
         assert handled == 1
 
         updated = s.get(Page, page.pk)
@@ -81,7 +81,7 @@ def test_multiple_saves_collapse_into_one_push(engine):
         s.commit()
 
     with Session(engine) as s:
-        handled = run_pending_commits(s, _client_factory(fake))
+        handled, _failed = run_pending_commits(s, _client_factory(fake))
         assert handled == 1
         commits = s.exec(select(Commit).where(Commit.page_pk == page.pk)).all()
         assert len(commits) == 1
@@ -103,8 +103,9 @@ def test_remote_conflict_recorded_not_raised(engine):
         s.commit()
 
     with Session(engine) as s:
-        handled = run_pending_commits(s, _client_factory(fake))
+        handled, failed = run_pending_commits(s, _client_factory(fake))
         assert handled == 1
+        assert page.pk in failed  # caller must exclude from subsequent sweeps
 
         commit = s.exec(select(Commit).where(Commit.page_pk == page.pk)).first()
         assert commit.status == CommitStatus.conflict
@@ -121,5 +122,5 @@ def test_no_pending_edits_is_a_noop(engine):
     _setup(engine)
     fake = FakeWikiClient()
     with Session(engine) as s:
-        handled = run_pending_commits(s, _client_factory(fake))
+        handled, _failed = run_pending_commits(s, _client_factory(fake))
     assert handled == 0

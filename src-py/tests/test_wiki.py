@@ -85,8 +85,8 @@ class TestConfigInjection:
         assert os.environ["PYWIKIBOT_NO_USER_CONFIG"] == "1"
         assert os.environ["REQUESTS_CA_BUNDLE"] == str(tmp_path / "ca.pem")
 
-    def test_configure_writes_bot_password_file(self, tmp_path):
-        import stat
+    def test_configure_points_password_file_and_writes_user_config(self, tmp_path):
+        import pywikibot.config as pwbconfig
 
         from wtbot.wiki.config import configure_pywikibot
 
@@ -100,28 +100,64 @@ class TestConfigInjection:
         )
         configure_pywikibot(settings)
 
-        password_file = tmp_path / "pwb" / "user-password.cfg"
-        assert password_file.is_file()
-        assert oct(password_file.stat().st_mode & 0o777) == oct(stat.S_IRUSR | stat.S_IWUSR)
-        content = password_file.read_text()
-        assert "'Alice'" in content
-        assert "BotPassword('wtbot', 'hunter2')" in content
+        # configure_pywikibot points pywikibot at the password file path even
+        # before write_password_entry creates the file (entry written post-Site).
+        assert pwbconfig.password_file == str(tmp_path / "pwb" / "user-password.cfg")
+
+        # user-config.py written for debugging.
+        user_config = tmp_path / "pwb" / "user-config.py"
+        assert user_config.is_file()
+        content = user_config.read_text()
+        assert "Alice" in content
+        assert "user-password.cfg" in content
+
+    def test_write_password_entry_appends_4tuple(self, tmp_path):
+        import stat
 
         import pywikibot.config as pwbconfig
 
-        assert pwbconfig.password_file == str(password_file)
-
-    def test_configure_without_password_writes_no_file(self, tmp_path):
-        from wtbot.wiki.config import configure_pywikibot
+        from wtbot.wiki.config import configure_pywikibot, write_password_entry
 
         settings = WikiSettings(
             family="mywikisource",
             code="en",
             username="Alice",
+            password="hunter2",
+            bot_name="wtbot",
             config_dir=str(tmp_path / "pwb"),
         )
         configure_pywikibot(settings)
-        assert not (tmp_path / "pwb" / "user-password.cfg").exists()
+
+        password_path = tmp_path / "pwb" / "user-password.cfg"
+        password_path.touch()  # create empty file as configure would leave it
+
+        write_password_entry(pwbconfig, code="mywikisource", family="wikisource-debian-13", settings=settings)
+
+        assert password_path.is_file()
+        assert oct(password_path.stat().st_mode & 0o777) == oct(stat.S_IRUSR | stat.S_IWUSR)
+        content = password_path.read_text()
+        assert "'mywikisource'" in content
+        assert "'wikisource-debian-13'" in content
+        assert "'Alice'" in content
+        assert "BotPassword('wtbot', 'hunter2')" in content
+
+    def test_write_password_entry_no_duplicate_on_reconnect(self, tmp_path):
+        import pywikibot.config as pwbconfig
+
+        from wtbot.wiki.config import configure_pywikibot, write_password_entry
+
+        settings = WikiSettings(
+            family="mywikisource", code="en", username="Alice", password="pw",
+            config_dir=str(tmp_path / "pwb"),
+        )
+        configure_pywikibot(settings)
+        password_path = tmp_path / "pwb" / "user-password.cfg"
+        password_path.touch()
+
+        write_password_entry(pwbconfig, code="en", family="mywikisource", settings=settings)
+        write_password_entry(pwbconfig, code="en", family="mywikisource", settings=settings)
+        lines = [l for l in password_path.read_text().splitlines() if l.strip()]
+        assert len(lines) == 1  # second call is a no-op
 
     def test_configure_api_url_registers_wildcard_username(self, tmp_path):
         from wtbot.wiki.config import configure_pywikibot
@@ -169,27 +205,23 @@ class _FakeSiteRow:
     api_url = "https://wikisource-debian-13.lan/w/api.php"
 
 
-def test_from_site_picks_up_credentials_from_env(monkeypatch):
+def test_from_site_has_no_credentials_without_overrides(monkeypatch):
+    # Credentials no longer fall back to env -- they must be passed explicitly
+    # by the DB-aware factory (which reads SiteCredential rows) to keep each
+    # site's credentials independent when multiple sites are configured.
     monkeypatch.setenv("WTBOT_WIKI_USERNAME", "Alice")
     monkeypatch.setenv("WTBOT_WIKI_PASSWORD", "hunter2")
-    monkeypatch.setenv("WTBOT_WIKI_BOTNAME", "wtbot")
 
     s = WikiSettings.from_site(_FakeSiteRow())
 
-    # Site row identity wins...
     assert s.family == "mywikisource"
     assert s.code == "en"
-    assert s.api_url == "https://wikisource-debian-13.lan/w/api.php"
-    # ...credentials come from env, since Site rows carry no secrets.
-    assert s.username == "Alice"
-    assert s.password == "hunter2"
-    assert s.bot_name == "wtbot"
+    assert s.username is None
+    assert s.password is None
 
 
-def test_from_site_explicit_overrides_win_over_env(monkeypatch):
-    monkeypatch.setenv("WTBOT_WIKI_USERNAME", "Alice")
-    monkeypatch.setenv("WTBOT_WIKI_PASSWORD", "hunter2")
-
-    s = WikiSettings.from_site(_FakeSiteRow(), username="Bob", password="swordfish")
+def test_from_site_explicit_credential_overrides():
+    s = WikiSettings.from_site(_FakeSiteRow(), username="Bob", password="swordfish", bot_name="mybot")
     assert s.username == "Bob"
     assert s.password == "swordfish"
+    assert s.bot_name == "mybot"

@@ -19,8 +19,13 @@ from wtbot.api import (
     vfs,
     viewer,
 )
+from sqlmodel import Session
+
 from wtbot.db import create_db_engine, init_db
-from wtbot.worker import ClientFactory, make_client_for_site
+from wtbot.settings import WikiSettings
+from wtbot.sqlmodel import Site, SiteCredential
+from wtbot.worker import ClientFactory
+from wtbot.wiki.client import WikiClient, get_wiki_client
 
 """wtbot FastAPI application.
 
@@ -34,6 +39,22 @@ health check and a sites vertical slice are wired up so far.
 #     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 #     datefmt="%Y-%m-%d %H:%M:%S",
 # )
+
+
+def _make_db_client_factory(engine) -> ClientFactory:
+    """Returns a ClientFactory that looks up SiteCredential from the DB
+    before falling back to an anonymous WikiSettings. Each call opens its own
+    short-lived Session so the factory is safe to call from any thread."""
+
+    def _factory(site: Site) -> WikiClient:
+        with Session(engine) as s:
+            cred: SiteCredential | None = s.get(SiteCredential, site.pk)
+        overrides: dict = {}
+        if cred:
+            overrides = dict(username=cred.username, password=cred.password, bot_name=cred.bot_name)
+        return get_wiki_client(WikiSettings.from_site(site, **overrides))
+
+    return _factory
 
 
 def create_app(
@@ -53,7 +74,7 @@ def create_app(
 
     app = FastAPI(title="wtbot", version="0.1.0", lifespan=lifespan)
     app.state.engine = engine
-    app.state.client_factory = client_factory or make_client_for_site
+    app.state.client_factory = client_factory or _make_db_client_factory(engine)
     app.state.blob_root = (
         Path(blob_root)
         if blob_root is not None

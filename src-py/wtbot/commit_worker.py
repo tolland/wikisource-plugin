@@ -15,16 +15,11 @@ from collections.abc import Callable
 
 from sqlmodel import Session, select
 
-from wtbot.settings import WikiSettings
 from wtbot.sqlmodel import Commit, CommitStatus, EditJournal, Page, Site
-from wtbot.wiki.client import WikiClient, get_wiki_client
+from wtbot.wiki.client import WikiClient
 from wtbot.wiki.types import EditConflict
 
 ClientFactory = Callable[[Site], WikiClient]
-
-
-def make_client_for_site(site: Site) -> WikiClient:
-    return get_wiki_client(WikiSettings.from_site(site))
 
 
 def run_pending_commits(
@@ -32,19 +27,27 @@ def run_pending_commits(
     client_factory: ClientFactory,
     *,
     limit: int = 100,
-) -> int:
-    """Push up to `limit` pages' worth of pending local edits. Returns how
-    many pages were handled."""
+    exclude: set[int] | None = None,
+) -> tuple[int, set[int]]:
+    """Push up to `limit` pages' worth of pending local edits.
+
+    Returns ``(handled, failed_page_pks)`` where *failed_page_pks* is the set
+    of page primary keys whose push did not succeed (conflict or error) this
+    run. The caller should pass this back as *exclude* on a subsequent call so
+    failed pages are not retried in the same sweep."""
+    attempted: set[int] = set(exclude or ())
+    failed: set[int] = set()
     handled = 0
-    attempted: set[int] = set()
     while handled < limit:
         page_pk = _claim_next_page(session, exclude=attempted)
         if page_pk is None:
             break
         attempted.add(page_pk)
-        _push_page(session, page_pk, client_factory)
+        ok = _push_page(session, page_pk, client_factory)
+        if not ok:
+            failed.add(page_pk)
         handled += 1
-    return handled
+    return handled, failed
 
 
 def _claim_next_page(session: Session, *, exclude: set[int]) -> int | None:
@@ -63,23 +66,24 @@ def _claim_next_page(session: Session, *, exclude: set[int]) -> int | None:
     return None
 
 
-def _push_page(session: Session, page_pk: int, client_factory: ClientFactory) -> None:
+def _push_page(session: Session, page_pk: int, client_factory: ClientFactory) -> bool:
+    """Returns True if the page was successfully pushed, False on conflict/error."""
     page = session.get(Page, page_pk)
     if page is None:
         # Orphaned journal rows (page deleted locally) -- drop them rather
         # than spin forever on a page that no longer exists.
         _drop_orphaned_journal(session, page_pk)
-        return
+        return True  # removed from queue; not a retriable failure
 
     pending = session.exec(
         select(EditJournal)
         .where(
             EditJournal.page_pk == page_pk, EditJournal.committed == False  # noqa: E712
-        )  # noqa: E712
+        )
         .order_by(EditJournal.saved_at)
     ).all()
     if not pending:
-        return
+        return True
 
     latest = pending[-1]
     commit = Commit(
@@ -92,6 +96,7 @@ def _push_page(session: Session, page_pk: int, client_factory: ClientFactory) ->
     )
 
     site = session.get(Site, page.site_pk)
+    success = False
     try:
         client = client_factory(site)
         result = client.save_page(
@@ -108,6 +113,7 @@ def _push_page(session: Session, page_pk: int, client_factory: ClientFactory) ->
         for row in pending:
             row.committed = True
             session.add(row)
+        success = True
     except EditConflict as exc:
         commit.status = CommitStatus.conflict
         commit.error_message = str(exc)
@@ -117,6 +123,7 @@ def _push_page(session: Session, page_pk: int, client_factory: ClientFactory) ->
 
     session.add(commit)
     session.commit()
+    return success
 
 
 def _drop_orphaned_journal(session: Session, page_pk: int) -> None:

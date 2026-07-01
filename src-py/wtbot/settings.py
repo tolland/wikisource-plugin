@@ -38,20 +38,21 @@ class WikiSettings:
 
     @classmethod
     def from_site(cls, site, **overrides) -> "WikiSettings":
-        """Build from a persisted Site row. Credentials are never stored on the
-        Site row, so they're picked up from process env (same vars as
-        ``from_env``) and layered under the site's own identity/TLS fields,
-        which always win since they're the authoritative per-site values."""
-        env_defaults = cls.from_env()
+        """Build from a persisted Site row plus explicit credential overrides.
+
+        Credentials (username/password/bot_name) are NOT sourced from env here:
+        the production factory looks them up from the SiteCredential DB table and
+        passes them as *overrides*, keeping each site's credentials independent.
+        Non-credential process-env settings (ca_bundle, config_dir) still come
+        from env since those are global/infrastructure, not per-site secrets."""
+        env = cls.from_env()
         base = dict(
             family=site.family,
             code=site.code,
             api_url=site.api_url,
-            username=env_defaults.username,
-            password=env_defaults.password,
-            bot_name=env_defaults.bot_name,
-            ca_bundle=env_defaults.ca_bundle,
-            config_dir=env_defaults.config_dir,
+            # No credential fallback to env -- callers pass them as overrides
+            ca_bundle=env.ca_bundle,
+            config_dir=env.config_dir,
         )
         base.update(overrides)
         return cls(**base)

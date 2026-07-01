@@ -43,7 +43,7 @@ class WikiClient(Protocol):
 class PywikibotClient:
     def __init__(self, settings: WikiSettings):
         self.settings = settings
-        from wtbot.wiki.config import configure_pywikibot
+        from wtbot.wiki.config import configure_pywikibot, write_password_entry
 
         configure_pywikibot(settings)
         import pywikibot
@@ -53,6 +53,22 @@ class PywikibotClient:
             self.site = pywikibot.Site(url=settings.api_url)
         else:
             self.site = pywikibot.Site(code=settings.code, fam=settings.family)
+
+        # Write the password file entry now that we know the runtime
+        # family/code (AutoFamily derives these from the hostname at Site()
+        # construction time, so we can't know them before this point).
+        # Uses the 4-tuple format so multiple sites in one process each get the
+        # right credential rather than the first match winning.
+        if settings.username and settings.password:
+            import pywikibot.config as pwbconfig
+
+            write_password_entry(
+                pwbconfig,
+                code=self.site.code,
+                family=self.site.family.name,
+                settings=settings,
+            )
+            self.site.login()
 
     def get_page(self, title: str) -> RemotePage:
         page = self._pwb.Page(self.site, title)

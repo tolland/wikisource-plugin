@@ -13,6 +13,7 @@ from wtbot.sqlmodel.file_blob import FileBlob
 from wtbot.sqlmodel.namespace import Namespace, NsRole, role_for_canonical
 from wtbot.sqlmodel.page import FetchState, Page
 from wtbot.sqlmodel.site import Site
+from wtbot.sqlmodel.site_credential import SiteCredential
 from wtbot.sqlmodel.transclusion import Transclusion
 
 __all__ = [
@@ -30,4 +31,5 @@ __all__ = [
     "EditJournal",
     "Commit",
     "CommitStatus",
+    "SiteCredential",
 ]
