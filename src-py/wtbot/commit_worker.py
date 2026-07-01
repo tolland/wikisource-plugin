@@ -17,7 +17,7 @@ from sqlmodel import Session, select
 
 from wtbot.sqlmodel import Commit, CommitStatus, EditJournal, Page, Site
 from wtbot.wiki.client import WikiClient
-from wtbot.wiki.types import EditConflict
+from wtbot.wiki.wiki_types import EditConflict
 
 ClientFactory = Callable[[Site], WikiClient]
 

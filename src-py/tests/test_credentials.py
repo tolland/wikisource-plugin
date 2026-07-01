@@ -9,7 +9,6 @@ from sqlmodel import Session, select
 from wtbot.main import create_app
 from wtbot.sqlmodel import Site, SiteCredential
 from wtbot.wiki.client import FakeWikiClient
-from wtbot.wiki.types import RemotePage
 
 
 @pytest.fixture
@@ -43,8 +42,12 @@ def test_put_credential_creates_and_returns(app_client):
 def test_put_credential_upserts(app_client):
     client, engine = app_client
     site = _create_site(client)
-    client.put(f"/sites/{site['pk']}/credential", json={"username": "Alice", "password": "pw1"})
-    r = client.put(f"/sites/{site['pk']}/credential", json={"username": "Alice", "password": "pw2"})
+    client.put(
+        f"/sites/{site['pk']}/credential", json={"username": "Alice", "password": "pw1"}
+    )
+    r = client.put(
+        f"/sites/{site['pk']}/credential", json={"username": "Alice", "password": "pw2"}
+    )
     assert r.status_code == 200
     assert r.json()["password"] == "pw2"
 
@@ -56,7 +59,9 @@ def test_put_credential_upserts(app_client):
 def test_get_credential(app_client):
     client, _ = app_client
     site = _create_site(client)
-    client.put(f"/sites/{site['pk']}/credential", json={"username": "Bob", "password": "xyz"})
+    client.put(
+        f"/sites/{site['pk']}/credential", json={"username": "Bob", "password": "xyz"}
+    )
     r = client.get(f"/sites/{site['pk']}/credential")
     assert r.status_code == 200
     assert r.json()["username"] == "Bob"
@@ -71,7 +76,9 @@ def test_get_credential_missing_returns_404(app_client):
 def test_delete_credential(app_client):
     client, _ = app_client
     site = _create_site(client)
-    client.put(f"/sites/{site['pk']}/credential", json={"username": "Bob", "password": "xyz"})
+    client.put(
+        f"/sites/{site['pk']}/credential", json={"username": "Bob", "password": "xyz"}
+    )
     r = client.delete(f"/sites/{site['pk']}/credential")
     assert r.status_code == 204
     assert client.get(f"/sites/{site['pk']}/credential").status_code == 404
@@ -101,7 +108,9 @@ def test_db_client_factory_uses_site_credential(engine):
         s.commit()
         s.refresh(site)
         site_pk = site.pk
-        cred = SiteCredential(site_pk=site_pk, username="Admin", password="secret", bot_name="wtbot")
+        cred = SiteCredential(
+            site_pk=site_pk, username="Admin", password="secret", bot_name="wtbot"
+        )
         s.add(cred)
         s.commit()
 

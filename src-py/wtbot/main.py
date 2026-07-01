@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 from sqlalchemy.engine import Engine
+from sqlmodel import Session
 
 from wtbot.api import (
     commit as commit_api,
@@ -20,13 +21,11 @@ from wtbot.api import (
     vfs,
     viewer,
 )
-from sqlmodel import Session
-
 from wtbot.db import create_db_engine, init_db
 from wtbot.settings import WikiSettings
 from wtbot.sqlmodel import Site, SiteCredential
-from wtbot.worker import ClientFactory
 from wtbot.wiki.client import WikiClient, get_wiki_client
+from wtbot.worker import ClientFactory
 
 """wtbot FastAPI application.
 
@@ -69,11 +68,12 @@ def _make_db_client_factory(engine) -> ClientFactory:
             cred: SiteCredential | None = s.get(SiteCredential, site.pk)
         overrides: dict = {}
         if cred:
-            overrides = dict(username=cred.username, password=cred.password, bot_name=cred.bot_name)
+            overrides = dict(
+                username=cred.username, password=cred.password, bot_name=cred.bot_name
+            )
         return get_wiki_client(WikiSettings.from_site(site, **overrides))
 
     return _factory
-
 
 
 def create_app(

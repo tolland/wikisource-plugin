@@ -58,7 +58,9 @@ def configure_pywikibot(settings: WikiSettings) -> str:
         # AutoFamily sites (api_url) get the wildcard match; conventional sites
         # get the exact match.  write_password_entry() (called later, after the
         # Site object knows its runtime family/code) handles the password.
-        for fam_key in ({settings.family, "*"} if settings.api_url else {settings.family}):
+        for fam_key in (
+            {settings.family, "*"} if settings.api_url else {settings.family}
+        ):
             fam = pwbconfig.usernames.setdefault(fam_key, {})
             fam.setdefault("*", settings.username)
             fam[settings.code] = settings.username
@@ -73,7 +75,9 @@ def configure_pywikibot(settings: WikiSettings) -> str:
     return config_dir
 
 
-def write_password_entry(pwbconfig, *, code: str, family: str, settings: WikiSettings) -> None:
+def write_password_entry(
+    pwbconfig, *, code: str, family: str, settings: WikiSettings
+) -> None:
     """Append a 4-tuple credential line to the password file.
 
     Uses the runtime ``code`` and ``family`` from the constructed pywikibot
@@ -114,11 +118,17 @@ def _write_user_config(config_dir: str, settings: WikiSettings) -> None:
         f"mylang = {settings.code!r}",
     ]
     if settings.api_url:
-        lines.append(f"# api_url = {settings.api_url!r}  (use Site(url=...) in scripts)")
+        lines.append(
+            f"# api_url = {settings.api_url!r}  (use Site(url=...) in scripts)"
+        )
     lines.append("")
     if settings.username:
         lines.append(f"usernames['*']['*'] = {settings.username!r}")
-        lines.append(f"usernames[{settings.family!r}][{settings.code!r}] = {settings.username!r}")
+        lines.append(
+            f"usernames[{settings.family!r}][{settings.code!r}] = {settings.username!r}"
+        )
         lines.append(f"password_file = {_PASSWORD_FILE!r}")
 
-    Path(config_dir, "user-config.py").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    Path(config_dir, "user-config.py").write_text(
+        "\n".join(lines) + "\n", encoding="utf-8"
+    )

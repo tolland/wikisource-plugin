@@ -11,6 +11,12 @@ router = APIRouter(prefix="/sites", tags=["sites"])
 
 @router.get("/", response_model=list[Site])
 def list_sites(session: Session = Depends(get_session)) -> list[Site]:
+    """
+    List all sites.
+
+    :param session:
+    :return:
+    """
     return list(session.exec(select(Site)).all())
 
 
@@ -51,7 +57,9 @@ def upsert_credential(
         raise HTTPException(status_code=404, detail="site not found")
     cred = session.get(SiteCredential, site_pk)
     if cred is None:
-        cred = SiteCredential(site_pk=site_pk, username=body.username, password=body.password)
+        cred = SiteCredential(
+            site_pk=site_pk, username=body.username, password=body.password
+        )
     else:
         cred.username = body.username
         cred.password = body.password
@@ -64,10 +72,14 @@ def upsert_credential(
 
 
 @router.get("/{site_pk}/credential", response_model=SiteCredential)
-def get_credential(site_pk: int, session: Session = Depends(get_session)) -> SiteCredential:
+def get_credential(
+    site_pk: int, session: Session = Depends(get_session)
+) -> SiteCredential:
     cred = session.get(SiteCredential, site_pk)
     if cred is None:
-        raise HTTPException(status_code=404, detail="no credential configured for this site")
+        raise HTTPException(
+            status_code=404, detail="no credential configured for this site"
+        )
     return cred
 
 
@@ -75,6 +87,8 @@ def get_credential(site_pk: int, session: Session = Depends(get_session)) -> Sit
 def delete_credential(site_pk: int, session: Session = Depends(get_session)) -> None:
     cred = session.get(SiteCredential, site_pk)
     if cred is None:
-        raise HTTPException(status_code=404, detail="no credential configured for this site")
+        raise HTTPException(
+            status_code=404, detail="no credential configured for this site"
+        )
     session.delete(cred)
     session.commit()

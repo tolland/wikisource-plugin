@@ -131,10 +131,17 @@ class TestConfigInjection:
         password_path = tmp_path / "pwb" / "user-password.cfg"
         password_path.touch()  # create empty file as configure would leave it
 
-        write_password_entry(pwbconfig, code="mywikisource", family="wikisource-debian-13", settings=settings)
+        write_password_entry(
+            pwbconfig,
+            code="mywikisource",
+            family="wikisource-debian-13",
+            settings=settings,
+        )
 
         assert password_path.is_file()
-        assert oct(password_path.stat().st_mode & 0o777) == oct(stat.S_IRUSR | stat.S_IWUSR)
+        assert oct(password_path.stat().st_mode & 0o777) == oct(
+            stat.S_IRUSR | stat.S_IWUSR
+        )
         content = password_path.read_text()
         assert "'mywikisource'" in content
         assert "'wikisource-debian-13'" in content
@@ -147,22 +154,31 @@ class TestConfigInjection:
         from wtbot.wiki.config import configure_pywikibot, write_password_entry
 
         settings = WikiSettings(
-            family="mywikisource", code="en", username="Alice", password="pw",
+            family="mywikisource",
+            code="en",
+            username="Alice",
+            password="pw",
             config_dir=str(tmp_path / "pwb"),
         )
         configure_pywikibot(settings)
         password_path = tmp_path / "pwb" / "user-password.cfg"
         password_path.touch()
 
-        write_password_entry(pwbconfig, code="en", family="mywikisource", settings=settings)
-        write_password_entry(pwbconfig, code="en", family="mywikisource", settings=settings)
-        lines = [l for l in password_path.read_text().splitlines() if l.strip()]
+        write_password_entry(
+            pwbconfig, code="en", family="mywikisource", settings=settings
+        )
+        write_password_entry(
+            pwbconfig, code="en", family="mywikisource", settings=settings
+        )
+        lines = [
+            line for line in password_path.read_text().splitlines() if line.strip()
+        ]
         assert len(lines) == 1  # second call is a no-op
 
     def test_configure_api_url_registers_wildcard_username(self, tmp_path):
-        from wtbot.wiki.config import configure_pywikibot
-
         import pywikibot.config as pwbconfig
+
+        from wtbot.wiki.config import configure_pywikibot
 
         settings = WikiSettings(
             family="mywikisource",
@@ -221,7 +237,9 @@ def test_from_site_has_no_credentials_without_overrides(monkeypatch):
 
 
 def test_from_site_explicit_credential_overrides():
-    s = WikiSettings.from_site(_FakeSiteRow(), username="Bob", password="swordfish", bot_name="mybot")
+    s = WikiSettings.from_site(
+        _FakeSiteRow(), username="Bob", password="swordfish", bot_name="mybot"
+    )
     assert s.username == "Bob"
     assert s.password == "swordfish"
     assert s.bot_name == "mybot"
