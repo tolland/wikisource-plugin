@@ -119,26 +119,16 @@ class MyToolWindowFactory : ToolWindowFactory {
         return panel
     }
 
+    /** Reflects the in-memory [WtVirtualFile] state — not a fresh backend query. */
     private fun showProperties(vFile: WtVirtualFile, area: JBTextArea) {
-        area.text = "Loading properties for ${vFile.path} …"
-        ApplicationManager.getApplication().executeOnPooledThread {
-            val text = try {
-                val stat = WtVfsService.instance.backend.stat(vFile.path)
-                buildString {
-                    appendLine("name:      ${stat.name ?: vFile.name}")
-                    appendLine("path:      ${stat.path}")
-                    appendLine("kind:      ${if (vFile.isDirectory) NodeKind.directory else NodeKind.file}")
-                    appendLine("exists:    ${stat.exists}")
-                    appendLine("stableId:  ${stat.stableId ?: vFile.stableId}")
-                    appendLine("revid:     ${stat.revid ?: vFile.revid}")
-                    appendLine("timestamp: ${stat.timestamp ?: "—"}")
-                    appendLine("length:    ${stat.length ?: "—"}")
-                    appendLine("writable:  ${vFile.isWritable}")
-                }
-            } catch (e: VfsBackendException) {
-                "⚠ failed to stat ${vFile.path}: ${e.message}"
-            }
-            SwingUtilities.invokeLater { area.text = text }
+        area.text = buildString {
+            appendLine("name:      ${vFile.name}")
+            appendLine("path:      ${vFile.path}")
+            appendLine("kind:      ${if (vFile.isDirectory) NodeKind.directory else NodeKind.file}")
+            appendLine("stableId:  ${vFile.stableId}")
+            appendLine("revid:     ${vFile.revid}")
+            appendLine("length:    ${vFile.cachedContent?.size ?: "not loaded"}")
+            appendLine("writable:  ${vFile.isWritable}")
         }
     }
 

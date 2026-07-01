@@ -82,10 +82,7 @@ class WtVirtualFileSystem : VirtualFileSystem() {
                 try {
                     val stat = backend.stat(file.path)
                     if (!stat.exists) continue
-                    if (stat.revid != file.revid) {
-                        file.cachedContent = null
-                    }
-                    file.cachedChildren = null
+                    file.invalidateIfStale(stat.revid)
                 } catch (_: VfsBackendException) {
                     // Backend unreachable — leave cached state as-is.
                 }

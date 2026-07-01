@@ -49,6 +49,20 @@ class WtVirtualFile(
 
     fun setParent(p: WtVirtualFile) { _parent = p }
 
+    /**
+     * Called by [WtVirtualFileSystem.refresh] with a freshly fetched revid.
+     * Content is re-fetched lazily on next access when the revid has moved on;
+     * children are always invalidated since listings carry no revid of their own.
+     */
+    @Synchronized
+    fun invalidateIfStale(freshRevid: Long?) {
+        if (freshRevid != revid) {
+            revid = freshRevid
+            cachedContent = null
+        }
+        cachedChildren = null
+    }
+
     override fun getName(): String = _name
     override fun getFileSystem(): VirtualFileSystem = fileSystem
     override fun getPath(): String = _path
