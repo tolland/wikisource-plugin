@@ -46,7 +46,8 @@ tasks {
         inputs.files(
             "sandbox-config/ide.general.xml",
             "sandbox-config/ui.lnf.xml",
-            "sandbox-config/trusted-paths.xml"
+            "sandbox-config/trusted-paths.xml",
+            "sandbox-config/editor.xml"
         )
             .withPropertyName("sandboxConfigFiles")
 
