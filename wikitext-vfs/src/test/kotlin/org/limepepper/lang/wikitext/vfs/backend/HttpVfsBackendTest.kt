@@ -72,6 +72,29 @@ class HttpVfsBackendTest {
         assertNull(r.kind)
     }
 
+    @Test fun `statBulk parses results array in order`() {
+        handle("/vfs/stat/bulk", """
+            {"results":[
+              {"path":"/wikisource/en/Index:Foo/Pages/Page:Foo/1","exists":true,"kind":"file",
+               "stable_id":1003,"revid":5003,"length":19,"timestamp":null,"writable":false},
+              {"path":"/wikisource/en/Index:Missing","exists":false}
+            ]}
+        """.trimIndent())
+
+        val r = backend.statBulk(listOf(
+            "/wikisource/en/Index:Foo/Pages/Page:Foo/1",
+            "/wikisource/en/Index:Missing",
+        ))
+        assertEquals(2, r.size)
+        assertTrue(r[0].exists)
+        assertEquals(5003L, r[0].revid)
+        assertFalse(r[1].exists)
+    }
+
+    @Test fun `statBulk with empty input does not call the backend`() {
+        assertEquals(emptyList<StatResult>(), backend.statBulk(emptyList()))
+    }
+
     @Test fun `listChildren parses children array`() {
         handle("/vfs/children", """
             {"parent_path":"/wikisource/en/Index:Foo.djvu/Pages","children":[

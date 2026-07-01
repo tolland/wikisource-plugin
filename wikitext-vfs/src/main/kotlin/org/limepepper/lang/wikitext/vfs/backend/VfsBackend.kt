@@ -8,6 +8,9 @@ interface VfsBackend {
     /** Returns stat for any path; [StatResult.exists] is false for unknown paths. */
     fun stat(path: String): StatResult
 
+    /** Batched [stat] for many paths in one round trip; result order matches [paths]. */
+    fun statBulk(paths: List<String>): List<StatResult>
+
     /** Lists the children of a directory path. */
     fun listChildren(path: String): ListChildrenResult
 

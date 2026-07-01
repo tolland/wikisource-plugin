@@ -72,20 +72,23 @@ class WtVirtualFileSystem : VirtualFileSystem() {
     override fun getProtocol(): String = PROTOCOL
 
     /**
-     * Re-stats every cached [WtVirtualFile] and invalidates its content/children
-     * cache when the backend's revid has moved on, so the next access re-fetches.
+     * Re-stats every cached [WtVirtualFile] in one batched call and invalidates
+     * its content/children cache when the backend's revid has moved on, so the
+     * next access re-fetches. Uses [VfsBackend.statBulk] rather than one
+     * request per file — at real-library scale (thousands of cached pages)
+     * a per-file loop here would be thousands of round trips.
      */
     override fun refresh(asynchronous: Boolean) {
         val doRefresh = Runnable {
-            val backend = WtVfsService.instance.backend
-            for (file in cache.values) {
-                try {
-                    val stat = backend.stat(file.path)
-                    if (!stat.exists) continue
-                    file.invalidateIfStale(stat.revid)
-                } catch (_: VfsBackendException) {
-                    // Backend unreachable — leave cached state as-is.
+            val files = cache.values.toList()
+            if (files.isEmpty()) return@Runnable
+            try {
+                val stats = WtVfsService.instance.backend.statBulk(files.map { it.path })
+                for ((file, stat) in files.zip(stats)) {
+                    if (stat.exists) file.invalidateIfStale(stat.revid)
                 }
+            } catch (_: VfsBackendException) {
+                // Backend unreachable — leave cached state as-is.
             }
         }
         if (asynchronous) {

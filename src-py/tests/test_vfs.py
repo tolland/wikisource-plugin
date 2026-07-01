@@ -191,6 +191,37 @@ def test_stat_missing(vfs_client):
 
 
 # ---------------------------------------------------------------------------
+# stat/bulk
+# ---------------------------------------------------------------------------
+
+
+def test_stat_bulk_matches_individual_stat(vfs_client):
+    paths = [
+        "/",
+        _INDEX_PATH,
+        f"{_PAGES_PATH}/{PAGE_1}",
+        f"{_PAGES_PATH}/{PAGE_2}",
+        f"{_FILE_PATH}/wikitext",
+        "/wikisource/en/Index:NoSuch",
+        f"{_PAGES_PATH}/Page:NoSuchPage.djvu/1",
+    ]
+    bulk = vfs_client.post("/vfs/stat/bulk", json={"paths": paths})
+    assert bulk.status_code == 200
+    results = bulk.json()["results"]
+    assert len(results) == len(paths)
+
+    for path, result in zip(paths, results):
+        individual = vfs_client.get("/vfs/stat", params={"path": path}).json()
+        assert result == individual, path
+
+
+def test_stat_bulk_empty(vfs_client):
+    r = vfs_client.post("/vfs/stat/bulk", json={"paths": []})
+    assert r.status_code == 200
+    assert r.json()["results"] == []
+
+
+# ---------------------------------------------------------------------------
 # list_children
 # ---------------------------------------------------------------------------
 

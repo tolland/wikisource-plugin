@@ -63,6 +63,8 @@ class FakeVfsBackend : VfsBackend {
         )
     }
 
+    override fun statBulk(paths: List<String>): List<StatResult> = paths.map(::stat)
+
     override fun listChildren(path: String): ListChildrenResult {
         val children = childrenOf[path].orEmpty().mapNotNull { childPath ->
             val e = entries[childPath] ?: return@mapNotNull null

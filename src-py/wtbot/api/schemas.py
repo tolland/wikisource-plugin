@@ -67,6 +67,16 @@ class Stat(BaseModel):
     length: int | None = None
 
 
+class StatBulkRequest(BaseModel):
+    paths: list[str]
+
+
+class StatBulkResponse(BaseModel):
+    """Same order as the request's `paths` -- index i answers paths[i]."""
+
+    results: list[Stat]
+
+
 # --------------------------------------------------------------------------
 # A) Operations
 # --------------------------------------------------------------------------

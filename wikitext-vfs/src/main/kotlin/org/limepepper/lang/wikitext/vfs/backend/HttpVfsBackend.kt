@@ -42,6 +42,25 @@ class HttpVfsBackend(
         }
     }
 
+    override fun statBulk(paths: List<String>): List<StatResult> {
+        if (paths.isEmpty()) return emptyList()
+        val body = "{\"paths\":[" + paths.joinToString(",") { "\"${escapeJson(it)}\"" } + "]}"
+        val json = post("/vfs/stat/bulk", body)
+        return JsonReader(json).array("results") { r ->
+            StatResult(
+                path = r.string("path"),
+                exists = r.bool("exists"),
+                name = r.stringOrNull("name"),
+                kind = r.stringOrNull("kind")?.let { NodeKind.valueOf(it) },
+                stableId = r.longOrNull("stable_id"),
+                revid = r.longOrNull("revid"),
+                length = r.longOrNull("length"),
+                timestamp = r.stringOrNull("timestamp"),
+                writable = r.boolOrDefault("writable", false),
+            )
+        }
+    }
+
     override fun listChildren(path: String): ListChildrenResult {
         val json = get("/vfs/children", "path" to path)
         return JsonReader(json).run {

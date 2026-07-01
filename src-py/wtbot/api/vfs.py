@@ -17,6 +17,8 @@ from wtbot.api.schemas import (
     ReadContentResponse,
     RenameRequest,
     Stat,
+    StatBulkRequest,
+    StatBulkResponse,
     WriteContentRequest,
     WriteResult,
     WriteStatus,
@@ -119,6 +121,10 @@ def stat(
     path: str = Query(...),
     session: Session = Depends(get_session),
 ) -> Stat:
+    return _stat_one(session, path)
+
+
+def _stat_one(session: Session, path: str) -> Stat:
     parts = _parse_path(path)
 
     if not parts:
@@ -245,6 +251,65 @@ def stat(
         )
 
     return Stat(path=path, exists=False)
+
+
+@router.post("/stat/bulk", response_model=StatBulkResponse)
+def stat_bulk(
+    body: StatBulkRequest,
+    session: Session = Depends(get_session),
+) -> StatBulkResponse:
+    """Batched stat() for refresh() sweeps over many cached paths at once.
+
+    Page-under-Pages/ paths (the dominant case at real-library scale — one
+    query per site+index_title rather than one per page) are batched via
+    `Page.title.in_(...)`; every other path shape falls back to `_stat_one`,
+    since sites/indexes/file-dirs are comparatively few per session.
+    """
+    results: dict[int, Stat] = {}
+    page_groups: dict[tuple[str, str, str], list[tuple[int, str, str]]] = {}
+
+    for i, path in enumerate(body.paths):
+        parts = _parse_path(path)
+        if len(parts) >= 5 and parts[3] == "Pages":
+            family, code, index_title = parts[0], parts[1], parts[2]
+            page_title = "/".join(parts[4:])
+            page_groups.setdefault((family, code, index_title), []).append(
+                (i, path, page_title)
+            )
+        else:
+            results[i] = _stat_one(session, path)
+
+    for (family, code, index_title), entries in page_groups.items():
+        site = session.exec(
+            select(Site).where(Site.family == family, Site.code == code)
+        ).first()
+        if site is None:
+            for i, path, _ in entries:
+                results[i] = Stat(path=path, exists=False)
+            continue
+        titles = [page_title for _, _, page_title in entries]
+        pages = session.exec(
+            select(Page).where(Page.site_pk == site.pk, Page.title.in_(titles))
+        ).all()
+        pages_by_title = {p.title: p for p in pages}
+        for i, path, page_title in entries:
+            page = pages_by_title.get(page_title)
+            if page is None:
+                results[i] = Stat(path=path, exists=False)
+                continue
+            body_text = page.text or ""
+            results[i] = Stat(
+                path=path,
+                exists=True,
+                name=page.title,
+                kind=NodeKind.file,
+                stable_id=page.pageid,
+                revid=page.revid,
+                timestamp=_ts(page.local_modified_at or page.remote_timestamp),
+                length=len(body_text.encode()),
+            )
+
+    return StatBulkResponse(results=[results[i] for i in range(len(body.paths))])
 
 
 # ---------------------------------------------------------------------------
