@@ -9,6 +9,15 @@ from wtbot.timeutil import utcnow
 router = APIRouter(prefix="/sites", tags=["sites"])
 
 
+class SiteRequest(BaseModel):
+    family: str
+    code: str
+    articlepath: str = "/wiki/$1"
+    host: str | None = None
+    api_url: str | None = None
+    label: str | None = None
+
+
 @router.get("/", response_model=list[Site])
 def list_sites(session: Session = Depends(get_session)) -> list[Site]:
     """
@@ -33,6 +42,26 @@ def get_site(site_pk: int, session: Session = Depends(get_session)) -> Site:
     site = session.get(Site, site_pk)
     if site is None:
         raise HTTPException(status_code=404, detail="site not found")
+    return site
+
+
+@router.put("/{site_pk}", response_model=Site)
+def update_site(
+    site_pk: int, body: SiteRequest, session: Session = Depends(get_session)
+) -> Site:
+    site = session.get(Site, site_pk)
+    if site is None:
+        raise HTTPException(status_code=404, detail="site not found")
+
+    site.family = body.family
+    site.code = body.code
+    site.articlepath = body.articlepath
+    site.host = body.host
+    site.api_url = body.api_url
+    site.label = body.label
+    session.add(site)
+    session.commit()
+    session.refresh(site)
     return site
 
 

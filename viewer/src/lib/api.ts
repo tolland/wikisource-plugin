@@ -8,7 +8,10 @@ import type {
   Commit,
   PendingCommitPage,
   ReadContentResponse,
-  Site
+  Site,
+  SiteCredential,
+  SitePayload,
+  CredentialPayload
 } from '$lib/types';
 
 async function getJson<T>(path: string): Promise<T> {
@@ -31,8 +34,55 @@ async function postJson<T>(path: string, payload: unknown): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function putJson<T>(path: string, payload: unknown): Promise<T> {
+  const response = await fetch(`/api${path}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!response.ok) {
+    throw new Error(`${response.status} ${response.statusText}`);
+  }
+  return response.json() as Promise<T>;
+}
+
+async function deleteRequest(path: string): Promise<void> {
+  const response = await fetch(`/api${path}`, { method: 'DELETE' });
+  if (!response.ok) {
+    throw new Error(`${response.status} ${response.statusText}`);
+  }
+}
+
 export function listSites(): Promise<Site[]> {
   return getJson<Site[]>('/sites/');
+}
+
+export function createSite(payload: SitePayload): Promise<Site> {
+  return postJson<Site>('/sites/', payload);
+}
+
+export function updateSite(sitePk: number, payload: SitePayload): Promise<Site> {
+  return putJson<Site>(`/sites/${sitePk}`, payload);
+}
+
+export async function getSiteCredential(sitePk: number): Promise<SiteCredential | null> {
+  const response = await fetch(`/api/sites/${sitePk}/credential`);
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(`${response.status} ${response.statusText}`);
+  }
+  return response.json() as Promise<SiteCredential>;
+}
+
+export function saveSiteCredential(
+  sitePk: number,
+  payload: CredentialPayload
+): Promise<SiteCredential> {
+  return putJson<SiteCredential>(`/sites/${sitePk}/credential`, payload);
+}
+
+export function deleteSiteCredential(sitePk: number): Promise<void> {
+  return deleteRequest(`/sites/${sitePk}/credential`);
 }
 
 export function listIndexPages(): Promise<IndexPageSummary[]> {

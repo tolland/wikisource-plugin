@@ -51,6 +51,11 @@
     <strong>Fetch pages</strong>
     <small>Pull Index: and Page: records into SQLite.</small>
   </a>
+  <a class="card" href="/sites">
+    <span class="card-kicker">Configuration</span>
+    <strong>{loading ? '...' : sites.length} Sites</strong>
+    <small>Add wikis, edit API URLs, and configure login credentials.</small>
+  </a>
   <a class="card" href="/indexes">
     <span class="card-kicker">Working tree</span>
     <strong>{loading ? '...' : indexes.length} Index pages</strong>

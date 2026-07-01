@@ -23,6 +23,29 @@ export interface Site {
   created_at?: string | null;
 }
 
+export interface SitePayload {
+  family: string;
+  code: string;
+  articlepath?: string;
+  host?: string | null;
+  api_url?: string | null;
+  label?: string | null;
+}
+
+export interface SiteCredential {
+  site_pk: number;
+  username: string;
+  password: string;
+  bot_name?: string | null;
+  updated_at: string;
+}
+
+export interface CredentialPayload {
+  username: string;
+  password: string;
+  bot_name?: string | null;
+}
+
 export interface IndexPageSummary {
   pk: number;
   title: string;

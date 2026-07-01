@@ -21,5 +21,30 @@ def test_create_and_list_site(client):
     assert listed[0]["code"] == "en"
 
 
+def test_update_site(client):
+    created = client.post(
+        "/sites/", json={"family": "mywikisource", "code": "en"}
+    ).json()
+
+    resp = client.put(
+        f"/sites/{created['pk']}",
+        json={
+            "family": "mywikisource",
+            "code": "fr",
+            "articlepath": "/wiki/$1",
+            "host": "example.test",
+            "api_url": "https://example.test/w/api.php",
+            "label": "Example",
+        },
+    )
+
+    assert resp.status_code == 200
+    updated = resp.json()
+    assert updated["code"] == "fr"
+    assert updated["host"] == "example.test"
+    assert updated["api_url"] == "https://example.test/w/api.php"
+    assert updated["label"] == "Example"
+
+
 def test_get_missing_site_404(client):
     assert client.get("/sites/999").status_code == 404
