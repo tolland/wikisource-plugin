@@ -27,7 +27,7 @@ from wtbot.sqlmodel.namespace import NsRole
 from wtbot.timeutil import utcnow
 from wtbot.wiki.client import WikiClient, get_wiki_client
 from wtbot.wiki.namespaces import sync_namespaces
-from wtbot.wiki.types import PageNotFound, RemotePage
+from wtbot.wiki.wiki_types import PageNotFound, RemotePage
 
 ClientFactory = Callable[[Site], WikiClient]
 

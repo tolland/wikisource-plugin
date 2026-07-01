@@ -32,7 +32,7 @@ We are using modern python version 3.13 and above for generics, type aliases, be
 Use of uv. The project is built in a environment which has a local pypi mirror
 so uv.lock contains LAN local urls, so don't commit uv.lock to the repo.
 
-
+Due to a bug in pycharm, please put file-based docstrings under the imports, so the imports are the first block in the page.
 
 ## Architecture
 

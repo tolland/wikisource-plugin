@@ -8,7 +8,7 @@ from wtbot.commit_worker import run_pending_commits
 from wtbot.sqlmodel import Commit, CommitStatus, EditJournal, Page, Site
 from wtbot.sqlmodel.namespace import NsRole
 from wtbot.wiki.client import FakeWikiClient
-from wtbot.wiki.types import RemotePage
+from wtbot.wiki.wiki_types import RemotePage
 
 TITLE = "Page:Foo.djvu/1"
 
@@ -40,13 +40,23 @@ def _client_factory(fake: FakeWikiClient):
 
 def test_push_single_save_succeeds(engine):
     site, page = _setup(engine)
-    fake = FakeWikiClient(pages={TITLE: RemotePage(
-        title=TITLE, namespace_key=0, namespace_canonical="Page",
-        content_model="proofread-page", text="original", revid=100,
-    )})
+    fake = FakeWikiClient(
+        pages={
+            TITLE: RemotePage(
+                title=TITLE,
+                namespace_key=0,
+                namespace_canonical="Page",
+                content_model="proofread-page",
+                text="original",
+                revid=100,
+            )
+        }
+    )
 
     with Session(engine) as s:
-        s.add(EditJournal(page_pk=page.pk, base_revid=100, body="edited", comment="fix"))
+        s.add(
+            EditJournal(page_pk=page.pk, base_revid=100, body="edited", comment="fix")
+        )
         s.commit()
 
     with Session(engine) as s:
@@ -54,11 +64,15 @@ def test_push_single_save_succeeds(engine):
         assert handled == 1
 
         updated = s.get(Page, page.pk)
-        assert updated.text == "original"  # cache text untouched by push (read_content already had it)
+        assert (
+            updated.text == "original"
+        )  # cache text untouched by push (read_content already had it)
         assert updated.revid == 101
         assert updated.dirty is False
 
-        journal = s.exec(select(EditJournal).where(EditJournal.page_pk == page.pk)).all()
+        journal = s.exec(
+            select(EditJournal).where(EditJournal.page_pk == page.pk)
+        ).all()
         assert all(j.committed for j in journal)
 
         commit = s.exec(select(Commit).where(Commit.page_pk == page.pk)).first()
@@ -70,10 +84,18 @@ def test_push_single_save_succeeds(engine):
 
 def test_multiple_saves_collapse_into_one_push(engine):
     site, page = _setup(engine)
-    fake = FakeWikiClient(pages={TITLE: RemotePage(
-        title=TITLE, namespace_key=0, namespace_canonical="Page",
-        content_model="proofread-page", text="original", revid=100,
-    )})
+    fake = FakeWikiClient(
+        pages={
+            TITLE: RemotePage(
+                title=TITLE,
+                namespace_key=0,
+                namespace_canonical="Page",
+                content_model="proofread-page",
+                text="original",
+                revid=100,
+            )
+        }
+    )
 
     with Session(engine) as s:
         s.add(EditJournal(page_pk=page.pk, base_revid=100, body="draft 1"))
@@ -93,10 +115,18 @@ def test_multiple_saves_collapse_into_one_push(engine):
 def test_remote_conflict_recorded_not_raised(engine):
     site, page = _setup(engine)
     # Remote has moved on to revid 200 since the local edit was based on 100.
-    fake = FakeWikiClient(pages={TITLE: RemotePage(
-        title=TITLE, namespace_key=0, namespace_canonical="Page",
-        content_model="proofread-page", text="someone else's edit", revid=200,
-    )})
+    fake = FakeWikiClient(
+        pages={
+            TITLE: RemotePage(
+                title=TITLE,
+                namespace_key=0,
+                namespace_canonical="Page",
+                content_model="proofread-page",
+                text="someone else's edit",
+                revid=200,
+            )
+        }
+    )
 
     with Session(engine) as s:
         s.add(EditJournal(page_pk=page.pk, base_revid=100, body="my edit"))
@@ -111,7 +141,9 @@ def test_remote_conflict_recorded_not_raised(engine):
         assert commit.status == CommitStatus.conflict
 
         # Not committed -- stays in the queue for the user to resolve/retry.
-        journal = s.exec(select(EditJournal).where(EditJournal.page_pk == page.pk)).first()
+        journal = s.exec(
+            select(EditJournal).where(EditJournal.page_pk == page.pk)
+        ).first()
         assert journal.committed is False
 
         updated = s.get(Page, page.pk)

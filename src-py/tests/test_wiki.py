@@ -4,7 +4,7 @@ from wtbot.settings import WikiSettings
 from wtbot.sqlmodel import NsRole
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.dispatch import Handling, classify, classify_remote
-from wtbot.wiki.types import PageNotFound, RemotePage
+from wtbot.wiki.wiki_types import PageNotFound, RemotePage
 
 
 def _page(title, content_model, ns_canonical, ns_key, text="x"):

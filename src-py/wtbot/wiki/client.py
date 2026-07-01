@@ -1,3 +1,17 @@
+import logging
+from dataclasses import replace
+from pathlib import Path
+from typing import Protocol, runtime_checkable
+
+from wtbot.settings import WikiSettings
+from wtbot.wiki.wiki_types import (
+    EditConflict,
+    PageNotFound,
+    RemoteFileInfo,
+    RemotePage,
+    SaveResult,
+)
+
 """Wiki access seam.
 
 ``WikiClient`` is the interface the worker/endpoints/CLI depend on. ``get_page``
@@ -8,18 +22,8 @@ and ``download_file`` are all the fetch path needs. Two implementations:
 - ``FakeWikiClient`` — in-memory, for tests/dev/CLI demos with no network.
 """
 
-from dataclasses import replace
-from pathlib import Path
-from typing import Protocol, runtime_checkable
 
-from wtbot.settings import WikiSettings
-from wtbot.wiki.types import (
-    EditConflict,
-    PageNotFound,
-    RemoteFileInfo,
-    RemotePage,
-    SaveResult,
-)
+logging.basicConfig(level=logging.DEBUG)
 
 
 @runtime_checkable

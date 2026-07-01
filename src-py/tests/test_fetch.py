@@ -8,7 +8,7 @@ from sqlmodel import Session, select
 from wtbot.main import create_app
 from wtbot.sqlmodel import FetchRequest, FetchStatus, FileBlob, Page, Site
 from wtbot.wiki.client import FakeWikiClient
-from wtbot.wiki.types import RemotePage
+from wtbot.wiki.wiki_types import RemotePage
 from wtbot.worker import run_pending
 
 _INDEX_TITLE = "Index:Tractatus.djvu"

@@ -12,7 +12,7 @@ from wtbot.main import create_app
 from wtbot.sqlmodel import Commit, CommitStatus, EditJournal, Page, Site
 from wtbot.sqlmodel.namespace import NsRole
 from wtbot.wiki.client import FakeWikiClient
-from wtbot.wiki.types import RemotePage
+from wtbot.wiki.wiki_types import RemotePage
 
 TITLE = "Page:Foo.djvu/1"
 PATH = "/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1"
