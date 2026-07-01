@@ -16,6 +16,16 @@ _FILE_TITLE = "File:Tractatus.djvu"
 _FAKE_FILE_BYTES = b"%PDF-fake"
 
 
+class GetPageHookClient(FakeWikiClient):
+    def __init__(self, *args, on_get_page, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._on_get_page = on_get_page
+
+    def get_page(self, title: str) -> RemotePage:
+        self._on_get_page()
+        return super().get_page(title)
+
+
 def _remote(title, content_model, ns_canonical, ns_key, text=None):
     return RemotePage(
         title=title,
@@ -272,6 +282,45 @@ def test_page_model_has_raw_text_not_proofread_sections(session):
     assert "header" not in dumped
     assert "body" not in dumped
     assert "footer" not in dumped
+
+
+def test_fetch_does_not_hold_db_lock_during_remote_get_page(engine):
+    remote = _remote(
+        "Page:Tractatus.djvu/1",
+        "proofread-page",
+        "Page",
+        250,
+        text="page content",
+    )
+    with Session(engine) as s:
+        site = Site(family="mywikisource", code="en")
+        s.add(site)
+        s.commit()
+        s.refresh(site)
+        s.add(FetchRequest(site_pk=site.pk, title=remote.title))
+        s.commit()
+
+    def write_while_getting_page():
+        with Session(engine) as s:
+            s.add(Site(family="mywikisource", code="fr"))
+            s.commit()
+
+    wiki = GetPageHookClient(
+        pages={remote.title: remote},
+        on_get_page=write_while_getting_page,
+    )
+
+    with Session(engine) as s:
+        assert run_pending(s, lambda _: wiki) == 1
+        assert s.in_transaction() is False
+
+    with Session(engine) as s:
+        req = s.exec(
+            select(FetchRequest).where(FetchRequest.title == remote.title)
+        ).one()
+        assert req.status == FetchStatus.done
+        page = s.exec(select(Page).where(Page.title == remote.title)).one()
+        assert page.text == "page content"
 
 
 def test_index_fanout_no_pagelist_creates_no_children(engine, tmp_path):

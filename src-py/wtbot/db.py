@@ -17,11 +17,10 @@ from sqlmodel import Session, SQLModel, create_engine
 import wtbot.sqlmodel  # noqa: F401
 
 logging.basicConfig()
-logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
+dblogger = logging.getLogger("sqlite-lock-debug")
+logging.basicConfig(filename="example.log", encoding="utf-8", level=logging.DEBUG)
 
 DEFAULT_SQLITE_URL = "sqlite:///database.db"
-
-log = logging.getLogger("sqlite-lock-debug")
 
 
 def create_db_engine(url: str = DEFAULT_SQLITE_URL, *, echo: bool = False) -> Engine:
@@ -46,7 +45,7 @@ def create_db_engine(url: str = DEFAULT_SQLITE_URL, *, echo: bool = False) -> En
     @event.listens_for(engine, "begin")
     def _on_begin(conn):  # noqa: ANN001
         conn.info["tx_start_time"] = time.monotonic()
-        log.warning("BEGIN conn=%s", id(conn))
+        dblogger.warning("BEGIN conn=%s", id(conn))
         # IMMEDIATE takes the write lock up front, matching the Kotlin side and
         # avoiding the deferred-to-write upgrade deadlock under concurrency.
         conn.exec_driver_sql("BEGIN IMMEDIATE")
@@ -55,13 +54,13 @@ def create_db_engine(url: str = DEFAULT_SQLITE_URL, *, echo: bool = False) -> En
     def on_commit(conn):
         started = conn.info.pop("tx_start_time", None)
         elapsed = time.monotonic() - started if started else None
-        log.warning("COMMIT conn=%s elapsed=%s", id(conn), elapsed)
+        dblogger.warning("COMMIT conn=%s elapsed=%s", id(conn), elapsed)
 
     @event.listens_for(Engine, "rollback")
     def on_rollback(conn):
         started = conn.info.pop("tx_start_time", None)
         elapsed = time.monotonic() - started if started else None
-        log.warning("ROLLBACK conn=%s elapsed=%s", id(conn), elapsed)
+        dblogger.warning("ROLLBACK conn=%s elapsed=%s", id(conn), elapsed)
 
     return engine
 
