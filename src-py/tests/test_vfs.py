@@ -375,7 +375,9 @@ def test_list_index_has_containers(vfs_client):
 def test_list_index_wikitext_matches_stat(vfs_client):
     r = vfs_client.get("/vfs/children", params={"path": _INDEX_PATH})
     node = next(c for c in r.json()["children"] if c["name"] == "wikitext")
-    stat = vfs_client.get("/vfs/stat", params={"path": f"{_INDEX_PATH}/wikitext"}).json()
+    stat = vfs_client.get(
+        "/vfs/stat", params={"path": f"{_INDEX_PATH}/wikitext"}
+    ).json()
     assert node["path"] == stat["path"]
     assert node["stable_id"] == stat["stable_id"]
     assert node["revid"] == stat["revid"]
