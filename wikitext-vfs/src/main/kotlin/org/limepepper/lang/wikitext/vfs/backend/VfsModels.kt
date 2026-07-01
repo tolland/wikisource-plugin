@@ -12,6 +12,7 @@ enum class NodeKind { file, directory }
 data class StatResult(
     val path: String,
     val exists: Boolean,
+    val name: String? = null,
     val kind: NodeKind? = null,
     val stableId: Long? = null,
     val revid: Long? = null,

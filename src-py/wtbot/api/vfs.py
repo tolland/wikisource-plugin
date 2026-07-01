@@ -122,7 +122,7 @@ def stat(
     parts = _parse_path(path)
 
     if not parts:
-        return Stat(path=path, exists=True, kind=NodeKind.directory)
+        return Stat(path=path, exists=True, name="/", kind=NodeKind.directory)
 
     if len(parts) < 2:
         return Stat(path=path, exists=False)
@@ -136,7 +136,10 @@ def stat(
             is not None
         )
         return Stat(
-            path=path, exists=exists, kind=NodeKind.directory if exists else None
+            path=path,
+            exists=exists,
+            name=f"{family}/{code}" if exists else None,
+            kind=NodeKind.directory if exists else None,
         )
 
     family, code, index_title = parts[0], parts[1], parts[2]
@@ -158,6 +161,7 @@ def stat(
         return Stat(
             path=path,
             exists=True,
+            name=index_title,
             kind=NodeKind.directory,
             stable_id=index_page.pageid,
             revid=index_page.revid,
@@ -169,7 +173,7 @@ def stat(
     # Pages/ container or individual page beneath it
     if container == "Pages":
         if len(rest) == 1:
-            return Stat(path=path, exists=True, kind=NodeKind.directory)
+            return Stat(path=path, exists=True, name="Pages", kind=NodeKind.directory)
         page_title = "/".join(rest[1:])
         page = session.exec(
             select(Page).where(Page.site_pk == site.pk, Page.title == page_title)
@@ -180,6 +184,7 @@ def stat(
         return Stat(
             path=path,
             exists=True,
+            name=page.title,
             kind=NodeKind.file,
             stable_id=page.pageid,
             revid=page.revid,
@@ -189,7 +194,7 @@ def stat(
 
     # Stub containers
     if container in ("Templates", "TranscludedFiles"):
-        return Stat(path=path, exists=True, kind=NodeKind.directory)
+        return Stat(path=path, exists=True, name=container, kind=NodeKind.directory)
 
     # File: directory or wikitext/blob leaf beneath it
     file_title = "/".join(rest)
@@ -206,6 +211,7 @@ def stat(
             return Stat(
                 path=path,
                 exists=True,
+                name="wikitext",
                 kind=NodeKind.file,
                 stable_id=file_page.pageid,
                 revid=file_page.revid,
@@ -220,6 +226,7 @@ def stat(
         return Stat(
             path=path,
             exists=True,
+            name="blob",
             kind=NodeKind.file,
             length=blob.size if blob else None,
         )
@@ -232,6 +239,7 @@ def stat(
         return Stat(
             path=path,
             exists=exists,
+            name=file_title if exists else None,
             kind=NodeKind.directory if exists else None,
             stable_id=fp.pageid if fp else None,
         )

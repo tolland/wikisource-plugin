@@ -59,6 +59,7 @@ class Node(BaseModel):
 class Stat(BaseModel):
     path: str
     exists: bool
+    name: str | None = None
     kind: NodeKind | None = None
     stable_id: int | None = None
     revid: int | None = None

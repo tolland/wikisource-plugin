@@ -31,6 +31,7 @@ class HttpVfsBackend(
             StatResult(
                 path = string("path"),
                 exists = bool("exists"),
+                name = stringOrNull("name"),
                 kind = stringOrNull("kind")?.let { NodeKind.valueOf(it) },
                 stableId = longOrNull("stable_id"),
                 revid = longOrNull("revid"),

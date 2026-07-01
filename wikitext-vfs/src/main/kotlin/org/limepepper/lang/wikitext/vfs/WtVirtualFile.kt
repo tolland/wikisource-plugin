@@ -138,7 +138,7 @@ class WtVirtualFile(
         fun fromStat(fs: WtVirtualFileSystem, stat: StatResult): WtVirtualFile =
             WtVirtualFile(
                 fileSystem = fs,
-                _name = stat.path.substringAfterLast('/').ifEmpty { "/" },
+                _name = stat.name ?: stat.path.substringAfterLast('/').ifEmpty { "/" },
                 _path = stat.path,
                 isDir = stat.kind == NodeKind.directory,
                 stableId = stat.stableId,

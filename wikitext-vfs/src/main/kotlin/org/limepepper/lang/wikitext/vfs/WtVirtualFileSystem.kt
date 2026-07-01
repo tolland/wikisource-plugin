@@ -58,7 +58,7 @@ class WtVirtualFileSystem : VirtualFileSystem() {
             if (!stat.exists) return null
             getOrCreate(
                 path = path,
-                name = path.substringAfterLast('/').ifEmpty { "/" },
+                name = stat.name ?: path.substringAfterLast('/').ifEmpty { "/" },
                 isDir = stat.kind == NodeKind.directory,
                 stableId = stat.stableId,
                 revid = stat.revid,

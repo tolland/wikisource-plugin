@@ -55,6 +55,7 @@ class FakeVfsBackend : VfsBackend {
         return StatResult(
             path = path,
             exists = true,
+            name = e.name,
             kind = e.kind,
             stableId = e.stableId,
             revid = e.revid,
