@@ -5,6 +5,7 @@ import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
+import java.io.IOException
 import java.net.InetSocketAddress
 import java.util.Base64
 
@@ -138,5 +139,17 @@ class HttpVfsBackendTest {
         assertThrows(VfsBackendException::class.java) {
             backend.stat("/wikisource/en/Index:Missing")
         }
+    }
+
+    @Test fun `throws VfsBackendException, not a raw ConnectException, when the sidecar is down`() {
+        // Point at a port nothing is listening on instead of the running stub server.
+        val unreachable = HttpVfsBackend("http://127.0.0.1:1")
+        assertThrows(VfsBackendException::class.java) {
+            unreachable.stat("/wikisource/en/Index:Anything")
+        }
+    }
+
+    @Test fun `VfsBackendException is an IOException so VirtualFile content-read overrides propagate it correctly`() {
+        assertTrue(IOException::class.java.isAssignableFrom(VfsBackendException::class.java))
     }
 }

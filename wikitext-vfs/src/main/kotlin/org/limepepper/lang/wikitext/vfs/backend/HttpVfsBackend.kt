@@ -1,5 +1,6 @@
 package org.limepepper.lang.wikitext.vfs.backend
 
+import java.io.IOException
 import java.net.URI
 import java.net.URLEncoder
 import java.net.http.HttpClient
@@ -131,7 +132,7 @@ class HttpVfsBackend(
             .version(HttpClient.Version.HTTP_1_1) // avoid upgrade requests
             .GET()
             .build()
-        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
+        val resp = send(req)
         if (resp.statusCode() !in 200..299) {
             throw VfsBackendException("HTTP ${resp.statusCode()} from $uri: ${resp.body()}")
         }
@@ -146,12 +147,30 @@ class HttpVfsBackend(
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
             .build()
-        val resp = client.send(req, HttpResponse.BodyHandlers.ofString())
+        val resp = send(req)
         if (resp.statusCode() !in 200..299) {
             throw VfsBackendException("HTTP ${resp.statusCode()} from $uri: ${resp.body()}")
         }
         return resp.body()
     }
+
+    /**
+     * Wraps [HttpClient.send] so a down/unreachable sidecar (the common case
+     * right after IDE launch, before wtbot has started) surfaces as
+     * [VfsBackendException] like every other failure mode here, instead of a
+     * raw [IOException]/[InterruptedException] that callers up the VFS chain
+     * (e.g. [WtVirtualFileSystem.findFileByPath] during editor-tab restore)
+     * don't expect and can't catch.
+     */
+    private fun send(req: HttpRequest): HttpResponse<String> =
+        try {
+            client.send(req, HttpResponse.BodyHandlers.ofString())
+        } catch (e: IOException) {
+            throw VfsBackendException("request to ${req.uri()} failed: ${e.message}", e)
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+            throw VfsBackendException("request to ${req.uri()} interrupted", e)
+        }
 
     /** Minimal JSON object writer — pairs of String key to String/Long/Boolean/null. */
     private fun buildJsonObject(vararg fields: Pair<String, Any?>): String =
@@ -182,5 +201,13 @@ class HttpVfsBackend(
     }
 }
 
+/**
+ * Extends [IOException], not [RuntimeException]: [WtVirtualFile]'s
+ * `contentsToByteArray()`/`getInputStream()` overrides implement a Java
+ * `VirtualFile` contract that declares `throws IOException`, and IntelliJ
+ * platform code around VFS content reads generally catches that — so a
+ * down/unreachable sidecar degrades the same way there as everywhere else
+ * that already explicitly catches [VfsBackendException].
+ */
 class VfsBackendException(message: String, cause: Throwable? = null) :
-    RuntimeException(message, cause)
+    IOException(message, cause)

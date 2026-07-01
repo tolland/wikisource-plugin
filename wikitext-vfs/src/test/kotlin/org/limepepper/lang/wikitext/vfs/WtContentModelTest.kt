@@ -1,7 +1,7 @@
 package org.limepepper.lang.wikitext.vfs
 
-import com.intellij.openapi.fileTypes.PlainTextFileType
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Test
 import org.limepepper.lang.wikitext.WtFileType
 
@@ -13,9 +13,13 @@ class WtContentModelTest {
         }
     }
 
-    @Test fun `non-wikitext content models map to plain text, not WtFileType`() {
+    @Test fun `non-wikitext content models do not map to WtFileType`() {
+        // The exact FileType (real CSS/JSON vs a platform fallback) depends on
+        // which file-type plugins are loaded in the running IDE, via
+        // FileTypeRegistry -- not resolvable from a bare JUnit test. What must
+        // hold everywhere is that these never get parsed as wikitext.
         for (id in listOf("sanitized-css", "json")) {
-            assertEquals(id, PlainTextFileType.INSTANCE, WtContentModel.fileTypeFor(id))
+            assertNotEquals(id, WtFileType, WtContentModel.fileTypeFor(id))
         }
     }
 
