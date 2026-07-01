@@ -15,6 +15,7 @@ class FakeVfsBackend : VfsBackend {
         var content: ByteArray = ByteArray(0),
         val stableId: Long? = null,
         var revid: Long? = null,
+        val contentModel: String? = null,
     )
 
     private val entries = mutableMapOf<String, Entry>()
@@ -35,8 +36,15 @@ class FakeVfsBackend : VfsBackend {
      * Register a file. [name] is the display name (may differ from the last
      * path segment when titles contain '/').
      */
-    fun addFile(path: String, content: String, name: String = path.substringAfterLast('/'), stableId: Long? = null, revid: Long? = null): FakeVfsBackend {
-        entries[path] = Entry(path, name, NodeKind.file, content.toByteArray(), stableId, revid)
+    fun addFile(
+        path: String,
+        content: String,
+        name: String = path.substringAfterLast('/'),
+        stableId: Long? = null,
+        revid: Long? = null,
+        contentModel: String? = null,
+    ): FakeVfsBackend {
+        entries[path] = Entry(path, name, NodeKind.file, content.toByteArray(), stableId, revid, contentModel)
         _registerWithParent(path)
         return this
     }
@@ -60,6 +68,7 @@ class FakeVfsBackend : VfsBackend {
             stableId = e.stableId,
             revid = e.revid,
             length = if (e.kind == NodeKind.file) e.content.size.toLong() else null,
+            contentModel = e.contentModel,
         )
     }
 
@@ -75,6 +84,7 @@ class FakeVfsBackend : VfsBackend {
                 stableId = e.stableId,
                 revid = e.revid,
                 length = if (e.kind == NodeKind.file) e.content.size.toLong() else null,
+                contentModel = e.contentModel,
             )
         }
         return ListChildrenResult(parentPath = path, children = children)

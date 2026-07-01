@@ -54,6 +54,11 @@ class Node(BaseModel):
         None, description="Content length in bytes; None for directories."
     )
     writable: bool = False
+    content_model: str | None = Field(
+        None,
+        description="Remote contentmodel (e.g. 'proofread-index', 'proofread-page', "
+        "'sanitized-css', 'json'). None for directories/synthetic nodes.",
+    )
 
 
 class Stat(BaseModel):
@@ -65,6 +70,7 @@ class Stat(BaseModel):
     revid: int | None = None
     timestamp: str | None = None
     length: int | None = None
+    content_model: str | None = None
 
 
 class StatBulkRequest(BaseModel):

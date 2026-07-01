@@ -127,6 +127,7 @@ def test_stat_index(vfs_client):
     assert body["exists"] is True
     assert body["kind"] == "directory"
     assert body["stable_id"] == 1001
+    assert body["content_model"] == "proofread-index"
 
 
 def test_stat_pages_container(vfs_client):
@@ -144,6 +145,7 @@ def test_stat_page(vfs_client):
     assert body["kind"] == "file"
     assert body["stable_id"] == 1003
     assert body["length"] == len(_PAGE_1_BODY.encode())
+    assert body["content_model"] == "proofread-page"
 
 
 def test_stat_templates_stub(vfs_client):
@@ -174,6 +176,7 @@ def test_stat_file_wikitext(vfs_client):
     assert body["exists"] is True
     assert body["kind"] == "file"
     assert body["length"] == len(_FILE_BODY.encode())
+    assert body["content_model"] == "wikitext"
 
 
 def test_stat_blob(vfs_client):
@@ -269,6 +272,7 @@ def test_list_pages_container(vfs_client):
     assert PAGE_1 in names
     assert PAGE_2 in names
     assert all(c["kind"] == "file" for c in children)
+    assert all(c["content_model"] == "proofread-page" for c in children)
 
 
 def test_list_pages_sorted(vfs_client):

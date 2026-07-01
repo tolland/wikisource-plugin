@@ -38,6 +38,7 @@ class HttpVfsBackend(
                 length = longOrNull("length"),
                 timestamp = stringOrNull("timestamp"),
                 writable = boolOrDefault("writable", false),
+                contentModel = stringOrNull("content_model"),
             )
         }
     }
@@ -57,6 +58,7 @@ class HttpVfsBackend(
                 length = r.longOrNull("length"),
                 timestamp = r.stringOrNull("timestamp"),
                 writable = r.boolOrDefault("writable", false),
+                contentModel = r.stringOrNull("content_model"),
             )
         }
     }
@@ -76,6 +78,7 @@ class HttpVfsBackend(
                         length = child.longOrNull("length"),
                         timestamp = child.stringOrNull("timestamp"),
                         writable = child.boolOrDefault("writable", false),
+                        contentModel = child.stringOrNull("content_model"),
                     )
                 },
             )

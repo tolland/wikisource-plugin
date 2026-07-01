@@ -46,8 +46,9 @@ class WtVirtualFileSystem : VirtualFileSystem() {
         parent: WtVirtualFile? = null,
         stableId: Long? = null,
         revid: Long? = null,
+        contentModel: String? = null,
     ): WtVirtualFile = cache.getOrPut(path) {
-        WtVirtualFile(this, name, path, isDir, parent, stableId, revid)
+        WtVirtualFile(this, name, path, isDir, parent, stableId, revid, contentModel)
     }.also { if (parent != null) it.setParent(parent) }
 
     /** Stat the backend and return a [WtVirtualFile] if the path exists. */
@@ -63,6 +64,7 @@ class WtVirtualFileSystem : VirtualFileSystem() {
                 isDir = stat.kind == NodeKind.directory,
                 stableId = stat.stableId,
                 revid = stat.revid,
+                contentModel = stat.contentModel,
             )
         } catch (_: VfsBackendException) {
             null

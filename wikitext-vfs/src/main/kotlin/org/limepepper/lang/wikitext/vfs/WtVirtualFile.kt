@@ -35,6 +35,13 @@ class WtVirtualFile(
     private var _parent: WtVirtualFile? = null,
     val stableId: Long? = null,
     revid: Long? = null,
+    /**
+     * Remote contentmodel (e.g. "proofread-index", "proofread-page", "wikitext",
+     * "sanitized-css", "json"). Currently informational only — [getFileType]
+     * always returns [WtFileType] since the plugin has no CSS/JSON PSI support
+     * yet, so a "sanitized-css"/"json" page still opens (and parses) as wikitext.
+     */
+    val contentModel: String? = null,
 ) : VirtualFile() {
 
     // Populated either eagerly by the tool window (BG thread) or lazily on
@@ -87,6 +94,7 @@ class WtVirtualFile(
                 parent = this,
                 stableId = child.stableId,
                 revid = child.revid,
+                contentModel = child.contentModel,
             )
         }.toTypedArray() as Array<VirtualFile>
         cachedChildren = children
@@ -157,6 +165,7 @@ class WtVirtualFile(
                 isDir = stat.kind == NodeKind.directory,
                 stableId = stat.stableId,
                 revid = stat.revid,
+                contentModel = stat.contentModel,
             )
     }
 }

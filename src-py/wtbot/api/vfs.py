@@ -70,6 +70,7 @@ def _page_node(path: str, page: Page) -> Node:
         timestamp=_ts(page.local_modified_at or page.remote_timestamp),
         length=len(body.encode()),
         writable=True,
+        content_model=page.content_model,
     )
 
 
@@ -172,6 +173,7 @@ def _stat_one(session: Session, path: str) -> Stat:
             stable_id=index_page.pageid,
             revid=index_page.revid,
             timestamp=_ts(index_page.local_modified_at or index_page.remote_timestamp),
+            content_model=index_page.content_model,
         )
 
     container = rest[0]
@@ -196,6 +198,7 @@ def _stat_one(session: Session, path: str) -> Stat:
             revid=page.revid,
             timestamp=_ts(page.local_modified_at or page.remote_timestamp),
             length=len(body.encode()),
+            content_model=page.content_model,
         )
 
     # Stub containers
@@ -225,6 +228,7 @@ def _stat_one(session: Session, path: str) -> Stat:
                     file_page.local_modified_at or file_page.remote_timestamp
                 ),
                 length=len(body.encode()),
+                content_model=file_page.content_model,
             )
         blob = session.exec(
             select(FileBlob).where(FileBlob.page_pk == file_page.pk)
@@ -307,6 +311,7 @@ def stat_bulk(
                 revid=page.revid,
                 timestamp=_ts(page.local_modified_at or page.remote_timestamp),
                 length=len(body_text.encode()),
+                content_model=page.content_model,
             )
 
     return StatBulkResponse(results=[results[i] for i in range(len(body.paths))])

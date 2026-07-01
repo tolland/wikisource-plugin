@@ -217,6 +217,7 @@ class MyToolWindowFactory : ToolWindowFactory {
             appendLine("revid:     ${vFile.revid}")
             appendLine("length:    ${vFile.cachedContent?.size ?: "not loaded"}")
             appendLine("writable:  ${vFile.isWritable}")
+            appendLine("contentModel: ${vFile.contentModel ?: "—"}")
         }
     }
 
@@ -228,6 +229,7 @@ class MyToolWindowFactory : ToolWindowFactory {
             parent = parent,
             stableId = child.stableId,
             revid = child.revid,
+            contentModel = child.contentModel,
         )
 
     private fun populateRoot(

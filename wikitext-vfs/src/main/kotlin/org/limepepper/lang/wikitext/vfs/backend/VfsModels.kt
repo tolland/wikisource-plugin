@@ -19,6 +19,8 @@ data class StatResult(
     val length: Long? = null,
     val timestamp: String? = null,
     val writable: Boolean = false,
+    /** Remote contentmodel, e.g. "proofread-index"/"proofread-page"/"wikitext". Null for dirs. */
+    val contentModel: String? = null,
 )
 
 data class ChildNode(
@@ -30,6 +32,7 @@ data class ChildNode(
     val length: Long? = null,
     val timestamp: String? = null,
     val writable: Boolean = false,
+    val contentModel: String? = null,
 )
 
 data class ListChildrenResult(
