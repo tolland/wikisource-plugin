@@ -6,7 +6,6 @@ license = { text = "MIT" }
 dependencies = [
     "bs4>=0.0.2",
     "fastapi[standard]>=0.138.1",
-    "pandas==3.0.3",
     "pywikibot>=11.4.2",
     "rich>=15.0.0",
     "sqlalchemy>=2.0.51",
@@ -34,6 +33,7 @@ dev = [
     "black[jupyter]>=26.5.1",
     "ipykernel>=7.3.0",
     "pre-commit>=4.0",
+    "pandas==3.0.3",
 ]
 
 [build-system]
