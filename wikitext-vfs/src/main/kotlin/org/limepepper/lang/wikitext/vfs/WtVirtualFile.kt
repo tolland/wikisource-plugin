@@ -3,7 +3,6 @@ package org.limepepper.lang.wikitext.vfs
 import com.intellij.openapi.fileTypes.FileType
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileSystem
-import org.limepepper.lang.wikitext.WtFileType
 import org.limepepper.lang.wikitext.vfs.backend.NodeKind
 import org.limepepper.lang.wikitext.vfs.backend.StatResult
 import org.limepepper.lang.wikitext.vfs.backend.VfsBackendException
@@ -37,9 +36,7 @@ class WtVirtualFile(
     revid: Long? = null,
     /**
      * Remote contentmodel (e.g. "proofread-index", "proofread-page", "wikitext",
-     * "sanitized-css", "json"). Currently informational only — [getFileType]
-     * always returns [WtFileType] since the plugin has no CSS/JSON PSI support
-     * yet, so a "sanitized-css"/"json" page still opens (and parses) as wikitext.
+     * "sanitized-css", "json") — drives [getFileType] via [WtContentModel].
      */
     val contentModel: String? = null,
 ) : VirtualFile() {
@@ -78,7 +75,8 @@ class WtVirtualFile(
     override fun isValid(): Boolean = true
     override fun getParent(): VirtualFile? = _parent
 
-    override fun getFileType(): FileType = if (isDir) super.getFileType() else WtFileType
+    override fun getFileType(): FileType =
+        if (isDir) super.getFileType() else WtContentModel.fileTypeFor(contentModel)
 
     override fun getChildren(): Array<VirtualFile> {
         if (!isDir) return emptyArray()
