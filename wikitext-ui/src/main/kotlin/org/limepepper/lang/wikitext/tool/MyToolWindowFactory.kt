@@ -1,6 +1,10 @@
 package org.limepepper.lang.wikitext.tool
 
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.ide.CopyPasteManager
+import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.fileEditor.FileEditorManager
@@ -12,6 +16,7 @@ import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.ColoredTreeCellRenderer
+import com.intellij.ui.PopupHandler
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextArea
 import com.intellij.ui.content.ContentFactory
@@ -24,6 +29,7 @@ import org.limepepper.lang.wikitext.vfs.backend.NodeKind
 import org.limepepper.lang.wikitext.vfs.backend.VfsBackendException
 import org.limepepper.lang.wikitext.vfs.backend.WtVfsService
 import java.awt.BorderLayout
+import java.awt.datatransfer.StringSelection
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.JButton
@@ -130,10 +136,23 @@ class MyToolWindowFactory : ToolWindowFactory {
             },
         )
 
+        installContextMenu(tree, model, project, propertiesArea)
+
+        val refreshButton = JButton("Refresh").apply {
+            addActionListener {
+                ApplicationManager.getApplication().executeOnPooledThread {
+                    fs?.refresh(false)
+                    populateRoot(rootNode, model, fs)
+                }
+            }
+        }
+        val toolbar = JPanel(BorderLayout()).apply { add(refreshButton, BorderLayout.WEST) }
+
         val split = JSplitPane(JSplitPane.VERTICAL_SPLIT, JBScrollPane(tree), JBScrollPane(propertiesArea))
         split.resizeWeight = 0.75
 
         val panel = JPanel(BorderLayout())
+        panel.add(toolbar, BorderLayout.NORTH)
         panel.add(split, BorderLayout.CENTER)
 
         ApplicationManager.getApplication().executeOnPooledThread {
@@ -141,6 +160,51 @@ class MyToolWindowFactory : ToolWindowFactory {
         }
 
         return panel
+    }
+
+    /** Stub menu: no cut/paste (VFS is read-only) — just open/copy-path/refresh-one. */
+    private fun installContextMenu(
+        tree: Tree,
+        model: DefaultTreeModel,
+        project: Project,
+        propertiesArea: JBTextArea,
+    ) {
+        fun selectedFile(): WtVirtualFile? =
+            (tree.lastSelectedPathComponent as? DefaultMutableTreeNode)?.userObject as? WtVirtualFile
+
+        val group = DefaultActionGroup().apply {
+            add(object : AnAction("Open") {
+                override fun actionPerformed(e: AnActionEvent) {
+                    val vFile = selectedFile() ?: return
+                    if (!vFile.isDirectory) FileEditorManager.getInstance(project).openFile(vFile, true)
+                }
+            })
+            add(object : AnAction("Copy Path") {
+                override fun actionPerformed(e: AnActionEvent) {
+                    val vFile = selectedFile() ?: return
+                    CopyPasteManager.getInstance().setContents(StringSelection(vFile.path))
+                }
+            })
+            add(object : AnAction("Refresh") {
+                override fun actionPerformed(e: AnActionEvent) {
+                    val node = tree.lastSelectedPathComponent as? DefaultMutableTreeNode ?: return
+                    val vFile = node.userObject as? WtVirtualFile ?: return
+                    ApplicationManager.getApplication().executeOnPooledThread {
+                        try {
+                            val stat = WtVfsService.instance.backend.stat(vFile.path)
+                            if (stat.exists) vFile.invalidateIfStale(stat.revid)
+                        } catch (_: VfsBackendException) {
+                            // Backend unreachable — leave cached state as-is.
+                        }
+                        SwingUtilities.invokeLater {
+                            model.reload(node)
+                            showProperties(vFile, propertiesArea)
+                        }
+                    }
+                }
+            })
+        }
+        PopupHandler.installPopupMenu(tree, group, "WikisourceVfsTreePopup")
     }
 
     /** Reflects the in-memory [WtVirtualFile] state — not a fresh backend query. */
