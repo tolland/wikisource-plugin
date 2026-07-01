@@ -1,5 +1,6 @@
 package org.limepepper.lang.wikitext.tool
 
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.fileEditor.FileEditorManager
@@ -10,10 +11,12 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
+import com.intellij.ui.ColoredTreeCellRenderer
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextArea
 import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.treeStructure.Tree
+import org.limepepper.lang.wikitext.WtFileType
 import org.limepepper.lang.wikitext.vfs.WtVirtualFile
 import org.limepepper.lang.wikitext.vfs.WtVirtualFileSystem
 import org.limepepper.lang.wikitext.vfs.backend.ChildNode
@@ -27,6 +30,7 @@ import javax.swing.JButton
 import javax.swing.JLabel
 import javax.swing.JPanel
 import javax.swing.JSplitPane
+import javax.swing.JTree
 import javax.swing.SwingUtilities
 import javax.swing.event.TreeExpansionEvent
 import javax.swing.event.TreeWillExpandListener
@@ -60,6 +64,26 @@ class MyToolWindowFactory : ToolWindowFactory {
         val model = DefaultTreeModel(rootNode)
         val tree = Tree(model)
         tree.isRootVisible = true
+        tree.cellRenderer = object : ColoredTreeCellRenderer() {
+            override fun customizeCellRenderer(
+                tree: JTree,
+                value: Any?,
+                selected: Boolean,
+                expanded: Boolean,
+                leaf: Boolean,
+                row: Int,
+                hasFocus: Boolean,
+            ) {
+                val node = value as? DefaultMutableTreeNode
+                val vFile = node?.userObject as? WtVirtualFile
+                icon = when {
+                    vFile == null -> null
+                    vFile.isDirectory -> AllIcons.Nodes.Folder
+                    else -> WtFileType.icon
+                }
+                append(node?.toString() ?: value.toString())
+            }
+        }
 
         tree.addMouseListener(object : MouseAdapter() {
             override fun mouseClicked(e: MouseEvent) {
@@ -290,11 +314,7 @@ class MyToolWindowFactory : ToolWindowFactory {
 
         private fun fileNode(vFile: WtVirtualFile?, fallbackName: String): DefaultMutableTreeNode =
             object : DefaultMutableTreeNode(vFile) {
-                override fun toString(): String {
-                    val f = userObject as? WtVirtualFile
-                    val icon = if (f?.isDirectory == true) "📁 " else "📄 "
-                    return icon + (f?.name ?: fallbackName)
-                }
+                override fun toString(): String = (userObject as? WtVirtualFile)?.name ?: fallbackName
             }
     }
 }
