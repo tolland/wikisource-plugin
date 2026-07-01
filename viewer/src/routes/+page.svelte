@@ -1,10 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { listIndexPages, listSites } from '$lib/api';
+  import { listIndexPages, listPendingCommits, listSites } from '$lib/api';
   import type { IndexPageSummary, Site } from '$lib/types';
 
   let sites: Site[] = $state([]);
   let indexes: IndexPageSummary[] = $state([]);
+  let pendingCommitCount = $state(0);
   let loading = $state(true);
   let error = $state('');
 
@@ -12,7 +13,14 @@
     loading = true;
     error = '';
     try {
-      [sites, indexes] = await Promise.all([listSites(), listIndexPages()]);
+      const [siteRows, indexRows, pendingCommits] = await Promise.all([
+        listSites(),
+        listIndexPages(),
+        listPendingCommits()
+      ]);
+      sites = siteRows;
+      indexes = indexRows;
+      pendingCommitCount = pendingCommits.length;
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to load workspace';
     } finally {
@@ -52,6 +60,11 @@
     <span class="card-kicker">Objects</span>
     <strong>Cached pages</strong>
     <small>Find any Page, Template, Book, or other cached title.</small>
+  </a>
+  <a class="card" href="/commits">
+    <span class="card-kicker">Review</span>
+    <strong>{loading ? '...' : pendingCommitCount} staged pages</strong>
+    <small>Inspect pending local edits and push them one page at a time.</small>
   </a>
   <a class="card" href="/vfs">
     <span class="card-kicker">Editor view</span>
@@ -124,7 +137,7 @@
 
   .cards {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
     gap: 1rem;
     margin: 2rem 0;
   }

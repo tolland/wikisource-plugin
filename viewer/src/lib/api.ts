@@ -5,6 +5,8 @@ import type {
   IndexPageSummary,
   ListChildrenResponse,
   CachedPage,
+  Commit,
+  PendingCommitPage,
   ReadContentResponse,
   Site
 } from '$lib/types';
@@ -52,6 +54,14 @@ export function getPage(pk: number): Promise<CachedPage> {
 
 export function createFetch(payload: FetchCreate): Promise<FetchResponse> {
   return postJson<FetchResponse>('/fetch/', payload);
+}
+
+export function listPendingCommits(): Promise<PendingCommitPage[]> {
+  return getJson<PendingCommitPage[]>('/commits/pending');
+}
+
+export function approvePendingCommit(pagePk: number): Promise<Commit> {
+  return postJson<Commit>(`/commits/${pagePk}`, {});
 }
 
 export function listVfsChildren(path: string): Promise<ListChildrenResponse> {

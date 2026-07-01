@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from sqlmodel import Session, select
 
+from wtbot.api.commit import list_pending_commits, run_commit_for_page
 from wtbot.commit_worker import run_pending_commits
 from wtbot.sqlmodel import Commit, CommitStatus, EditJournal, Page, Site
 from wtbot.sqlmodel.namespace import NsRole
@@ -252,6 +255,43 @@ def test_remote_conflict_releases_db_lock(engine):
         with Session(engine) as other_session:
             other_session.add(Site(family="wikisource", code="fr"))
             other_session.commit()
+
+
+def test_pending_commit_api_lists_and_pushes_one_page(engine):
+    site, page = _setup(engine)
+    fake = FakeWikiClient(
+        pages={
+            TITLE: RemotePage(
+                title=TITLE,
+                namespace_key=0,
+                namespace_canonical="Page",
+                content_model="proofread-page",
+                text="original",
+                revid=100,
+            )
+        }
+    )
+
+    with Session(engine) as s:
+        s.add(EditJournal(page_pk=page.pk, base_revid=100, body="draft 1"))
+        s.add(EditJournal(page_pk=page.pk, base_revid=100, body="draft 2 final"))
+        s.commit()
+
+    request = SimpleNamespace(
+        app=SimpleNamespace(state=SimpleNamespace(client_factory=_client_factory(fake)))
+    )
+    with Session(engine) as s:
+        pending = list_pending_commits(session=s)
+        assert len(pending) == 1
+        assert pending[0].page_pk == page.pk
+        assert pending[0].pending_count == 2
+        assert pending[0].submitted_body == "draft 2 final"
+
+        commit = run_commit_for_page(page.pk, request, session=s)
+        assert commit.status == CommitStatus.success
+        assert commit.submitted_body == "draft 2 final"
+
+        assert list_pending_commits(session=s) == []
 
 
 def test_no_pending_edits_is_a_noop(engine):

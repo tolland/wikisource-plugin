@@ -116,6 +116,28 @@ class CommitRunResponse(BaseModel):
     )
 
 
+class PendingCommitJournal(BaseModel):
+    pk: int
+    base_revid: int | None = None
+    body: str
+    comment: str | None = None
+    saved_at: str
+
+
+class PendingCommitPage(BaseModel):
+    page_pk: int
+    site_pk: int
+    title: str
+    current_revid: int | None = None
+    base_revid: int
+    comment: str | None = None
+    submitted_body: str
+    pending_count: int
+    first_saved_at: str
+    latest_saved_at: str
+    journals: list[PendingCommitJournal]
+
+
 class RenameRequest(BaseModel):
     path: str
     new_name: str

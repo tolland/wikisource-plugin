@@ -86,6 +86,42 @@ export interface FetchResponse {
   page?: CachedPage | null;
 }
 
+export type CommitStatus = 'pending' | 'success' | 'conflict' | 'error';
+
+export interface Commit {
+  pk: number;
+  page_pk: number;
+  base_revid: number;
+  submitted_body: string;
+  comment?: string | null;
+  status: CommitStatus;
+  result_revid?: number | null;
+  error_message?: string | null;
+  created_at: string;
+}
+
+export interface PendingCommitJournal {
+  pk: number;
+  base_revid?: number | null;
+  body: string;
+  comment?: string | null;
+  saved_at: string;
+}
+
+export interface PendingCommitPage {
+  page_pk: number;
+  site_pk: number;
+  title: string;
+  current_revid?: number | null;
+  base_revid: number;
+  comment?: string | null;
+  submitted_body: string;
+  pending_count: number;
+  first_saved_at: string;
+  latest_saved_at: string;
+  journals: PendingCommitJournal[];
+}
+
 export type NodeKind = 'file' | 'directory';
 
 export interface VfsNode {

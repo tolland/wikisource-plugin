@@ -89,6 +89,24 @@ def run_pending_commits(
             session.rollback()
 
 
+def run_pending_commit_for_page(
+    session: Session,
+    page_pk: int,
+    client_factory: ClientFactory,
+) -> bool:
+    """Push one page's pending local edits.
+
+    Returns True on a successful remote save. Returns False when the page has a
+    pending batch but the remote save records a conflict/error. Missing pending
+    rows are treated as a no-op success by the lower-level worker.
+    """
+    with _worker_lock:
+        try:
+            return _push_page(session, page_pk, client_factory)
+        finally:
+            session.rollback()
+
+
 def _run_pending_commits_unlocked(
     session: Session,
     client_factory: ClientFactory,

@@ -8,6 +8,7 @@
   const navItems = [
     { href: '/', label: 'Workspace' },
     { href: '/fetch', label: 'Fetch' },
+    { href: '/commits', label: 'Commits' },
     { href: '/pages', label: 'Pages' },
     { href: '/indexes', label: 'Indexes' },
     { href: '/vfs', label: 'VFS' }
@@ -142,7 +143,7 @@
     }
 
     nav {
-      grid-template-columns: repeat(5, minmax(0, 1fr));
+      grid-template-columns: repeat(6, minmax(0, 1fr));
       gap: 0.35rem;
     }
 
