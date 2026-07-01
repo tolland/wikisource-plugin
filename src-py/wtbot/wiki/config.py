@@ -54,10 +54,17 @@ def configure_pywikibot(settings: WikiSettings) -> str:
     throttle_ctrl.touch(exist_ok=True)
 
     if settings.username:
-        fam = pwbconfig.usernames.get(settings.family)
-        if fam is None:
-            pwbconfig.usernames[settings.family] = fam = {}
-        fam[settings.code] = settings.username
+        # When api_url is set the Site is constructed via AutoFamily, whose
+        # family name and code are derived from the hostname at runtime (e.g.
+        # "wikisource-debian-13"/"wikisource-debian-13"). We don't know those
+        # values here, so register under the '*' wildcard that pywikibot's
+        # LoginManager falls back to for any unrecognised site.  We still also
+        # register under settings.family/settings.code so that non-api_url
+        # sites (where the family name IS the configured one) keep working.
+        for fam_key in ({settings.family, "*"} if settings.api_url else {settings.family}):
+            fam = pwbconfig.usernames.setdefault(fam_key, {})
+            fam.setdefault("*", settings.username)
+            fam[settings.code] = settings.username
 
         if settings.password:
             _write_password_file(config_dir, settings, pwbconfig)
@@ -69,13 +76,17 @@ def _write_password_file(config_dir: str, settings: WikiSettings, pwbconfig) -> 
     """Writes pywikibot's password file so login is headless -- no console
     prompt. Uses the BotPasswords format (recommended: API-only credentials,
     separate from the main account password) when bot_name is set, otherwise
-    a plain (username, password) line."""
+    a plain (username, password) line.
+
+    The 2-tuple form `(username, password)` is used: pywikibot fills in the
+    site's own family and code at read time, so it matches correctly even when
+    the family was created by AutoFamily at runtime from an api_url."""
     if settings.bot_name:
         line = f"({settings.username!r}, BotPassword({settings.bot_name!r}, {settings.password!r}))\n"
     else:
         line = f"({settings.username!r}, {settings.password!r})\n"
 
-    password_path = Path(config_dir) / "user-password.py"
+    password_path = Path(config_dir) / "user-password.cfg"
     password_path.write_text(line, encoding="utf-8")
     password_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
 

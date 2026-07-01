@@ -100,7 +100,7 @@ class TestConfigInjection:
         )
         configure_pywikibot(settings)
 
-        password_file = tmp_path / "pwb" / "user-password.py"
+        password_file = tmp_path / "pwb" / "user-password.cfg"
         assert password_file.is_file()
         assert oct(password_file.stat().st_mode & 0o777) == oct(stat.S_IRUSR | stat.S_IWUSR)
         content = password_file.read_text()
@@ -121,7 +121,23 @@ class TestConfigInjection:
             config_dir=str(tmp_path / "pwb"),
         )
         configure_pywikibot(settings)
-        assert not (tmp_path / "pwb" / "user-password.py").exists()
+        assert not (tmp_path / "pwb" / "user-password.cfg").exists()
+
+    def test_configure_api_url_registers_wildcard_username(self, tmp_path):
+        from wtbot.wiki.config import configure_pywikibot
+
+        import pywikibot.config as pwbconfig
+
+        settings = WikiSettings(
+            family="mywikisource",
+            code="en",
+            api_url="https://wikisource-debian-13.lan/w/api.php",
+            username="Alice",
+            config_dir=str(tmp_path / "pwb"),
+        )
+        configure_pywikibot(settings)
+        # '*' wildcard must be set so AutoFamily-derived sites find the username
+        assert pwbconfig.usernames.get("*", {}).get("*") == "Alice"
 
 
 def test_from_env():
