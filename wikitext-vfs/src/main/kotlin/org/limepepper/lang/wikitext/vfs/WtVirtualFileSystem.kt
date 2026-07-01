@@ -1,5 +1,6 @@
 package org.limepepper.lang.wikitext.vfs
 
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileListener
 import com.intellij.openapi.vfs.VirtualFileSystem
@@ -70,7 +71,32 @@ class WtVirtualFileSystem : VirtualFileSystem() {
 
     override fun getProtocol(): String = PROTOCOL
 
-    override fun refresh(asynchronous: Boolean) {}
+    /**
+     * Re-stats every cached [WtVirtualFile] and invalidates its content/children
+     * cache when the backend's revid has moved on, so the next access re-fetches.
+     */
+    override fun refresh(asynchronous: Boolean) {
+        val doRefresh = Runnable {
+            val backend = WtVfsService.instance.backend
+            for (file in cache.values) {
+                try {
+                    val stat = backend.stat(file.path)
+                    if (!stat.exists) continue
+                    if (stat.revid != file.revid) {
+                        file.cachedContent = null
+                    }
+                    file.cachedChildren = null
+                } catch (_: VfsBackendException) {
+                    // Backend unreachable — leave cached state as-is.
+                }
+            }
+        }
+        if (asynchronous) {
+            ApplicationManager.getApplication().executeOnPooledThread(doRefresh)
+        } else {
+            doRefresh.run()
+        }
+    }
 
     override fun refreshAndFindFileByPath(path: String): VirtualFile? = findFileByPath(path)
 

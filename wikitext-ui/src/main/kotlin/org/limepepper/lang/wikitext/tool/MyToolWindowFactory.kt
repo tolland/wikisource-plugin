@@ -3,6 +3,8 @@ package org.limepepper.lang.wikitext.tool
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.FileEditorManagerEvent
+import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
@@ -24,6 +26,7 @@ import java.awt.event.MouseEvent
 import javax.swing.JButton
 import javax.swing.JLabel
 import javax.swing.JPanel
+import javax.swing.JSplitPane
 import javax.swing.SwingUtilities
 import javax.swing.event.TreeExpansionEvent
 import javax.swing.event.TreeWillExpandListener
@@ -37,7 +40,7 @@ class MyToolWindowFactory : ToolWindowFactory {
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         val contentFactory = ContentFactory.getInstance()
         toolWindow.contentManager.addContent(
-            contentFactory.createContent(buildBrowserTab(project), "Browser", false)
+            contentFactory.createContent(buildBrowserTab(project, toolWindow), "Browser", false)
         )
         toolWindow.contentManager.addContent(
             contentFactory.createContent(buildDebugTab(), "Debug", false)
@@ -48,7 +51,7 @@ class MyToolWindowFactory : ToolWindowFactory {
     // Tab 1 — VFS browser
     // -------------------------------------------------------------------------
 
-    private fun buildBrowserTab(project: Project): JPanel {
+    private fun buildBrowserTab(project: Project, toolWindow: ToolWindow): JPanel {
         val fs: WtVirtualFileSystem? = VirtualFileManager.getInstance()
             .getFileSystem(WtVirtualFileSystem.PROTOCOL) as? WtVirtualFileSystem
 
@@ -81,14 +84,62 @@ class MyToolWindowFactory : ToolWindowFactory {
             override fun treeWillCollapse(event: TreeExpansionEvent) {}
         })
 
+        val propertiesArea = JBTextArea(8, 60).apply {
+            isEditable = false
+            font = java.awt.Font(java.awt.Font.MONOSPACED, java.awt.Font.PLAIN, 12)
+            text = "Select a file to see its properties."
+        }
+
+        tree.addTreeSelectionListener {
+            val node = tree.lastSelectedPathComponent as? DefaultMutableTreeNode ?: return@addTreeSelectionListener
+            val vFile = node.userObject as? WtVirtualFile ?: return@addTreeSelectionListener
+            showProperties(vFile, propertiesArea)
+        }
+
+        project.messageBus.connect(toolWindow.disposable).subscribe(
+            FileEditorManagerListener.FILE_EDITOR_MANAGER,
+            object : FileEditorManagerListener {
+                override fun selectionChanged(event: FileEditorManagerEvent) {
+                    val file = event.newFile as? WtVirtualFile ?: return
+                    showProperties(file, propertiesArea)
+                }
+            },
+        )
+
+        val split = JSplitPane(JSplitPane.VERTICAL_SPLIT, JBScrollPane(tree), JBScrollPane(propertiesArea))
+        split.resizeWeight = 0.75
+
         val panel = JPanel(BorderLayout())
-        panel.add(JBScrollPane(tree), BorderLayout.CENTER)
+        panel.add(split, BorderLayout.CENTER)
 
         ApplicationManager.getApplication().executeOnPooledThread {
             populateRoot(rootNode, model, fs)
         }
 
         return panel
+    }
+
+    private fun showProperties(vFile: WtVirtualFile, area: JBTextArea) {
+        area.text = "Loading properties for ${vFile.path} …"
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val text = try {
+                val stat = WtVfsService.instance.backend.stat(vFile.path)
+                buildString {
+                    appendLine("name:      ${stat.name ?: vFile.name}")
+                    appendLine("path:      ${stat.path}")
+                    appendLine("kind:      ${if (vFile.isDirectory) NodeKind.directory else NodeKind.file}")
+                    appendLine("exists:    ${stat.exists}")
+                    appendLine("stableId:  ${stat.stableId ?: vFile.stableId}")
+                    appendLine("revid:     ${stat.revid ?: vFile.revid}")
+                    appendLine("timestamp: ${stat.timestamp ?: "—"}")
+                    appendLine("length:    ${stat.length ?: "—"}")
+                    appendLine("writable:  ${vFile.isWritable}")
+                }
+            } catch (e: VfsBackendException) {
+                "⚠ failed to stat ${vFile.path}: ${e.message}"
+            }
+            SwingUtilities.invokeLater { area.text = text }
+        }
     }
 
     private fun toVFile(fs: WtVirtualFileSystem, child: ChildNode, parent: WtVirtualFile?): WtVirtualFile =
