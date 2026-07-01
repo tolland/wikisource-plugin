@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.openapi.utils import get_openapi
 from sqlalchemy.engine import Engine
 
 from wtbot.api import (
@@ -41,6 +42,23 @@ health check and a sites vertical slice are wired up so far.
 # )
 
 
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    openapi_schema = get_openapi(
+        title="Custom title",
+        version="2.5.0",
+        summary="This is a very custom OpenAPI schema",
+        description="Here's a longer description of the custom **OpenAPI** schema",
+        routes=app.routes,
+    )
+    openapi_schema["info"]["x-logo"] = {
+        "url": "https://fastapi.tiangolo.com/img/logo-margin/logo-teal.png"
+    }
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
 def _make_db_client_factory(engine) -> ClientFactory:
     """Returns a ClientFactory that looks up SiteCredential from the DB
     before falling back to an anonymous WikiSettings. Each call opens its own
@@ -55,6 +73,7 @@ def _make_db_client_factory(engine) -> ClientFactory:
         return get_wiki_client(WikiSettings.from_site(site, **overrides))
 
     return _factory
+
 
 
 def create_app(
@@ -73,6 +92,9 @@ def create_app(
         yield
 
     app = FastAPI(title="wtbot", version="0.1.0", lifespan=lifespan)
+
+    app.openapi = custom_openapi
+
     app.state.engine = engine
     app.state.client_factory = client_factory or _make_db_client_factory(engine)
     app.state.blob_root = (
