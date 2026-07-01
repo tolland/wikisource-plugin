@@ -34,6 +34,7 @@ Path scheme (all relative to wikisource://):
   /                                       root — all sites
   /{family}/{code}/                       site root — Index pages for that site
   /{family}/{code}/{Index title}/         index dir — Pages + File subdir
+  /{family}/{code}/{Index title}/wikitext            Index: description/pagelist wikitext
   /{family}/{code}/{Index title}/{Page title}        page wikitext file
   /{family}/{code}/{Index title}/{File title}/       file dir
   /{family}/{code}/{Index title}/{File title}/wikitext   File: description wikitext
@@ -212,6 +213,21 @@ def _stat_one(session: Session, path: str) -> Stat:
         )
 
     container = rest[0]
+
+    # Index's own wikitext body (dual role: directory + proofread-index content)
+    if container == "wikitext" and len(rest) == 1:
+        body = index_page.text or ""
+        return Stat(
+            path=path,
+            exists=True,
+            name="wikitext",
+            kind=NodeKind.file,
+            stable_id=index_page.pageid,
+            revid=index_page.revid,
+            timestamp=_ts(index_page.local_modified_at or index_page.remote_timestamp),
+            length=len(body.encode()),
+            content_model=index_page.content_model,
+        )
 
     # Pages/ container or individual page beneath it
     if container == "Pages":
@@ -426,6 +442,9 @@ def list_children(
     # /{family}/{code}/{Index title} → Pages/ + File:/ + Templates/ + TranscludedFiles/
     if not rest:
         children: list[Node] = []
+        index_wikitext = _page_node(f"{index_path}/wikitext", index_page)
+        index_wikitext.name = "wikitext"
+        children.append(index_wikitext)
         children.append(_dir_node(f"{index_path}/Pages", "Pages"))
 
         file_title = _index_to_file_title(index_title)

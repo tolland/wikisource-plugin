@@ -172,6 +172,18 @@ def test_stat_index(vfs_client):
     assert body["content_model"] == "proofread-index"
 
 
+def test_stat_index_wikitext(vfs_client):
+    r = vfs_client.get("/vfs/stat", params={"path": f"{_INDEX_PATH}/wikitext"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["exists"] is True
+    assert body["kind"] == "file"
+    assert body["name"] == "wikitext"
+    assert body["stable_id"] == 1001
+    assert body["length"] == len(_INDEX_BODY.encode())
+    assert body["content_model"] == "proofread-index"
+
+
 def test_stat_pages_container(vfs_client):
     r = vfs_client.get("/vfs/stat", params={"path": _PAGES_PATH})
     assert r.status_code == 200
@@ -258,6 +270,7 @@ def test_stat_bulk_matches_individual_stat(vfs_client):
     paths = [
         "/",
         _INDEX_PATH,
+        f"{_INDEX_PATH}/wikitext",
         f"{_PAGES_PATH}/{PAGE_1}",
         f"{_PAGES_PATH}/{PAGE_2}",
         f"{_FILE_PATH}/wikitext",
@@ -341,6 +354,7 @@ def test_list_index_has_containers(vfs_client):
     r = vfs_client.get("/vfs/children", params={"path": _INDEX_PATH})
     assert r.status_code == 200
     names = [c["name"] for c in r.json()["children"]]
+    assert "wikitext" in names
     assert "Pages" in names
     assert FILE in names
     assert "Templates" in names
@@ -350,11 +364,23 @@ def test_list_index_has_containers(vfs_client):
     assert PAGE_1 not in names
     assert PAGE_2 not in names
     kinds = {c["name"]: c["kind"] for c in r.json()["children"]}
+    assert kinds["wikitext"] == "file"
     assert kinds["Pages"] == "directory"
     assert kinds[FILE] == "directory"
     assert kinds["styles.css"] == "file"
     assert kinds["Templates"] == "directory"
     assert kinds["TranscludedFiles"] == "directory"
+
+
+def test_list_index_wikitext_matches_stat(vfs_client):
+    r = vfs_client.get("/vfs/children", params={"path": _INDEX_PATH})
+    node = next(c for c in r.json()["children"] if c["name"] == "wikitext")
+    stat = vfs_client.get("/vfs/stat", params={"path": f"{_INDEX_PATH}/wikitext"}).json()
+    assert node["path"] == stat["path"]
+    assert node["stable_id"] == stat["stable_id"]
+    assert node["revid"] == stat["revid"]
+    assert node["length"] == stat["length"]
+    assert node["content_model"] == stat["content_model"]
 
 
 def test_list_pages_container(vfs_client):
