@@ -1,6 +1,7 @@
 package org.limepepper.lang.wikitext.vfs
 
 import com.intellij.openapi.fileTypes.FileType
+import com.intellij.openapi.fileTypes.FileTypeRegistry
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileSystem
 import org.limepepper.lang.wikitext.vfs.backend.NodeKind
@@ -74,6 +75,10 @@ class WtVirtualFile(
     override fun isDirectory(): Boolean = isDir
     override fun isValid(): Boolean = true
     override fun getParent(): VirtualFile? = _parent
+
+    fun getFileTypeForFile() {
+        FileTypeRegistry.getInstance().getFileTypeByFileName("dummy.css")
+    }
 
     override fun getFileType(): FileType =
         if (isDir) super.getFileType() else WtContentModel.fileTypeFor(contentModel)

@@ -27,7 +27,7 @@ jobs:
             pyproject.toml
 
       - name: Install Python dependencies
-        run: uv sync --extra dev
+        run: uv sync --group test
 
       - name: Ruff
         run: uv run ruff check .

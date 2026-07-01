@@ -1,6 +1,7 @@
 package org.limepepper.lang.wikitext.vfs
 
 import com.intellij.openapi.fileTypes.FileType
+import com.intellij.openapi.fileTypes.FileTypeRegistry
 import com.intellij.openapi.fileTypes.PlainTextFileType
 import org.limepepper.lang.wikitext.WtFileType
 
@@ -22,12 +23,8 @@ enum class WtContentModel(val wikiId: String, val fileType: FileType) {
     PROOFREAD_INDEX("proofread-index", WtFileType),
     PROOFREAD_PAGE("proofread-page", WtFileType),
     WIKITEXT("wikitext", WtFileType),
-
-    // Not wikitext syntax — parsing these with the Wikitext lexer would just
-    // produce garbage annotations. Plain text until this plugin has real
-    // CSS/JSON PSI support (tracked alongside the File:/transclusion work).
-    SANITIZED_CSS("sanitized-css", PlainTextFileType.INSTANCE),
-    JSON("json", PlainTextFileType.INSTANCE),
+    SANITIZED_CSS("sanitized-css", FileTypeRegistry.getInstance().getFileTypeByFileName("dummy.css")),
+    JSON("json", FileTypeRegistry.getInstance().getFileTypeByFileName("dummy.json")),
     ;
 
     companion object {
