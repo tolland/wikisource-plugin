@@ -314,7 +314,15 @@ class MyToolWindowFactory : ToolWindowFactory {
 
         private fun fileNode(vFile: WtVirtualFile?, fallbackName: String): DefaultMutableTreeNode =
             object : DefaultMutableTreeNode(vFile) {
-                override fun toString(): String = (userObject as? WtVirtualFile)?.name ?: fallbackName
+                override fun toString(): String =
+                    (userObject as? WtVirtualFile)?.let { displayLabel(it.name) } ?: fallbackName
             }
+
+        /**
+         * Tree-display-only shorthand. `getName()`/`getPath()` on the underlying
+         * [WtVirtualFile] are untouched — this never leaves the tool window.
+         */
+        private fun displayLabel(name: String): String =
+            if (name.startsWith("Page:") && '/' in name) "Page/${name.substringAfterLast('/')}" else name
     }
 }
