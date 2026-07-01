@@ -26,6 +26,8 @@ See src-py/tests/cassettes/README.md for full instructions.
 PEIRCE_INDEX = "Index:NeglectedArgument.pdf"
 PEIRCE_FILE = "File:NeglectedArgument.pdf"
 PEIRCE_PAGE_1 = "Page:NeglectedArgument.pdf/1"
+AUSTIN_INDEX = "Index:Austin-HowToDoThingsWithWords-1962.pdf"
+AUSTIN_STYLES = f"{AUSTIN_INDEX}/styles.css"
 
 # Real fixture blob — the user points TRACTATUS_DJVU_PATH at their local copy.
 # If absent, the download assertions are skipped; metadata assertions still run.
@@ -212,6 +214,7 @@ _lan_index = _skip_if_no_cassette("lan", "get_index_page")
 _lan_file_info = _skip_if_no_cassette("lan", "get_file_info")
 _lan_page_1 = _skip_if_no_cassette("lan", "get_page_1")
 _lan_fanout = _skip_if_no_cassette("lan", "fanout_index")
+_lan_index_subpages = _skip_if_no_cassette("lan", "list_index_subpages")
 
 
 @_lan_index
@@ -250,6 +253,16 @@ def test_lan_get_page_1():
 
     assert remote.content_model == "proofread-page"
     assert remote.revid is not None
+
+
+@_lan_index_subpages
+def test_lan_list_index_subpages():
+    """Index subpage assets are discoverable through the real pywikibot path."""
+    with _LAN_VCR.use_cassette("list_index_subpages.yaml"):
+        client = PywikibotClient(_LAN_SETTINGS)
+        titles = client.list_index_subpage_titles(AUSTIN_INDEX)
+
+    assert AUSTIN_STYLES in titles
 
 
 @_lan_fanout

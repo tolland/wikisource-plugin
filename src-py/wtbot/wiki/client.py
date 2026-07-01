@@ -30,6 +30,8 @@ logging.basicConfig(level=logging.DEBUG)
 class WikiClient(Protocol):
     def get_page(self, title: str) -> RemotePage: ...
 
+    def list_index_subpage_titles(self, title: str) -> list[str]: ...
+
     def get_file_info(self, title: str) -> RemoteFileInfo: ...
 
     def download_file(self, title: str, dest: Path) -> Path: ...
@@ -110,6 +112,20 @@ class PywikibotClient:
             page_count=page_count,
         )
 
+    def list_index_subpage_titles(self, title: str) -> list[str]:
+        from pywikibot import pagegenerators
+        from pywikibot.proofreadpage import IndexPage
+
+        index_page = IndexPage(self.site, title)
+        return [
+            page.title()
+            for page in pagegenerators.PrefixingPageGenerator(
+                prefix=f"{title}/",
+                site=self.site,
+                namespace=index_page.namespace().id,
+            )
+        ]
+
     def _resolve_file_page(self, title: str):
         """Resolve a File: title to a FilePage, following the shared repo (e.g.
         Commons) when the file isn't uploaded locally — the common case for
@@ -187,6 +203,10 @@ class FakeWikiClient:
             return self._pages[title]
         except KeyError:
             raise PageNotFound(title) from None
+
+    def list_index_subpage_titles(self, title: str) -> list[str]:
+        prefix = f"{title}/"
+        return sorted(t for t in self._pages if t.startswith(prefix))
 
     def get_file_info(self, title: str) -> RemoteFileInfo:
         try:

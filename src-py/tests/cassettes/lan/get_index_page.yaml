@@ -16,7 +16,7 @@ interactions:
     uri: https://wikisource-debian-13.lan/w/api.php?action=query&meta=userinfo&uiprop=blockinfo%7Cgroups%7Chasmsg%7Cratelimits%7Crights&formatversion=2&maxlag=5&format=json
   response:
     body:
-      string: '{"batchcomplete":true,"query":{"userinfo":{"id":0,"name":"192.168.10.10","anon":true,"messages":false,"groups":["*"],"rights":["createaccount","read","createpage","createtalk","viewmyprivateinfo","editmyprivateinfo","editmyoptions","unfuzzy"],"ratelimits":{"edit":{"ip":{"hits":8,"seconds":60}},"upload":{"ip":{"hits":8,"seconds":60}},"mailpassword":{"ip":{"hits":5,"seconds":3600}},"sendemail":{"ip":{"hits":5,"seconds":86400}},"purge":{"ip":{"hits":30,"seconds":60}},"linkpurge":{"ip":{"hits":30,"seconds":60}},"renderfile":{"ip":{"hits":700,"seconds":30}},"renderfile-nonstandard":{"ip":{"hits":70,"seconds":30}},"stashedit":{"ip":{"hits":30,"seconds":60}},"stashbasehtml":{"ip":{"hits":5,"seconds":60}},"changetags":{"ip":{"hits":8,"seconds":60}}}}}}'
+      string: '{"batchcomplete":true,"query":{"userinfo":{"id":0,"name":"192.168.10.10","anon":true,"messages":false,"groups":["*"],"rights":["createaccount","read","edit","createpage","createtalk","viewmyprivateinfo","editmyprivateinfo","editmyoptions","unfuzzy"],"ratelimits":{"edit":{"ip":{"hits":8,"seconds":60}},"upload":{"ip":{"hits":8,"seconds":60}},"mailpassword":{"ip":{"hits":5,"seconds":3600}},"sendemail":{"ip":{"hits":5,"seconds":86400}},"purge":{"ip":{"hits":30,"seconds":60}},"linkpurge":{"ip":{"hits":30,"seconds":60}},"renderfile":{"ip":{"hits":700,"seconds":30}},"renderfile-nonstandard":{"ip":{"hits":70,"seconds":30}},"stashedit":{"ip":{"hits":30,"seconds":60}},"stashbasehtml":{"ip":{"hits":5,"seconds":60}},"changetags":{"ip":{"hits":8,"seconds":60}}}}}}'
     headers:
       Access-Control-Allow-Origin:
       - '*'
@@ -31,7 +31,7 @@ interactions:
       Content-Type:
       - application/json; charset=utf-8
       Date:
-      - Tue, 30 Jun 2026 06:48:31 GMT
+      - Wed, 01 Jul 2026 13:45:32 GMT
       Server:
       - nginx
       Transfer-Encoding:
@@ -41,7 +41,7 @@ interactions:
       X-Frame-Options:
       - DENY
       X-Request-Id:
-      - 7c89d3a1e4d835adb08ee0d0
+      - b42d746072c4a1c9d79a3980
     status:
       code: 200
       message: OK
@@ -81,7 +81,7 @@ interactions:
         WikiSource","mainpageisdomainroot":false,"logo":"https://wikisource-debian-13.lan/w/resources/assets/change-your-logo.svg","generator":"MediaWiki
         1.43.6","phpversion":"8.4.21","phpsapi":"fpm-fcgi","dbtype":"mysql","dbversion":"11.8.6-MariaDB-0+deb13u1
         from Debian","imagewhitelistenabled":false,"langconversion":true,"linkconversion":true,"titleconversion":true,"linkprefixcharset":"","linkprefix":"","linktrail":"/^([a-z]+)(.*)$/sD","legaltitlechars":"
-        %!\"$&''()*,\\-.\\/0-9:;=?@A-Z\\\\^_`a-z~\\x80-\\xFF+","invalidusernamechars":"@:>=","allunicodefixes":false,"fixarabicunicode":true,"fixmalayalamunicode":true,"case":"first-letter","lang":"en","fallback":[],"rtl":false,"fallback8bitEncoding":"windows-1252","readonly":false,"writeapi":true,"maxarticlesize":2097152,"timezone":"UTC","timeoffset":0,"articlepath":"/wiki/$1","scriptpath":"/w","script":"/w/index.php","variantarticlepath":false,"server":"https://wikisource-debian-13.lan","servername":"wikisource-debian-13.lan","wikiid":"wiki","time":"2026-06-30T06:48:31Z","misermode":false,"uploadsenabled":true,"maxuploadsize":536870912,"minuploadchunksize":1024,"galleryoptions":{"imagesPerRow":0,"imageWidth":120,"imageHeight":120,"captionLength":true,"showBytes":true,"showDimensions":true,"mode":"traditional"},"thumblimits":{"0":120,"1":150,"2":180,"3":200,"4":250,"5":300},"imagelimits":{"0":{"width":320,"height":240},"1":{"width":640,"height":480},"2":{"width":800,"height":600},"3":{"width":1024,"height":768},"4":{"width":1280,"height":1024},"5":{"width":2560,"height":2048}},"favicon":"https://wikisource-debian-13.lan/favicon.ico","centralidlookupprovider":"local","allcentralidlookupproviders":["local"],"interwikimagic":true,"magiclinks":{"ISBN":false,"PMID":false,"RFC":false},"categorycollation":"uppercase","nofollowlinks":true,"nofollownsexceptions":[],"nofollowdomainexceptions":["mediawiki.org"],"externallinktarget":false,"citeresponsivereferences":true,"linter":{"high":["deletable-table-tag","duplicate-ids","html5-misnesting","misc-tidy-replacement-issues","multiline-html-table-in-list","multiple-unclosed-formatting-tags","pwrap-bug-workaround","self-closed-tag","tidy-font-bug","tidy-whitespace-bug","unclosed-quotes-in-heading"],"medium":["bogus-image-options","fostered","misnested-tag","multi-colon-escape","wikilink-in-extlink"],"low":["missing-end-tag","missing-end-tag-in-heading","night-mode-unaware-background-color","obsolete-tag","stripped-tag"]}},"userinfo":{"id":0,"name":"192.168.10.10","anon":true,"messages":false}}}'
+        %!\"$&''()*,\\-.\\/0-9:;=?@A-Z\\\\^_`a-z~\\x80-\\xFF+","invalidusernamechars":"@:>=","allunicodefixes":false,"fixarabicunicode":true,"fixmalayalamunicode":true,"case":"first-letter","lang":"en","fallback":[],"rtl":false,"fallback8bitEncoding":"windows-1252","readonly":false,"writeapi":true,"maxarticlesize":2097152,"timezone":"UTC","timeoffset":0,"articlepath":"/wiki/$1","scriptpath":"/w","script":"/w/index.php","variantarticlepath":false,"server":"https://wikisource-debian-13.lan","servername":"wikisource-debian-13.lan","wikiid":"wiki","time":"2026-07-01T13:45:33Z","misermode":false,"uploadsenabled":true,"maxuploadsize":536870912,"minuploadchunksize":1024,"galleryoptions":{"imagesPerRow":0,"imageWidth":120,"imageHeight":120,"captionLength":true,"showBytes":true,"showDimensions":true,"mode":"traditional"},"thumblimits":{"0":120,"1":150,"2":180,"3":200,"4":250,"5":300},"imagelimits":{"0":{"width":320,"height":240},"1":{"width":640,"height":480},"2":{"width":800,"height":600},"3":{"width":1024,"height":768},"4":{"width":1280,"height":1024},"5":{"width":2560,"height":2048}},"favicon":"https://wikisource-debian-13.lan/favicon.ico","centralidlookupprovider":"local","allcentralidlookupproviders":["local"],"interwikimagic":true,"magiclinks":{"ISBN":false,"PMID":false,"RFC":false},"categorycollation":"uppercase","nofollowlinks":true,"nofollownsexceptions":[],"nofollowdomainexceptions":["mediawiki.org"],"externallinktarget":false,"citeresponsivereferences":true,"linter":{"high":["deletable-table-tag","duplicate-ids","html5-misnesting","misc-tidy-replacement-issues","multiline-html-table-in-list","multiple-unclosed-formatting-tags","pwrap-bug-workaround","self-closed-tag","tidy-font-bug","tidy-whitespace-bug","unclosed-quotes-in-heading"],"medium":["bogus-image-options","fostered","misnested-tag","multi-colon-escape","wikilink-in-extlink"],"low":["missing-end-tag","missing-end-tag-in-heading","night-mode-unaware-background-color","obsolete-tag","stripped-tag"]}},"userinfo":{"id":0,"name":"192.168.10.10","anon":true,"messages":false}}}'
     headers:
       Access-Control-Allow-Origin:
       - '*'
@@ -96,7 +96,7 @@ interactions:
       Content-Type:
       - application/json; charset=utf-8
       Date:
-      - Tue, 30 Jun 2026 06:48:31 GMT
+      - Wed, 01 Jul 2026 13:45:33 GMT
       Server:
       - nginx
       Transfer-Encoding:
@@ -106,7 +106,7 @@ interactions:
       X-Frame-Options:
       - DENY
       X-Request-Id:
-      - d9b90288eb119bdb8a9e4e39
+      - 0db839be3ae4c78b75d8089e
     status:
       code: 200
       message: OK
@@ -142,7 +142,7 @@ interactions:
       Content-Type:
       - application/json; charset=utf-8
       Date:
-      - Tue, 30 Jun 2026 06:48:31 GMT
+      - Wed, 01 Jul 2026 13:45:33 GMT
       Server:
       - nginx
       Transfer-Encoding:
@@ -152,7 +152,7 @@ interactions:
       X-Frame-Options:
       - DENY
       X-Request-Id:
-      - f0fb6c74b5aeebfb52dd8be2
+      - fa631176d0a65a6d914eb945
     status:
       code: 200
       message: OK
@@ -189,7 +189,7 @@ interactions:
       Content-Type:
       - application/json; charset=utf-8
       Date:
-      - Tue, 30 Jun 2026 06:48:31 GMT
+      - Wed, 01 Jul 2026 13:45:33 GMT
       Server:
       - nginx
       Transfer-Encoding:
@@ -199,7 +199,7 @@ interactions:
       X-Frame-Options:
       - DENY
       X-Request-Id:
-      - f944073dbe327c4a3c425dcc
+      - d08f995d174560c08609d616
     status:
       code: 200
       message: OK
@@ -299,7 +299,7 @@ interactions:
       Content-Type:
       - application/json; charset=utf-8
       Date:
-      - Tue, 30 Jun 2026 06:48:31 GMT
+      - Wed, 01 Jul 2026 13:45:33 GMT
       Server:
       - nginx
       Transfer-Encoding:
@@ -309,7 +309,7 @@ interactions:
       X-Frame-Options:
       - DENY
       X-Request-Id:
-      - 78b0e775e0a651c5279eca16
+      - 74bdc8b7f77f23df24c5c3dd
     status:
       code: 200
       message: OK
@@ -345,7 +345,7 @@ interactions:
       Content-Type:
       - application/json; charset=utf-8
       Date:
-      - Tue, 30 Jun 2026 06:48:31 GMT
+      - Wed, 01 Jul 2026 13:45:33 GMT
       Server:
       - nginx
       Transfer-Encoding:
@@ -355,7 +355,7 @@ interactions:
       X-Frame-Options:
       - DENY
       X-Request-Id:
-      - 5cc84b2480bdaf629acf4bbd
+      - 961ec2293d58899d3ab524e1
     status:
       code: 200
       message: OK
@@ -391,7 +391,7 @@ interactions:
       Content-Type:
       - application/json; charset=utf-8
       Date:
-      - Tue, 30 Jun 2026 06:48:31 GMT
+      - Wed, 01 Jul 2026 13:45:33 GMT
       Server:
       - nginx
       Transfer-Encoding:
@@ -401,7 +401,7 @@ interactions:
       X-Frame-Options:
       - DENY
       X-Request-Id:
-      - df52eeb78dc1ad548a3d5a11
+      - d6d268f6838fc7f30f5b2ea7
     status:
       code: 200
       message: OK
@@ -437,7 +437,7 @@ interactions:
       Content-Type:
       - application/json; charset=utf-8
       Date:
-      - Tue, 30 Jun 2026 06:48:31 GMT
+      - Wed, 01 Jul 2026 13:45:33 GMT
       Server:
       - nginx
       Transfer-Encoding:
@@ -447,7 +447,7 @@ interactions:
       X-Frame-Options:
       - DENY
       X-Request-Id:
-      - eaef2344874d15cae05583a5
+      - e32992afba75faeb5bfeef7b
     status:
       code: 200
       message: OK
@@ -488,7 +488,7 @@ interactions:
       Content-Type:
       - application/json; charset=utf-8
       Date:
-      - Tue, 30 Jun 2026 06:48:31 GMT
+      - Wed, 01 Jul 2026 13:45:33 GMT
       Server:
       - nginx
       Transfer-Encoding:
@@ -498,7 +498,7 @@ interactions:
       X-Frame-Options:
       - DENY
       X-Request-Id:
-      - 26d0826fa582556ec2abb957
+      - a0499b6b46ac384953e3858a
     status:
       code: 200
       message: OK
@@ -535,7 +535,7 @@ interactions:
       Content-Type:
       - application/json; charset=utf-8
       Date:
-      - Tue, 30 Jun 2026 06:48:31 GMT
+      - Wed, 01 Jul 2026 13:45:33 GMT
       Server:
       - nginx
       Transfer-Encoding:
@@ -545,7 +545,7 @@ interactions:
       X-Frame-Options:
       - DENY
       X-Request-Id:
-      - 2838077feb9df33d45ede3ce
+      - 7eaa4b7c7abb0ba51852a6b3
     status:
       code: 200
       message: OK
@@ -582,7 +582,7 @@ interactions:
       Content-Type:
       - application/json; charset=utf-8
       Date:
-      - Tue, 30 Jun 2026 06:48:32 GMT
+      - Wed, 01 Jul 2026 13:45:33 GMT
       Server:
       - nginx
       Transfer-Encoding:
@@ -592,7 +592,7 @@ interactions:
       X-Frame-Options:
       - DENY
       X-Request-Id:
-      - 29d284a492cc714f3c9b398d
+      - 974190823aa9bb07ca1367be
     status:
       code: 200
       message: OK
@@ -628,7 +628,7 @@ interactions:
       Content-Type:
       - application/json; charset=utf-8
       Date:
-      - Tue, 30 Jun 2026 06:48:32 GMT
+      - Wed, 01 Jul 2026 13:45:33 GMT
       Server:
       - nginx
       Transfer-Encoding:
@@ -638,7 +638,7 @@ interactions:
       X-Frame-Options:
       - DENY
       X-Request-Id:
-      - b4191f19856681ea41e73d02
+      - 17ee235eb268ff05a9bf7353
     status:
       code: 200
       message: OK
@@ -674,7 +674,7 @@ interactions:
       Content-Type:
       - application/json; charset=utf-8
       Date:
-      - Tue, 30 Jun 2026 06:48:32 GMT
+      - Wed, 01 Jul 2026 13:45:33 GMT
       Server:
       - nginx
       Transfer-Encoding:
@@ -684,7 +684,7 @@ interactions:
       X-Frame-Options:
       - DENY
       X-Request-Id:
-      - 046c064e790c371e3bc3a274
+      - a289271516120de3a474db87
     status:
       code: 200
       message: OK
@@ -825,8 +825,8 @@ interactions:
         <a href=\"/wiki/Page:NeglectedArgument.pdf/23\" class=\"prp-index-pagelist-page
         prp-pagequality-3 quality3\" title=\"Page:NeglectedArgument.pdf/23\">23</a></div>\n</div></div></td></tr></tbody></table></td><td
         id=\"ws-index-remarks-empty\"></td></tr></tbody></table>\n<!-- \nNewPP limit
-        report\nCached time: 20260630064832\nCache expiry: 86400\nReduced expiry:
-        false\nComplications: []\nCPU time usage: 0.033 seconds\nReal time usage:
+        report\nCached time: 20260701134534\nCache expiry: 86400\nReduced expiry:
+        false\nComplications: []\nCPU time usage: 0.034 seconds\nReal time usage:
         0.037 seconds\nPreprocessor visited node count: 48/1000000\nPost\u2010expand
         include size: 0/2097152 bytes\nTemplate argument size: 0/2097152 bytes\nHighest
         expansion depth: 2/100\nExpensive parser function count: 0/1000\nUnstrip recursion
@@ -854,7 +854,7 @@ interactions:
       Content-Type:
       - application/json; charset=utf-8
       Date:
-      - Tue, 30 Jun 2026 06:48:32 GMT
+      - Wed, 01 Jul 2026 13:45:34 GMT
       Server:
       - nginx
       Transfer-Encoding:
@@ -866,7 +866,7 @@ interactions:
       X-Frame-Options:
       - DENY
       X-Request-Id:
-      - 85c84d4007b3bed61c17f008
+      - 16bd2bb2264a41ad06a955ae
     status:
       code: 200
       message: OK

@@ -36,7 +36,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:17:48 GMT
+      - Wed, 01 Jul 2026 13:49:34 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -44,18 +44,18 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-bs6wr
+      - mw-api-ext.eqiad.main-69b4b479d5-pl6tv
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       set-cookie:
-      - WMF-Last-Access=30-Jun-2026;Path=/;HttpOnly;secure;Expires=Sat, 01 Aug 2026
-        00:00:00 GMT
-      - WMF-Last-Access-Global=30-Jun-2026;Path=/;Domain=.wikisource.org;HttpOnly;secure;Expires=Sat,
-        01 Aug 2026 00:00:00 GMT
+      - WMF-Last-Access=01-Jul-2026;Path=/;HttpOnly;secure;Expires=Sun, 02 Aug 2026
+        12:00:00 GMT
+      - WMF-Last-Access-Global=01-Jul-2026;Path=/;Domain=.wikisource.org;HttpOnly;secure;Expires=Sun,
+        02 Aug 2026 12:00:00 GMT
       - GeoIP=GB:ENG:Ashton-under-Lyne:53.51:-2.04:v4; Path=/; secure; Domain=.wikisource.org
       - NetworkProbeLimit=0.001;Path=/;Secure;SameSite=None;Max-Age=3600
-      - WMF-Uniq=SsBhsiYLm1rCG83b2Ce3GQOPAAAAAFvdXDrIc8cjIUxVnShCVPyRJfAs04wqp5UT;Domain=.wikisource.org;Path=/;HttpOnly;secure;SameSite=None;Expires=Wed,
-        30 Jun 2027 00:00:00 GMT
+      - WMF-Uniq=gCHDZDNtrfpnek_hhqoTwQOQAAAAAFvdYutJ-pbdpq01TWZ_2TECCFejT6dWijyW;Domain=.wikisource.org;Path=/;HttpOnly;secure;SameSite=None;Expires=Thu,
+        01 Jul 2027 00:00:00 GMT
       strict-transport-security:
       - max-age=106384710; includeSubDomains; preload
       vary:
@@ -73,7 +73,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - fd399e25-531c-435d-afc4-c5c2011f2321
+      - f4d49807-021b-40a0-b7d9-950251559be6
     status:
       code: 200
       message: OK
@@ -113,12 +113,12 @@ interactions:
         talk","subpages":true,"canonical":"Event talk","content":false,"nonincludable":false}},"namespacealiases":[{"id":4,"alias":"WS"},{"id":5,"alias":"WT"},{"id":6,"alias":"Image"},{"id":7,"alias":"Image
         talk"},{"id":12,"alias":"H"}],"general":{"mainpage":"Main Page","base":"https://en.wikisource.org/wiki/Main_Page","sitename":"Wikisource","mainpageisdomainroot":false,"logo":"//en.wikisource.org/static/images/project-logos/enwikisource.png","generator":"MediaWiki
         1.47.0-wmf.8","phpversion":"8.3.31","phpsapi":"fpm-fcgi","dbtype":"mysql","dbversion":"10.11.16-MariaDB-log","imagewhitelistenabled":false,"langconversion":true,"linkconversion":true,"titleconversion":true,"linkprefixcharset":"","linkprefix":"","linktrail":"/^([a-z]+)(.*)$/sD","legaltitlechars":"
-        %!\"$&''()*,\\-.\\/0-9:;=?@A-Z\\\\^_`a-z~\\x80-\\xFF+","invalidusernamechars":"@:>=","allunicodefixes":false,"git-hash":"25e62d72e7e5f21bfe88d296e688865b3b5e5310","git-branch":"wmf/1.47.0-wmf.8","case":"first-letter","lang":"en","fallback":[],"rtl":false,"fallback8bitEncoding":"windows-1252","readonly":false,"writeapi":true,"maxarticlesize":2097152,"timezone":"UTC","timeoffset":0,"articlepath":"/wiki/$1","scriptpath":"/w","script":"/w/index.php","variantarticlepath":false,"server":"//en.wikisource.org","servername":"en.wikisource.org","wikiid":"enwikisource","time":"2026-06-30T08:17:48Z","misermode":true,"uploadsenabled":true,"maxuploadsize":5368709120,"minuploadchunksize":1024,"galleryoptions":{"imagesPerRow":0,"imageWidth":120,"imageHeight":120,"captionLength":true,"showBytes":true,"mode":"traditional","showDimensions":true},"thumblimits":{"0":180,"1":250,"2":400},"imagelimits":{"0":{"width":320,"height":240},"1":{"width":640,"height":480},"2":{"width":800,"height":600},"3":{"width":1024,"height":768},"4":{"width":1280,"height":1024},"5":{"width":2560,"height":2048}},"favicon":"https://en.wikisource.org/static/favicon/wikisource.ico","centralidlookupprovider":"CentralAuth","allcentralidlookupproviders":["CentralAuth","local"],"interwikimagic":true,"magiclinks":{"ISBN":true,"PMID":true,"RFC":true},"categorycollation":"uppercase","nofollowlinks":true,"nofollownsexceptions":[],"nofollowdomainexceptions":["mediawiki.org","wikibooks.org","wikimedia.com","wikimedia.org","wikinews.org","wikipedia.org","wikiquote.org","wikisource.org","wikiversity.org","wiktionary.org","wikivoyage.org","wikidata.org","wikifunctions.org","tools.wmflabs.org","toolforge.org","etherpad.wmflabs.org"],"externallinktarget":false,"wmf-config":{"wmfMasterDatacenter":"eqiad","wmfEtcdLastModifiedIndex":3836224},"citeresponsivereferences":false,"max-page-id":5155615,"linter":{"high":["deletable-table-tag","duplicate-ids","html5-misnesting","misc-tidy-replacement-issues","multiline-html-table-in-list","multiple-unclosed-formatting-tags","pwrap-bug-workaround","self-closed-tag","template-arg-in-extension-tag","tidy-font-bug","tidy-whitespace-bug","unclosed-quotes-in-heading"],"medium":["bogus-image-options","fostered","misnested-tag","multi-colon-escape","wikilink-in-extlink"],"low":["empty-heading","missing-end-tag","missing-end-tag-in-heading","night-mode-unaware-background-color","obsolete-tag","stripped-tag"]},"mobileserver":"https://en.wikisource.org","pageviewservice-supported-metrics":{"pageviews":{"pageviews":true,"uniques":false},"siteviews":{"pageviews":true,"uniques":true},"mostviewed":{"pageviews":true,"uniques":false}},"readinglists-config":{"maxListsPerUser":100,"maxEntriesPerList":5000,"deletedRetentionDays":30}},"userinfo":{"id":0,"name":"80.229.142.179","anon":true,"messages":false}}}'
+        %!\"$&''()*,\\-.\\/0-9:;=?@A-Z\\\\^_`a-z~\\x80-\\xFF+","invalidusernamechars":"@:>=","allunicodefixes":false,"git-hash":"080dd21eacaca9094009be300a8fa3379f78ea38","git-branch":"wmf/1.47.0-wmf.8","case":"first-letter","lang":"en","fallback":[],"rtl":false,"fallback8bitEncoding":"windows-1252","readonly":false,"writeapi":true,"maxarticlesize":2097152,"timezone":"UTC","timeoffset":0,"articlepath":"/wiki/$1","scriptpath":"/w","script":"/w/index.php","variantarticlepath":false,"server":"//en.wikisource.org","servername":"en.wikisource.org","wikiid":"enwikisource","time":"2026-07-01T13:49:35Z","misermode":true,"uploadsenabled":true,"maxuploadsize":5368709120,"minuploadchunksize":1024,"galleryoptions":{"imagesPerRow":0,"imageWidth":120,"imageHeight":120,"captionLength":true,"showBytes":true,"mode":"traditional","showDimensions":true},"thumblimits":{"0":180,"1":250,"2":400},"imagelimits":{"0":{"width":320,"height":240},"1":{"width":640,"height":480},"2":{"width":800,"height":600},"3":{"width":1024,"height":768},"4":{"width":1280,"height":1024},"5":{"width":2560,"height":2048}},"favicon":"https://en.wikisource.org/static/favicon/wikisource.ico","centralidlookupprovider":"CentralAuth","allcentralidlookupproviders":["CentralAuth","local"],"interwikimagic":true,"magiclinks":{"ISBN":true,"PMID":true,"RFC":true},"categorycollation":"uppercase","nofollowlinks":true,"nofollownsexceptions":[],"nofollowdomainexceptions":["mediawiki.org","wikibooks.org","wikimedia.com","wikimedia.org","wikinews.org","wikipedia.org","wikiquote.org","wikisource.org","wikiversity.org","wiktionary.org","wikivoyage.org","wikidata.org","wikifunctions.org","tools.wmflabs.org","toolforge.org","etherpad.wmflabs.org"],"externallinktarget":false,"wmf-config":{"wmfMasterDatacenter":"eqiad","wmfEtcdLastModifiedIndex":3838157},"citeresponsivereferences":false,"max-page-id":5156833,"linter":{"high":["deletable-table-tag","duplicate-ids","html5-misnesting","misc-tidy-replacement-issues","multiline-html-table-in-list","multiple-unclosed-formatting-tags","pwrap-bug-workaround","self-closed-tag","template-arg-in-extension-tag","tidy-font-bug","tidy-whitespace-bug","unclosed-quotes-in-heading"],"medium":["bogus-image-options","fostered","misnested-tag","multi-colon-escape","wikilink-in-extlink"],"low":["empty-heading","missing-end-tag","missing-end-tag-in-heading","night-mode-unaware-background-color","obsolete-tag","stripped-tag"]},"mobileserver":"https://en.wikisource.org","pageviewservice-supported-metrics":{"pageviews":{"pageviews":true,"uniques":false},"siteviews":{"pageviews":true,"uniques":true},"mostviewed":{"pageviews":true,"uniques":false}},"readinglists-config":{"maxListsPerUser":100,"maxEntriesPerList":5000,"deletedRetentionDays":30}},"userinfo":{"id":0,"name":"80.229.142.179","anon":true,"messages":false}}}'
     headers:
       accept-ranges:
       - bytes
       age:
-      - '0'
+      - '1'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
@@ -130,7 +130,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:17:48 GMT
+      - Wed, 01 Jul 2026 13:49:35 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -138,12 +138,12 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.canary-76c45d46cf-pmk7l
+      - mw-api-ext.eqiad.main-69b4b479d5-jc2ls
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       set-cookie:
-      - WMF-Uniq=SsBhsiYLm1rCG83b2Ce3GQOPAAEBAFvdzTBbeVHQrRO7eGqLRgNlXd7HFdQqbozd;Domain=.wikisource.org;Path=/;HttpOnly;secure;SameSite=None;Expires=Wed,
-        30 Jun 2027 00:00:00 GMT
+      - WMF-Uniq=gCHDZDNtrfpnek_hhqoTwQOQAAEBAFvdnyjZFT6mHNliL57ZdXgykGdTX_L7pZbb;Domain=.wikisource.org;Path=/;HttpOnly;secure;SameSite=None;Expires=Thu,
+        01 Jul 2027 00:00:00 GMT
       strict-transport-security:
       - max-age=106384710; includeSubDomains; preload
       transfer-encoding:
@@ -163,7 +163,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - a820d88d-030c-4716-a6be-feb49188925a
+      - 64e6cb07-05ea-4c7c-8bd2-0cb37488100b
     status:
       code: 200
       message: OK
@@ -190,7 +190,7 @@ interactions:
       accept-ranges:
       - bytes
       age:
-      - '2'
+      - '0'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
@@ -202,7 +202,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:17:48 GMT
+      - Wed, 01 Jul 2026 13:49:35 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -210,7 +210,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-29qg9
+      - mw-api-ext.eqiad.main-69b4b479d5-n9frz
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -232,7 +232,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - a9f7e346-6f1e-4d52-b0a4-530d057590a4
+      - 2f68c995-36e3-4685-a68c-b4024511a048
     status:
       code: 200
       message: OK
@@ -272,7 +272,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:17:49 GMT
+      - Wed, 01 Jul 2026 13:49:35 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -280,7 +280,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-tpg6l
+      - mw-api-ext.eqiad.main-69b4b479d5-sr4j7
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -302,7 +302,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 02fc1058-c9e2-4fab-8778-7084c22be238
+      - 02ab6d68-9eea-4462-ae68-8361e9ef8712
     status:
       code: 200
       message: OK
@@ -347,7 +347,7 @@ interactions:
         Vibber\",\"url\":\"https://www.mediawiki.org/wiki/Extension:CharInsert\",\"vcs-system\":\"git\",\"vcs-version\":\"28bcae2022962c078e50bfcf320487351a1c55c5\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/CharInsert/+/28bcae2022962c078e50bfcf320487351a1c55c5\",\"vcs-date\":\"2026-06-14T03:12:21Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/CharInsert\"},{\"type\":\"parserhook\",\"name\":\"ParserFunctions\",\"descriptionmsg\":\"pfunc_desc\",\"author\":\"Tim
         Starling, Robert Rohde, Ross McClure, Juraj Simlovic\",\"url\":\"https://www.mediawiki.org/wiki/Extension:ParserFunctions\",\"version\":\"1.6.1\",\"vcs-system\":\"git\",\"vcs-version\":\"bdcc63059c7d358a6420714134fdc99e205a15dc\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/ParserFunctions/+/bdcc63059c7d358a6420714134fdc99e205a15dc\",\"vcs-date\":\"2026-06-16T07:52:39Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/ParserFunctions\"},{\"type\":\"parserhook\",\"name\":\"Cite\",\"descriptionmsg\":\"cite-desc\",\"author\":\"\xC6var
         Arnfj\xF6r\xF0 Bjarmason, Andrew Garrett, Brooke Vibber, Ed Sanders, Marius
-        Hoch, Steve Sanbeg, Trevor Parscal, ...\",\"url\":\"https://www.mediawiki.org/wiki/Extension:Cite\",\"vcs-system\":\"git\",\"vcs-version\":\"062de4ec796e2b2e69b732b1cb6f19b734048b12\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/Cite/+/062de4ec796e2b2e69b732b1cb6f19b734048b12\",\"vcs-date\":\"2026-06-19T12:22:45Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/Cite\",\"credits\":\"/wiki/Special:Version/Credits/Cite\"},{\"type\":\"parserhook\",\"name\":\"InputBox\",\"descriptionmsg\":\"inputbox-desc\",\"author\":\"Erik
+        Hoch, Steve Sanbeg, Trevor Parscal, ...\",\"url\":\"https://www.mediawiki.org/wiki/Extension:Cite\",\"vcs-system\":\"git\",\"vcs-version\":\"4dcbd27b017a9629ce0e7368404290d529e94481\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/Cite/+/4dcbd27b017a9629ce0e7368404290d529e94481\",\"vcs-date\":\"2026-06-30T14:37:07Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/Cite\",\"credits\":\"/wiki/Special:Version/Credits/Cite\"},{\"type\":\"parserhook\",\"name\":\"InputBox\",\"descriptionmsg\":\"inputbox-desc\",\"author\":\"Erik
         Moeller, Leonardo Pimenta, Rob Church, Trevor Parscal, DaSch\",\"url\":\"https://www.mediawiki.org/wiki/Extension:InputBox\",\"version\":\"0.3.0\",\"vcs-system\":\"git\",\"vcs-version\":\"c8fd733db765b0109785d1fa00cfac2b6bf98ed2\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/InputBox/+/c8fd733db765b0109785d1fa00cfac2b6bf98ed2\",\"vcs-date\":\"2026-06-14T09:40:49Z\",\"license-name\":\"MIT\",\"license\":\"/wiki/Special:Version/License/InputBox\"},{\"type\":\"parserhook\",\"name\":\"ImageMap\",\"descriptionmsg\":\"imagemap_desc\",\"author\":\"Tim
         Starling, Arlo Breault\",\"url\":\"https://www.mediawiki.org/wiki/Extension:ImageMap\",\"vcs-system\":\"git\",\"vcs-version\":\"eb3708b4b988bf3e81b06a220ce4e3295a2d1cbc\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/ImageMap/+/eb3708b4b988bf3e81b06a220ce4e3295a2d1cbc\",\"vcs-date\":\"2026-06-14T09:25:18Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/ImageMap\"},{\"type\":\"parserhook\",\"name\":\"SyntaxHighlight\",\"descriptionmsg\":\"syntaxhighlight-desc\",\"author\":\"Brooke
         Vibber, Tim Starling, Rob Church, Niklas Laxstr\xF6m, Ori Livneh, Ed Sanders\",\"url\":\"https://www.mediawiki.org/wiki/Extension:SyntaxHighlight\",\"version\":\"2.0\",\"vcs-system\":\"git\",\"vcs-version\":\"9044bd37cd0179437c911cc26b55eec678c72f82\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/SyntaxHighlight_GeSHi/+/9044bd37cd0179437c911cc26b55eec678c72f82\",\"vcs-date\":\"2026-06-20T19:04:46Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/SyntaxHighlight\"},{\"type\":\"parserhook\",\"name\":\"Poem\",\"descriptionmsg\":\"poem-desc\",\"author\":\"Nikola
@@ -377,9 +377,9 @@ interactions:
         Mehta, wctaiwan\",\"url\":\"https://www.mediawiki.org/wiki/Extension:MassMessage\",\"version\":\"0.5.0\",\"vcs-system\":\"git\",\"vcs-version\":\"a834f3ec5de845674bec34c4d6c1bfbbd6b86f98\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/MassMessage/+/a834f3ec5de845674bec34c4d6c1bfbbd6b86f98\",\"vcs-date\":\"2026-06-17T17:18:31Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/MassMessage\"},{\"type\":\"specialpage\",\"name\":\"Linter\",\"descriptionmsg\":\"linter-desc\",\"author\":\"Kunal
         Mehta, Arlo Breault, Subramanya Sastry\",\"url\":\"https://www.mediawiki.org/wiki/Extension:Linter\",\"vcs-system\":\"git\",\"vcs-version\":\"a6f85567e9a52aca6b98753cd21d54afe272d433\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/Linter/+/a6f85567e9a52aca6b98753cd21d54afe272d433\",\"vcs-date\":\"2026-06-19T19:20:10Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/Linter\"},{\"type\":\"specialpage\",\"name\":\"Echo\",\"descriptionmsg\":\"echo-desc\",\"author\":\"Andrew
         Garrett, Ryan Kaldari, Benny Situ, Luke Welling, Kunal Mehta, Moriel Schottlender,
-        Jon Robson, Roan Kattouw\",\"url\":\"https://www.mediawiki.org/wiki/Extension:Echo\",\"vcs-system\":\"git\",\"vcs-version\":\"2c24a9c5d834a73b8d4a43804ee6bef29f3ee49a\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/Echo/+/2c24a9c5d834a73b8d4a43804ee6bef29f3ee49a\",\"vcs-date\":\"2026-06-18T19:36:38Z\",\"license-name\":\"MIT\",\"license\":\"/wiki/Special:Version/License/Echo\"},{\"type\":\"specialpage\",\"name\":\"TemplateSandbox\",\"descriptionmsg\":\"templatesandbox-desc\",\"author\":\"Brad
+        Jon Robson, Roan Kattouw\",\"url\":\"https://www.mediawiki.org/wiki/Extension:Echo\",\"vcs-system\":\"git\",\"vcs-version\":\"6b5f477328663d52365d8f1880ff3d6fbd0e1eda\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/Echo/+/6b5f477328663d52365d8f1880ff3d6fbd0e1eda\",\"vcs-date\":\"2026-06-29T15:14:33Z\",\"license-name\":\"MIT\",\"license\":\"/wiki/Special:Version/License/Echo\"},{\"type\":\"specialpage\",\"name\":\"TemplateSandbox\",\"descriptionmsg\":\"templatesandbox-desc\",\"author\":\"Brad
         Jorsch\",\"url\":\"https://www.mediawiki.org/wiki/Extension:TemplateSandbox\",\"version\":\"1.1.0\",\"vcs-system\":\"git\",\"vcs-version\":\"d24659f97aed2a8421ffb296f22ed30a6a70926f\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/TemplateSandbox/+/d24659f97aed2a8421ffb296f22ed30a6a70926f\",\"vcs-date\":\"2026-06-14T18:56:56Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/TemplateSandbox\"},{\"type\":\"specialpage\",\"name\":\"CheckUser\",\"descriptionmsg\":\"checkuser-desc\",\"author\":\"Tim
-        Starling, Aaron Schulz, Dreamy Jazz\",\"url\":\"https://www.mediawiki.org/wiki/Extension:CheckUser\",\"version\":\"2.5\",\"vcs-system\":\"git\",\"vcs-version\":\"ac78d1a5468122fbcb4ac52a945611e72bcff0db\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/CheckUser/+/ac78d1a5468122fbcb4ac52a945611e72bcff0db\",\"vcs-date\":\"2026-06-24T10:57:02Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/CheckUser\"},{\"type\":\"specialpage\",\"name\":\"CampaignEvents\",\"descriptionmsg\":\"campaignevents-desc\",\"author\":\"[https://meta.wikimedia.org/wiki/Connection_Team
+        Starling, Aaron Schulz, Dreamy Jazz\",\"url\":\"https://www.mediawiki.org/wiki/Extension:CheckUser\",\"version\":\"2.5\",\"vcs-system\":\"git\",\"vcs-version\":\"725cc9a315a544961c2dfbe289faa0f24b2e2f0e\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/CheckUser/+/725cc9a315a544961c2dfbe289faa0f24b2e2f0e\",\"vcs-date\":\"2026-06-30T10:21:07Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/CheckUser\"},{\"type\":\"specialpage\",\"name\":\"CampaignEvents\",\"descriptionmsg\":\"campaignevents-desc\",\"author\":\"[https://meta.wikimedia.org/wiki/Connection_Team
         WMF Connection Team]\",\"url\":\"https://www.mediawiki.org/wiki/Extension:CampaignEvents\",\"vcs-system\":\"git\",\"vcs-version\":\"456e4957ba4bf4ab19a030bbc8f758e57369767f\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/CampaignEvents/+/456e4957ba4bf4ab19a030bbc8f758e57369767f\",\"vcs-date\":\"2026-06-18T07:49:47Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/CampaignEvents\"},{\"type\":\"specialpage\",\"name\":\"WikimediaCampaignEvents\",\"namemsg\":\"wikimediacampaignevents-extensionname\",\"descriptionmsg\":\"wikimediacampaignevents-desc\",\"author\":\"[https://meta.wikimedia.org/wiki/Connection_Team
         WMF Connection Team]\",\"url\":\"https://www.mediawiki.org/wiki/Extension:WikimediaCampaignEvents\",\"vcs-system\":\"git\",\"vcs-version\":\"49bd7e71f4de48c4a31f94e0bf7b7e45369ccbf9\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/WikimediaCampaignEvents/+/49bd7e71f4de48c4a31f94e0bf7b7e45369ccbf9\",\"vcs-date\":\"2026-06-14T23:20:44Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/WikimediaCampaignEvents\"},{\"type\":\"other\",\"name\":\"ProofreadPage\",\"descriptionmsg\":\"proofreadpage_desc\",\"author\":\"ThomasV,
         Thomas Pellissier Tanon\",\"url\":\"https://www.mediawiki.org/wiki/Extension:Proofread_Page\",\"vcs-system\":\"git\",\"vcs-version\":\"5f46af888028263f4ea6e49b70ca03b6db6c6264\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/ProofreadPage/+/5f46af888028263f4ea6e49b70ca03b6db6c6264\",\"vcs-date\":\"2026-06-19T03:25:48Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/ProofreadPage\"},{\"type\":\"other\",\"name\":\"Gadgets\",\"descriptionmsg\":\"gadgets-desc\",\"author\":\"Daniel
@@ -393,7 +393,7 @@ interactions:
         Eggleston, Tomasz Finc, Andrew Russell Green, Ryan Kaldari, Trevor Parscal,
         Matthew Walker, Adam Roses Wight, Brooke Vibber\",\"url\":\"https://www.mediawiki.org/wiki/Extension:CentralNotice\",\"version\":\"2.6.1\",\"vcs-system\":\"git\",\"vcs-version\":\"d50f2f30fe3ce3a8e5d4a4c082f388ed138995be\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/CentralNotice/+/d50f2f30fe3ce3a8e5d4a4c082f388ed138995be\",\"vcs-date\":\"2026-06-15T19:31:34Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/CentralNotice\",\"credits\":\"/wiki/Special:Version/Credits/CentralNotice\"},{\"type\":\"other\",\"name\":\"TestKitchen\",\"descriptionmsg\":\"testkitchen-desc\",\"author\":\"[https://www.mediawiki.org/wiki/Data_Platform_Engineering/Experiment_Platform
         Experiment Platform], Sam Smith, Santiago Faci, Clare Ming\",\"url\":\"https://www.mediawiki.org/wiki/Extension:TestKitchen\",\"vcs-system\":\"git\",\"vcs-version\":\"e9a7e64849f879e84747e6593d403ef226778344\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/TestKitchen/+/e9a7e64849f879e84747e6593d403ef226778344\",\"vcs-date\":\"2026-06-17T15:48:37Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/TestKitchen\"},{\"type\":\"other\",\"name\":\"WikimediaCustomizations\",\"descriptionmsg\":\"wikimediacustomizations-desc\",\"author\":\"Gerg\u0151
-        Tisza\",\"url\":\"https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:WikimediaCustomizations\",\"vcs-system\":\"git\",\"vcs-version\":\"dca05a1f2248a55f6d580d363304f97071ce0046\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/WikimediaCustomizations/+/dca05a1f2248a55f6d580d363304f97071ce0046\",\"vcs-date\":\"2026-06-17T07:54:05Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/WikimediaCustomizations\"},{\"type\":\"other\",\"name\":\"WikimediaMessages\",\"descriptionmsg\":\"wikimediamessages-desc\",\"author\":\"Tim
+        Tisza\",\"url\":\"https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:WikimediaCustomizations\",\"vcs-system\":\"git\",\"vcs-version\":\"8e8f059eb348190478a055224963c6b569a8c4f6\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/WikimediaCustomizations/+/8e8f059eb348190478a055224963c6b569a8c4f6\",\"vcs-date\":\"2026-06-30T16:49:46Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/WikimediaCustomizations\"},{\"type\":\"other\",\"name\":\"WikimediaMessages\",\"descriptionmsg\":\"wikimediamessages-desc\",\"author\":\"Tim
         Starling, Siebrand Mazeland, James D. Forrester, Multichill\",\"url\":\"https://www.mediawiki.org/wiki/Extension:WikimediaMessages\",\"vcs-system\":\"git\",\"vcs-version\":\"f3d445b2ea7f48a0ef8368c270dc85e2519fcf1e\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/WikimediaMessages/+/f3d445b2ea7f48a0ef8368c270dc85e2519fcf1e\",\"vcs-date\":\"2026-06-17T07:54:28Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/WikimediaMessages\"},{\"type\":\"other\",\"name\":\"ElectronPdfService\",\"descriptionmsg\":\"electronpdfservice-desc\",\"author\":\"[https://meta.wikimedia.org/wiki/WMDE_Technical_Wishes
         Wikimedia Deutschland Technical Wishes Team], Tobias Gritschacher, Addshore,
         Christoph Jauera\",\"url\":\"https://www.mediawiki.org/wiki/Extension:ElectronPdfService\",\"vcs-system\":\"git\",\"vcs-version\":\"606fa2d5a8bb0705dec8cac5abad9009f8161d5d\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/ElectronPdfService/+/606fa2d5a8bb0705dec8cac5abad9009f8161d5d\",\"vcs-date\":\"2026-06-11T07:50:39Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/ElectronPdfService\"},{\"type\":\"other\",\"name\":\"AdvancedSearch\",\"descriptionmsg\":\"advancedsearch-desc\",\"author\":\"[https://meta.wikimedia.org/wiki/WMDE_Technical_Wishes
@@ -457,7 +457,7 @@ interactions:
         Starling, John Du Hart, Daniel Kinzler\",\"url\":\"https://www.mediawiki.org/wiki/Extension:SpamBlacklist\",\"vcs-system\":\"git\",\"vcs-version\":\"ebd04259b90199dab09150fd19b687068f2f8ae5\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/SpamBlacklist/+/ebd04259b90199dab09150fd19b687068f2f8ae5\",\"vcs-date\":\"2026-06-17T18:03:43Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/SpamBlacklist\"},{\"type\":\"antispam\",\"name\":\"TitleBlacklist\",\"descriptionmsg\":\"titleblacklist-desc\",\"author\":\"Victor
         Vasiliev, Fran Rogers\",\"url\":\"https://www.mediawiki.org/wiki/Extension:TitleBlacklist\",\"version\":\"1.5.0\",\"vcs-system\":\"git\",\"vcs-version\":\"d2d390c1cd2ea2acd72dccabec2aaefa469d7d01\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/TitleBlacklist/+/d2d390c1cd2ea2acd72dccabec2aaefa469d7d01\",\"vcs-date\":\"2026-06-16T07:53:02Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/TitleBlacklist\"},{\"type\":\"antispam\",\"name\":\"TorBlock\",\"descriptionmsg\":\"torblock-desc\",\"author\":\"Andrew
         Garrett\",\"url\":\"https://www.mediawiki.org/wiki/Extension:TorBlock\",\"version\":\"1.1.0\",\"vcs-system\":\"git\",\"vcs-version\":\"0d5c1023335e634cc41e12e0a8319b2ac5cd2600\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/TorBlock/+/0d5c1023335e634cc41e12e0a8319b2ac5cd2600\",\"vcs-date\":\"2026-06-19T17:55:32Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/TorBlock\"},{\"type\":\"antispam\",\"name\":\"ConfirmEdit\",\"descriptionmsg\":\"captcha-desc\",\"author\":\"Brooke
-        Vibber, Florian Schmidt, Sam Reed, ...\",\"url\":\"https://www.mediawiki.org/wiki/Extension:ConfirmEdit\",\"version\":\"1.6.0\",\"vcs-system\":\"git\",\"vcs-version\":\"c662d9a73ed9e035c7fc4e5a1508e4ae510dd080\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/ConfirmEdit/+/c662d9a73ed9e035c7fc4e5a1508e4ae510dd080\",\"vcs-date\":\"2026-06-25T09:26:43Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/ConfirmEdit\",\"credits\":\"/wiki/Special:Version/Credits/ConfirmEdit\"},{\"type\":\"antispam\",\"name\":\"hCaptcha\",\"descriptionmsg\":\"hcaptcha-desc\",\"author\":\"Sam
+        Vibber, Florian Schmidt, Sam Reed, ...\",\"url\":\"https://www.mediawiki.org/wiki/Extension:ConfirmEdit\",\"version\":\"1.6.0\",\"vcs-system\":\"git\",\"vcs-version\":\"b29b34a67c7fd42bcad90f1bdfe09f3fa027c4a6\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/ConfirmEdit/+/b29b34a67c7fd42bcad90f1bdfe09f3fa027c4a6\",\"vcs-date\":\"2026-06-30T13:24:03Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/ConfirmEdit\",\"credits\":\"/wiki/Special:Version/Credits/ConfirmEdit\"},{\"type\":\"antispam\",\"name\":\"hCaptcha\",\"descriptionmsg\":\"hcaptcha-desc\",\"author\":\"Sam
         Reed, ...\",\"url\":\"https://www.mediawiki.org/wiki/Extension:ConfirmEdit\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/hCaptcha\"},{\"type\":\"antispam\",\"name\":\"FancyCaptcha\",\"descriptionmsg\":\"fancycaptcha-desc\",\"author\":\"Brooke
         Vibber, ...\",\"url\":\"https://www.mediawiki.org/wiki/Extension:ConfirmEdit#FancyCaptcha\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/FancyCaptcha\"},{\"type\":\"antispam\",\"name\":\"AntiSpoof\",\"descriptionmsg\":\"antispoof-desc\",\"author\":\"Brooke
         Vibber\",\"url\":\"https://www.mediawiki.org/wiki/Extension:AntiSpoof\",\"vcs-system\":\"git\",\"vcs-version\":\"a03632ad4b77eebc7ad80d12a4f042cea577f841\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/AntiSpoof/+/a03632ad4b77eebc7ad80d12a4f042cea577f841\",\"vcs-date\":\"2026-06-15T08:15:36Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/AntiSpoof\"},{\"type\":\"antispam\",\"name\":\"Abuse
@@ -503,7 +503,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:17:49 GMT
+      - Wed, 01 Jul 2026 13:49:35 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -511,7 +511,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-wv75q
+      - mw-api-ext.eqiad.main-69b4b479d5-llpjx
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -533,7 +533,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 49fe39f4-cbf1-4eb2-b673-09a5e8f24889
+      - 6cc3c710-518c-4c8d-af8c-198b60d4ccb1
     status:
       code: 200
       message: OK
@@ -560,7 +560,7 @@ interactions:
       accept-ranges:
       - bytes
       age:
-      - '2'
+      - '0'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
@@ -574,7 +574,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:17:49 GMT
+      - Wed, 01 Jul 2026 13:49:36 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -582,7 +582,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-bfnv5
+      - mw-api-ext.eqiad.main-69b4b479d5-6sh7w
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -602,7 +602,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - f56f5698-7a64-449d-a339-e1656b82cf4f
+      - a58d719c-c5c5-4ea9-a2d8-5bc2d858bebc
     status:
       code: 200
       message: OK
@@ -643,7 +643,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:17:50 GMT
+      - Wed, 01 Jul 2026 13:49:36 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -651,7 +651,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-226xk
+      - mw-api-ext.eqiad.main-69b4b479d5-dxbkk
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -671,7 +671,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - ef491cc5-3fbd-462c-b6c6-9fabaf2c7b86
+      - 964e2f88-cd1e-461e-87b3-28074f15cf68
     status:
       code: 200
       message: OK
@@ -705,12 +705,14 @@ interactions:
       - inline; filename=api-result.json
       content-encoding:
       - gzip
+      content-length:
+      - '829'
       content-security-policy:
       - default-src 'self'; script-src 'none'; object-src 'none'
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:17:50 GMT
+      - Wed, 01 Jul 2026 13:49:36 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -718,13 +720,11 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-hvpn4
+      - mw-api-ext.eqiad.main-69b4b479d5-hdfvd
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
       - max-age=106384710; includeSubDomains; preload
-      transfer-encoding:
-      - chunked
       vary:
       - Accept-Encoding,User-Agent
       x-analytics:
@@ -740,7 +740,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 658061c3-0805-4f4b-8fa2-9ea42611d0a9
+      - b4366fa6-85eb-40a5-8156-b13f6dac1586
     status:
       code: 200
       message: OK
@@ -772,21 +772,19 @@ interactions:
         transcluded and proofread","parsedcomment":"Now transcluded and proofread","tags":["wikieditor"]}]}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
       age:
-      - '0'
+      - '2'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
       - inline; filename=api-result.json
       content-encoding:
       - gzip
-      content-length:
-      - '785'
       content-security-policy:
       - default-src 'self'; script-src 'none'; object-src 'none'
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:17:50 GMT
+      - Wed, 01 Jul 2026 13:49:36 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -794,11 +792,13 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-r7vdj
+      - mw-api-ext.eqiad.main-69b4b479d5-w6xh6
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
       - max-age=106384710; includeSubDomains; preload
+      transfer-encoding:
+      - chunked
       vary:
       - Accept-Encoding,User-Agent
       x-analytics:
@@ -814,7 +814,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 517eea60-cf68-4a6e-9ddb-9bb18bcb6ae0
+      - 44c31016-3c08-49ae-b367-c81eafd08099
     status:
       code: 200
       message: OK
@@ -842,21 +842,19 @@ interactions:
       accept-ranges:
       - bytes
       age:
-      - '2'
+      - '0'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
       - inline; filename=api-result.json
       content-encoding:
       - gzip
-      content-length:
-      - '213'
       content-security-policy:
       - default-src 'self'; script-src 'none'; object-src 'none'
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:17:50 GMT
+      - Wed, 01 Jul 2026 13:49:37 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -864,11 +862,13 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-g4j8q
+      - mw-api-ext.eqiad.main-69b4b479d5-qt7r2
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
       - max-age=106384710; includeSubDomains; preload
+      transfer-encoding:
+      - chunked
       vary:
       - Accept-Encoding,User-Agent
       x-analytics:
@@ -884,7 +884,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - d0942e27-f2cd-4261-a900-6ff36abfcad2
+      - 3852182c-b16e-4fab-a45a-3df699e221d2
     status:
       code: 200
       message: OK
@@ -926,7 +926,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:17:51 GMT
+      - Wed, 01 Jul 2026 13:49:37 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -934,7 +934,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-mtr87
+      - mw-api-ext.eqiad.main-69b4b479d5-lm8zp
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -954,7 +954,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - b9283756-a473-46ac-956a-ceacaa89bbf7
+      - ff747d46-b93b-4f62-bd92-75ff9f2d5a9a
     status:
       code: 200
       message: OK
@@ -988,14 +988,12 @@ interactions:
       - inline; filename=api-result.json
       content-encoding:
       - gzip
-      content-length:
-      - '353'
       content-security-policy:
       - default-src 'self'; script-src 'none'; object-src 'none'
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:17:51 GMT
+      - Wed, 01 Jul 2026 13:49:37 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -1003,11 +1001,13 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-6k7hk
+      - mw-api-ext.eqiad.main-69b4b479d5-8hlc8
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
       - max-age=106384710; includeSubDomains; preload
+      transfer-encoding:
+      - chunked
       vary:
       - Accept-Encoding,User-Agent
       x-analytics:
@@ -1023,7 +1023,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - ab9c922e-dd59-4028-9034-a94001dc6233
+      - 37a09f9c-1b4a-42af-b1c4-9a7d0d98d627
     status:
       code: 200
       message: OK
@@ -1050,7 +1050,7 @@ interactions:
       accept-ranges:
       - bytes
       age:
-      - '0'
+      - '2'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
@@ -1062,7 +1062,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:17:51 GMT
+      - Wed, 01 Jul 2026 13:49:37 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -1070,7 +1070,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-bg56w
+      - mw-api-ext.eqiad.main-69b4b479d5-86l49
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -1092,7 +1092,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 7161a486-1cc4-4a5e-9f61-02561821ec72
+      - 47d414e2-7ef0-4802-991f-05c07ffd037a
     status:
       code: 200
       message: OK
@@ -1255,7 +1255,7 @@ interactions:
       accept-ranges:
       - bytes
       age:
-      - '1'
+      - '0'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
@@ -1267,7 +1267,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:17:52 GMT
+      - Wed, 01 Jul 2026 13:49:38 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -1275,7 +1275,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-hkj7f
+      - mw-api-ext.eqiad.main-69b4b479d5-f2q24
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -1297,7 +1297,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 3c291df6-84b6-4a07-a84e-73c54626c78a
+      - 5f6e6942-02c5-4ed5-80f3-9de18bc14b95
     status:
       code: 200
       message: OK

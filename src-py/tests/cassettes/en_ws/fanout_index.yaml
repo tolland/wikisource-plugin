@@ -20,7 +20,7 @@ interactions:
       string: '{"batchcomplete":"","query":{"pageids":["4734308"],"pages":{"4734308":{"pageid":4734308,"ns":106,"title":"Index:NeglectedArgument.pdf","contentmodel":"proofread-index","pagelanguage":"en","pagelanguagehtmlcode":"en","pagelanguagedir":"ltr","touched":"2026-04-30T17:48:35Z","lastrevid":14857009,"length":123,"protection":[],"restrictiontypes":["edit","move"]}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
       age:
-      - '1'
+      - '0'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
@@ -34,7 +34,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:06 GMT
+      - Wed, 01 Jul 2026 13:49:42 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -42,7 +42,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-8fhkx
+      - mw-api-ext.eqiad.main-69b4b479d5-fdtc2
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -62,7 +62,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 237d33a9-1f23-4558-b61a-b26ef0c3c759
+      - 5496626f-3ec7-402b-bb79-42f0ce523300
     status:
       code: 200
       message: OK
@@ -94,7 +94,7 @@ interactions:
         transcluded and proofread","parsedcomment":"Now transcluded and proofread","tags":["wikieditor"]}]}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
       age:
-      - '0'
+      - '2'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
@@ -106,7 +106,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:06 GMT
+      - Wed, 01 Jul 2026 13:49:42 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -114,7 +114,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-2ws8x
+      - mw-api-ext.eqiad.main-69b4b479d5-hhwbk
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -136,7 +136,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - d7fb2dea-05af-4753-afed-b6ba1d82ac02
+      - fcd29420-e234-4e3c-b473-b52e229e4c31
     status:
       code: 200
       message: OK
@@ -175,7 +175,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:06 GMT
+      - Wed, 01 Jul 2026 13:49:43 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -183,7 +183,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-mjc22
+      - mw-api-ext.eqiad.main-69b4b479d5-hzlsc
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -203,7 +203,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - e22d8735-cdaa-4dc0-9516-1fcaf37f9456
+      - 991c17bc-ff78-4736-81a8-5c7de74eb262
     status:
       code: 200
       message: OK
@@ -364,7 +364,7 @@ interactions:
         class=\"mw-page-title-separator\">:</span><span class=\"mw-page-title-main\">NeglectedArgument.pdf</span></span>","iwlinks":[],"properties":[{"name":"noeditsection","*":""}]}}'
     headers:
       age:
-      - '2'
+      - '0'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
@@ -376,7 +376,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:06 GMT
+      - Wed, 01 Jul 2026 13:49:43 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -384,7 +384,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-nnp2z
+      - mw-api-ext.eqiad.main-69b4b479d5-zftnc
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -406,7 +406,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - c4a07f7b-a1da-40e2-8243-3aa21b3a2f2f
+      - 1dc9f73b-b5fc-45e1-ade4-da97a41d3ba6
     status:
       code: 200
       message: OK
@@ -445,7 +445,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:07 GMT
+      - Wed, 01 Jul 2026 13:49:43 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -453,7 +453,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-pwq4b
+      - mw-api-ext.eqiad.main-69b4b479d5-n4sg5
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -473,7 +473,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 4b9b5402-ac0d-49ec-82ab-4eb1863070e3
+      - fea646a8-83a7-47d0-aef8-b01378646d12
     status:
       code: 200
       message: OK
@@ -498,7 +498,7 @@ interactions:
       string: '{"batchcomplete":"","query":{"pageids":["158814456"],"pages":{"158814456":{"pageid":158814456,"ns":6,"title":"File:NeglectedArgument.pdf","contentmodel":"wikitext","pagelanguage":"en","pagelanguagehtmlcode":"en","pagelanguagedir":"ltr","touched":"2025-11-28T01:00:33Z","lastrevid":992278688,"length":324,"protection":[],"restrictiontypes":["edit","move","upload"]}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
       age:
-      - '0'
+      - '2'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
@@ -512,7 +512,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:07 GMT
+      - Wed, 01 Jul 2026 13:49:43 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -520,7 +520,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-8fhkx
+      - mw-api-ext.eqiad.main-69b4b479d5-xt7wb
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -540,7 +540,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 63661d76-c6c9-4015-8145-5cc211d56d50
+      - ba7dd824-6faf-4892-a580-bb777a78ac02
     status:
       code: 200
       message: OK
@@ -580,7 +580,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:07 GMT
+      - Wed, 01 Jul 2026 13:49:44 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -588,7 +588,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-rcwrz
+      - mw-api-ext.eqiad.main-69b4b479d5-klx7s
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -608,7 +608,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - af656ed4-d7cc-4e63-8f38-0c45e672e692
+      - 0360435c-5fd8-4107-bfc8-6f691c970eb1
     status:
       code: 200
       message: OK
@@ -1301,7 +1301,7 @@ interactions:
         the will (willing to believe).\nC. S. PEIRCE.\nWESTFALL, PENNSYLVANIA.\n\n"},{"name":23,"value":""}]}],"mime":"application/pdf","mediatype":"OFFICE","bitdepth":0}]}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
       age:
-      - '2'
+      - '0'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
@@ -1313,7 +1313,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:07 GMT
+      - Wed, 01 Jul 2026 13:49:44 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -1321,7 +1321,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-928fs
+      - mw-api-ext.eqiad.canary-dbbfbd9db-mgv5n
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -1343,7 +1343,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 47c37dc3-ee98-4033-be80-630029ffd2fb
+      - 4acdc4cf-6f81-4dc4-9716-ebaa0de710a1
     status:
       code: 200
       message: OK
@@ -1382,7 +1382,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:08 GMT
+      - Wed, 01 Jul 2026 13:49:44 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -1390,7 +1390,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-q2t6k
+      - mw-api-ext.eqiad.main-69b4b479d5-lw8ql
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -1410,7 +1410,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 04b23519-c086-4a38-8eea-00c79d0b9d95
+      - 1fa05705-70da-4ca4-968c-238bf55fb92d
     status:
       code: 200
       message: OK
@@ -1449,7 +1449,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:08 GMT
+      - Wed, 01 Jul 2026 13:49:45 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -1457,7 +1457,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-928fs
+      - mw-api-ext.eqiad.main-69b4b479d5-p5bs2
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -1477,7 +1477,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - d6dcee18-c0eb-4fbe-a9a2-42d0692176f0
+      - be7928b4-92bd-4f67-8283-dcf6cb6e3032
     status:
       code: 200
       message: OK
@@ -1503,7 +1503,7 @@ interactions:
         a work by Charles Sanders Peirce from Internet Archive with UploadWizard","url":"https://upload.wikimedia.org/wikipedia/commons/1/1a/NeglectedArgument.pdf","descriptionurl":"https://commons.wikimedia.org/wiki/File:NeglectedArgument.pdf","descriptionshorturl":"https://commons.wikimedia.org/w/index.php?curid=158814456","sha1":"89c4260e5a9d79b29ad62a35baeda6d6e180ecab","mime":"application/pdf","mediatype":"OFFICE","bitdepth":0}]}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
       age:
-      - '2'
+      - '0'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
@@ -1517,7 +1517,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:08 GMT
+      - Wed, 01 Jul 2026 13:49:45 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -1525,7 +1525,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-pwq4b
+      - mw-api-ext.eqiad.main-69b4b479d5-n4sg5
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -1545,7 +1545,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 45885ca0-9bb7-4501-b35f-122dd4813cc6
+      - eb3479db-89ec-4438-807d-ce394b1dbe3d
     status:
       code: 200
       message: OK
@@ -1564,53 +1564,43 @@ interactions:
     uri: https://upload.wikimedia.org/wikipedia/commons/1/1a/NeglectedArgument.pdf
   response:
     body:
-      string: "<!DOCTYPE html>\n<html lang=\"en\">\n<meta charset=\"utf-8\">\n<title>Wikimedia
-        Error</title>\n<style>\n* { margin: 0; padding: 0; }\nbody { background: #fff;
-        font: 15px/1.6 sans-serif; color: #333; }\n.content { margin: 7% auto 0; padding:
-        2em 1em 1em; max-width: 640px; display: flex; flex-direction: row; flex-wrap:
-        wrap; }\n.footer { clear: both; margin-top: 14%; border-top: 1px solid #e5e5e5;
-        background: #f9f9f9; padding: 2em 0; font-size: 0.8em; text-align: center;
-        }\nimg { margin: 0 2em 2em 0; }\na img { border: 0; }\nh1 { margin-top: 1em;
-        font-size: 1.2em; }\n.content-text { flex: 1; }\np { margin: 0.7em 0 1em 0;
-        }\na { color: #0645ad; text-decoration: none; }\na:hover { text-decoration:
-        underline; }\ncode { font-family: sans-serif; }\nsummary { font-weight: bold;
-        cursor: pointer; }\ndetails[open] { background: #970302; color: #dfdedd; }\n.text-muted
-        { color: #777; }\n@media (prefers-color-scheme: dark) {\n  a { color: #9e9eff;
-        }\n  body { background: transparent; color: #ddd; }\n  .footer { border-top:
-        1px solid #444; background: #060606; }\n  #logo { filter: invert(1) hue-rotate(180deg);
-        }\n  .text-muted { color: #888; }\n}\n</style>\n<meta name=\"color-scheme\"
-        content=\"light dark\">\n<div class=\"content\" role=\"main\">\n<a href=\"https://www.wikimedia.org\"><img
-        id=\"logo\" src=\"https://www.wikimedia.org/static/images/wmf-logo.png\" srcset=\"https://www.wikimedia.org/static/images/wmf-logo-2x.png
-        2x\" alt=\"Wikimedia\" width=\"135\" height=\"101\">\n</a>\n<div class=\"content-text\">\n<h1>Error</h1>\n\n<p>Too
-        Many Requests (015d12c)</p>\n</div>\n</div>\n<div class=\"footer\"><p>If you
-        report this error to the Wikimedia System Administrators, please include the
-        details below.</p><p class=\"text-muted\"><code>Request served via cp3076
-        cp3076, Varnish XID 936157726<br>Upstream caches: cp3076 int<br>Error: 429,
-        Too Many Requests (015d12c) at Tue, 30 Jun 2026 08:18:09 GMT<br><details><summary>Sensitive
-        client information</summary>IP address: 80.229.142.179</details></code></p>\n</div>\n</html>\n"
+      string: <BINARY_STUB>
     headers:
+      accept-ranges:
+      - bytes
       access-control-allow-origin:
       - '*'
       access-control-expose-headers:
       - Age, Date, Content-Length, Content-Range, X-Content-Duration, X-Cache
+      age:
+      - '0'
       content-length:
-      - '1966'
+      - '2109864'
+      content-security-policy-report-only:
+      - 'default-src ''none''; style-src ''unsafe-inline'' data:; font-src data:;
+        img-src data: https://upload.wikimedia.org/favicon.ico; connect-src https://upload.wikimedia.org/favicon.ico;
+        media-src data: ''self''; object-src ''self''; report-uri https://commons.wikimedia.org/w/api.php?reportonly=1&source=image&action=cspreport&format=json&'
       content-type:
-      - text/html; charset=utf-8
+      - application/pdf
       date:
-      - Tue, 30 Jun 2026 08:18:09 GMT
+      - Wed, 01 Jul 2026 13:49:45 GMT
+      etag:
+      - 5439f5b1fdc3d42588d745c055ae293c
+      last-modified:
+      - Thu, 30 Jan 2025 20:07:38 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
       report-to:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
-      retry-after:
-      - '10'
       server:
-      - Varnish
+      - envoy
       server-timing:
-      - cache;desc="int-front", host;desc="cp3076"
+      - cache;desc="hit-local", host;desc="cp3076"
+      set-cookie:
+      - WMF-Uniq=rP7UYAYbGZL6IGS3VJyVfwOQAAAAAFvdhPOXiXDchDAa9LqFkgWVY7qyt7CbJMXg;Domain=upload.wikimedia.org;Path=/;HttpOnly;secure;SameSite=None;Expires=Thu,
+        01 Jul 2027 00:00:00 GMT
       strict-transport-security:
       - max-age=106384710; includeSubDomains; preload
       timing-allow-origin:
@@ -1618,16 +1608,298 @@ interactions:
       x-analytics:
       - ''
       x-cache:
-      - cp3076 int
+      - cp3076 hit, cp3076 miss
       x-cache-status:
-      - int-front
+      - hit-local
       x-client-ip:
       - 80.229.142.179
+      x-content-security-policy-report-only:
+      - 'default-src ''none''; style-src ''unsafe-inline'' data:; font-src data:;
+        img-src data: https://upload.wikimedia.org/favicon.ico; connect-src https://upload.wikimedia.org/favicon.ico;
+        media-src data: ''self''; object-src ''self''; report-uri https://commons.wikimedia.org/w/api.php?reportonly=1&source=image&action=cspreport&format=json&'
+      x-content-type-options:
+      - nosniff
+      x-object-meta-sha1base36:
+      - g3c1q5jqcvdl6udv8vwbrz7abytc8tn
       x-request-id:
-      - 33105499-1227-4f6a-9b18-332f3e625aa7
+      - 8999cc28-4596-45b3-88b0-1e722bf96ea3
     status:
-      code: 429
-      message: Too Many Requests (015d12c)
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Type:
+      - application/x-www-form-urlencoded
+      user-agent:
+      - Tolland/pytest (wikisource:en; User:Tolland) Pywikibot/11.4.2 (-1 (unknown))
+        Python/3.13.1.final.0 requests/2.34.2
+    method: GET
+    uri: https://en.wikisource.org/w/api.php?prppiititle=Index%3ANeglectedArgument.pdf&list=proofreadpagesinindex&action=query&indexpageids=&meta=userinfo&uiprop=blockinfo%7Chasmsg&maxlag=5&format=json
+  response:
+    body:
+      string: '{"batchcomplete":"","query":{"proofreadpagesinindex":[{"pageoffset":1,"pageid":4734312,"title":"Page:NeglectedArgument.pdf/1"},{"pageoffset":2,"pageid":4734315,"title":"Page:NeglectedArgument.pdf/2"},{"pageoffset":3,"pageid":4734318,"title":"Page:NeglectedArgument.pdf/3"},{"pageoffset":4,"pageid":4742930,"title":"Page:NeglectedArgument.pdf/4"},{"pageoffset":5,"pageid":4742926,"title":"Page:NeglectedArgument.pdf/5"},{"pageoffset":6,"pageid":4742927,"title":"Page:NeglectedArgument.pdf/6"},{"pageoffset":7,"pageid":4742959,"title":"Page:NeglectedArgument.pdf/7"},{"pageoffset":8,"pageid":4742963,"title":"Page:NeglectedArgument.pdf/8"},{"pageoffset":9,"pageid":4742966,"title":"Page:NeglectedArgument.pdf/9"},{"pageoffset":10,"pageid":4742967,"title":"Page:NeglectedArgument.pdf/10"},{"pageoffset":11,"pageid":4742970,"title":"Page:NeglectedArgument.pdf/11"},{"pageoffset":12,"pageid":4742972,"title":"Page:NeglectedArgument.pdf/12"},{"pageoffset":13,"pageid":4742974,"title":"Page:NeglectedArgument.pdf/13"},{"pageoffset":14,"pageid":4742975,"title":"Page:NeglectedArgument.pdf/14"},{"pageoffset":15,"pageid":4742982,"title":"Page:NeglectedArgument.pdf/15"},{"pageoffset":16,"pageid":4742984,"title":"Page:NeglectedArgument.pdf/16"},{"pageoffset":17,"pageid":4742986,"title":"Page:NeglectedArgument.pdf/17"},{"pageoffset":18,"pageid":4742988,"title":"Page:NeglectedArgument.pdf/18"},{"pageoffset":19,"pageid":4742989,"title":"Page:NeglectedArgument.pdf/19"},{"pageoffset":20,"pageid":4742990,"title":"Page:NeglectedArgument.pdf/20"},{"pageoffset":21,"pageid":4742991,"title":"Page:NeglectedArgument.pdf/21"},{"pageoffset":22,"pageid":4742993,"title":"Page:NeglectedArgument.pdf/22"},{"pageoffset":23,"pageid":4742996,"title":"Page:NeglectedArgument.pdf/23"}],"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
+    headers:
+      age:
+      - '0'
+      cache-control:
+      - private, must-revalidate, max-age=0
+      content-disposition:
+      - inline; filename=api-result.json
+      content-encoding:
+      - gzip
+      content-length:
+      - '353'
+      content-security-policy:
+      - default-src 'self'; script-src 'none'; object-src 'none'
+      content-type:
+      - application/json; charset=utf-8
+      date:
+      - Wed, 01 Jul 2026 13:49:46 GMT
+      nel:
+      - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
+        0.0}'
+      report-to:
+      - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
+        }] }'
+      server:
+      - mw-api-ext.eqiad.main-69b4b479d5-wpkqj
+      server-timing:
+      - cache;desc="pass", host;desc="cp3073"
+      strict-transport-security:
+      - max-age=106384710; includeSubDomains; preload
+      vary:
+      - Accept-Encoding,User-Agent
+      x-analytics:
+      - ''
+      x-cache:
+      - cp3073 miss, cp3073 pass
+      x-cache-status:
+      - pass
+      x-client-ip:
+      - 80.229.142.179
+      x-content-type-options:
+      - nosniff
+      x-frame-options:
+      - DENY
+      x-request-id:
+      - 6eee3e61-02d1-465c-bf1f-c0a638789835
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Type:
+      - application/x-www-form-urlencoded
+      user-agent:
+      - Tolland/pytest (wikisource:en; User:Tolland) Pywikibot/11.4.2 (-1 (unknown))
+        Python/3.13.1.final.0 requests/2.34.2
+    method: GET
+    uri: https://en.wikisource.org/w/api.php?action=paraminfo&modules=query%2Ballpages&maxlag=5&format=json
+  response:
+    body:
+      string: '{"paraminfo":{"helpformat":"none","modules":[{"name":"allpages","classname":"MediaWiki\\Api\\ApiQueryAllPages","path":"query+allpages","group":"list","prefix":"ap","source":"MediaWiki","sourcename":"MediaWiki","licensetag":"GPL-2.0-or-later","licenselink":"//en.wikisource.org/wiki/Special:Version/License/MediaWiki","readrights":"","generator":"","helpurls":["https://www.mediawiki.org/wiki/Special:MyLanguage/API:Allpages"],"parameters":[{"index":1,"name":"from","type":"string"},{"index":2,"name":"continue","type":"string"},{"index":3,"name":"to","type":"string"},{"index":4,"name":"prefix","type":"string"},{"index":5,"name":"namespace","type":"namespace","default":0},{"index":6,"name":"filterredir","type":["all","nonredirects","redirects"],"default":"all"},{"index":7,"name":"filterlanglinks","type":["all","withlanglinks","withoutlanglinks"],"default":"all"},{"index":8,"name":"minsize","type":"integer"},{"index":9,"name":"maxsize","type":"integer"},{"index":10,"name":"prtype","type":["edit","move","upload"],"multi":"","lowlimit":50,"highlimit":500,"limit":50},{"index":11,"name":"prlevel","type":["","autoconfirmed","sysop"],"multi":"","lowlimit":50,"highlimit":500,"limit":50},{"index":12,"name":"prfiltercascade","type":["all","cascading","noncascading"],"default":"all"},{"index":13,"name":"prexpiry","type":["all","definite","indefinite"],"default":"all"},{"index":14,"name":"limit","type":"limit","default":10,"min":1,"max":500,"highmax":5000},{"index":15,"name":"dir","type":["ascending","descending"],"default":"ascending"}],"templatedparameters":[]}]}}'
+    headers:
+      accept-ranges:
+      - bytes
+      age:
+      - '0'
+      cache-control:
+      - private, must-revalidate, max-age=0
+      content-disposition:
+      - inline; filename=api-result.json
+      content-encoding:
+      - gzip
+      content-security-policy:
+      - default-src 'self'; script-src 'none'; object-src 'none'
+      content-type:
+      - application/json; charset=utf-8
+      date:
+      - Wed, 01 Jul 2026 13:49:46 GMT
+      nel:
+      - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
+        0.0}'
+      report-to:
+      - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
+        }] }'
+      server:
+      - mw-api-ext.eqiad.main-69b4b479d5-vgdll
+      server-timing:
+      - cache;desc="pass", host;desc="cp3073"
+      strict-transport-security:
+      - max-age=106384710; includeSubDomains; preload
+      transfer-encoding:
+      - chunked
+      vary:
+      - Accept-Encoding,User-Agent
+      x-analytics:
+      - ''
+      x-cache:
+      - cp3073 miss, cp3073 pass
+      x-cache-status:
+      - pass
+      x-client-ip:
+      - 80.229.142.179
+      x-content-type-options:
+      - nosniff
+      x-frame-options:
+      - DENY
+      x-request-id:
+      - 674365d6-e644-4467-b4dd-512ba3e4d3e2
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Type:
+      - application/x-www-form-urlencoded
+      user-agent:
+      - Tolland/pytest (wikisource:en; User:Tolland) Pywikibot/11.4.2 (-1 (unknown))
+        Python/3.13.1.final.0 requests/2.34.2
+    method: GET
+    uri: https://en.wikisource.org/w/api.php?action=paraminfo&modules=query%2Bcategoryinfo%7Cquery%2Bimageinfo&maxlag=5&format=json
+  response:
+    body:
+      string: '{"paraminfo":{"helpformat":"none","modules":[{"name":"categoryinfo","classname":"MediaWiki\\Api\\ApiQueryCategoryInfo","path":"query+categoryinfo","group":"prop","prefix":"ci","source":"MediaWiki","sourcename":"MediaWiki","licensetag":"GPL-2.0-or-later","licenselink":"//en.wikisource.org/wiki/Special:Version/License/MediaWiki","readrights":"","helpurls":["https://www.mediawiki.org/wiki/Special:MyLanguage/API:Categoryinfo"],"parameters":[{"index":1,"name":"continue","type":"string"}],"templatedparameters":[]},{"name":"imageinfo","classname":"MediaWiki\\Api\\ApiQueryImageInfo","path":"query+imageinfo","group":"prop","prefix":"ii","source":"MediaWiki","sourcename":"MediaWiki","licensetag":"GPL-2.0-or-later","licenselink":"//en.wikisource.org/wiki/Special:Version/License/MediaWiki","readrights":"","helpurls":["https://www.mediawiki.org/wiki/Special:MyLanguage/API:Imageinfo"],"parameters":[{"index":1,"name":"prop","type":["archivename","badfile","bitdepth","canonicaltitle","comment","commonmetadata","dimensions","extmetadata","mediatype","metadata","mime","parsedcomment","sha1","size","thumbmime","thumburls","timestamp","uploadwarning","url","user","userid"],"default":"timestamp|user","multi":"","lowlimit":50,"highlimit":500,"limit":50},{"index":2,"name":"limit","type":"limit","default":1,"min":1,"max":500,"highmax":5000},{"index":3,"name":"start","type":"timestamp"},{"index":4,"name":"end","type":"timestamp"},{"index":5,"name":"urlwidth","type":"integer","default":-1},{"index":6,"name":"urlheight","type":"integer","default":-1},{"index":7,"name":"metadataversion","type":"string","default":"1"},{"index":8,"name":"extmetadatalanguage","type":"string","default":"en"},{"index":9,"name":"extmetadatamultilang","type":"boolean"},{"index":10,"name":"extmetadatafilter","type":"string","multi":"","lowlimit":50,"highlimit":500,"limit":50},{"index":11,"name":"urlparam","type":"string","default":""},{"index":12,"name":"badfilecontexttitle","type":"string"},{"index":13,"name":"continue","type":"string"},{"index":14,"name":"localonly","type":"boolean"}],"templatedparameters":[]}]}}'
+    headers:
+      accept-ranges:
+      - bytes
+      age:
+      - '0'
+      cache-control:
+      - private, must-revalidate, max-age=0
+      content-disposition:
+      - inline; filename=api-result.json
+      content-encoding:
+      - gzip
+      content-length:
+      - '683'
+      content-security-policy:
+      - default-src 'self'; script-src 'none'; object-src 'none'
+      content-type:
+      - application/json; charset=utf-8
+      date:
+      - Wed, 01 Jul 2026 13:49:46 GMT
+      nel:
+      - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
+        0.0}'
+      report-to:
+      - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
+        }] }'
+      server:
+      - mw-api-ext.eqiad.main-69b4b479d5-czj98
+      server-timing:
+      - cache;desc="pass", host;desc="cp3073"
+      strict-transport-security:
+      - max-age=106384710; includeSubDomains; preload
+      vary:
+      - Accept-Encoding,User-Agent
+      x-analytics:
+      - ''
+      x-cache:
+      - cp3073 miss, cp3073 pass
+      x-cache-status:
+      - pass
+      x-client-ip:
+      - 80.229.142.179
+      x-content-type-options:
+      - nosniff
+      x-frame-options:
+      - DENY
+      x-request-id:
+      - b04bcdfa-5515-4547-949a-c02dca94f442
+    status:
+      code: 200
+      message: OK
+- request:
+    body: gapfrom=%21&prop=categoryinfo%7Cimageinfo%7Cinfo%7Cproofread&inprop=protection&iiprop=timestamp%7Cuser%7Ccomment%7Curl%7Csize%7Csha1%7Cmime%7Cmediatype%7Carchivename%7Cbitdepth&iilimit=max&generator=allpages&action=query&indexpageids=&gapnamespace=106&gapprefix=NeglectedArgument.pdf%2F&gaplimit=500&meta=userinfo&uiprop=blockinfo%7Chasmsg&maxlag=5&format=json
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '360'
+      Content-Type:
+      - application/x-www-form-urlencoded
+      user-agent:
+      - Tolland/pytest (wikisource:en; User:Tolland) Pywikibot/11.4.2 (-1 (unknown))
+        Python/3.13.1.final.0 requests/2.34.2
+    method: POST
+    uri: https://en.wikisource.org/w/api.php
+  response:
+    body:
+      string: '{"batchcomplete":"","limits":{"imageinfo":500},"query":{"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
+    headers:
+      age:
+      - '0'
+      cache-control:
+      - private, must-revalidate, max-age=0
+      content-disposition:
+      - inline; filename=api-result.json
+      content-encoding:
+      - gzip
+      content-length:
+      - '112'
+      content-security-policy:
+      - default-src 'self'; script-src 'none'; object-src 'none'
+      content-type:
+      - application/json; charset=utf-8
+      date:
+      - Wed, 01 Jul 2026 13:49:46 GMT
+      nel:
+      - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
+        0.0}'
+      report-to:
+      - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
+        }] }'
+      server:
+      - mw-api-ext.eqiad.main-69b4b479d5-lkg7b
+      server-timing:
+      - cache;desc="pass", host;desc="cp3073"
+      strict-transport-security:
+      - max-age=106384710; includeSubDomains; preload
+      vary:
+      - Accept-Encoding,User-Agent
+      x-analytics:
+      - ''
+      x-cache:
+      - cp3073 miss, cp3073 pass
+      x-cache-status:
+      - pass
+      x-client-ip:
+      - 80.229.142.179
+      x-content-type-options:
+      - nosniff
+      x-frame-options:
+      - DENY
+      x-request-id:
+      - dbb4e0b8-47e8-4e16-82f9-5afdcbd28dc5
+    status:
+      code: 200
+      message: OK
 - request:
     body: null
     headers:
@@ -1663,7 +1935,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:09 GMT
+      - Wed, 01 Jul 2026 13:49:47 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -1671,7 +1943,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-8bw7g
+      - mw-api-ext.eqiad.main-69b4b479d5-7259s
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -1691,7 +1963,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - dc6d67de-e087-4851-a583-0e448a3cfaec
+      - ab4f3b1b-caef-488f-b1ce-74effd6de83b
     status:
       code: 200
       message: OK
@@ -1751,7 +2023,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:09 GMT
+      - Wed, 01 Jul 2026 13:49:47 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -1759,7 +2031,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-dcrrm
+      - mw-api-ext.eqiad.main-69b4b479d5-llpjx
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -1781,7 +2053,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 40f5b76a-11c8-4683-92de-44aeef6ab603
+      - 7a2489e8-63df-4cc8-830b-49a8db612e4a
     status:
       code: 200
       message: OK
@@ -1805,6 +2077,8 @@ interactions:
     body:
       string: '{"batchcomplete":"","query":{"pageids":["4734315"],"pages":{"4734315":{"pageid":4734315,"ns":104,"title":"Page:NeglectedArgument.pdf/2","contentmodel":"proofread-page","pagelanguage":"en","pagelanguagehtmlcode":"en","pagelanguagedir":"ltr","touched":"2025-02-08T18:46:40Z","lastrevid":14856927,"length":2135,"protection":[],"restrictiontypes":["edit","move"],"proofread":{"quality":3,"quality_text":"Proofread"}}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
       - '0'
       cache-control:
@@ -1820,7 +2094,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:09 GMT
+      - Wed, 01 Jul 2026 13:49:47 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -1828,7 +2102,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-8vbww
+      - mw-api-ext.eqiad.main-69b4b479d5-zm9ts
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -1848,7 +2122,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - f666c05c-b385-4ae3-be71-8eebc0a72a99
+      - 07433680-0496-4855-9d5c-b51f0231c574
     status:
       code: 200
       message: OK
@@ -1906,7 +2180,7 @@ interactions:
         title=\"Page:NeglectedArgument.pdf/2\">\u2192<bdi dir=\"ltr\">Proofread</bdi></a></span>","tags":["proofreadpage-quality3","wikieditor"]}]}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
       age:
-      - '0'
+      - '2'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
@@ -1918,7 +2192,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:10 GMT
+      - Wed, 01 Jul 2026 13:49:47 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -1926,7 +2200,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-4vjgx
+      - mw-api-ext.eqiad.canary-dbbfbd9db-wtrjm
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -1948,7 +2222,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - fe02f383-770e-4135-8656-3c4dd52e5007
+      - 212350a9-2330-44e5-b84d-5ddeca1a320b
     status:
       code: 200
       message: OK
@@ -1972,6 +2246,8 @@ interactions:
     body:
       string: '{"batchcomplete":"","query":{"pageids":["4734318"],"pages":{"4734318":{"pageid":4734318,"ns":104,"title":"Page:NeglectedArgument.pdf/3","contentmodel":"proofread-page","pagelanguage":"en","pagelanguagehtmlcode":"en","pagelanguagedir":"ltr","touched":"2025-02-08T18:55:59Z","lastrevid":14856942,"length":2142,"protection":[],"restrictiontypes":["edit","move"],"proofread":{"quality":3,"quality_text":"Proofread"}}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
       - '0'
       cache-control:
@@ -1987,7 +2263,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:10 GMT
+      - Wed, 01 Jul 2026 13:49:48 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -1995,7 +2271,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-j582r
+      - mw-api-ext.eqiad.main-69b4b479d5-kl5mb
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -2015,7 +2291,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 62964aa9-aa0e-4d38-b054-f0c655e8e3a8
+      - 451b3fe8-19af-4dc5-82cd-cd8e29190a36
     status:
       code: 200
       message: OK
@@ -2085,7 +2361,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:10 GMT
+      - Wed, 01 Jul 2026 13:49:48 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -2093,7 +2369,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-5dzr6
+      - mw-api-ext.eqiad.main-69b4b479d5-5fmpb
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -2115,7 +2391,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - d2ce192e-1f8f-47a5-8d2d-693a0b0094c8
+      - edc47497-2815-45e4-89c0-3928cc2fd2e0
     status:
       code: 200
       message: OK
@@ -2139,8 +2415,10 @@ interactions:
     body:
       string: '{"batchcomplete":"","query":{"pageids":["4742930"],"pages":{"4742930":{"pageid":4742930,"ns":104,"title":"Page:NeglectedArgument.pdf/4","contentmodel":"proofread-page","pagelanguage":"en","pagelanguagehtmlcode":"en","pagelanguagedir":"ltr","touched":"2025-03-10T08:52:46Z","lastrevid":14856944,"length":2094,"protection":[],"restrictiontypes":["edit","move"],"proofread":{"quality":3,"quality_text":"Proofread"}}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
-      - '2'
+      - '0'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
@@ -2154,7 +2432,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:10 GMT
+      - Wed, 01 Jul 2026 13:49:48 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -2162,7 +2440,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-z8ctb
+      - mw-api-ext.eqiad.canary-dbbfbd9db-b7cbc
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -2182,7 +2460,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 90812a51-9822-413b-8d3a-437dbc73f432
+      - b3f29af0-ddbf-4bf2-9612-74e634aedb24
     status:
       code: 200
       message: OK
@@ -2240,7 +2518,7 @@ interactions:
         title=\"Page:NeglectedArgument.pdf/4\">\u2192<bdi dir=\"ltr\">Proofread</bdi></a></span>","tags":["proofreadpage-quality3","wikieditor"]}]}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
       age:
-      - '0'
+      - '2'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
@@ -2252,7 +2530,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:11 GMT
+      - Wed, 01 Jul 2026 13:49:48 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -2260,7 +2538,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-v778z
+      - mw-api-ext.eqiad.main-69b4b479d5-zzwjb
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -2282,7 +2560,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 829b254a-62cc-4011-94ce-cf86193b932b
+      - 89bf3545-e80f-4546-b307-b71302cd3884
     status:
       code: 200
       message: OK
@@ -2306,6 +2584,8 @@ interactions:
     body:
       string: '{"batchcomplete":"","query":{"pageids":["4742926"],"pages":{"4742926":{"pageid":4742926,"ns":104,"title":"Page:NeglectedArgument.pdf/5","contentmodel":"proofread-page","pagelanguage":"en","pagelanguagehtmlcode":"en","pagelanguagedir":"ltr","touched":"2025-03-09T08:46:39Z","lastrevid":14856948,"length":2087,"protection":[],"restrictiontypes":["edit","move"],"proofread":{"quality":3,"quality_text":"Proofread"}}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
       - '0'
       cache-control:
@@ -2321,7 +2601,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:11 GMT
+      - Wed, 01 Jul 2026 13:49:49 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -2329,7 +2609,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-fx7wh
+      - mw-api-ext.eqiad.main-69b4b479d5-n4s8t
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -2349,7 +2629,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - f0576cdf-a3a8-47c5-8114-20991f2ec9c6
+      - 0c495327-171c-4024-bffe-523886b42454
     status:
       code: 200
       message: OK
@@ -2419,7 +2699,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:11 GMT
+      - Wed, 01 Jul 2026 13:49:49 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -2427,7 +2707,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-9jxgm
+      - mw-api-ext.eqiad.main-69b4b479d5-xn8sj
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -2449,7 +2729,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 5d98325b-ce37-4efd-b3ca-9812d7bf26db
+      - 9f98d912-b952-46bd-99ae-963addcd137c
     status:
       code: 200
       message: OK
@@ -2473,8 +2753,10 @@ interactions:
     body:
       string: '{"batchcomplete":"","query":{"pageids":["4742927"],"pages":{"4742927":{"pageid":4742927,"ns":104,"title":"Page:NeglectedArgument.pdf/6","contentmodel":"proofread-page","pagelanguage":"en","pagelanguagehtmlcode":"en","pagelanguagedir":"ltr","touched":"2025-03-09T08:46:43Z","lastrevid":14856951,"length":2116,"protection":[],"restrictiontypes":["edit","move"],"proofread":{"quality":3,"quality_text":"Proofread"}}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
-      - '3'
+      - '0'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
@@ -2488,7 +2770,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:12 GMT
+      - Wed, 01 Jul 2026 13:49:49 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -2496,7 +2778,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-85hsp
+      - mw-api-ext.eqiad.main-69b4b479d5-q4bqx
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -2516,7 +2798,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 66844296-bdc9-4455-8899-3ddf29288e8a
+      - 5da8b72f-a423-4f9b-addc-cdb79f3e64c4
     status:
       code: 200
       message: OK
@@ -2574,19 +2856,21 @@ interactions:
         title=\"Page:NeglectedArgument.pdf/6\">\u2192<bdi dir=\"ltr\">Proofread</bdi></a></span>","tags":["proofreadpage-quality3","wikieditor"]}]}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
       age:
-      - '0'
+      - '2'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
       - inline; filename=api-result.json
       content-encoding:
       - gzip
+      content-length:
+      - '1724'
       content-security-policy:
       - default-src 'self'; script-src 'none'; object-src 'none'
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:13 GMT
+      - Wed, 01 Jul 2026 13:49:49 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -2594,13 +2878,11 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-bmk8t
+      - mw-api-ext.eqiad.main-69b4b479d5-htswr
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
       - max-age=106384710; includeSubDomains; preload
-      transfer-encoding:
-      - chunked
       vary:
       - Accept-Encoding,User-Agent
       x-analytics:
@@ -2616,7 +2898,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 70391e5f-d304-4cad-820e-473688b9504d
+      - d844010b-a24e-4bb9-9358-cde3edb85ca1
     status:
       code: 200
       message: OK
@@ -2640,6 +2922,8 @@ interactions:
     body:
       string: '{"batchcomplete":"","query":{"pageids":["4742959"],"pages":{"4742959":{"pageid":4742959,"ns":104,"title":"Page:NeglectedArgument.pdf/7","contentmodel":"proofread-page","pagelanguage":"en","pagelanguagehtmlcode":"en","pagelanguagedir":"ltr","touched":"2025-03-09T08:46:47Z","lastrevid":14856953,"length":2094,"protection":[],"restrictiontypes":["edit","move"],"proofread":{"quality":3,"quality_text":"Proofread"}}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
       - '0'
       cache-control:
@@ -2655,7 +2939,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:13 GMT
+      - Wed, 01 Jul 2026 13:49:50 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -2663,7 +2947,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-4sqdl
+      - mw-api-ext.eqiad.main-69b4b479d5-q4bqx
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -2683,7 +2967,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - d6083de1-6c9f-42b3-9622-d9e1cbad407f
+      - 7d946873-5f39-4d01-8221-cde371892737
     status:
       code: 200
       message: OK
@@ -2741,7 +3025,7 @@ interactions:
         title=\"Page:NeglectedArgument.pdf/7\">\u2192<bdi dir=\"ltr\">Proofread</bdi></a></span>","tags":["proofreadpage-quality3","wikieditor"]}]}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
       age:
-      - '2'
+      - '0'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
@@ -2753,7 +3037,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:13 GMT
+      - Wed, 01 Jul 2026 13:49:50 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -2761,7 +3045,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-pwq4b
+      - mw-api-ext.eqiad.main-69b4b479d5-gwk5c
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -2783,7 +3067,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 97d646d1-6a7a-4f01-ac16-ffc4c6b51213
+      - f9621935-a7dd-4bee-97cd-b4ebf25d4a37
     status:
       code: 200
       message: OK
@@ -2807,6 +3091,8 @@ interactions:
     body:
       string: '{"batchcomplete":"","query":{"pageids":["4742963"],"pages":{"4742963":{"pageid":4742963,"ns":104,"title":"Page:NeglectedArgument.pdf/8","contentmodel":"proofread-page","pagelanguage":"en","pagelanguagehtmlcode":"en","pagelanguagedir":"ltr","touched":"2025-03-09T08:46:51Z","lastrevid":14856954,"length":2167,"protection":[],"restrictiontypes":["edit","move"],"proofread":{"quality":3,"quality_text":"Proofread"}}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
       - '0'
       cache-control:
@@ -2822,7 +3108,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:14 GMT
+      - Wed, 01 Jul 2026 13:49:50 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -2830,7 +3116,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-shk45
+      - mw-api-ext.eqiad.main-69b4b479d5-g7n6c
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -2850,7 +3136,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 88adfd42-4fef-4bcd-bd68-06baaf722aa9
+      - a539cd54-b44f-469c-916b-b98fd7e9e0a6
     status:
       code: 200
       message: OK
@@ -2908,7 +3194,7 @@ interactions:
         title=\"Page:NeglectedArgument.pdf/8\">\u2192<bdi dir=\"ltr\">Proofread</bdi></a></span>","tags":["proofreadpage-quality3","wikieditor"]}]}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
       age:
-      - '0'
+      - '1'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
@@ -2920,7 +3206,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:14 GMT
+      - Wed, 01 Jul 2026 13:49:51 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -2928,7 +3214,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-zc5fj
+      - mw-api-ext.eqiad.main-69b4b479d5-9dvlb
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -2950,7 +3236,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - cb32c875-da95-4ca5-83f8-bbf83f8797ce
+      - ab07aa36-1fd8-462f-9e80-dcb4a52c477d
     status:
       code: 200
       message: OK
@@ -2974,6 +3260,8 @@ interactions:
     body:
       string: '{"batchcomplete":"","query":{"pageids":["4742966"],"pages":{"4742966":{"pageid":4742966,"ns":104,"title":"Page:NeglectedArgument.pdf/9","contentmodel":"proofread-page","pagelanguage":"en","pagelanguagehtmlcode":"en","pagelanguagedir":"ltr","touched":"2026-04-30T17:46:38Z","lastrevid":15917905,"length":2107,"protection":[],"restrictiontypes":["edit","move"],"proofread":{"quality":3,"quality_text":"Proofread"}}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
       - '0'
       cache-control:
@@ -2989,7 +3277,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:14 GMT
+      - Wed, 01 Jul 2026 13:49:51 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -2997,7 +3285,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-5rfjz
+      - mw-api-ext.eqiad.main-69b4b479d5-tsk6f
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -3017,7 +3305,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - ea8467ae-6d35-4601-91d6-25c1401a87c9
+      - e036f30c-8037-48a0-8fb1-7445525550c6
     status:
       code: 200
       message: OK
@@ -3073,7 +3361,7 @@ interactions:
         and by its<noinclude></noinclude>"}},"comment":"","parsedcomment":"","tags":["wikieditor"]}]}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
       age:
-      - '2'
+      - '0'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
@@ -3085,7 +3373,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:14 GMT
+      - Wed, 01 Jul 2026 13:49:51 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -3093,7 +3381,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-65qgb
+      - mw-api-ext.eqiad.main-69b4b479d5-8hlc8
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -3115,7 +3403,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 122c25fe-77ed-4185-978e-f0aedd642176
+      - 017d0365-6f6c-4fc2-a048-0b3c9498aa26
     status:
       code: 200
       message: OK
@@ -3139,8 +3427,10 @@ interactions:
     body:
       string: '{"batchcomplete":"","query":{"pageids":["4742967"],"pages":{"4742967":{"pageid":4742967,"ns":104,"title":"Page:NeglectedArgument.pdf/10","contentmodel":"proofread-page","pagelanguage":"en","pagelanguagehtmlcode":"en","pagelanguagedir":"ltr","touched":"2026-04-30T17:46:56Z","lastrevid":15917906,"length":2083,"protection":[],"restrictiontypes":["edit","move"],"proofread":{"quality":3,"quality_text":"Proofread"}}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
-      - '0'
+      - '2'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
@@ -3154,7 +3444,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:15 GMT
+      - Wed, 01 Jul 2026 13:49:51 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -3162,7 +3452,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-cbr62
+      - mw-api-ext.eqiad.main-69b4b479d5-t5rxj
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -3182,7 +3472,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 25b1c016-bb77-4977-983f-e627c5d53f2f
+      - 063e51e2-3c7b-47dd-89e2-8a099798b83d
     status:
       code: 200
       message: OK
@@ -3244,12 +3534,14 @@ interactions:
       - inline; filename=api-result.json
       content-encoding:
       - gzip
+      content-length:
+      - '1559'
       content-security-policy:
       - default-src 'self'; script-src 'none'; object-src 'none'
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:15 GMT
+      - Wed, 01 Jul 2026 13:49:52 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -3257,13 +3549,11 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.canary-76c45d46cf-nvz6j
+      - mw-api-ext.eqiad.main-69b4b479d5-ckdgs
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
       - max-age=106384710; includeSubDomains; preload
-      transfer-encoding:
-      - chunked
       vary:
       - Accept-Encoding,User-Agent
       x-analytics:
@@ -3279,7 +3569,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 192cb3e8-c152-4f0c-8648-193f569f416d
+      - 7320453a-c074-411e-9a36-532af0999a03
     status:
       code: 200
       message: OK
@@ -3303,6 +3593,8 @@ interactions:
     body:
       string: '{"batchcomplete":"","query":{"pageids":["4742970"],"pages":{"4742970":{"pageid":4742970,"ns":104,"title":"Page:NeglectedArgument.pdf/11","contentmodel":"proofread-page","pagelanguage":"en","pagelanguagehtmlcode":"en","pagelanguagedir":"ltr","touched":"2025-03-09T08:47:03Z","lastrevid":14856966,"length":2162,"protection":[],"restrictiontypes":["edit","move"],"proofread":{"quality":3,"quality_text":"Proofread"}}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
       - '0'
       cache-control:
@@ -3318,7 +3610,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:15 GMT
+      - Wed, 01 Jul 2026 13:49:52 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -3326,7 +3618,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-f5f6m
+      - mw-api-ext.eqiad.main-69b4b479d5-htswr
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -3346,7 +3638,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - decd023d-614f-492a-95c8-f5ae7dc63c4b
+      - e2ffc127-819e-4755-8ba5-cd4b55dafe2b
     status:
       code: 200
       message: OK
@@ -3404,7 +3696,7 @@ interactions:
         title=\"Page:NeglectedArgument.pdf/11\">\u2192<bdi dir=\"ltr\">Proofread</bdi></a></span>","tags":["proofreadpage-quality3","wikieditor"]}]}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
       age:
-      - '2'
+      - '0'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
@@ -3416,7 +3708,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:15 GMT
+      - Wed, 01 Jul 2026 13:49:52 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -3424,7 +3716,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-j582r
+      - mw-api-ext.eqiad.main-69b4b479d5-d9dgk
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -3446,7 +3738,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 017a21da-40df-44b6-86a2-0a1138e77027
+      - add159f2-2a3a-4f84-9e2a-ab26a517cdfc
     status:
       code: 200
       message: OK
@@ -3470,8 +3762,10 @@ interactions:
     body:
       string: '{"batchcomplete":"","query":{"pageids":["4742972"],"pages":{"4742972":{"pageid":4742972,"ns":104,"title":"Page:NeglectedArgument.pdf/12","contentmodel":"proofread-page","pagelanguage":"en","pagelanguagehtmlcode":"en","pagelanguagedir":"ltr","touched":"2025-03-09T08:47:07Z","lastrevid":14856968,"length":2085,"protection":[],"restrictiontypes":["edit","move"],"proofread":{"quality":3,"quality_text":"Proofread"}}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
-      - '0'
+      - '2'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
@@ -3485,7 +3779,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:16 GMT
+      - Wed, 01 Jul 2026 13:49:52 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -3493,7 +3787,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-248ws
+      - mw-api-ext.eqiad.main-69b4b479d5-kl5mb
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -3513,7 +3807,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 945ebad0-acaa-4ab1-86f2-bdca6e7ea677
+      - 1d47cb89-3d87-48ad-883c-48397ec5fe63
     status:
       code: 200
       message: OK
@@ -3581,7 +3875,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:16 GMT
+      - Wed, 01 Jul 2026 13:49:53 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -3589,7 +3883,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-6wr9p
+      - mw-api-ext.eqiad.main-69b4b479d5-dnnbx
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -3611,7 +3905,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 21fa71ac-bc40-43e3-9a7f-33f45374da16
+      - d0ca4a13-7d18-46bb-91ff-20fa9aaea206
     status:
       code: 200
       message: OK
@@ -3635,6 +3929,8 @@ interactions:
     body:
       string: '{"batchcomplete":"","query":{"pageids":["4742974"],"pages":{"4742974":{"pageid":4742974,"ns":104,"title":"Page:NeglectedArgument.pdf/13","contentmodel":"proofread-page","pagelanguage":"en","pagelanguagehtmlcode":"en","pagelanguagedir":"ltr","touched":"2025-03-09T08:47:11Z","lastrevid":14856975,"length":2110,"protection":[],"restrictiontypes":["edit","move"],"proofread":{"quality":3,"quality_text":"Proofread"}}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
       - '0'
       cache-control:
@@ -3650,7 +3946,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:16 GMT
+      - Wed, 01 Jul 2026 13:49:53 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -3658,7 +3954,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-gtmt5
+      - mw-api-ext.eqiad.main-69b4b479d5-xzdp7
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -3678,7 +3974,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 201b8eff-efdb-4ad0-ba60-11bd6e0d14ff
+      - 55a2d761-676f-44e0-9aa2-6b4c39ad39dd
     status:
       code: 200
       message: OK
@@ -3745,7 +4041,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:17 GMT
+      - Wed, 01 Jul 2026 13:49:53 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -3753,7 +4049,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-txg5z
+      - mw-api-ext.eqiad.canary-dbbfbd9db-wtrjm
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -3775,7 +4071,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 63104fa9-4005-40eb-b31b-71a4f2aa322c
+      - d194f481-a2e4-4ba4-964e-758383fe3495
     status:
       code: 200
       message: OK
@@ -3799,8 +4095,10 @@ interactions:
     body:
       string: '{"batchcomplete":"","query":{"pageids":["4742975"],"pages":{"4742975":{"pageid":4742975,"ns":104,"title":"Page:NeglectedArgument.pdf/14","contentmodel":"proofread-page","pagelanguage":"en","pagelanguagehtmlcode":"en","pagelanguagedir":"ltr","touched":"2026-04-30T17:47:20Z","lastrevid":15917908,"length":2111,"protection":[],"restrictiontypes":["edit","move"],"proofread":{"quality":3,"quality_text":"Proofread"}}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
-      - '0'
+      - '1'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
@@ -3814,7 +4112,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:17 GMT
+      - Wed, 01 Jul 2026 13:49:54 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -3822,7 +4120,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-8bw7g
+      - mw-api-ext.eqiad.main-69b4b479d5-8qlzp
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -3842,7 +4140,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 67416917-f81c-44e5-89b6-e0da8d290bb3
+      - 014a4c67-b2a9-4bca-8b4c-681bfbec3309
     status:
       code: 200
       message: OK
@@ -3909,7 +4207,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:17 GMT
+      - Wed, 01 Jul 2026 13:49:54 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -3917,7 +4215,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-99mxr
+      - mw-api-ext.eqiad.main-69b4b479d5-dnwmv
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -3939,7 +4237,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 16884d77-32d0-4847-bfc8-6d1c05375ecd
+      - cb8a46c6-04ae-45dd-8038-f1d3abefdd72
     status:
       code: 200
       message: OK
@@ -3963,6 +4261,8 @@ interactions:
     body:
       string: '{"batchcomplete":"","query":{"pageids":["4742982"],"pages":{"4742982":{"pageid":4742982,"ns":104,"title":"Page:NeglectedArgument.pdf/15","contentmodel":"proofread-page","pagelanguage":"en","pagelanguagehtmlcode":"en","pagelanguagedir":"ltr","touched":"2025-03-10T08:52:58Z","lastrevid":14856978,"length":2196,"protection":[],"restrictiontypes":["edit","move"],"proofread":{"quality":3,"quality_text":"Proofread"}}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
       - '0'
       cache-control:
@@ -3978,7 +4278,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:17 GMT
+      - Wed, 01 Jul 2026 13:49:54 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -3986,7 +4286,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-r2zbn
+      - mw-api-ext.eqiad.main-69b4b479d5-85njt
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -4006,7 +4306,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 9a2c5701-3fcf-4b5b-adf4-53d4c0b31b37
+      - fcdb315d-577a-4559-b814-01d508dbee36
     status:
       code: 200
       message: OK
@@ -4077,7 +4377,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:18 GMT
+      - Wed, 01 Jul 2026 13:49:54 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -4085,7 +4385,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-d7fcd
+      - mw-api-ext.eqiad.main-69b4b479d5-p9rl7
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -4107,7 +4407,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 640eb32e-3e1c-4924-b2d8-e3f0c5c1d31d
+      - 4e8bbc89-9d95-48d2-8934-fc042abffd53
     status:
       code: 200
       message: OK
@@ -4131,8 +4431,10 @@ interactions:
     body:
       string: '{"batchcomplete":"","query":{"pageids":["4742984"],"pages":{"4742984":{"pageid":4742984,"ns":104,"title":"Page:NeglectedArgument.pdf/16","contentmodel":"proofread-page","pagelanguage":"en","pagelanguagehtmlcode":"en","pagelanguagedir":"ltr","touched":"2025-03-10T08:53:03Z","lastrevid":14856980,"length":2156,"protection":[],"restrictiontypes":["edit","move"],"proofread":{"quality":3,"quality_text":"Proofread"}}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
-      - '0'
+      - '2'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
@@ -4146,7 +4448,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:18 GMT
+      - Wed, 01 Jul 2026 13:49:54 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -4154,7 +4456,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-5dxjt
+      - mw-api-ext.eqiad.main-69b4b479d5-gw5l7
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -4174,7 +4476,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 5db7d114-a3c1-4538-9a8d-2789d014b103
+      - 9d0ecfb3-fce1-4750-a2dc-feac1604a573
     status:
       code: 200
       message: OK
@@ -4244,7 +4546,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:18 GMT
+      - Wed, 01 Jul 2026 13:49:55 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -4252,7 +4554,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-xmxc5
+      - mw-api-ext.eqiad.main-69b4b479d5-sr4j7
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -4274,7 +4576,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 3748fbda-cc2d-4bcf-960e-13841832b347
+      - ebed235a-1aec-466b-82bb-08ac27c78552
     status:
       code: 200
       message: OK
@@ -4298,8 +4600,10 @@ interactions:
     body:
       string: '{"batchcomplete":"","query":{"pageids":["4742986"],"pages":{"4742986":{"pageid":4742986,"ns":104,"title":"Page:NeglectedArgument.pdf/17","contentmodel":"proofread-page","pagelanguage":"en","pagelanguagehtmlcode":"en","pagelanguagedir":"ltr","touched":"2026-04-30T17:48:34Z","lastrevid":15917913,"length":2029,"protection":[],"restrictiontypes":["edit","move"],"proofread":{"quality":3,"quality_text":"Proofread"}}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
-      - '2'
+      - '0'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
@@ -4313,7 +4617,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:18 GMT
+      - Wed, 01 Jul 2026 13:49:55 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -4321,7 +4625,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-4sqdl
+      - mw-api-ext.eqiad.main-69b4b479d5-h2vc2
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -4341,7 +4645,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 5cebd667-29eb-4dec-ab82-351571925d08
+      - f960867a-69ba-4a7a-b3a7-c1965bfb1cfc
     status:
       code: 200
       message: OK
@@ -4408,7 +4712,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:19 GMT
+      - Wed, 01 Jul 2026 13:49:55 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -4416,7 +4720,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-zzh79
+      - mw-api-ext.eqiad.main-69b4b479d5-z5cvs
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -4438,7 +4742,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 4e121d9b-30ec-4ebe-add1-6cfce91cace8
+      - 1d9dca1f-c25e-44a1-9aa0-9dd05d886e29
     status:
       code: 200
       message: OK
@@ -4462,8 +4766,10 @@ interactions:
     body:
       string: '{"batchcomplete":"","query":{"pageids":["4742988"],"pages":{"4742988":{"pageid":4742988,"ns":104,"title":"Page:NeglectedArgument.pdf/18","contentmodel":"proofread-page","pagelanguage":"en","pagelanguagehtmlcode":"en","pagelanguagedir":"ltr","touched":"2025-03-10T08:53:13Z","lastrevid":14856984,"length":2185,"protection":[],"restrictiontypes":["edit","move"],"proofread":{"quality":3,"quality_text":"Proofread"}}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
-      - '0'
+      - '2'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
@@ -4477,7 +4783,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:19 GMT
+      - Wed, 01 Jul 2026 13:49:55 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -4485,7 +4791,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-wmvdt
+      - mw-api-ext.eqiad.main-69b4b479d5-r98sh
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -4505,7 +4811,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 87e4659a-d02d-420f-981a-228d820a65d0
+      - ea86b671-f862-4b02-b917-8a8d0888bef4
     status:
       code: 200
       message: OK
@@ -4576,7 +4882,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:19 GMT
+      - Wed, 01 Jul 2026 13:49:56 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -4584,7 +4890,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-mpw2w
+      - mw-api-ext.eqiad.main-69b4b479d5-p2v9g
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -4606,7 +4912,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 229cee64-95ea-453b-b516-b98654c836f4
+      - 6c12a8a1-1007-4c09-9cd6-9d82a97ffd1f
     status:
       code: 200
       message: OK
@@ -4630,6 +4936,8 @@ interactions:
     body:
       string: '{"batchcomplete":"","query":{"pageids":["4742989"],"pages":{"4742989":{"pageid":4742989,"ns":104,"title":"Page:NeglectedArgument.pdf/19","contentmodel":"proofread-page","pagelanguage":"en","pagelanguagehtmlcode":"en","pagelanguagedir":"ltr","touched":"2025-03-10T08:53:16Z","lastrevid":14856987,"length":2107,"protection":[],"restrictiontypes":["edit","move"],"proofread":{"quality":3,"quality_text":"Proofread"}}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
       - '0'
       cache-control:
@@ -4645,7 +4953,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:20 GMT
+      - Wed, 01 Jul 2026 13:49:56 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -4653,7 +4961,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-9662j
+      - mw-api-ext.eqiad.main-69b4b479d5-w7bzs
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -4673,7 +4981,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - cb239dfd-4b1e-4b4e-b206-26600c3cacd0
+      - 6874cd96-1861-4881-bbdc-dec3ee6ca248
     status:
       code: 200
       message: OK
@@ -4743,7 +5051,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:20 GMT
+      - Wed, 01 Jul 2026 13:49:56 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -4751,7 +5059,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-f5f6m
+      - mw-api-ext.eqiad.main-69b4b479d5-l4z6v
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -4773,7 +5081,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - d0ecc646-e6b8-4f93-87f7-b31a8b657eaa
+      - 83cf1132-3dcc-4d1e-9713-aec7c8f340c5
     status:
       code: 200
       message: OK
@@ -4797,8 +5105,10 @@ interactions:
     body:
       string: '{"batchcomplete":"","query":{"pageids":["4742990"],"pages":{"4742990":{"pageid":4742990,"ns":104,"title":"Page:NeglectedArgument.pdf/20","contentmodel":"proofread-page","pagelanguage":"en","pagelanguagehtmlcode":"en","pagelanguagedir":"ltr","touched":"2025-03-10T08:53:20Z","lastrevid":14856988,"length":2149,"protection":[],"restrictiontypes":["edit","move"],"proofread":{"quality":3,"quality_text":"Proofread"}}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
-      - '0'
+      - '2'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
@@ -4812,7 +5122,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:20 GMT
+      - Wed, 01 Jul 2026 13:49:56 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -4820,7 +5130,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-nqxbm
+      - mw-api-ext.eqiad.main-69b4b479d5-8xlbg
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -4840,7 +5150,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - fefc2449-be36-4093-91f0-312ed7f10a89
+      - b9e22b26-a2e8-4b26-8243-36c797d338ab
     status:
       code: 200
       message: OK
@@ -4910,7 +5220,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:20 GMT
+      - Wed, 01 Jul 2026 13:49:57 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -4918,7 +5228,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-vsq92
+      - mw-api-ext.eqiad.main-69b4b479d5-h2vc2
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -4940,7 +5250,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - c22e4f3b-f0ef-4517-8aec-f02d2620f945
+      - 30e4015b-fd00-4f09-afec-11194baacba6
     status:
       code: 200
       message: OK
@@ -4964,6 +5274,8 @@ interactions:
     body:
       string: '{"batchcomplete":"","query":{"pageids":["4742991"],"pages":{"4742991":{"pageid":4742991,"ns":104,"title":"Page:NeglectedArgument.pdf/21","contentmodel":"proofread-page","pagelanguage":"en","pagelanguagehtmlcode":"en","pagelanguagedir":"ltr","touched":"2025-03-10T08:53:24Z","lastrevid":14856992,"length":2126,"protection":[],"restrictiontypes":["edit","move"],"proofread":{"quality":3,"quality_text":"Proofread"}}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
       - '0'
       cache-control:
@@ -4979,7 +5291,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:21 GMT
+      - Wed, 01 Jul 2026 13:49:57 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -4987,7 +5299,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-wm2fd
+      - mw-api-ext.eqiad.main-69b4b479d5-9tmnl
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -5007,7 +5319,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 60046992-74f8-4d64-8047-d577c260eb91
+      - 3ad6220b-e1e7-4da4-ab28-24fd03e522ba
     status:
       code: 200
       message: OK
@@ -5077,7 +5389,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:21 GMT
+      - Wed, 01 Jul 2026 13:49:57 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -5085,7 +5397,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-2wcs7
+      - mw-api-ext.eqiad.main-69b4b479d5-pbdf8
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -5107,7 +5419,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 594d28f1-f0b6-4728-a464-4efed225f175
+      - 65b6191e-ca86-4254-849b-5751912df4d4
     status:
       code: 200
       message: OK
@@ -5131,6 +5443,8 @@ interactions:
     body:
       string: '{"batchcomplete":"","query":{"pageids":["4742993"],"pages":{"4742993":{"pageid":4742993,"ns":104,"title":"Page:NeglectedArgument.pdf/22","contentmodel":"proofread-page","pagelanguage":"en","pagelanguagehtmlcode":"en","pagelanguagedir":"ltr","touched":"2025-03-10T08:53:28Z","lastrevid":14856994,"length":2182,"protection":[],"restrictiontypes":["edit","move"],"proofread":{"quality":3,"quality_text":"Proofread"}}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
       - '0'
       cache-control:
@@ -5146,7 +5460,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:21 GMT
+      - Wed, 01 Jul 2026 13:49:58 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -5154,7 +5468,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-k4lcn
+      - mw-api-ext.eqiad.main-69b4b479d5-r98sh
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -5174,7 +5488,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 68598db4-ce7b-4021-81a7-de986c78c780
+      - ffc8b4bf-7069-4780-9eb2-6eb7f9ef7635
     status:
       code: 200
       message: OK
@@ -5233,7 +5547,7 @@ interactions:
         title=\"Page:NeglectedArgument.pdf/22\">\u2192<bdi dir=\"ltr\">Proofread</bdi></a></span>","tags":["proofreadpage-quality3","wikieditor"]}]}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
       age:
-      - '2'
+      - '0'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
@@ -5245,7 +5559,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:21 GMT
+      - Wed, 01 Jul 2026 13:49:58 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -5253,7 +5567,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-vwfrf
+      - mw-api-ext.eqiad.main-69b4b479d5-tsk6f
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -5275,7 +5589,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 97d139e4-0511-4bdd-a69b-9fcf62b8b4d4
+      - 76e72b8c-aed4-4949-b651-be02d0a5709c
     status:
       code: 200
       message: OK
@@ -5299,6 +5613,8 @@ interactions:
     body:
       string: '{"batchcomplete":"","query":{"pageids":["4742996"],"pages":{"4742996":{"pageid":4742996,"ns":104,"title":"Page:NeglectedArgument.pdf/23","contentmodel":"proofread-page","pagelanguage":"en","pagelanguagehtmlcode":"en","pagelanguagedir":"ltr","touched":"2025-12-06T08:18:13Z","lastrevid":14856997,"length":2151,"protection":[],"restrictiontypes":["edit","move"],"proofread":{"quality":3,"quality_text":"Proofread"}}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
       - '0'
       cache-control:
@@ -5314,7 +5630,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:22 GMT
+      - Wed, 01 Jul 2026 13:49:58 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -5322,7 +5638,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-s2rf9
+      - mw-api-ext.eqiad.main-69b4b479d5-klcwb
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -5342,7 +5658,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - a04eee75-0fef-43c9-83bb-1a7dafa7429b
+      - 318bc1c3-23ee-4e40-9ec3-e218cfa3ef97
     status:
       code: 200
       message: OK
@@ -5413,7 +5729,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:22 GMT
+      - Wed, 01 Jul 2026 13:49:58 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -5421,7 +5737,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-nzdvs
+      - mw-api-ext.eqiad.main-69b4b479d5-6sh7w
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -5443,7 +5759,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 88751901-2cc5-4a60-85ae-40f7c529ea25
+      - 21d59903-59e0-439d-8277-8d312c7e5e56
     status:
       code: 200
       message: OK

@@ -1,0 +1,188 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Type:
+      - application/x-www-form-urlencoded
+      user-agent:
+      - /pytest Pywikibot/11.4.2 (-1 (unknown)) Python/3.13.1.final.0 requests/2.34.2
+    method: GET
+    uri: https://wikisource-debian-13.lan/w/api.php?prppiititle=Index%3AAustin-HowToDoThingsWithWords-1962.pdf&list=proofreadpagesinindex&action=query&indexpageids=&meta=userinfo&uiprop=blockinfo%7Chasmsg&maxlag=5&format=json
+  response:
+    body:
+      string: '{"batchcomplete":"","query":{"proofreadpagesinindex":[{"pageoffset":1,"pageid":11404,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/1"},{"pageoffset":2,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/2"},{"pageoffset":3,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/3"},{"pageoffset":4,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/4"},{"pageoffset":5,"pageid":11420,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/5"},{"pageoffset":6,"pageid":11405,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/6"},{"pageoffset":7,"pageid":11406,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/7"},{"pageoffset":8,"pageid":11407,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/8"},{"pageoffset":9,"pageid":11408,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/9"},{"pageoffset":10,"pageid":11409,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/10"},{"pageoffset":11,"pageid":11410,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/11"},{"pageoffset":12,"pageid":11411,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/12"},{"pageoffset":13,"pageid":11422,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/13"},{"pageoffset":14,"pageid":11423,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/14"},{"pageoffset":15,"pageid":11424,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/15"},{"pageoffset":16,"pageid":11425,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/16"},{"pageoffset":17,"pageid":11426,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/17"},{"pageoffset":18,"pageid":11428,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/18"},{"pageoffset":19,"pageid":11475,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/19"},{"pageoffset":20,"pageid":11476,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/20"},{"pageoffset":21,"pageid":11477,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/21"},{"pageoffset":22,"pageid":11478,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/22"},{"pageoffset":23,"pageid":11417,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/23"},{"pageoffset":24,"pageid":11479,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/24"},{"pageoffset":25,"pageid":11418,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/25"},{"pageoffset":26,"pageid":11481,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/26"},{"pageoffset":27,"pageid":11482,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/27"},{"pageoffset":28,"pageid":11483,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/28"},{"pageoffset":29,"pageid":11484,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/29"},{"pageoffset":30,"pageid":11429,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/30"},{"pageoffset":31,"pageid":11430,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/31"},{"pageoffset":32,"pageid":11485,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/32"},{"pageoffset":33,"pageid":11486,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/33"},{"pageoffset":34,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/34"},{"pageoffset":35,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/35"},{"pageoffset":36,"pageid":11414,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/36"},{"pageoffset":37,"pageid":11487,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/37"},{"pageoffset":38,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/38"},{"pageoffset":39,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/39"},{"pageoffset":40,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/40"},{"pageoffset":41,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/41"},{"pageoffset":42,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/42"},{"pageoffset":43,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/43"},{"pageoffset":44,"pageid":11432,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/44"},{"pageoffset":45,"pageid":11434,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/45"},{"pageoffset":46,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/46"},{"pageoffset":47,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/47"},{"pageoffset":48,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/48"},{"pageoffset":49,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/49"},{"pageoffset":50,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/50"},{"pageoffset":51,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/51"},{"pageoffset":52,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/52"},{"pageoffset":53,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/53"},{"pageoffset":54,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/54"},{"pageoffset":55,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/55"},{"pageoffset":56,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/56"},{"pageoffset":57,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/57"},{"pageoffset":58,"pageid":11435,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/58"},{"pageoffset":59,"pageid":11437,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/59"},{"pageoffset":60,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/60"},{"pageoffset":61,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/61"},{"pageoffset":62,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/62"},{"pageoffset":63,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/63"},{"pageoffset":64,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/64"},{"pageoffset":65,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/65"},{"pageoffset":66,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/66"},{"pageoffset":67,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/67"},{"pageoffset":68,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/68"},{"pageoffset":69,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/69"},{"pageoffset":70,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/70"},{"pageoffset":71,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/71"},{"pageoffset":72,"pageid":11438,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/72"},{"pageoffset":73,"pageid":11440,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/73"},{"pageoffset":74,"pageid":11441,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/74"},{"pageoffset":75,"pageid":11442,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/75"},{"pageoffset":76,"pageid":11443,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/76"},{"pageoffset":77,"pageid":11444,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/77"},{"pageoffset":78,"pageid":11445,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/78"},{"pageoffset":79,"pageid":11446,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/79"},{"pageoffset":80,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/80"},{"pageoffset":81,"pageid":11447,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/81"},{"pageoffset":82,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/82"},{"pageoffset":83,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/83"},{"pageoffset":84,"pageid":11600,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/84"},{"pageoffset":85,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/85"},{"pageoffset":86,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/86"},{"pageoffset":87,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/87"},{"pageoffset":88,"pageid":11454,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/88"},{"pageoffset":89,"pageid":11453,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/89"},{"pageoffset":90,"pageid":11452,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/90"},{"pageoffset":91,"pageid":11451,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/91"},{"pageoffset":92,"pageid":11450,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/92"},{"pageoffset":93,"pageid":11449,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/93"},{"pageoffset":94,"pageid":11448,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/94"},{"pageoffset":95,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/95"},{"pageoffset":96,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/96"},{"pageoffset":97,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/97"},{"pageoffset":98,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/98"},{"pageoffset":99,"pageid":11456,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/99"},{"pageoffset":100,"pageid":11457,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/100"},{"pageoffset":101,"pageid":11459,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/101"},{"pageoffset":102,"pageid":11460,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/102"},{"pageoffset":103,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/103"},{"pageoffset":104,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/104"},{"pageoffset":105,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/105"},{"pageoffset":106,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/106"},{"pageoffset":107,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/107"},{"pageoffset":108,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/108"},{"pageoffset":109,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/109"},{"pageoffset":110,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/110"},{"pageoffset":111,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/111"},{"pageoffset":112,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/112"},{"pageoffset":113,"pageid":11462,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/113"},{"pageoffset":114,"pageid":11461,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/114"},{"pageoffset":115,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/115"},{"pageoffset":116,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/116"},{"pageoffset":117,"pageid":11413,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/117"},{"pageoffset":118,"pageid":11412,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/118"},{"pageoffset":119,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/119"},{"pageoffset":120,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/120"},{"pageoffset":121,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/121"},{"pageoffset":122,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/122"},{"pageoffset":123,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/123"},{"pageoffset":124,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/124"},{"pageoffset":125,"pageid":11465,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/125"},{"pageoffset":126,"pageid":11467,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/126"},{"pageoffset":127,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/127"},{"pageoffset":128,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/128"},{"pageoffset":129,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/129"},{"pageoffset":130,"pageid":11415,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/130"},{"pageoffset":131,"pageid":11416,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/131"},{"pageoffset":132,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/132"},{"pageoffset":133,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/133"},{"pageoffset":134,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/134"},{"pageoffset":135,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/135"},{"pageoffset":136,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/136"},{"pageoffset":137,"pageid":11469,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/137"},{"pageoffset":138,"pageid":11471,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/138"},{"pageoffset":139,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/139"},{"pageoffset":140,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/140"},{"pageoffset":141,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/141"},{"pageoffset":142,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/142"},{"pageoffset":143,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/143"},{"pageoffset":144,"pageid":11488,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/144"},{"pageoffset":145,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/145"},{"pageoffset":146,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/146"},{"pageoffset":147,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/147"},{"pageoffset":148,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/148"},{"pageoffset":149,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/149"},{"pageoffset":150,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/150"},{"pageoffset":151,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/151"},{"pageoffset":152,"pageid":11470,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/152"},{"pageoffset":153,"pageid":11472,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/153"},{"pageoffset":154,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/154"},{"pageoffset":155,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/155"},{"pageoffset":156,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/156"},{"pageoffset":157,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/157"},{"pageoffset":158,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/158"},{"pageoffset":159,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/159"},{"pageoffset":160,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/160"},{"pageoffset":161,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/161"},{"pageoffset":162,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/162"},{"pageoffset":163,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/163"},{"pageoffset":164,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/164"},{"pageoffset":165,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/165"},{"pageoffset":166,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/166"},{"pageoffset":167,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/167"},{"pageoffset":168,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/168"},{"pageoffset":169,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/169"},{"pageoffset":170,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/170"},{"pageoffset":171,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/171"},{"pageoffset":172,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/172"},{"pageoffset":173,"pageid":0,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/173"},{"pageoffset":174,"pageid":11489,"title":"Page:Austin-HowToDoThingsWithWords-1962.pdf/174"}],"userinfo":{"id":0,"name":"192.168.10.10","anon":""}}}'
+    headers:
+      Access-Control-Allow-Origin:
+      - '*'
+      Cache-Control:
+      - private, must-revalidate, max-age=0
+      Connection:
+      - keep-alive
+      Content-Disposition:
+      - inline; filename=api-result.json
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Wed, 01 Jul 2026 13:45:34 GMT
+      Server:
+      - nginx
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      X-Request-Id:
+      - cc2cb6c6d99da7401ab3f06f
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Type:
+      - application/x-www-form-urlencoded
+      user-agent:
+      - /pytest Pywikibot/11.4.2 (-1 (unknown)) Python/3.13.1.final.0 requests/2.34.2
+    method: GET
+    uri: https://wikisource-debian-13.lan/w/api.php?action=paraminfo&modules=query%2Ballpages&maxlag=5&format=json
+  response:
+    body:
+      string: '{"paraminfo":{"helpformat":"none","modules":[{"name":"allpages","classname":"MediaWiki\\Api\\ApiQueryAllPages","path":"query+allpages","group":"list","prefix":"ap","source":"MediaWiki","sourcename":"MediaWiki","licensetag":"GPL-2.0-or-later","licenselink":"https://wikisource-debian-13.lan/wiki/Special:Version/License/MediaWiki","readrights":"","generator":"","helpurls":["https://www.mediawiki.org/wiki/Special:MyLanguage/API:Allpages"],"parameters":[{"index":1,"name":"from","type":"string"},{"index":2,"name":"continue","type":"string"},{"index":3,"name":"to","type":"string"},{"index":4,"name":"prefix","type":"string"},{"index":5,"name":"namespace","type":"namespace","default":0},{"index":6,"name":"filterredir","type":["all","nonredirects","redirects"],"default":"all"},{"index":7,"name":"filterlanglinks","type":["all","withlanglinks","withoutlanglinks"],"default":"all"},{"index":8,"name":"minsize","type":"integer"},{"index":9,"name":"maxsize","type":"integer"},{"index":10,"name":"prtype","type":["edit","move","upload"],"multi":"","lowlimit":50,"highlimit":500,"limit":50},{"index":11,"name":"prlevel","type":["","autoconfirmed","sysop"],"multi":"","lowlimit":50,"highlimit":500,"limit":50},{"index":12,"name":"prfiltercascade","type":["all","cascading","noncascading"],"default":"all"},{"index":13,"name":"prexpiry","type":["all","definite","indefinite"],"default":"all"},{"index":14,"name":"limit","type":"limit","default":10,"min":1,"max":500,"highmax":5000},{"index":15,"name":"dir","type":["ascending","descending"],"default":"ascending"}],"templatedparameters":[]}]}}'
+    headers:
+      Access-Control-Allow-Origin:
+      - '*'
+      Cache-Control:
+      - private, must-revalidate, max-age=0
+      Connection:
+      - keep-alive
+      Content-Disposition:
+      - inline; filename=api-result.json
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Wed, 01 Jul 2026 13:45:34 GMT
+      Server:
+      - nginx
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      X-Request-Id:
+      - 97195f85bab64e0faa143a2f
+    status:
+      code: 200
+      message: OK
+- request:
+    body: null
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Type:
+      - application/x-www-form-urlencoded
+      user-agent:
+      - /pytest Pywikibot/11.4.2 (-1 (unknown)) Python/3.13.1.final.0 requests/2.34.2
+    method: GET
+    uri: https://wikisource-debian-13.lan/w/api.php?action=paraminfo&modules=query%2Bcategoryinfo&maxlag=5&format=json
+  response:
+    body:
+      string: '{"paraminfo":{"helpformat":"none","modules":[{"name":"categoryinfo","classname":"MediaWiki\\Api\\ApiQueryCategoryInfo","path":"query+categoryinfo","group":"prop","prefix":"ci","source":"MediaWiki","sourcename":"MediaWiki","licensetag":"GPL-2.0-or-later","licenselink":"https://wikisource-debian-13.lan/wiki/Special:Version/License/MediaWiki","readrights":"","helpurls":["https://www.mediawiki.org/wiki/Special:MyLanguage/API:Categoryinfo"],"parameters":[{"index":1,"name":"continue","type":"string"}],"templatedparameters":[]}]}}'
+    headers:
+      Access-Control-Allow-Origin:
+      - '*'
+      Cache-Control:
+      - private, must-revalidate, max-age=0
+      Connection:
+      - keep-alive
+      Content-Disposition:
+      - inline; filename=api-result.json
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Wed, 01 Jul 2026 13:45:34 GMT
+      Server:
+      - nginx
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      X-Request-Id:
+      - a453072a192cbe1f7c3b03e1
+    status:
+      code: 200
+      message: OK
+- request:
+    body: gapfrom=%21&prop=categoryinfo%7Cimageinfo%7Cinfo%7Cproofread&inprop=protection&iiprop=timestamp%7Cuser%7Ccomment%7Curl%7Csize%7Csha1%7Cmime%7Cmediatype%7Carchivename%7Cbitdepth&iilimit=max&generator=allpages&action=query&indexpageids=&gapnamespace=252&gapprefix=Austin-HowToDoThingsWithWords-1962.pdf%2F&gaplimit=500&meta=userinfo&uiprop=blockinfo%7Chasmsg&maxlag=5&format=json
+    headers:
+      Accept:
+      - '*/*'
+      Accept-Encoding:
+      - gzip, deflate
+      Connection:
+      - keep-alive
+      Content-Length:
+      - '377'
+      Content-Type:
+      - application/x-www-form-urlencoded
+      user-agent:
+      - /pytest Pywikibot/11.4.2 (-1 (unknown)) Python/3.13.1.final.0 requests/2.34.2
+    method: POST
+    uri: https://wikisource-debian-13.lan/w/api.php
+  response:
+    body:
+      string: '{"batchcomplete":"","query":{"pageids":["11464"],"pages":{"11464":{"pageid":11464,"ns":252,"title":"Index:Austin-HowToDoThingsWithWords-1962.pdf/styles.css","contentmodel":"sanitized-css","pagelanguage":"en","pagelanguagehtmlcode":"en","pagelanguagedir":"ltr","touched":"2026-06-18T17:14:53Z","lastrevid":23650,"length":5703,"new":"","protection":[],"restrictiontypes":["edit","move"]}},"userinfo":{"id":0,"name":"192.168.10.10","anon":""}},"limits":{"imageinfo":500}}'
+    headers:
+      Access-Control-Allow-Origin:
+      - '*'
+      Cache-Control:
+      - private, must-revalidate, max-age=0
+      Connection:
+      - keep-alive
+      Content-Disposition:
+      - inline; filename=api-result.json
+      Content-Encoding:
+      - gzip
+      Content-Type:
+      - application/json; charset=utf-8
+      Date:
+      - Wed, 01 Jul 2026 13:45:34 GMT
+      Server:
+      - nginx
+      Transfer-Encoding:
+      - chunked
+      X-Content-Type-Options:
+      - nosniff
+      X-Frame-Options:
+      - DENY
+      X-Request-Id:
+      - e4ffdea7b10f54cd9b99e583
+    status:
+      code: 200
+      message: OK
+version: 1

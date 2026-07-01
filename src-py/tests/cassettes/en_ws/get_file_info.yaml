@@ -19,6 +19,8 @@ interactions:
     body:
       string: '{"batchcomplete":true,"query":{"fileextensions":[{"ext":"tiff"},{"ext":"tif"},{"ext":"png"},{"ext":"gif"},{"ext":"jpg"},{"ext":"jpeg"},{"ext":"webp"},{"ext":"xcf"},{"ext":"pdf"},{"ext":"mid"},{"ext":"ogg"},{"ext":"ogv"},{"ext":"svg"},{"ext":"djvu"},{"ext":"oga"},{"ext":"flac"},{"ext":"opus"},{"ext":"wav"},{"ext":"webm"},{"ext":"mp3"},{"ext":"midi"},{"ext":"mpg"},{"ext":"mpeg"}],"userinfo":{"id":0,"name":"80.229.142.179","anon":true,"messages":false}}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
       - '0'
       cache-control:
@@ -34,7 +36,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:17:52 GMT
+      - Wed, 01 Jul 2026 13:49:38 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -42,7 +44,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-5njmt
+      - mw-api-ext.eqiad.main-69b4b479d5-fdtc2
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -62,7 +64,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 20c60235-c78e-4171-93c8-a0085fd6f40f
+      - 022f6149-f49e-47e0-826d-676a545a4339
     status:
       code: 200
       message: OK
@@ -84,146 +86,12 @@ interactions:
     uri: https://commons.wikimedia.org/w/api.php?action=query&meta=userinfo&uiprop=blockinfo%7Cgroups%7Chasmsg%7Cratelimits%7Crights&formatversion=2&maxlag=5&format=json
   response:
     body:
-      string: 'You are making too many requests to the API.
-
-        Please follow the best practices at <https://www.mediawiki.org/wiki/Wikimedia_APIs/Rate_limits>.
-
-        If you are unsure how to get the access you need, contact <bot-traffic@wikimedia.org>.'
-    headers:
-      age:
-      - '0'
-      content-length:
-      - '228'
-      content-type:
-      - text/plain
-      date:
-      - Tue, 30 Jun 2026 08:17:52 GMT
-      nel:
-      - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
-        0.0}'
-      report-to:
-      - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
-        }] }'
-      retry-after:
-      - '8'
-      server:
-      - envoy
-      server-timing:
-      - cache;desc="pass", host;desc="cp3073"
-      set-cookie:
-      - WMF-Last-Access=30-Jun-2026;Path=/;HttpOnly;secure;Expires=Sat, 01 Aug 2026
-        00:00:00 GMT
-      - GeoIP=GB:ENG:Ashton-under-Lyne:53.51:-2.04:v4; Path=/; secure; Domain=.wikimedia.org
-      - NetworkProbeLimit=0.001;Path=/;Secure;SameSite=None;Max-Age=3600
-      - WMF-Uniq=TsPqki2bEIzoi7fgXOj6FQOPAAAAAFvd555nQtWXqlsg9Tn0swycRN13rKKDvBUi;Domain=commons.wikimedia.org;Path=/;HttpOnly;secure;SameSite=None;Expires=Wed,
-        30 Jun 2027 00:00:00 GMT
-      strict-transport-security:
-      - max-age=106384710; includeSubDomains; preload
-      vary:
-      - User-Agent
-      x-analytics:
-      - ''
-      x-cache:
-      - cp3073 miss, cp3073 pass
-      x-cache-status:
-      - pass
-      x-client-ip:
-      - 80.229.142.179
-      x-envoy-ratelimited:
-      - 'true'
-      x-request-id:
-      - b798e8e4-cf28-4120-8014-7f80dc78e35a
-    status:
-      code: 429
-      message: Too Many Requests
-- request:
-    body: null
-    headers:
-      Accept:
-      - '*/*'
-      Accept-Encoding:
-      - gzip, deflate
-      Connection:
-      - keep-alive
-      Content-Type:
-      - application/x-www-form-urlencoded
-      user-agent:
-      - Tolland/pytest (https://commons.wikimedia.org/wiki/User:Tolland) Pywikibot/11.4.2
-        (-1 (unknown)) Python/3.13.1.final.0 requests/2.34.2
-    method: GET
-    uri: https://commons.wikimedia.org/w/api.php?action=query&meta=userinfo&uiprop=blockinfo%7Cgroups%7Chasmsg%7Cratelimits%7Crights&formatversion=2&maxlag=5&format=json
-  response:
-    body:
-      string: 'You are making too many requests to the API.
-
-        Please follow the best practices at <https://www.mediawiki.org/wiki/Wikimedia_APIs/Rate_limits>.
-
-        If you are unsure how to get the access you need, contact <bot-traffic@wikimedia.org>.'
-    headers:
-      age:
-      - '0'
-      content-length:
-      - '228'
-      content-type:
-      - text/plain
-      date:
-      - Tue, 30 Jun 2026 08:17:55 GMT
-      nel:
-      - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
-        0.0}'
-      report-to:
-      - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
-        }] }'
-      retry-after:
-      - '5'
-      server:
-      - envoy
-      server-timing:
-      - cache;desc="pass", host;desc="cp3073"
-      set-cookie:
-      - WMF-Uniq=TsPqki2bEIzoi7fgXOj6FQOPAAEBAFvdq_DCX5tJzE_hZazxQIpTU8e3UggQNhd0;Domain=commons.wikimedia.org;Path=/;HttpOnly;secure;SameSite=None;Expires=Wed,
-        30 Jun 2027 00:00:00 GMT
-      strict-transport-security:
-      - max-age=106384710; includeSubDomains; preload
-      vary:
-      - User-Agent
-      x-analytics:
-      - ''
-      x-cache:
-      - cp3073 miss, cp3073 pass
-      x-cache-status:
-      - pass
-      x-client-ip:
-      - 80.229.142.179
-      x-envoy-ratelimited:
-      - 'true'
-      x-request-id:
-      - 4bcf4d96-3688-4d7e-9a5c-4d07bd7c28a4
-    status:
-      code: 429
-      message: Too Many Requests
-- request:
-    body: null
-    headers:
-      Accept:
-      - '*/*'
-      Accept-Encoding:
-      - gzip, deflate
-      Connection:
-      - keep-alive
-      Content-Type:
-      - application/x-www-form-urlencoded
-      user-agent:
-      - Tolland/pytest (https://commons.wikimedia.org/wiki/User:Tolland) Pywikibot/11.4.2
-        (-1 (unknown)) Python/3.13.1.final.0 requests/2.34.2
-    method: GET
-    uri: https://commons.wikimedia.org/w/api.php?action=query&meta=userinfo&uiprop=blockinfo%7Cgroups%7Chasmsg%7Cratelimits%7Crights&formatversion=2&maxlag=5&format=json
-  response:
-    body:
       string: '{"batchcomplete":true,"query":{"userinfo":{"id":0,"name":"80.229.142.179","anon":true,"messages":false,"groups":["*"],"rights":["createaccount","autocreateaccount","read","edit","createpage","createtalk","viewmyprivateinfo","editmyprivateinfo","editmyoptions","translate","urlshortener-create-url","centralauth-merge","abusefilter-view","abusefilter-log","translate-empty-category","echo-read-notifications","flow-hide","flow-edit-title","item-term","property-term","item-merge","item-redirect","property-create","wbqc-check-constraints","mediainfo-term"],"ratelimits":{"edit":{"ip":{"hits":120,"seconds":900}},"linkpurge":{"ip":{"hits":30,"seconds":60}},"badcaptcha":{"ip":{"hits":15,"seconds":60}},"wikimediaevents-hcaptcha-diff-logging":{"ip":{"hits":8,"seconds":60}},"mailpassword":{"ip":{"hits":5,"seconds":3600}},"sendemail":{"ip":{"hits":5,"seconds":86400}},"purge":{"ip":{"hits":30,"seconds":60}},"renderfile":{"ip":{"hits":700,"seconds":30}},"renderfile-nonstandard":{"ip":{"hits":70,"seconds":30}},"cxsave":{"ip":{"hits":10,"seconds":30}},"urlshortcode":{"ip":{"hits":10,"seconds":120}},"post-hcaptcha-token":{"ip":{"hits":15,"seconds":60}},"wikibase-idgenerator":{"ip":{"hits":120,"seconds":900}}}}}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
-      - '0'
+      - '2'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
@@ -237,7 +105,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:02 GMT
+      - Wed, 01 Jul 2026 13:49:38 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -245,9 +113,16 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-pwq4b
+      - mw-api-ext.eqiad.main-69b4b479d5-qdjs9
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
+      set-cookie:
+      - WMF-Last-Access=01-Jul-2026;Path=/;HttpOnly;secure;Expires=Sun, 02 Aug 2026
+        12:00:00 GMT
+      - GeoIP=GB:ENG:Ashton-under-Lyne:53.51:-2.04:v4; Path=/; secure; Domain=.wikimedia.org
+      - NetworkProbeLimit=0.001;Path=/;Secure;SameSite=None;Max-Age=3600
+      - WMF-Uniq=TbUXTdFV3bZPEsLetB9VrAOQAAAAAFvdL4PUefmIQZVmO6DNLZw8QT_4oBeI35r0;Domain=commons.wikimedia.org;Path=/;HttpOnly;secure;SameSite=None;Expires=Thu,
+        01 Jul 2027 00:00:00 GMT
       strict-transport-security:
       - max-age=106384710; includeSubDomains; preload
       vary:
@@ -265,7 +140,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 15692a75-198b-4c87-9222-6cad2773ce22
+      - db36be2e-1259-4034-ab57-8ab1528e2bb4
     status:
       code: 200
       message: OK
@@ -308,8 +183,10 @@ interactions:
         talk"}],"general":{"mainpage":"Main Page","base":"https://commons.wikimedia.org/wiki/Main_Page","sitename":"Wikimedia
         Commons","mainpageisdomainroot":false,"logo":"//commons.wikimedia.org/static/images/project-logos/commonswiki.png","generator":"MediaWiki
         1.47.0-wmf.8","phpversion":"8.3.31","phpsapi":"fpm-fcgi","dbtype":"mysql","dbversion":"10.11.16-MariaDB-log","imagewhitelistenabled":false,"langconversion":true,"linkconversion":true,"titleconversion":true,"linkprefixcharset":"","linkprefix":"","linktrail":"/^([a-z]+)(.*)$/sD","legaltitlechars":"
-        %!\"$&''()*,\\-.\\/0-9:;=?@A-Z\\\\^_`a-z~\\x80-\\xFF+","invalidusernamechars":"@:>=","allunicodefixes":false,"git-hash":"25e62d72e7e5f21bfe88d296e688865b3b5e5310","git-branch":"wmf/1.47.0-wmf.8","case":"first-letter","lang":"en","fallback":[],"rtl":false,"fallback8bitEncoding":"windows-1252","readonly":false,"writeapi":true,"maxarticlesize":2097152,"timezone":"UTC","timeoffset":0,"articlepath":"/wiki/$1","scriptpath":"/w","script":"/w/index.php","variantarticlepath":false,"server":"//commons.wikimedia.org","servername":"commons.wikimedia.org","wikiid":"commonswiki","time":"2026-06-30T08:18:02Z","misermode":true,"uploadsenabled":true,"maxuploadsize":5368709120,"minuploadchunksize":1024,"galleryoptions":{"imagesPerRow":0,"imageWidth":120,"imageHeight":120,"captionLength":true,"showBytes":true,"mode":"traditional","showDimensions":true},"thumblimits":{"0":180,"1":250,"2":400},"imagelimits":{"0":{"width":320,"height":240},"1":{"width":640,"height":480},"2":{"width":800,"height":600},"3":{"width":1024,"height":768},"4":{"width":1280,"height":1024},"5":{"width":2560,"height":2048}},"favicon":"https://commons.wikimedia.org/static/favicon/commons.ico","centralidlookupprovider":"CentralAuth","allcentralidlookupproviders":["CentralAuth","local"],"interwikimagic":true,"magiclinks":{"ISBN":true,"PMID":true,"RFC":true},"categorycollation":"uppercase","nofollowlinks":true,"nofollownsexceptions":[],"nofollowdomainexceptions":["mediawiki.org","wikibooks.org","wikimedia.com","wikimedia.org","wikinews.org","wikipedia.org","wikiquote.org","wikisource.org","wikiversity.org","wiktionary.org","wikivoyage.org","wikidata.org","wikifunctions.org","tools.wmflabs.org","toolforge.org","etherpad.wmflabs.org"],"externallinktarget":false,"wmf-config":{"wmfMasterDatacenter":"eqiad","wmfEtcdLastModifiedIndex":3836224},"citeresponsivereferences":false,"max-page-id":194869654,"linter":{"high":["deletable-table-tag","duplicate-ids","html5-misnesting","misc-tidy-replacement-issues","multiline-html-table-in-list","multiple-unclosed-formatting-tags","pwrap-bug-workaround","self-closed-tag","template-arg-in-extension-tag","tidy-font-bug","tidy-whitespace-bug","unclosed-quotes-in-heading"],"medium":["bogus-image-options","fostered","misnested-tag","multi-colon-escape","wikilink-in-extlink"],"low":["empty-heading","missing-end-tag","missing-end-tag-in-heading","night-mode-unaware-background-color","obsolete-tag","stripped-tag"]},"mobileserver":"https://commons.wikimedia.org","wikibase-propertytypes":{"commonsMedia":{"valuetype":"string"},"geo-shape":{"valuetype":"string"},"tabular-data":{"valuetype":"string"},"url":{"valuetype":"string"},"external-id":{"valuetype":"string"},"wikibase-item":{"valuetype":"wikibase-entityid"},"wikibase-property":{"valuetype":"wikibase-entityid"},"globe-coordinate":{"valuetype":"globecoordinate"},"monolingualtext":{"valuetype":"monolingualtext"},"quantity":{"valuetype":"quantity"},"string":{"valuetype":"string"},"time":{"valuetype":"time"},"math":{"valuetype":"string"},"musical-notation":{"valuetype":"string"}},"wikibase-conceptbaseuri":"https://commons.wikimedia.org/entity/","wikibase-geoshapestoragebaseurl":"https://commons.wikimedia.org/wiki/","wikibase-tabulardatastoragebaseurl":"https://commons.wikimedia.org/wiki/","pageviewservice-supported-metrics":{"pageviews":{"pageviews":true,"uniques":false},"siteviews":{"pageviews":true,"uniques":true},"mostviewed":{"pageviews":true,"uniques":false}},"readinglists-config":{"maxListsPerUser":100,"maxEntriesPerList":5000,"deletedRetentionDays":30}},"userinfo":{"id":0,"name":"80.229.142.179","anon":true,"messages":false}}}'
+        %!\"$&''()*,\\-.\\/0-9:;=?@A-Z\\\\^_`a-z~\\x80-\\xFF+","invalidusernamechars":"@:>=","allunicodefixes":false,"git-hash":"080dd21eacaca9094009be300a8fa3379f78ea38","git-branch":"wmf/1.47.0-wmf.8","case":"first-letter","lang":"en","fallback":[],"rtl":false,"fallback8bitEncoding":"windows-1252","readonly":false,"writeapi":true,"maxarticlesize":2097152,"timezone":"UTC","timeoffset":0,"articlepath":"/wiki/$1","scriptpath":"/w","script":"/w/index.php","variantarticlepath":false,"server":"//commons.wikimedia.org","servername":"commons.wikimedia.org","wikiid":"commonswiki","time":"2026-07-01T13:49:39Z","misermode":true,"uploadsenabled":true,"maxuploadsize":5368709120,"minuploadchunksize":1024,"galleryoptions":{"imagesPerRow":0,"imageWidth":120,"imageHeight":120,"captionLength":true,"showBytes":true,"mode":"traditional","showDimensions":true},"thumblimits":{"0":180,"1":250,"2":400},"imagelimits":{"0":{"width":320,"height":240},"1":{"width":640,"height":480},"2":{"width":800,"height":600},"3":{"width":1024,"height":768},"4":{"width":1280,"height":1024},"5":{"width":2560,"height":2048}},"favicon":"https://commons.wikimedia.org/static/favicon/commons.ico","centralidlookupprovider":"CentralAuth","allcentralidlookupproviders":["CentralAuth","local"],"interwikimagic":true,"magiclinks":{"ISBN":true,"PMID":true,"RFC":true},"categorycollation":"uppercase","nofollowlinks":true,"nofollownsexceptions":[],"nofollowdomainexceptions":["mediawiki.org","wikibooks.org","wikimedia.com","wikimedia.org","wikinews.org","wikipedia.org","wikiquote.org","wikisource.org","wikiversity.org","wiktionary.org","wikivoyage.org","wikidata.org","wikifunctions.org","tools.wmflabs.org","toolforge.org","etherpad.wmflabs.org"],"externallinktarget":false,"wmf-config":{"wmfMasterDatacenter":"eqiad","wmfEtcdLastModifiedIndex":3838157},"citeresponsivereferences":false,"max-page-id":194946808,"linter":{"high":["deletable-table-tag","duplicate-ids","html5-misnesting","misc-tidy-replacement-issues","multiline-html-table-in-list","multiple-unclosed-formatting-tags","pwrap-bug-workaround","self-closed-tag","template-arg-in-extension-tag","tidy-font-bug","tidy-whitespace-bug","unclosed-quotes-in-heading"],"medium":["bogus-image-options","fostered","misnested-tag","multi-colon-escape","wikilink-in-extlink"],"low":["empty-heading","missing-end-tag","missing-end-tag-in-heading","night-mode-unaware-background-color","obsolete-tag","stripped-tag"]},"mobileserver":"https://commons.wikimedia.org","wikibase-propertytypes":{"commonsMedia":{"valuetype":"string"},"geo-shape":{"valuetype":"string"},"tabular-data":{"valuetype":"string"},"url":{"valuetype":"string"},"external-id":{"valuetype":"string"},"wikibase-item":{"valuetype":"wikibase-entityid"},"wikibase-property":{"valuetype":"wikibase-entityid"},"globe-coordinate":{"valuetype":"globecoordinate"},"monolingualtext":{"valuetype":"monolingualtext"},"quantity":{"valuetype":"quantity"},"string":{"valuetype":"string"},"time":{"valuetype":"time"},"math":{"valuetype":"string"},"musical-notation":{"valuetype":"string"}},"wikibase-conceptbaseuri":"https://commons.wikimedia.org/entity/","wikibase-geoshapestoragebaseurl":"https://commons.wikimedia.org/wiki/","wikibase-tabulardatastoragebaseurl":"https://commons.wikimedia.org/wiki/","pageviewservice-supported-metrics":{"pageviews":{"pageviews":true,"uniques":false},"siteviews":{"pageviews":true,"uniques":true},"mostviewed":{"pageviews":true,"uniques":false}},"readinglists-config":{"maxListsPerUser":100,"maxEntriesPerList":5000,"deletedRetentionDays":30}},"userinfo":{"id":0,"name":"80.229.142.179","anon":true,"messages":false}}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
       - '0'
       cache-control:
@@ -323,7 +200,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:02 GMT
+      - Wed, 01 Jul 2026 13:49:39 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -331,9 +208,12 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-wpl4m
+      - mw-api-ext.eqiad.main-69b4b479d5-tsdsm
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
+      set-cookie:
+      - WMF-Uniq=TbUXTdFV3bZPEsLetB9VrAOQAAEBAFvd6aCmkWISSxOyjhZdn304i0ROT2O3lshJ;Domain=commons.wikimedia.org;Path=/;HttpOnly;secure;SameSite=None;Expires=Thu,
+        01 Jul 2027 00:00:00 GMT
       strict-transport-security:
       - max-age=106384710; includeSubDomains; preload
       transfer-encoding:
@@ -353,7 +233,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - ea9753fb-724e-4cd4-b40e-c7e10d63bbb6
+      - 616ea01d-6311-4b17-b252-569750d8a6de
     status:
       code: 200
       message: OK
@@ -377,6 +257,8 @@ interactions:
     body:
       string: '{"batchcomplete":true,"query":{"fileextensions":[{"ext":"tiff"},{"ext":"tif"},{"ext":"png"},{"ext":"gif"},{"ext":"jpg"},{"ext":"jpeg"},{"ext":"webp"},{"ext":"xcf"},{"ext":"pdf"},{"ext":"mid"},{"ext":"ogg"},{"ext":"ogv"},{"ext":"svg"},{"ext":"djvu"},{"ext":"stl"},{"ext":"oga"},{"ext":"flac"},{"ext":"opus"},{"ext":"wav"},{"ext":"webm"},{"ext":"mp3"},{"ext":"midi"},{"ext":"mpg"},{"ext":"mpeg"}],"userinfo":{"id":0,"name":"80.229.142.179","anon":true,"messages":false}}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
       - '0'
       cache-control:
@@ -392,7 +274,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:02 GMT
+      - Wed, 01 Jul 2026 13:49:39 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -400,7 +282,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-mjc22
+      - mw-api-ext.eqiad.main-69b4b479d5-j2bv8
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -420,7 +302,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - f09fffb7-4e92-407f-8a74-7b75587b9beb
+      - 7919d0b1-c0ed-4cca-927a-aedc7195e411
     status:
       code: 200
       message: OK
@@ -444,6 +326,8 @@ interactions:
     body:
       string: '{"batchcomplete":"","query":{"pageids":["-1"],"pages":{"-1":{"ns":6,"title":"File:NeglectedArgument.pdf","missing":"","known":"","contentmodel":"wikitext","pagelanguage":"en","pagelanguagehtmlcode":"en","pagelanguagedir":"ltr","protection":[],"restrictiontypes":["create"]}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
       - '0'
       cache-control:
@@ -459,7 +343,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:02 GMT
+      - Wed, 01 Jul 2026 13:49:39 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -467,7 +351,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-92mg5
+      - mw-api-ext.eqiad.main-69b4b479d5-p2rng
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -487,7 +371,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - ba479abb-c041-41e1-85a9-c876c0487dd8
+      - 14368a8b-6634-49c6-82de-cd00e3a791dc
     status:
       code: 200
       message: OK
@@ -511,8 +395,10 @@ interactions:
     body:
       string: '{"paraminfo":{"helpformat":"none","modules":[{"name":"main","classname":"MediaWiki\\Api\\ApiMain","path":"main","prefix":"","source":"MediaWiki","sourcename":"MediaWiki","licensetag":"GPL-2.0-or-later","licenselink":"//commons.wikimedia.org/wiki/Special:Version/License/MediaWiki","helpurls":[],"parameters":[{"index":1,"name":"action","type":["abusefiltercheckmatch","abusefilterchecksyntax","abusefilterevalexpression","abusefilterunblockautopromote","abuselogprivatedetails","acquiretempusername","aggregategroups","antispoof","block","centralauthtoken","centralnoticecdncacheupdatebanner","centralnoticechoicedata","centralnoticequerycampaign","changeauthenticationdata","changecontentmodel","checktoken","clearhasmsg","clientlogin","communityconfigurationedit","compare","createaccount","createlocalaccount","delete","deleteglobalaccount","discouragetranslation","discussiontoolsedit","discussiontoolsfindcomment","discussiontoolsgetsubscriptions","discussiontoolssubscribe","discussiontoolsthank","echocreateevent","echomarkread","echomarkseen","echomute","edit","editmassmessagelist","emailuser","expandtemplates","featuredfeed","feedcontributions","feedrecentchanges","feedwatchlist","filerevert","flickrblacklist","flow","flow-parsoid-utils","flowthank","globalblock","globalpreferenceoverrides","globalpreferences","globaluserrights","groupreview","help","imagerotate","import","jsonconfig","languagesearch","linkaccount","login","logout","managetags","markfortranslation","massmessage","mediadetection","mergehistory","move","opensearch","options","paraminfo","parse","patrol","protect","purge","query","removeauthenticationdata","resetpassword","revisiondelete","rollback","rsd","searchtranslations","setglobalaccountstatus","setnotificationtimestamp","setpagelanguage","shortenurl","sitematrix","spamblacklist","streamconfigs","strikevote","tag","templatedata","thank","titleblacklist","torblock","transcodereset","translationaids","translationreview","translationstats","ttmserver","unblock","undelete","unlinkaccount","upload","userrights","validatepassword","watch","wbavailablebadges","wbcheckconstraintparameters","wbcheckconstraints","wbcreateclaim","wbcreateredirect","wbeditentity","wbformatentities","wbformatvalue","wbgetclaims","wbgetentities","wblinktitles","wbmergeitems","wbparsevalue","wbremoveclaims","wbremovequalifiers","wbremovereferences","wbsearchentities","wbsetaliases","wbsetclaim","wbsetclaimvalue","wbsetdescription","wbsetlabel","wbsetqualifier","wbsetreference","wbsetsitelink","webapp-manifest","webauthn","wikilove","bouncehandler","categorytree","chartinfo","cirrus-check-sanity","cirrus-config-dump","cirrus-profiles-dump","cirrus-schema-dump","codemirror-validate","collection","cspreport","discussiontoolscompare","discussiontoolspageinfo","discussiontoolspreview","editcheckreferenceurl","fancycaptchareload","jsondata","jsontransform","managegroupsynchronizationcache","managemessagegroups","messagegroupsubscription","readinglists","sanitize-mapdata","scribunto-console","securepollauth","stashedit","timedtext","translationcheck","translationentitysearch","ulslocalization","ulssetlang","visualeditor","visualeditoredit","wikimediaeventsblockededit","wikimediaeventshcaptchaeditattempt"],"default":"help","submodules":{"abusefiltercheckmatch":"abusefiltercheckmatch","abusefilterchecksyntax":"abusefilterchecksyntax","abusefilterevalexpression":"abusefilterevalexpression","abusefilterunblockautopromote":"abusefilterunblockautopromote","abuselogprivatedetails":"abuselogprivatedetails","acquiretempusername":"acquiretempusername","aggregategroups":"aggregategroups","antispoof":"antispoof","block":"block","centralauthtoken":"centralauthtoken","centralnoticecdncacheupdatebanner":"centralnoticecdncacheupdatebanner","centralnoticechoicedata":"centralnoticechoicedata","centralnoticequerycampaign":"centralnoticequerycampaign","changeauthenticationdata":"changeauthenticationdata","changecontentmodel":"changecontentmodel","checktoken":"checktoken","clearhasmsg":"clearhasmsg","clientlogin":"clientlogin","communityconfigurationedit":"communityconfigurationedit","compare":"compare","createaccount":"createaccount","createlocalaccount":"createlocalaccount","delete":"delete","deleteglobalaccount":"deleteglobalaccount","discouragetranslation":"discouragetranslation","discussiontoolsedit":"discussiontoolsedit","discussiontoolsfindcomment":"discussiontoolsfindcomment","discussiontoolsgetsubscriptions":"discussiontoolsgetsubscriptions","discussiontoolssubscribe":"discussiontoolssubscribe","discussiontoolsthank":"discussiontoolsthank","echocreateevent":"echocreateevent","echomarkread":"echomarkread","echomarkseen":"echomarkseen","echomute":"echomute","edit":"edit","editmassmessagelist":"editmassmessagelist","emailuser":"emailuser","expandtemplates":"expandtemplates","featuredfeed":"featuredfeed","feedcontributions":"feedcontributions","feedrecentchanges":"feedrecentchanges","feedwatchlist":"feedwatchlist","filerevert":"filerevert","flickrblacklist":"flickrblacklist","flow":"flow","flow-parsoid-utils":"flow-parsoid-utils","flowthank":"flowthank","globalblock":"globalblock","globalpreferenceoverrides":"globalpreferenceoverrides","globalpreferences":"globalpreferences","globaluserrights":"globaluserrights","groupreview":"groupreview","help":"help","imagerotate":"imagerotate","import":"import","jsonconfig":"jsonconfig","languagesearch":"languagesearch","linkaccount":"linkaccount","login":"login","logout":"logout","managetags":"managetags","markfortranslation":"markfortranslation","massmessage":"massmessage","mediadetection":"mediadetection","mergehistory":"mergehistory","move":"move","opensearch":"opensearch","options":"options","paraminfo":"paraminfo","parse":"parse","patrol":"patrol","protect":"protect","purge":"purge","query":"query","removeauthenticationdata":"removeauthenticationdata","resetpassword":"resetpassword","revisiondelete":"revisiondelete","rollback":"rollback","rsd":"rsd","searchtranslations":"searchtranslations","setglobalaccountstatus":"setglobalaccountstatus","setnotificationtimestamp":"setnotificationtimestamp","setpagelanguage":"setpagelanguage","shortenurl":"shortenurl","sitematrix":"sitematrix","spamblacklist":"spamblacklist","streamconfigs":"streamconfigs","strikevote":"strikevote","tag":"tag","templatedata":"templatedata","thank":"thank","titleblacklist":"titleblacklist","torblock":"torblock","transcodereset":"transcodereset","translationaids":"translationaids","translationreview":"translationreview","translationstats":"translationstats","ttmserver":"ttmserver","unblock":"unblock","undelete":"undelete","unlinkaccount":"unlinkaccount","upload":"upload","userrights":"userrights","validatepassword":"validatepassword","watch":"watch","wbavailablebadges":"wbavailablebadges","wbcheckconstraintparameters":"wbcheckconstraintparameters","wbcheckconstraints":"wbcheckconstraints","wbcreateclaim":"wbcreateclaim","wbcreateredirect":"wbcreateredirect","wbeditentity":"wbeditentity","wbformatentities":"wbformatentities","wbformatvalue":"wbformatvalue","wbgetclaims":"wbgetclaims","wbgetentities":"wbgetentities","wblinktitles":"wblinktitles","wbmergeitems":"wbmergeitems","wbparsevalue":"wbparsevalue","wbremoveclaims":"wbremoveclaims","wbremovequalifiers":"wbremovequalifiers","wbremovereferences":"wbremovereferences","wbsearchentities":"wbsearchentities","wbsetaliases":"wbsetaliases","wbsetclaim":"wbsetclaim","wbsetclaimvalue":"wbsetclaimvalue","wbsetdescription":"wbsetdescription","wbsetlabel":"wbsetlabel","wbsetqualifier":"wbsetqualifier","wbsetreference":"wbsetreference","wbsetsitelink":"wbsetsitelink","webapp-manifest":"webapp-manifest","webauthn":"webauthn","wikilove":"wikilove","bouncehandler":"bouncehandler","categorytree":"categorytree","chartinfo":"chartinfo","cirrus-check-sanity":"cirrus-check-sanity","cirrus-config-dump":"cirrus-config-dump","cirrus-profiles-dump":"cirrus-profiles-dump","cirrus-schema-dump":"cirrus-schema-dump","codemirror-validate":"codemirror-validate","collection":"collection","cspreport":"cspreport","discussiontoolscompare":"discussiontoolscompare","discussiontoolspageinfo":"discussiontoolspageinfo","discussiontoolspreview":"discussiontoolspreview","editcheckreferenceurl":"editcheckreferenceurl","fancycaptchareload":"fancycaptchareload","jsondata":"jsondata","jsontransform":"jsontransform","managegroupsynchronizationcache":"managegroupsynchronizationcache","managemessagegroups":"managemessagegroups","messagegroupsubscription":"messagegroupsubscription","readinglists":"readinglists","sanitize-mapdata":"sanitize-mapdata","scribunto-console":"scribunto-console","securepollauth":"securepollauth","stashedit":"stashedit","timedtext":"timedtext","translationcheck":"translationcheck","translationentitysearch":"translationentitysearch","ulslocalization":"ulslocalization","ulssetlang":"ulssetlang","visualeditor":"visualeditor","visualeditoredit":"visualeditoredit","wikimediaeventsblockededit":"wikimediaeventsblockededit","wikimediaeventshcaptchaeditattempt":"wikimediaeventshcaptchaeditattempt"},"internalvalues":["bouncehandler","categorytree","chartinfo","cirrus-check-sanity","cirrus-config-dump","cirrus-profiles-dump","cirrus-schema-dump","codemirror-validate","collection","cspreport","discussiontoolscompare","discussiontoolspageinfo","discussiontoolspreview","editcheckreferenceurl","fancycaptchareload","jsondata","jsontransform","managegroupsynchronizationcache","managemessagegroups","messagegroupsubscription","readinglists","sanitize-mapdata","scribunto-console","securepollauth","stashedit","timedtext","translationcheck","translationentitysearch","ulslocalization","ulssetlang","visualeditor","visualeditoredit","wikimediaeventsblockededit","wikimediaeventshcaptchaeditattempt"]},{"index":2,"name":"format","type":["json","jsonfm","none","rawfm","xml","xmlfm"],"default":"jsonfm","submodules":{"json":"json","jsonfm":"jsonfm","none":"none","rawfm":"rawfm","xml":"xml","xmlfm":"xmlfm"}},{"index":3,"name":"maxlag","type":"integer"},{"index":4,"name":"smaxage","type":"integer","default":0,"min":0},{"index":5,"name":"maxage","type":"integer","default":0,"min":0},{"index":6,"name":"assert","type":["anon","bot","user"]},{"index":7,"name":"assertuser","type":"user","subtypes":["name","temp"]},{"index":8,"name":"requestid","type":"string"},{"index":9,"name":"servedby","type":"boolean"},{"index":10,"name":"curtimestamp","type":"boolean"},{"index":11,"name":"responselanginfo","type":"boolean"},{"index":12,"name":"origin","type":"string"},{"index":13,"name":"crossorigin","type":"boolean"},{"index":14,"name":"uselang","type":"string","default":"user"},{"index":15,"name":"variant","type":"string"},{"index":16,"name":"errorformat","type":["bc","html","none","plaintext","raw","wikitext"],"default":"bc"},{"index":17,"name":"errorlang","type":"string","default":"uselang"},{"index":18,"name":"errorsuselocal","type":"boolean"},{"index":19,"name":"centralauthtoken","type":"string","sensitive":""}],"templatedparameters":[]},{"name":"paraminfo","classname":"MediaWiki\\Api\\ApiParamInfo","path":"paraminfo","group":"action","prefix":"","source":"MediaWiki","sourcename":"MediaWiki","licensetag":"GPL-2.0-or-later","licenselink":"//commons.wikimedia.org/wiki/Special:Version/License/MediaWiki","helpurls":["https://www.mediawiki.org/wiki/Special:MyLanguage/API:Parameter_information"],"parameters":[{"index":1,"name":"modules","type":"string","multi":"","lowlimit":50,"highlimit":500,"limit":50},{"index":2,"name":"helpformat","type":["html","none","raw","wikitext"],"default":"none"},{"index":3,"name":"querymodules","type":["abusefilters","abuselog","allcampaigns","allcategories","alldeletedrevisions","allfileusages","allimages","alllinks","allmessages","allpages","allredirects","allrevisions","alltransclusions","allusers","authmanagerinfo","babel","backlinks","betafeatures","blocks","categories","categoryinfo","categorymembers","centralnoticeactivecampaigns","centralnoticelogs","checkuser","checkuserformattedblockinfo","checkuserlog","cirrusbuilddoc","cirruscompsuggestbuilddoc","cirrusdoc","codexicons","communityconfiguration","contributors","coordinates","deletedrevisions","deletedrevs","description","duplicatefiles","embeddedin","entityterms","extlinks","extracts","exturlusage","featureusage","filearchive","filerepoinfo","fileusage","flowinfo","gadgetcategories","gadgets","geosearch","globalallusers","globalblocks","globalgroups","globalpreferences","globalrenamestatus","globalusage","globaluserinfo","globalusers","imageinfo","images","imageusage","info","iwbacklinks","iwlinks","langbacklinks","langlinks","languageinfo","languagestats","links","linkshere","linterrors","linterstats","logevents","managemessagegroups","mapdata","messagecollection","messagegroups","messagegroupstats","messagegroupsubscription","messagetranslations","mmcontent","mostviewed","mystashedfiles","notifications","pagecollectionsmetadata","pageimages","pagepropnames","pageprops","pageswithprop","pageterms","pageviews","prefixsearch","protectedtitles","querypage","random","readinglistentries","readinglists","recentchanges","redirects","revisions","search","siteinfo","siteviews","stashimageinfo","tags","templates","tokens","trackingcategories","transcludedin","transcodestatus","unreadnotificationpages","usercontribs","userinfo","users","videoinfo","watchlist","watchlistraw","wbcontentlanguages","wbentityusage","wblistentityusage","wbsearch","wbsubscribers","wikibase","wikisets"],"deprecated":"","multi":"","lowlimit":50,"highlimit":500,"limit":50},{"index":4,"name":"mainmodule","type":"string","deprecated":""},{"index":5,"name":"pagesetmodule","type":"string","deprecated":""},{"index":6,"name":"formatmodules","type":["json","jsonfm","none","rawfm","xml","xmlfm"],"deprecated":"","multi":"","lowlimit":50,"highlimit":500,"limit":50}],"templatedparameters":[]},{"name":"query","classname":"MediaWiki\\Api\\ApiQuery","path":"query","group":"action","prefix":"","source":"MediaWiki","sourcename":"MediaWiki","licensetag":"GPL-2.0-or-later","licenselink":"//commons.wikimedia.org/wiki/Special:Version/License/MediaWiki","readrights":"","helpurls":["https://www.mediawiki.org/wiki/Special:MyLanguage/API:Query","https://www.mediawiki.org/wiki/Special:MyLanguage/API:Meta","https://www.mediawiki.org/wiki/Special:MyLanguage/API:Properties","https://www.mediawiki.org/wiki/Special:MyLanguage/API:Lists"],"parameters":[{"index":1,"name":"prop","type":["categories","categoryinfo","contributors","coordinates","deletedrevisions","duplicatefiles","entityterms","extlinks","extracts","fileusage","globalusage","imageinfo","images","info","iwlinks","langlinks","links","linkshere","mmcontent","pageimages","pageprops","pageterms","pageviews","redirects","revisions","stashimageinfo","templates","transcludedin","transcodestatus","videoinfo","wbentityusage","flowinfo","cirrusbuilddoc","cirruscompsuggestbuilddoc","cirrusdoc","description","mapdata"],"multi":"","lowlimit":50,"highlimit":500,"limit":50,"submodules":{"categories":"query+categories","categoryinfo":"query+categoryinfo","contributors":"query+contributors","coordinates":"query+coordinates","deletedrevisions":"query+deletedrevisions","duplicatefiles":"query+duplicatefiles","entityterms":"query+entityterms","extlinks":"query+extlinks","extracts":"query+extracts","fileusage":"query+fileusage","globalusage":"query+globalusage","imageinfo":"query+imageinfo","images":"query+images","info":"query+info","iwlinks":"query+iwlinks","langlinks":"query+langlinks","links":"query+links","linkshere":"query+linkshere","mmcontent":"query+mmcontent","pageimages":"query+pageimages","pageprops":"query+pageprops","pageterms":"query+pageterms","pageviews":"query+pageviews","redirects":"query+redirects","revisions":"query+revisions","stashimageinfo":"query+stashimageinfo","templates":"query+templates","transcludedin":"query+transcludedin","transcodestatus":"query+transcodestatus","videoinfo":"query+videoinfo","wbentityusage":"query+wbentityusage","flowinfo":"query+flowinfo","cirrusbuilddoc":"query+cirrusbuilddoc","cirruscompsuggestbuilddoc":"query+cirruscompsuggestbuilddoc","cirrusdoc":"query+cirrusdoc","description":"query+description","mapdata":"query+mapdata"},"internalvalues":["cirrusbuilddoc","cirruscompsuggestbuilddoc","cirrusdoc","description","mapdata"],"deprecatedvalues":["flowinfo"]},{"index":2,"name":"list","type":["abusefilters","abuselog","allcampaigns","allcategories","alldeletedrevisions","allfileusages","allimages","alllinks","allpages","allredirects","allrevisions","alltransclusions","allusers","backlinks","betafeatures","blocks","categorymembers","centralnoticeactivecampaigns","centralnoticelogs","checkuserlog","codexicons","embeddedin","exturlusage","filearchive","gadgetcategories","gadgets","geosearch","globalallusers","globalblocks","globalgroups","globalusers","imageusage","iwbacklinks","langbacklinks","linterrors","logevents","messagecollection","mostviewed","mystashedfiles","pagecollectionsmetadata","pagepropnames","pageswithprop","prefixsearch","protectedtitles","querypage","random","recentchanges","search","tags","trackingcategories","usercontribs","users","watchlist","watchlistraw","wblistentityusage","wbsubscribers","wikisets","checkuser","deletedrevs","messagegroupsubscription","readinglistentries","wbsearch"],"multi":"","lowlimit":50,"highlimit":500,"limit":50,"submodules":{"abusefilters":"query+abusefilters","abuselog":"query+abuselog","allcampaigns":"query+allcampaigns","allcategories":"query+allcategories","alldeletedrevisions":"query+alldeletedrevisions","allfileusages":"query+allfileusages","allimages":"query+allimages","alllinks":"query+alllinks","allpages":"query+allpages","allredirects":"query+allredirects","allrevisions":"query+allrevisions","alltransclusions":"query+alltransclusions","allusers":"query+allusers","backlinks":"query+backlinks","betafeatures":"query+betafeatures","blocks":"query+blocks","categorymembers":"query+categorymembers","centralnoticeactivecampaigns":"query+centralnoticeactivecampaigns","centralnoticelogs":"query+centralnoticelogs","checkuserlog":"query+checkuserlog","codexicons":"query+codexicons","embeddedin":"query+embeddedin","exturlusage":"query+exturlusage","filearchive":"query+filearchive","gadgetcategories":"query+gadgetcategories","gadgets":"query+gadgets","geosearch":"query+geosearch","globalallusers":"query+globalallusers","globalblocks":"query+globalblocks","globalgroups":"query+globalgroups","globalusers":"query+globalusers","imageusage":"query+imageusage","iwbacklinks":"query+iwbacklinks","langbacklinks":"query+langbacklinks","linterrors":"query+linterrors","logevents":"query+logevents","messagecollection":"query+messagecollection","mostviewed":"query+mostviewed","mystashedfiles":"query+mystashedfiles","pagecollectionsmetadata":"query+pagecollectionsmetadata","pagepropnames":"query+pagepropnames","pageswithprop":"query+pageswithprop","prefixsearch":"query+prefixsearch","protectedtitles":"query+protectedtitles","querypage":"query+querypage","random":"query+random","recentchanges":"query+recentchanges","search":"query+search","tags":"query+tags","trackingcategories":"query+trackingcategories","usercontribs":"query+usercontribs","users":"query+users","watchlist":"query+watchlist","watchlistraw":"query+watchlistraw","wblistentityusage":"query+wblistentityusage","wbsubscribers":"query+wbsubscribers","wikisets":"query+wikisets","checkuser":"query+checkuser","deletedrevs":"query+deletedrevs","messagegroupsubscription":"query+messagegroupsubscription","readinglistentries":"query+readinglistentries","wbsearch":"query+wbsearch"},"deprecatedvalues":["checkuser","deletedrevs"],"internalvalues":["messagegroupsubscription","readinglistentries","wbsearch"]},{"index":3,"name":"meta","type":["allmessages","authmanagerinfo","babel","communityconfiguration","featureusage","filerepoinfo","globalpreferences","globalrenamestatus","globaluserinfo","languageinfo","languagestats","linterstats","managemessagegroups","messagegroups","messagegroupstats","messagetranslations","notifications","siteinfo","siteviews","tokens","unreadnotificationpages","userinfo","wbcontentlanguages","wikibase","checkuserformattedblockinfo","readinglists"],"multi":"","lowlimit":50,"highlimit":500,"limit":50,"submodules":{"allmessages":"query+allmessages","authmanagerinfo":"query+authmanagerinfo","babel":"query+babel","communityconfiguration":"query+communityconfiguration","featureusage":"query+featureusage","filerepoinfo":"query+filerepoinfo","globalpreferences":"query+globalpreferences","globalrenamestatus":"query+globalrenamestatus","globaluserinfo":"query+globaluserinfo","languageinfo":"query+languageinfo","languagestats":"query+languagestats","linterstats":"query+linterstats","managemessagegroups":"query+managemessagegroups","messagegroups":"query+messagegroups","messagegroupstats":"query+messagegroupstats","messagetranslations":"query+messagetranslations","notifications":"query+notifications","siteinfo":"query+siteinfo","siteviews":"query+siteviews","tokens":"query+tokens","unreadnotificationpages":"query+unreadnotificationpages","userinfo":"query+userinfo","wbcontentlanguages":"query+wbcontentlanguages","wikibase":"query+wikibase","checkuserformattedblockinfo":"query+checkuserformattedblockinfo","readinglists":"query+readinglists"},"internalvalues":["checkuserformattedblockinfo","readinglists"]},{"index":4,"name":"indexpageids","type":"boolean"},{"index":5,"name":"export","type":"boolean"},{"index":6,"name":"exportnowrap","type":"boolean"},{"index":7,"name":"exportschema","type":["0.10","0.11"],"default":"0.11"},{"index":8,"name":"iwurl","type":"boolean"},{"index":9,"name":"continue","type":"string"},{"index":10,"name":"rawcontinue","type":"boolean"},{"index":11,"name":"titles","type":"string","multi":"","lowlimit":50,"highlimit":500,"limit":50},{"index":12,"name":"pageids","type":"integer","multi":"","lowlimit":50,"highlimit":500,"limit":50},{"index":13,"name":"revids","type":"integer","multi":"","lowlimit":50,"highlimit":500,"limit":50},{"index":14,"name":"generator","type":["allcategories","alldeletedrevisions","allfileusages","allimages","alllinks","allpages","allredirects","allrevisions","alltransclusions","backlinks","categories","categorymembers","deletedrevisions","duplicatefiles","embeddedin","exturlusage","fileusage","geosearch","images","imageusage","iwbacklinks","langbacklinks","links","linkshere","messagecollection","mostviewed","pageswithprop","prefixsearch","protectedtitles","querypage","random","recentchanges","redirects","revisions","search","templates","trackingcategories","transcludedin","watchlist","watchlistraw","wblistentityusage","readinglistentries","wbsearch"],"submodules":{"allcategories":"query+allcategories","alldeletedrevisions":"query+alldeletedrevisions","allfileusages":"query+allfileusages","allimages":"query+allimages","alllinks":"query+alllinks","allpages":"query+allpages","allredirects":"query+allredirects","allrevisions":"query+allrevisions","alltransclusions":"query+alltransclusions","backlinks":"query+backlinks","categories":"query+categories","categorymembers":"query+categorymembers","deletedrevisions":"query+deletedrevisions","duplicatefiles":"query+duplicatefiles","embeddedin":"query+embeddedin","exturlusage":"query+exturlusage","fileusage":"query+fileusage","geosearch":"query+geosearch","images":"query+images","imageusage":"query+imageusage","iwbacklinks":"query+iwbacklinks","langbacklinks":"query+langbacklinks","links":"query+links","linkshere":"query+linkshere","messagecollection":"query+messagecollection","mostviewed":"query+mostviewed","pageswithprop":"query+pageswithprop","prefixsearch":"query+prefixsearch","protectedtitles":"query+protectedtitles","querypage":"query+querypage","random":"query+random","recentchanges":"query+recentchanges","redirects":"query+redirects","revisions":"query+revisions","search":"query+search","templates":"query+templates","trackingcategories":"query+trackingcategories","transcludedin":"query+transcludedin","watchlist":"query+watchlist","watchlistraw":"query+watchlistraw","wblistentityusage":"query+wblistentityusage","readinglistentries":"query+readinglistentries","wbsearch":"query+wbsearch"},"submoduleparamprefix":"g","internalvalues":["readinglistentries","wbsearch"]},{"index":15,"name":"redirects","type":"boolean"},{"index":16,"name":"converttitles","type":"boolean"}],"templatedparameters":[]}]}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
-      - '0'
+      - '2'
       cache-control:
       - private, must-revalidate, max-age=0
       content-disposition:
@@ -524,7 +410,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:03 GMT
+      - Wed, 01 Jul 2026 13:49:39 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -532,7 +418,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-v8hkl
+      - mw-api-ext.eqiad.main-69b4b479d5-92kfj
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -554,7 +440,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 227ed866-7c25-4aab-896b-5f2f3bb09d8d
+      - b8920cb6-a114-41d9-9910-aa816310b329
     status:
       code: 200
       message: OK
@@ -579,6 +465,8 @@ interactions:
       string: '{"paraminfo":{"helpformat":"none","modules":[{"name":"info","classname":"MediaWiki\\Api\\ApiQueryInfo","path":"query+info","group":"prop","prefix":"in","source":"MediaWiki","sourcename":"MediaWiki","licensetag":"GPL-2.0-or-later","licenselink":"//commons.wikimedia.org/wiki/Special:Version/License/MediaWiki","readrights":"","helpurls":["https://www.mediawiki.org/wiki/Special:MyLanguage/API:Info"],"parameters":[{"index":1,"name":"prop","type":["associatedpage","displaytitle","editintro","linkclasses","notificationtimestamp","preloadcontent","protection","subjectid","talkid","url","varianttitles","visitingwatchers","watched","watchers","watchlistlabels","preload","readable"],"multi":"","lowlimit":50,"highlimit":500,"limit":50,"deprecatedvalues":["preload","readable"]},{"index":2,"name":"linkcontext","type":"title","default":"Main
         Page"},{"index":3,"name":"defaultlinkcaption","type":"boolean"},{"index":4,"name":"testactions","type":"string","multi":"","lowlimit":50,"highlimit":500,"limit":50},{"index":5,"name":"testactionsdetail","type":["boolean","full","quick"],"default":"boolean"},{"index":6,"name":"testactionsautocreate","type":"boolean"},{"index":7,"name":"preloadcustom","type":"string","info":[{"name":"preloadcontentonly"}]},{"index":8,"name":"preloadparams","type":"string","multi":"","lowlimit":50,"highlimit":500,"limit":50,"info":[{"name":"preloadcontentonly"}]},{"index":9,"name":"preloadnewsection","type":"boolean","info":[{"name":"preloadcontentonly"}]},{"index":10,"name":"editintrostyle","type":["lessframes","moreframes"],"default":"moreframes","info":[{"name":"editintroonly"}]},{"index":11,"name":"editintroskip","type":"string","multi":"","lowlimit":50,"highlimit":500,"limit":50,"info":[{"name":"editintroonly"}]},{"index":12,"name":"editintrocustom","type":"string","info":[{"name":"editintroonly"}]},{"index":13,"name":"continue","type":"string"}],"templatedparameters":[]}]}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
       - '0'
       cache-control:
@@ -587,14 +475,12 @@ interactions:
       - inline; filename=api-result.json
       content-encoding:
       - gzip
-      content-length:
-      - '677'
       content-security-policy:
       - default-src 'self'; script-src 'none'; object-src 'none'
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:03 GMT
+      - Wed, 01 Jul 2026 13:49:40 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -602,11 +488,13 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-zbcjd
+      - mw-api-ext.eqiad.main-69b4b479d5-xctfd
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
       - max-age=106384710; includeSubDomains; preload
+      transfer-encoding:
+      - chunked
       vary:
       - Accept-Encoding,User-Agent
       x-analytics:
@@ -622,7 +510,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - e07e6985-79fa-4960-b569-914a06090b56
+      - 439975df-274d-4091-8fa1-aa6ee82614aa
     status:
       code: 200
       message: OK
@@ -667,7 +555,7 @@ interactions:
         Vibber\",\"url\":\"https://www.mediawiki.org/wiki/Extension:CharInsert\",\"vcs-system\":\"git\",\"vcs-version\":\"28bcae2022962c078e50bfcf320487351a1c55c5\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/CharInsert/+/28bcae2022962c078e50bfcf320487351a1c55c5\",\"vcs-date\":\"2026-06-14T03:12:21Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/CharInsert\"},{\"type\":\"parserhook\",\"name\":\"ParserFunctions\",\"descriptionmsg\":\"pfunc_desc\",\"author\":\"Tim
         Starling, Robert Rohde, Ross McClure, Juraj Simlovic\",\"url\":\"https://www.mediawiki.org/wiki/Extension:ParserFunctions\",\"version\":\"1.6.1\",\"vcs-system\":\"git\",\"vcs-version\":\"bdcc63059c7d358a6420714134fdc99e205a15dc\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/ParserFunctions/+/bdcc63059c7d358a6420714134fdc99e205a15dc\",\"vcs-date\":\"2026-06-16T07:52:39Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/ParserFunctions\"},{\"type\":\"parserhook\",\"name\":\"Cite\",\"descriptionmsg\":\"cite-desc\",\"author\":\"\xC6var
         Arnfj\xF6r\xF0 Bjarmason, Andrew Garrett, Brooke Vibber, Ed Sanders, Marius
-        Hoch, Steve Sanbeg, Trevor Parscal, ...\",\"url\":\"https://www.mediawiki.org/wiki/Extension:Cite\",\"vcs-system\":\"git\",\"vcs-version\":\"062de4ec796e2b2e69b732b1cb6f19b734048b12\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/Cite/+/062de4ec796e2b2e69b732b1cb6f19b734048b12\",\"vcs-date\":\"2026-06-19T12:22:45Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/Cite\",\"credits\":\"/wiki/Special:Version/Credits/Cite\"},{\"type\":\"parserhook\",\"name\":\"InputBox\",\"descriptionmsg\":\"inputbox-desc\",\"author\":\"Erik
+        Hoch, Steve Sanbeg, Trevor Parscal, ...\",\"url\":\"https://www.mediawiki.org/wiki/Extension:Cite\",\"vcs-system\":\"git\",\"vcs-version\":\"4dcbd27b017a9629ce0e7368404290d529e94481\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/Cite/+/4dcbd27b017a9629ce0e7368404290d529e94481\",\"vcs-date\":\"2026-06-30T14:37:07Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/Cite\",\"credits\":\"/wiki/Special:Version/Credits/Cite\"},{\"type\":\"parserhook\",\"name\":\"InputBox\",\"descriptionmsg\":\"inputbox-desc\",\"author\":\"Erik
         Moeller, Leonardo Pimenta, Rob Church, Trevor Parscal, DaSch\",\"url\":\"https://www.mediawiki.org/wiki/Extension:InputBox\",\"version\":\"0.3.0\",\"vcs-system\":\"git\",\"vcs-version\":\"c8fd733db765b0109785d1fa00cfac2b6bf98ed2\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/InputBox/+/c8fd733db765b0109785d1fa00cfac2b6bf98ed2\",\"vcs-date\":\"2026-06-14T09:40:49Z\",\"license-name\":\"MIT\",\"license\":\"/wiki/Special:Version/License/InputBox\"},{\"type\":\"parserhook\",\"name\":\"ImageMap\",\"descriptionmsg\":\"imagemap_desc\",\"author\":\"Tim
         Starling, Arlo Breault\",\"url\":\"https://www.mediawiki.org/wiki/Extension:ImageMap\",\"vcs-system\":\"git\",\"vcs-version\":\"eb3708b4b988bf3e81b06a220ce4e3295a2d1cbc\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/ImageMap/+/eb3708b4b988bf3e81b06a220ce4e3295a2d1cbc\",\"vcs-date\":\"2026-06-14T09:25:18Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/ImageMap\"},{\"type\":\"parserhook\",\"name\":\"SyntaxHighlight\",\"descriptionmsg\":\"syntaxhighlight-desc\",\"author\":\"Brooke
         Vibber, Tim Starling, Rob Church, Niklas Laxstr\xF6m, Ori Livneh, Ed Sanders\",\"url\":\"https://www.mediawiki.org/wiki/Extension:SyntaxHighlight\",\"version\":\"2.0\",\"vcs-system\":\"git\",\"vcs-version\":\"9044bd37cd0179437c911cc26b55eec678c72f82\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/SyntaxHighlight_GeSHi/+/9044bd37cd0179437c911cc26b55eec678c72f82\",\"vcs-date\":\"2026-06-20T19:04:46Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/SyntaxHighlight\"},{\"type\":\"parserhook\",\"name\":\"Poem\",\"descriptionmsg\":\"poem-desc\",\"author\":\"Nikola
@@ -702,17 +590,17 @@ interactions:
         Laxstr\xF6m, Amir E. Aharoni, Santhosh Thottingal, Siebrand Mazeland, Jon
         Harald S\xF8by\",\"url\":\"https://www.mediawiki.org/wiki/Extension:TranslationNotifications\",\"version\":\"2018-08-05\",\"vcs-system\":\"git\",\"vcs-version\":\"d7befb8541dfe6f5048625688728fa5e9ef87db5\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/TranslationNotifications/+/d7befb8541dfe6f5048625688728fa5e9ef87db5\",\"vcs-date\":\"2026-06-18T17:58:23Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/TranslationNotifications\"},{\"type\":\"specialpage\",\"name\":\"Echo\",\"descriptionmsg\":\"echo-desc\",\"author\":\"Andrew
         Garrett, Ryan Kaldari, Benny Situ, Luke Welling, Kunal Mehta, Moriel Schottlender,
-        Jon Robson, Roan Kattouw\",\"url\":\"https://www.mediawiki.org/wiki/Extension:Echo\",\"vcs-system\":\"git\",\"vcs-version\":\"2c24a9c5d834a73b8d4a43804ee6bef29f3ee49a\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/Echo/+/2c24a9c5d834a73b8d4a43804ee6bef29f3ee49a\",\"vcs-date\":\"2026-06-18T19:36:38Z\",\"license-name\":\"MIT\",\"license\":\"/wiki/Special:Version/License/Echo\"},{\"type\":\"specialpage\",\"name\":\"FileImporter\",\"namemsg\":\"fileimporter\",\"descriptionmsg\":\"fileimporter-desc\",\"author\":\"[https://meta.wikimedia.org/wiki/WMDE_Technical_Wishes
+        Jon Robson, Roan Kattouw\",\"url\":\"https://www.mediawiki.org/wiki/Extension:Echo\",\"vcs-system\":\"git\",\"vcs-version\":\"6b5f477328663d52365d8f1880ff3d6fbd0e1eda\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/Echo/+/6b5f477328663d52365d8f1880ff3d6fbd0e1eda\",\"vcs-date\":\"2026-06-29T15:14:33Z\",\"license-name\":\"MIT\",\"license\":\"/wiki/Special:Version/License/Echo\"},{\"type\":\"specialpage\",\"name\":\"FileImporter\",\"namemsg\":\"fileimporter\",\"descriptionmsg\":\"fileimporter-desc\",\"author\":\"[https://meta.wikimedia.org/wiki/WMDE_Technical_Wishes
         Wikimedia Deutschland Technical Wishes Team], Addshore, Andrew Kostka, Christoph
         Jauera, Thiemo Kreuz\",\"url\":\"https://www.mediawiki.org/wiki/Extension:FileImporter\",\"vcs-system\":\"git\",\"vcs-version\":\"09379ba3c1b48a89cd1509590c28f23b9205224b\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/FileImporter/+/09379ba3c1b48a89cd1509590c28f23b9205224b\",\"vcs-date\":\"2026-06-16T07:51:57Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/FileImporter\"},{\"type\":\"specialpage\",\"name\":\"TemplateSandbox\",\"descriptionmsg\":\"templatesandbox-desc\",\"author\":\"Brad
         Jorsch\",\"url\":\"https://www.mediawiki.org/wiki/Extension:TemplateSandbox\",\"version\":\"1.1.0\",\"vcs-system\":\"git\",\"vcs-version\":\"d24659f97aed2a8421ffb296f22ed30a6a70926f\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/TemplateSandbox/+/d24659f97aed2a8421ffb296f22ed30a6a70926f\",\"vcs-date\":\"2026-06-14T18:56:56Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/TemplateSandbox\"},{\"type\":\"specialpage\",\"name\":\"CheckUser\",\"descriptionmsg\":\"checkuser-desc\",\"author\":\"Tim
-        Starling, Aaron Schulz, Dreamy Jazz\",\"url\":\"https://www.mediawiki.org/wiki/Extension:CheckUser\",\"version\":\"2.5\",\"vcs-system\":\"git\",\"vcs-version\":\"ac78d1a5468122fbcb4ac52a945611e72bcff0db\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/CheckUser/+/ac78d1a5468122fbcb4ac52a945611e72bcff0db\",\"vcs-date\":\"2026-06-24T10:57:02Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/CheckUser\"},{\"type\":\"specialpage\",\"name\":\"CampaignEvents\",\"descriptionmsg\":\"campaignevents-desc\",\"author\":\"[https://meta.wikimedia.org/wiki/Connection_Team
+        Starling, Aaron Schulz, Dreamy Jazz\",\"url\":\"https://www.mediawiki.org/wiki/Extension:CheckUser\",\"version\":\"2.5\",\"vcs-system\":\"git\",\"vcs-version\":\"725cc9a315a544961c2dfbe289faa0f24b2e2f0e\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/CheckUser/+/725cc9a315a544961c2dfbe289faa0f24b2e2f0e\",\"vcs-date\":\"2026-06-30T10:21:07Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/CheckUser\"},{\"type\":\"specialpage\",\"name\":\"CampaignEvents\",\"descriptionmsg\":\"campaignevents-desc\",\"author\":\"[https://meta.wikimedia.org/wiki/Connection_Team
         WMF Connection Team]\",\"url\":\"https://www.mediawiki.org/wiki/Extension:CampaignEvents\",\"vcs-system\":\"git\",\"vcs-version\":\"456e4957ba4bf4ab19a030bbc8f758e57369767f\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/CampaignEvents/+/456e4957ba4bf4ab19a030bbc8f758e57369767f\",\"vcs-date\":\"2026-06-18T07:49:47Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/CampaignEvents\"},{\"type\":\"specialpage\",\"name\":\"WikimediaCampaignEvents\",\"namemsg\":\"wikimediacampaignevents-extensionname\",\"descriptionmsg\":\"wikimediacampaignevents-desc\",\"author\":\"[https://meta.wikimedia.org/wiki/Connection_Team
         WMF Connection Team]\",\"url\":\"https://www.mediawiki.org/wiki/Extension:WikimediaCampaignEvents\",\"vcs-system\":\"git\",\"vcs-version\":\"49bd7e71f4de48c4a31f94e0bf7b7e45369ccbf9\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/WikimediaCampaignEvents/+/49bd7e71f4de48c4a31f94e0bf7b7e45369ccbf9\",\"vcs-date\":\"2026-06-14T23:20:44Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/WikimediaCampaignEvents\"},{\"type\":\"specialpage\",\"name\":\"NearbyPages\",\"descriptionmsg\":\"nearby-pages-desc\",\"url\":\"https://www.mediawiki.org/wiki/Extension:NearbyPages\",\"version\":\"1.0.0\",\"vcs-system\":\"git\",\"vcs-version\":\"1157af41d0fbfff36d80a7ab5ef82d36cecafcc5\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/NearbyPages/+/1157af41d0fbfff36d80a7ab5ef82d36cecafcc5\",\"vcs-date\":\"2026-06-12T07:56:13Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/NearbyPages\"},{\"type\":\"antispam\",\"name\":\"SpamBlacklist\",\"descriptionmsg\":\"spam-blacklist-desc\",\"author\":\"Tim
         Starling, John Du Hart, Daniel Kinzler\",\"url\":\"https://www.mediawiki.org/wiki/Extension:SpamBlacklist\",\"vcs-system\":\"git\",\"vcs-version\":\"ebd04259b90199dab09150fd19b687068f2f8ae5\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/SpamBlacklist/+/ebd04259b90199dab09150fd19b687068f2f8ae5\",\"vcs-date\":\"2026-06-17T18:03:43Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/SpamBlacklist\"},{\"type\":\"antispam\",\"name\":\"TitleBlacklist\",\"descriptionmsg\":\"titleblacklist-desc\",\"author\":\"Victor
         Vasiliev, Fran Rogers\",\"url\":\"https://www.mediawiki.org/wiki/Extension:TitleBlacklist\",\"version\":\"1.5.0\",\"vcs-system\":\"git\",\"vcs-version\":\"d2d390c1cd2ea2acd72dccabec2aaefa469d7d01\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/TitleBlacklist/+/d2d390c1cd2ea2acd72dccabec2aaefa469d7d01\",\"vcs-date\":\"2026-06-16T07:53:02Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/TitleBlacklist\"},{\"type\":\"antispam\",\"name\":\"TorBlock\",\"descriptionmsg\":\"torblock-desc\",\"author\":\"Andrew
         Garrett\",\"url\":\"https://www.mediawiki.org/wiki/Extension:TorBlock\",\"version\":\"1.1.0\",\"vcs-system\":\"git\",\"vcs-version\":\"0d5c1023335e634cc41e12e0a8319b2ac5cd2600\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/TorBlock/+/0d5c1023335e634cc41e12e0a8319b2ac5cd2600\",\"vcs-date\":\"2026-06-19T17:55:32Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/TorBlock\"},{\"type\":\"antispam\",\"name\":\"ConfirmEdit\",\"descriptionmsg\":\"captcha-desc\",\"author\":\"Brooke
-        Vibber, Florian Schmidt, Sam Reed, ...\",\"url\":\"https://www.mediawiki.org/wiki/Extension:ConfirmEdit\",\"version\":\"1.6.0\",\"vcs-system\":\"git\",\"vcs-version\":\"c662d9a73ed9e035c7fc4e5a1508e4ae510dd080\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/ConfirmEdit/+/c662d9a73ed9e035c7fc4e5a1508e4ae510dd080\",\"vcs-date\":\"2026-06-25T09:26:43Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/ConfirmEdit\",\"credits\":\"/wiki/Special:Version/Credits/ConfirmEdit\"},{\"type\":\"antispam\",\"name\":\"hCaptcha\",\"descriptionmsg\":\"hcaptcha-desc\",\"author\":\"Sam
+        Vibber, Florian Schmidt, Sam Reed, ...\",\"url\":\"https://www.mediawiki.org/wiki/Extension:ConfirmEdit\",\"version\":\"1.6.0\",\"vcs-system\":\"git\",\"vcs-version\":\"b29b34a67c7fd42bcad90f1bdfe09f3fa027c4a6\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/ConfirmEdit/+/b29b34a67c7fd42bcad90f1bdfe09f3fa027c4a6\",\"vcs-date\":\"2026-06-30T13:24:03Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/ConfirmEdit\",\"credits\":\"/wiki/Special:Version/Credits/ConfirmEdit\"},{\"type\":\"antispam\",\"name\":\"hCaptcha\",\"descriptionmsg\":\"hcaptcha-desc\",\"author\":\"Sam
         Reed, ...\",\"url\":\"https://www.mediawiki.org/wiki/Extension:ConfirmEdit\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/hCaptcha\"},{\"type\":\"antispam\",\"name\":\"FancyCaptcha\",\"descriptionmsg\":\"fancycaptcha-desc\",\"author\":\"Brooke
         Vibber, ...\",\"url\":\"https://www.mediawiki.org/wiki/Extension:ConfirmEdit#FancyCaptcha\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/FancyCaptcha\"},{\"type\":\"antispam\",\"name\":\"AntiSpoof\",\"descriptionmsg\":\"antispoof-desc\",\"author\":\"Brooke
         Vibber\",\"url\":\"https://www.mediawiki.org/wiki/Extension:AntiSpoof\",\"vcs-system\":\"git\",\"vcs-version\":\"a03632ad4b77eebc7ad80d12a4f042cea577f841\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/AntiSpoof/+/a03632ad4b77eebc7ad80d12a4f042cea577f841\",\"vcs-date\":\"2026-06-15T08:15:36Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/AntiSpoof\"},{\"type\":\"antispam\",\"name\":\"Abuse
@@ -730,7 +618,7 @@ interactions:
         Eggleston, Tomasz Finc, Andrew Russell Green, Ryan Kaldari, Trevor Parscal,
         Matthew Walker, Adam Roses Wight, Brooke Vibber\",\"url\":\"https://www.mediawiki.org/wiki/Extension:CentralNotice\",\"version\":\"2.6.1\",\"vcs-system\":\"git\",\"vcs-version\":\"d50f2f30fe3ce3a8e5d4a4c082f388ed138995be\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/CentralNotice/+/d50f2f30fe3ce3a8e5d4a4c082f388ed138995be\",\"vcs-date\":\"2026-06-15T19:31:34Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/CentralNotice\",\"credits\":\"/wiki/Special:Version/Credits/CentralNotice\"},{\"type\":\"other\",\"name\":\"TestKitchen\",\"descriptionmsg\":\"testkitchen-desc\",\"author\":\"[https://www.mediawiki.org/wiki/Data_Platform_Engineering/Experiment_Platform
         Experiment Platform], Sam Smith, Santiago Faci, Clare Ming\",\"url\":\"https://www.mediawiki.org/wiki/Extension:TestKitchen\",\"vcs-system\":\"git\",\"vcs-version\":\"e9a7e64849f879e84747e6593d403ef226778344\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/TestKitchen/+/e9a7e64849f879e84747e6593d403ef226778344\",\"vcs-date\":\"2026-06-17T15:48:37Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/TestKitchen\"},{\"type\":\"other\",\"name\":\"WikimediaCustomizations\",\"descriptionmsg\":\"wikimediacustomizations-desc\",\"author\":\"Gerg\u0151
-        Tisza\",\"url\":\"https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:WikimediaCustomizations\",\"vcs-system\":\"git\",\"vcs-version\":\"dca05a1f2248a55f6d580d363304f97071ce0046\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/WikimediaCustomizations/+/dca05a1f2248a55f6d580d363304f97071ce0046\",\"vcs-date\":\"2026-06-17T07:54:05Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/WikimediaCustomizations\"},{\"type\":\"other\",\"name\":\"WikimediaMessages\",\"descriptionmsg\":\"wikimediamessages-desc\",\"author\":\"Tim
+        Tisza\",\"url\":\"https://www.mediawiki.org/wiki/Special:MyLanguage/Extension:WikimediaCustomizations\",\"vcs-system\":\"git\",\"vcs-version\":\"8e8f059eb348190478a055224963c6b569a8c4f6\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/WikimediaCustomizations/+/8e8f059eb348190478a055224963c6b569a8c4f6\",\"vcs-date\":\"2026-06-30T16:49:46Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/WikimediaCustomizations\"},{\"type\":\"other\",\"name\":\"WikimediaMessages\",\"descriptionmsg\":\"wikimediamessages-desc\",\"author\":\"Tim
         Starling, Siebrand Mazeland, James D. Forrester, Multichill\",\"url\":\"https://www.mediawiki.org/wiki/Extension:WikimediaMessages\",\"vcs-system\":\"git\",\"vcs-version\":\"f3d445b2ea7f48a0ef8368c270dc85e2519fcf1e\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/WikimediaMessages/+/f3d445b2ea7f48a0ef8368c270dc85e2519fcf1e\",\"vcs-date\":\"2026-06-17T07:54:28Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/WikimediaMessages\"},{\"type\":\"other\",\"name\":\"ElectronPdfService\",\"descriptionmsg\":\"electronpdfservice-desc\",\"author\":\"[https://meta.wikimedia.org/wiki/WMDE_Technical_Wishes
         Wikimedia Deutschland Technical Wishes Team], Tobias Gritschacher, Addshore,
         Christoph Jauera\",\"url\":\"https://www.mediawiki.org/wiki/Extension:ElectronPdfService\",\"vcs-system\":\"git\",\"vcs-version\":\"606fa2d5a8bb0705dec8cac5abad9009f8161d5d\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/ElectronPdfService/+/606fa2d5a8bb0705dec8cac5abad9009f8161d5d\",\"vcs-date\":\"2026-06-11T07:50:39Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/ElectronPdfService\"},{\"type\":\"other\",\"name\":\"AdvancedSearch\",\"descriptionmsg\":\"advancedsearch-desc\",\"author\":\"[https://meta.wikimedia.org/wiki/WMDE_Technical_Wishes
@@ -827,6 +715,8 @@ interactions:
         Bene*], [https://www.mediawiki.org/wiki/User:Hoo_man Marius Hoch]\",\"url\":\"https://www.mediawiki.org/wiki/Extension:WikimediaBadges\",\"vcs-system\":\"git\",\"vcs-version\":\"1f6f269f00bbf761227a0c8db202f7e2dee46bd8\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/WikimediaBadges/+/1f6f269f00bbf761227a0c8db202f7e2dee46bd8\",\"vcs-date\":\"2026-06-14T23:20:37Z\",\"license-name\":\"GPL-2.0-or-later\",\"license\":\"/wiki/Special:Version/License/WikimediaBadges\"},{\"type\":\"api\",\"name\":\"PageImages\",\"descriptionmsg\":\"pageimages-desc\",\"author\":\"Max
         Semenik\",\"url\":\"https://www.mediawiki.org/wiki/Extension:PageImages\",\"vcs-system\":\"git\",\"vcs-version\":\"89b02ccaed9299d213f6825d675aab9794fd8aab\",\"vcs-url\":\"https://gerrit.wikimedia.org/g/mediawiki/extensions/PageImages/+/89b02ccaed9299d213f6825d675aab9794fd8aab\",\"vcs-date\":\"2026-06-17T19:43:07Z\",\"license-name\":\"WTFPL\",\"license\":\"/wiki/Special:Version/License/PageImages\"}],\"userinfo\":{\"id\":0,\"name\":\"80.229.142.179\",\"anon\":true,\"messages\":false}}}"
     headers:
+      accept-ranges:
+      - bytes
       age:
       - '0'
       cache-control:
@@ -840,7 +730,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:03 GMT
+      - Wed, 01 Jul 2026 13:49:40 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -848,7 +738,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-xmxc5
+      - mw-api-ext.eqiad.main-69b4b479d5-x7rq5
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -870,7 +760,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - a0477b0d-3109-4e55-ab7c-551c7f3c31e2
+      - caffee57-3e25-4705-be63-3048a8495c6d
     status:
       code: 200
       message: OK
@@ -894,6 +784,8 @@ interactions:
     body:
       string: '{"batchcomplete":"","query":{"pageids":["158814456"],"pages":{"158814456":{"pageid":158814456,"ns":6,"title":"File:NeglectedArgument.pdf","contentmodel":"wikitext","pagelanguage":"en","pagelanguagehtmlcode":"en","pagelanguagedir":"ltr","touched":"2025-11-28T01:00:33Z","lastrevid":992278688,"length":324,"protection":[],"restrictiontypes":["edit","move","upload"]}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
       - '0'
       cache-control:
@@ -909,7 +801,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:04 GMT
+      - Wed, 01 Jul 2026 13:49:40 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -917,7 +809,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-jcz8g
+      - mw-api-ext.eqiad.main-69b4b479d5-b844d
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -937,7 +829,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 9fe7a0e9-d838-4332-b7c2-64e0645b2c6c
+      - b4f6c2bd-a60c-466c-b857-137cfe4e7ba9
     status:
       code: 200
       message: OK
@@ -961,6 +853,8 @@ interactions:
     body:
       string: '{"paraminfo":{"helpformat":"none","modules":[{"name":"imageinfo","classname":"MediaWiki\\Api\\ApiQueryImageInfo","path":"query+imageinfo","group":"prop","prefix":"ii","source":"MediaWiki","sourcename":"MediaWiki","licensetag":"GPL-2.0-or-later","licenselink":"//commons.wikimedia.org/wiki/Special:Version/License/MediaWiki","readrights":"","helpurls":["https://www.mediawiki.org/wiki/Special:MyLanguage/API:Imageinfo"],"parameters":[{"index":1,"name":"prop","type":["archivename","badfile","bitdepth","canonicaltitle","comment","commonmetadata","dimensions","extmetadata","mediatype","metadata","mime","parsedcomment","sha1","size","thumbmime","thumburls","timestamp","uploadwarning","url","user","userid"],"default":"timestamp|user","multi":"","lowlimit":50,"highlimit":500,"limit":50},{"index":2,"name":"limit","type":"limit","default":1,"min":1,"max":500,"highmax":5000},{"index":3,"name":"start","type":"timestamp"},{"index":4,"name":"end","type":"timestamp"},{"index":5,"name":"urlwidth","type":"integer","default":-1},{"index":6,"name":"urlheight","type":"integer","default":-1},{"index":7,"name":"metadataversion","type":"string","default":"1"},{"index":8,"name":"extmetadatalanguage","type":"string","default":"en"},{"index":9,"name":"extmetadatamultilang","type":"boolean"},{"index":10,"name":"extmetadatafilter","type":"string","multi":"","lowlimit":50,"highlimit":500,"limit":50},{"index":11,"name":"urlparam","type":"string","default":""},{"index":12,"name":"badfilecontexttitle","type":"string"},{"index":13,"name":"continue","type":"string"},{"index":14,"name":"localonly","type":"boolean"}],"templatedparameters":[]}]}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
       - '0'
       cache-control:
@@ -969,14 +863,12 @@ interactions:
       - inline; filename=api-result.json
       content-encoding:
       - gzip
-      content-length:
-      - '640'
       content-security-policy:
       - default-src 'self'; script-src 'none'; object-src 'none'
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:04 GMT
+      - Wed, 01 Jul 2026 13:49:41 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -984,11 +876,13 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-xwfv8
+      - mw-api-ext.eqiad.canary-dbbfbd9db-gmc8s
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
       - max-age=106384710; includeSubDomains; preload
+      transfer-encoding:
+      - chunked
       vary:
       - Accept-Encoding,User-Agent
       x-analytics:
@@ -1004,7 +898,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - cc73131a-7a2d-4d9d-92ad-22a74c5e2907
+      - 46925d78-e8aa-4140-b20d-51803a105e90
     status:
       code: 200
       message: OK
@@ -1029,6 +923,8 @@ interactions:
       string: '{"batchcomplete":"","query":{"pageids":["158814456"],"pages":{"158814456":{"pageid":158814456,"ns":6,"title":"File:NeglectedArgument.pdf","imagerepository":"local","imageinfo":[{"timestamp":"2025-01-30T20:07:38Z","user":"JoanSevier","size":2109864,"width":756,"height":1189,"pagecount":23,"comment":"Uploaded
         a work by Charles Sanders Peirce from Internet Archive with UploadWizard","url":"https://upload.wikimedia.org/wikipedia/commons/1/1a/NeglectedArgument.pdf","descriptionurl":"https://commons.wikimedia.org/wiki/File:NeglectedArgument.pdf","descriptionshorturl":"https://commons.wikimedia.org/w/index.php?curid=158814456","sha1":"89c4260e5a9d79b29ad62a35baeda6d6e180ecab","mime":"application/pdf","mediatype":"OFFICE","bitdepth":0}]}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
       - '0'
       cache-control:
@@ -1044,7 +940,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:04 GMT
+      - Wed, 01 Jul 2026 13:49:41 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -1052,7 +948,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-8vbww
+      - mw-api-ext.eqiad.main-69b4b479d5-78bnd
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -1072,7 +968,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 3629a783-3a3f-43d2-99c2-2c57d834f06a
+      - 282f3080-0902-442a-b047-2afb81c7ff30
     status:
       code: 200
       message: OK
@@ -1777,7 +1673,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:05 GMT
+      - Wed, 01 Jul 2026 13:49:41 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -1785,7 +1681,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-hkj7f
+      - mw-api-ext.eqiad.main-69b4b479d5-56lls
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -1807,7 +1703,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 02067d98-d17a-4aea-8fe9-7b3b52f5d79c
+      - 3220135d-fcdc-4b1c-a920-567743749db3
     status:
       code: 200
       message: OK

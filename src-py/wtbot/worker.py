@@ -300,9 +300,9 @@ def _fan_out_index(
     client: WikiClient,
     blob_root: Path | None,
 ) -> int:
-    """Download the File: blob, parse page count, enqueue per-page children.
+    """Download the File: blob, parse page count, enqueue index children.
 
-    Returns the number of child FetchRequests created (0 if page count unknown).
+    Returns the number of child FetchRequests created.
     """
     file_title = _index_to_file_title(req.title)
     _download_file_blob(session, site, index_page, file_title, client, blob_root)
@@ -310,28 +310,41 @@ def _fan_out_index(
     # Prefer page_count set by _upsert_page (from IndexPage.num_pages via
     # PywikibotClient); fall back to <pagelist> parsing for FakeWikiClient.
     page_count = index_page.page_count or _parse_page_count(index_page.text or "")
-    if not page_count:
-        return 0
+    subpage_titles = client.list_index_subpage_titles(req.title)
 
     try:
         db_index_page = session.get(Page, index_page.pk)
-        if db_index_page is not None:
+        if db_index_page is not None and page_count:
             db_index_page.page_count = page_count
             session.add(db_index_page)
 
         basename = _index_basename(req.title)
-        for n in range(1, page_count + 1):
+        child_specs: list[tuple[str, FetchKind]] = []
+        if page_count:
+            child_specs.extend(
+                (f"Page:{basename}/{n}", FetchKind.page)
+                for n in range(1, page_count + 1)
+            )
+        child_specs.extend((title, FetchKind.single) for title in subpage_titles)
+
+        seen_titles: set[str] = set()
+        child_count = 0
+        for title, kind in child_specs:
+            if title in seen_titles:
+                continue
+            seen_titles.add(title)
             child = FetchRequest(
                 site_pk=req.site_pk,
                 parent_pk=req.pk,
-                title=f"Page:{basename}/{n}",
-                kind=FetchKind.page,
+                title=title,
+                kind=kind,
                 depth=0,
             )
             session.add(child)
+            child_count += 1
 
         session.commit()
-        return page_count
+        return child_count
     except Exception:
         session.rollback()
         raise

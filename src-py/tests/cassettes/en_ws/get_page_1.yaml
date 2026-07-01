@@ -19,6 +19,8 @@ interactions:
     body:
       string: '{"batchcomplete":"","query":{"pageids":["4734312"],"pages":{"4734312":{"pageid":4734312,"ns":104,"title":"Page:NeglectedArgument.pdf/1","contentmodel":"proofread-page","pagelanguage":"en","pagelanguagehtmlcode":"en","pagelanguagedir":"ltr","touched":"2026-04-30T17:45:09Z","lastrevid":15917897,"length":1514,"protection":[],"restrictiontypes":["edit","move"],"proofread":{"quality":3,"quality_text":"Proofread"}}},"userinfo":{"id":0,"name":"80.229.142.179","anon":""}}}'
     headers:
+      accept-ranges:
+      - bytes
       age:
       - '0'
       cache-control:
@@ -34,7 +36,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:05 GMT
+      - Wed, 01 Jul 2026 13:49:42 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -42,7 +44,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-mfjv8
+      - mw-api-ext.eqiad.main-69b4b479d5-q4bqx
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -62,7 +64,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - bff0bac2-971d-4277-932f-c1a16d62736d
+      - db6d7be9-ab63-4786-81a6-a74e683adc97
     status:
       code: 200
       message: OK
@@ -122,7 +124,7 @@ interactions:
       content-type:
       - application/json; charset=utf-8
       date:
-      - Tue, 30 Jun 2026 08:18:05 GMT
+      - Wed, 01 Jul 2026 13:49:42 GMT
       nel:
       - '{ "report_to": "wm_nel", "max_age": 604800, "failure_fraction": 0.05, "success_fraction":
         0.0}'
@@ -130,7 +132,7 @@ interactions:
       - '{ "group": "wm_nel", "max_age": 604800, "endpoints": [{ "url": "https://intake-logging.wikimedia.org/v1/events?stream=w3c.reportingapi.network_error&schema_uri=/w3c/reportingapi/network_error/1.0.0"
         }] }'
       server:
-      - mw-api-ext.eqiad.main-7fd488d796-gtmt5
+      - mw-api-ext.eqiad.main-69b4b479d5-8tlcc
       server-timing:
       - cache;desc="pass", host;desc="cp3073"
       strict-transport-security:
@@ -152,7 +154,7 @@ interactions:
       x-frame-options:
       - DENY
       x-request-id:
-      - 9d397070-2daa-4795-b8a8-ea96983d0bc1
+      - c5f3ab25-c0ae-4cea-a7db-6e685553b643
     status:
       code: 200
       message: OK

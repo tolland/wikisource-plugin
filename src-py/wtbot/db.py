@@ -18,7 +18,6 @@ import wtbot.sqlmodel  # noqa: F401
 
 logging.basicConfig()
 dblogger = logging.getLogger("sqlite-lock-debug")
-logging.basicConfig(filename="example.log", encoding="utf-8", level=logging.DEBUG)
 
 DEFAULT_SQLITE_URL = "sqlite:///database.db"
 
@@ -45,7 +44,7 @@ def create_db_engine(url: str = DEFAULT_SQLITE_URL, *, echo: bool = False) -> En
     @event.listens_for(engine, "begin")
     def _on_begin(conn):  # noqa: ANN001
         conn.info["tx_start_time"] = time.monotonic()
-        dblogger.warning("BEGIN conn=%s", id(conn))
+        dblogger.debug("BEGIN conn=%s", id(conn))
         # IMMEDIATE takes the write lock up front, matching the Kotlin side and
         # avoiding the deferred-to-write upgrade deadlock under concurrency.
         conn.exec_driver_sql("BEGIN IMMEDIATE")
@@ -54,13 +53,13 @@ def create_db_engine(url: str = DEFAULT_SQLITE_URL, *, echo: bool = False) -> En
     def on_commit(conn):
         started = conn.info.pop("tx_start_time", None)
         elapsed = time.monotonic() - started if started else None
-        dblogger.warning("COMMIT conn=%s elapsed=%s", id(conn), elapsed)
+        dblogger.debug("COMMIT conn=%s elapsed=%s", id(conn), elapsed)
 
     @event.listens_for(Engine, "rollback")
     def on_rollback(conn):
         started = conn.info.pop("tx_start_time", None)
         elapsed = time.monotonic() - started if started else None
-        dblogger.warning("ROLLBACK conn=%s elapsed=%s", id(conn), elapsed)
+        dblogger.debug("ROLLBACK conn=%s elapsed=%s", id(conn), elapsed)
 
     return engine
 

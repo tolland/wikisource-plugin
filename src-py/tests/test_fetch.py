@@ -58,6 +58,22 @@ def _page_remote(n: int) -> RemotePage:
     )
 
 
+def _index_subpage_remote(title: str) -> RemotePage:
+    return RemotePage(
+        title=title,
+        namespace_key=252,
+        namespace_canonical="Index",
+        content_model="sanitized-css",
+        text=".pagetext { font-variant-numeric: oldstyle-nums; }",
+        pageid=700,
+        revid=1700,
+        user="bot",
+        comment="styles",
+        sha1="c" * 40,
+        size=50,
+    )
+
+
 @pytest.fixture
 def index_remote():
     return _remote(
@@ -90,8 +106,10 @@ def index_remote_with_pagelist():
 
 @pytest.fixture
 def app_with_index_fanout(engine, tmp_path, index_remote_with_pagelist):
+    asset_title = f"{_INDEX_TITLE}/styles.css"
     pages = {
         index_remote_with_pagelist.title: index_remote_with_pagelist,
+        asset_title: _index_subpage_remote(asset_title),
         **{f"Page:Tractatus.djvu/{n}": _page_remote(n) for n in range(1, 4)},
     }
     files = {_FILE_TITLE: _FAKE_FILE_BYTES}
@@ -182,7 +200,7 @@ def test_refetch_updates_in_place(app_with_fake, engine):
 
 
 def test_index_fanout_creates_pages_and_children(app_with_index_fanout, engine):
-    """depth=1 on a proofread-index: index + 3 page children are all fetched."""
+    """depth=1 on a proofread-index fetches page children and index subpages."""
     client, index_remote, tmp_path = app_with_index_fanout
     resp = client.post(
         "/fetch/",
@@ -200,8 +218,8 @@ def test_index_fanout_creates_pages_and_children(app_with_index_fanout, engine):
     # Parent request ends done after all children drain.
     req = body["request"]
     assert req["status"] == FetchStatus.done.value
-    assert req["progress_total"] == 4  # 1 index + 3 pages
-    assert req["progress_done"] == 4
+    assert req["progress_total"] == 5  # 1 index + 3 pages + styles.css
+    assert req["progress_done"] == 5
 
     # Index page carries page_count (from <pagelist> wikitext).
     page = body["page"]
@@ -213,26 +231,36 @@ def test_index_fanout_creates_pages_and_children(app_with_index_fanout, engine):
     assert blob_file.exists()
     assert blob_file.read_bytes() == _FAKE_FILE_BYTES
 
-    # 4 FetchRequests: the parent + 3 children.
+    # 5 FetchRequests: the parent + 3 page children + 1 index asset child.
     with Session(engine) as s:
         all_reqs = s.exec(select(FetchRequest)).all()
-        assert len(all_reqs) == 4
+        assert len(all_reqs) == 5
         parent = next(r for r in all_reqs if r.parent_pk is None)
         children = [r for r in all_reqs if r.parent_pk == parent.pk]
-        assert len(children) == 3
+        assert len(children) == 4
+        assert {c.title for c in children} == {
+            "Page:Tractatus.djvu/1",
+            "Page:Tractatus.djvu/2",
+            "Page:Tractatus.djvu/3",
+            f"{_INDEX_TITLE}/styles.css",
+        }
         assert all(c.status == FetchStatus.done for c in children)
 
-    # 4 Page rows: index + pages 1, 2, 3.
+    # 5 Page rows: index + pages 1, 2, 3 + styles.css.
     with Session(engine) as s:
         pages = s.exec(select(Page)).all()
-        assert len(pages) == 4
+        assert len(pages) == 5
         titles = {p.title for p in pages}
         assert _INDEX_TITLE in titles
+        assert f"{_INDEX_TITLE}/styles.css" in titles
         for n in range(1, 4):
             assert f"Page:Tractatus.djvu/{n}" in titles
         page_one = next(p for p in pages if p.title == "Page:Tractatus.djvu/1")
         assert page_one.text == "page 1 content"
         assert page_one.content_model == "proofread-page"
+        styles = next(p for p in pages if p.title == f"{_INDEX_TITLE}/styles.css")
+        assert styles.text == ".pagetext { font-variant-numeric: oldstyle-nums; }"
+        assert styles.content_model == "sanitized-css"
 
     # FileBlob row exists for the index (via the File: download).
     with Session(engine) as s:
@@ -246,6 +274,60 @@ def test_index_fanout_creates_pages_and_children(app_with_index_fanout, engine):
         assert fb.size == len(_FAKE_FILE_BYTES)
         assert fb.local_path is not None
         assert fb.local_path == str(blob_file)
+
+
+def test_worker_index_fanout_queues_index_subpages(
+    session, tmp_path, index_remote_with_pagelist
+):
+    asset_title = f"{_INDEX_TITLE}/styles.css"
+    pages = {
+        index_remote_with_pagelist.title: index_remote_with_pagelist,
+        asset_title: _index_subpage_remote(asset_title),
+        **{f"Page:Tractatus.djvu/{n}": _page_remote(n) for n in range(1, 4)},
+    }
+    wiki = FakeWikiClient(pages=pages, files={_FILE_TITLE: _FAKE_FILE_BYTES})
+    site = Site(family="mywikisource", code="en")
+    session.add(site)
+    session.commit()
+    session.refresh(site)
+    session.add(FetchRequest(site_pk=site.pk, title=_INDEX_TITLE, depth=1))
+    session.commit()
+
+    handled = run_pending(
+        session,
+        lambda _: wiki,
+        limit=10,
+        blob_root=tmp_path / "blobs",
+    )
+
+    assert handled == 5
+    req = session.exec(
+        select(FetchRequest).where(
+            FetchRequest.title == _INDEX_TITLE,
+            FetchRequest.parent_pk.is_(None),
+        )
+    ).one()
+    assert req.status == FetchStatus.done
+    assert req.progress_total == 5
+    assert req.progress_done == 5
+    assert {
+        r.title
+        for r in session.exec(
+            select(FetchRequest).where(FetchRequest.parent_pk == req.pk)
+        )
+    } == {
+        "Page:Tractatus.djvu/1",
+        "Page:Tractatus.djvu/2",
+        "Page:Tractatus.djvu/3",
+        asset_title,
+    }
+    assert {p.title for p in session.exec(select(Page)).all()} == {
+        _INDEX_TITLE,
+        "Page:Tractatus.djvu/1",
+        "Page:Tractatus.djvu/2",
+        "Page:Tractatus.djvu/3",
+        asset_title,
+    }
 
 
 def test_page_model_has_raw_text_not_proofread_sections(session):
@@ -347,6 +429,45 @@ def test_index_fanout_no_pagelist_creates_no_children(engine, tmp_path):
     with Session(engine) as s:
         assert len(s.exec(select(FetchRequest)).all()) == 1  # just the parent
         assert len(s.exec(select(Page)).all()) == 1  # just the index
+
+
+def test_index_fanout_fetches_subpages_without_pagelist(engine, tmp_path):
+    """Index subpages are assets and do not depend on page-count detection."""
+    index = _remote(_INDEX_TITLE, "proofread-index", "Index", 252)
+    asset_title = f"{_INDEX_TITLE}/styles.css"
+    wiki = FakeWikiClient(
+        pages={
+            _INDEX_TITLE: index,
+            asset_title: _index_subpage_remote(asset_title),
+        }
+    )
+    app = create_app(
+        engine=engine,
+        client_factory=lambda site: wiki,
+        blob_root=tmp_path / "blobs",
+    )
+    with TestClient(app) as c:
+        body = c.post(
+            "/fetch/",
+            json={
+                "title": _INDEX_TITLE,
+                "family": "mywikisource",
+                "code": "en",
+                "depth": 1,
+            },
+        ).json()
+
+    assert body["request"]["status"] == FetchStatus.done.value
+    assert body["request"]["progress_total"] == 2
+    with Session(engine) as s:
+        assert {r.title for r in s.exec(select(FetchRequest)).all()} == {
+            _INDEX_TITLE,
+            asset_title,
+        }
+        assert {p.title for p in s.exec(select(Page)).all()} == {
+            _INDEX_TITLE,
+            asset_title,
+        }
 
 
 def test_file_fetch_downloads_blob(engine, tmp_path):
