@@ -60,17 +60,22 @@ def custom_openapi():
 
 def _make_db_client_factory(engine) -> ClientFactory:
     """Returns a ClientFactory that looks up SiteCredential from the DB
-    before falling back to an anonymous WikiSettings. Each call opens its own
-    short-lived Session so the factory is safe to call from any thread."""
+    before falling back to an anonymous WikiSettings.
+
+    Uses AUTOCOMMIT for the credential SELECT so this never contends with the
+    BEGIN IMMEDIATE write lock held by the enclosing run_pending_commits session."""
 
     def _factory(site: Site) -> WikiClient:
-        with Session(engine) as s:
-            cred: SiteCredential | None = s.get(SiteCredential, site.pk)
+        # AUTOCOMMIT bypasses the BEGIN IMMEDIATE engine event, so this read is
+        # safe to call from inside an active write session without deadlocking.
+        with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+            row = conn.exec_driver_sql(
+                "SELECT username, password, bot_name FROM sitecredential WHERE site_pk = ?",
+                (site.pk,),
+            ).fetchone()
         overrides: dict = {}
-        if cred:
-            overrides = dict(
-                username=cred.username, password=cred.password, bot_name=cred.bot_name
-            )
+        if row:
+            overrides = dict(username=row[0], password=row[1], bot_name=row[2])
         return get_wiki_client(WikiSettings.from_site(site, **overrides))
 
     return _factory
