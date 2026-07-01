@@ -5,7 +5,6 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 from sqlalchemy.engine import Engine
-from sqlmodel import Session
 
 from wtbot.api import (
     commit as commit_api,
@@ -23,7 +22,7 @@ from wtbot.api import (
 )
 from wtbot.db import create_db_engine, init_db
 from wtbot.settings import WikiSettings
-from wtbot.sqlmodel import Site, SiteCredential
+from wtbot.sqlmodel import Site
 from wtbot.wiki.client import WikiClient, get_wiki_client
 from wtbot.worker import ClientFactory
 
