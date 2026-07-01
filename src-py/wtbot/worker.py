@@ -377,12 +377,22 @@ def _upsert_page(session: Session, site: Site, remote: RemotePage) -> _CachedPag
             page.page_count = remote.page_count
         # Derive index_title and page_number for ProofreadPage Page: rows.
         # Title is always "Page:{basename}/{n}"; rsplit gives (basename, n).
-        if ns_role == NsRole.page and page.index_title is None:
+        if remote.content_model == "proofread-page" and page.index_title is None:
             after_ns = remote.title.split(":", 1)[-1]  # "Foo.pdf/3"
             base, _, num = after_ns.rpartition("/")
             if base and num.isdigit():
                 page.index_title = f"Index:{base}"
                 page.page_number = int(num)
+        # Index namespace subpages such as Index:Foo.pdf/styles.css are assets
+        # of the proofread index, not proofread indexes themselves.
+        if (
+            ns_role == NsRole.index
+            and page.index_title is None
+            and remote.content_model != "proofread-index"
+        ):
+            parent_title, _, _ = remote.title.rpartition("/")
+            if parent_title:
+                page.index_title = parent_title
         page.dirty = False
         page.fetch_status = FetchState.done
         page.fetch_error = None

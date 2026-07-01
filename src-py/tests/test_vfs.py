@@ -6,12 +6,15 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
+from wtbot.api.schemas import WriteContentRequest
+from wtbot.api.vfs import _stat_one, list_children, read_content, write_content
 from wtbot.sqlmodel import EditJournal, FileBlob, Page, Site
 from wtbot.sqlmodel.namespace import NsRole
 
 FAMILY = "wikisource"
 CODE = "en"
 INDEX = "Index:Wittgenstein - Tractatus Logico-Philosophicus, 1922.djvu"
+INDEX_STYLES = f"{INDEX}/styles.css"
 FILE = "File:Wittgenstein - Tractatus Logico-Philosophicus, 1922.djvu"
 PAGE_1 = "Page:Wittgenstein - Tractatus Logico-Philosophicus, 1922.djvu/1"
 PAGE_2 = "Page:Wittgenstein - Tractatus Logico-Philosophicus, 1922.djvu/2"
@@ -24,6 +27,33 @@ _PAGE_2_BODY = "{{verso}} Page two content."
 _INDEX_PATH = f"/{FAMILY}/{CODE}/{INDEX}"
 _PAGES_PATH = f"{_INDEX_PATH}/Pages"
 _FILE_PATH = f"{_INDEX_PATH}/{FILE}"
+
+
+def _add_index_asset_tree(session: Session) -> None:
+    site = Site(family=FAMILY, code=CODE)
+    session.add(site)
+    session.commit()
+    session.refresh(site)
+    session.add(
+        Page(
+            site_pk=site.pk,
+            title=INDEX,
+            namespace_role=NsRole.index,
+            content_model="proofread-index",
+        )
+    )
+    session.add(
+        Page(
+            site_pk=site.pk,
+            title=INDEX_STYLES,
+            namespace_role=NsRole.index,
+            content_model="sanitized-css",
+            text=".pagetext {}",
+            revid=5005,
+            index_title=INDEX,
+        )
+    )
+    session.commit()
 
 
 @pytest.fixture
@@ -49,6 +79,18 @@ def vfs_client(engine, tmp_path) -> TestClient:
             revid=5001,
         )
         s.add(index_page)
+
+        index_styles = Page(
+            site_pk=site.pk,
+            title=INDEX_STYLES,
+            namespace_role=NsRole.index,
+            content_model="sanitized-css",
+            text=".pagetext {}",
+            pageid=1005,
+            revid=5005,
+            index_title=INDEX,
+        )
+        s.add(index_styles)
 
         file_page = Page(
             site_pk=site.pk,
@@ -193,6 +235,20 @@ def test_stat_missing(vfs_client):
     assert r.json()["exists"] is False
 
 
+def test_stat_index_namespace_asset(engine):
+    with Session(engine) as s:
+        _add_index_asset_tree(s)
+
+        stat = _stat_one(s, f"{_INDEX_PATH}/styles.css")
+
+    assert stat.exists is True
+    assert stat.name == "styles.css"
+    assert stat.kind == "file"
+    assert stat.revid == 5005
+    assert stat.length == len(".pagetext {}".encode())
+    assert stat.content_model == "sanitized-css"
+
+
 # ---------------------------------------------------------------------------
 # stat/bulk
 # ---------------------------------------------------------------------------
@@ -244,6 +300,41 @@ def test_list_site(vfs_client):
     assert len(children) == 1
     assert children[0]["name"] == INDEX
     assert children[0]["kind"] == "directory"
+    assert INDEX_STYLES not in [c["name"] for c in children]
+
+
+def test_list_site_excludes_index_namespace_assets(engine):
+    with Session(engine) as s:
+        _add_index_asset_tree(s)
+
+        response = list_children(path=f"/{FAMILY}/{CODE}", session=s)
+
+    assert [child.name for child in response.children] == [INDEX]
+
+
+def test_list_index_includes_index_namespace_assets(engine):
+    with Session(engine) as s:
+        _add_index_asset_tree(s)
+        site = s.exec(
+            select(Site).where(Site.family == FAMILY, Site.code == CODE)
+        ).one()
+        s.add(
+            Page(
+                site_pk=site.pk,
+                title=f"{INDEX}/legacy.css",
+                namespace_role=NsRole.index,
+                content_model="sanitized-css",
+                text=".legacy {}",
+            )
+        )
+        s.commit()
+
+        response = list_children(path=_INDEX_PATH, session=s)
+
+    by_name = {child.name: child for child in response.children}
+    assert by_name["styles.css"].kind == "file"
+    assert by_name["styles.css"].content_model == "sanitized-css"
+    assert by_name["legacy.css"].kind == "file"
 
 
 def test_list_index_has_containers(vfs_client):
@@ -254,12 +345,14 @@ def test_list_index_has_containers(vfs_client):
     assert FILE in names
     assert "Templates" in names
     assert "TranscludedFiles" in names
+    assert "styles.css" in names
     # no Page: titles directly under index
     assert PAGE_1 not in names
     assert PAGE_2 not in names
     kinds = {c["name"]: c["kind"] for c in r.json()["children"]}
     assert kinds["Pages"] == "directory"
     assert kinds[FILE] == "directory"
+    assert kinds["styles.css"] == "file"
     assert kinds["Templates"] == "directory"
     assert kinds["TranscludedFiles"] == "directory"
 
@@ -339,6 +432,18 @@ def test_read_missing_page_returns_404(vfs_client):
     assert r.status_code == 404
 
 
+def test_read_index_namespace_asset(engine):
+    import base64
+
+    with Session(engine) as s:
+        _add_index_asset_tree(s)
+
+        response = read_content(path=f"{_INDEX_PATH}/styles.css", session=s)
+
+    assert response.revid == 5005
+    assert base64.b64decode(response.content_base64).decode() == ".pagetext {}"
+
+
 # ---------------------------------------------------------------------------
 # write_content
 # ---------------------------------------------------------------------------
@@ -405,3 +510,30 @@ def test_write_missing_page_returns_error_status(vfs_client):
     )
     assert r.status_code == 200
     assert r.json()["status"] == "error"
+
+
+def test_write_index_namespace_asset(engine):
+    new_body = ".pagetext { color: red; }"
+    with Session(engine) as s:
+        _add_index_asset_tree(s)
+
+        result = write_content(
+            WriteContentRequest(
+                path=f"{_INDEX_PATH}/styles.css",
+                content_base64=_b64(new_body),
+                base_revid=5005,
+                comment="adjust styles",
+            ),
+            session=s,
+        )
+
+        page = s.exec(select(Page).where(Page.title == INDEX_STYLES)).one()
+        journal = s.exec(
+            select(EditJournal).where(EditJournal.page_pk == page.pk)
+        ).one()
+
+    assert result.status == "ok"
+    assert page.text == new_body
+    assert page.dirty is True
+    assert journal.body == new_body
+    assert journal.base_revid == 5005

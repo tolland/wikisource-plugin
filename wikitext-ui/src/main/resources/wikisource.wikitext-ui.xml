@@ -30,6 +30,7 @@
             id="MyToolWindow"
             icon="AllIcons.Toolwindows.ToolWindowPalette"
             factoryClass="org.limepepper.lang.wikitext.tool.MyToolWindowFactory"
+            anchor="right"
         />
 
         <lang.psiStructureViewFactory

@@ -44,6 +44,8 @@ Write / rename / delete and the change feed are stubbed for now.
 
 router = APIRouter(prefix="/vfs", tags=["vfs"], route_class=DebugLoggingRoute)
 
+PROOFREAD_INDEX_CONTENT_MODEL = "proofread-index"
+
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -110,6 +112,39 @@ def _get_site(session: Session, family: str, code: str) -> Site:
 def _index_to_file_title(index_title: str) -> str:
     _, _, rest = index_title.partition(":")
     return f"File:{rest}"
+
+
+def _index_asset_title(index_title: str, rest: list[str]) -> str:
+    return f"{index_title}/{'/'.join(rest)}"
+
+
+def _index_asset_name(index_title: str, title: str) -> str:
+    prefix = f"{index_title}/"
+    if title.startswith(prefix):
+        return title[len(prefix) :]
+    return title
+
+
+def _index_asset_node(index_path: str, index_title: str, page: Page) -> Node:
+    name = _index_asset_name(index_title, page.title)
+    node = _page_node(f"{index_path}/{name}", page)
+    node.name = name
+    return node
+
+
+def _get_index_asset(
+    session: Session, site: Site, index_title: str, rest: list[str]
+) -> Page | None:
+    if not rest:
+        return None
+    asset_title = _index_asset_title(index_title, rest)
+    return session.exec(
+        select(Page).where(
+            Page.site_pk == site.pk,
+            Page.title == asset_title,
+            Page.content_model != PROOFREAD_INDEX_CONTENT_MODEL,
+        )
+    ).first()
 
 
 # ---------------------------------------------------------------------------
@@ -254,6 +289,21 @@ def _stat_one(session: Session, path: str) -> Stat:
             stable_id=fp.pageid if fp else None,
         )
 
+    asset_page = _get_index_asset(session, site, index_title, rest)
+    if asset_page is not None:
+        body = asset_page.text or ""
+        return Stat(
+            path=path,
+            exists=True,
+            name=_index_asset_name(index_title, asset_page.title),
+            kind=NodeKind.file,
+            stable_id=asset_page.pageid,
+            revid=asset_page.revid,
+            timestamp=_ts(asset_page.local_modified_at or asset_page.remote_timestamp),
+            length=len(body.encode()),
+            content_model=asset_page.content_model,
+        )
+
     return Stat(path=path, exists=False)
 
 
@@ -349,7 +399,7 @@ def list_children(
         indexes = session.exec(
             select(Page).where(
                 Page.site_pk == site.pk,
-                Page.namespace_role == NsRole.index,
+                Page.content_model == PROOFREAD_INDEX_CONTENT_MODEL,
             )
         ).all()
         return ListChildrenResponse(
@@ -388,6 +438,25 @@ def list_children(
                     f"{index_path}/{file_title}", file_title, stable_id=file_page.pageid
                 )
             )
+
+        index_asset_candidates = session.exec(
+            select(Page)
+            .where(
+                Page.site_pk == site.pk,
+                Page.namespace_role == NsRole.index,
+                Page.content_model != PROOFREAD_INDEX_CONTENT_MODEL,
+            )
+            .order_by(Page.title)
+        ).all()
+        index_assets = [
+            asset
+            for asset in index_asset_candidates
+            if asset.index_title == index_title
+            or asset.title.startswith(f"{index_title}/")
+        ]
+        children.extend(
+            _index_asset_node(index_path, index_title, asset) for asset in index_assets
+        )
 
         children.append(_dir_node(f"{index_path}/Templates", "Templates"))
         children.append(_dir_node(f"{index_path}/TranscludedFiles", "TranscludedFiles"))
@@ -441,6 +510,9 @@ def list_children(
             children=[wikitext, _blob_node(f"{file_dir_path}/blob", blob)],
         )
 
+    if _get_index_asset(session, site, index_title, rest) is not None:
+        raise HTTPException(status_code=404, detail=f"not a directory: {path}")
+
     raise HTTPException(status_code=404, detail=f"not a directory: {path}")
 
 
@@ -458,7 +530,7 @@ def read_content(
     if len(parts) < 4:
         raise HTTPException(status_code=400, detail="path does not refer to a file")
 
-    family, code, _index_title = parts[0], parts[1], parts[2]
+    family, code, index_title = parts[0], parts[1], parts[2]
     rest = parts[3:]
     site = _get_site(session, family, code)
 
@@ -498,6 +570,14 @@ def read_content(
             content_base64=base64.b64encode((page.text or "").encode()).decode(),
         )
 
+    asset_page = _get_index_asset(session, site, index_title, rest)
+    if asset_page is not None:
+        return ReadContentResponse(
+            path=path,
+            revid=asset_page.revid,
+            content_base64=base64.b64encode((asset_page.text or "").encode()).decode(),
+        )
+
     raise HTTPException(status_code=400, detail="path does not refer to a file")
 
 
@@ -522,7 +602,7 @@ def write_content(
             message="path is not a writable file",
         )
 
-    family, code = parts[0], parts[1]
+    family, code, index_title = parts[0], parts[1], parts[2]
     rest = parts[3:]
 
     try:
@@ -535,6 +615,8 @@ def write_content(
         page_title = "/".join(rest[1:])
     elif rest and rest[-1] == "wikitext" and "/".join(rest[:-1]).startswith("File:"):
         page_title = "/".join(rest[:-1])
+    elif rest:
+        page_title = _index_asset_title(index_title, rest)
 
     if page_title is None:
         return WriteResult(

@@ -3,9 +3,11 @@ from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from wtbot.deps import get_session
-from wtbot.sqlmodel import NsRole, Page
+from wtbot.sqlmodel import Page
 
 router = APIRouter(prefix="/viewer", tags=["viewer"])
+
+PROOFREAD_INDEX_CONTENT_MODEL = "proofread-index"
 
 
 class IndexPageSummary(BaseModel):
@@ -35,7 +37,9 @@ def _summary(page: Page) -> IndexPageSummary:
 @router.get("/indexes", response_model=list[IndexPageSummary])
 def list_index_pages(session: Session = Depends(get_session)) -> list[IndexPageSummary]:
     pages = session.exec(
-        select(Page).where(Page.namespace_role == NsRole.index).order_by(Page.title)
+        select(Page)
+        .where(Page.content_model == PROOFREAD_INDEX_CONTENT_MODEL)
+        .order_by(Page.title)
     ).all()
     return [_summary(page) for page in pages]
 
@@ -45,7 +49,7 @@ def get_index_page(
     page_pk: int, session: Session = Depends(get_session)
 ) -> IndexPageDetail:
     page = session.get(Page, page_pk)
-    if page is None or page.namespace_role != NsRole.index:
+    if page is None or page.content_model != PROOFREAD_INDEX_CONTENT_MODEL:
         raise HTTPException(status_code=404, detail="index page not found")
 
     summary = _summary(page)

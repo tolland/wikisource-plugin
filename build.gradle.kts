@@ -59,6 +59,7 @@ tasks {
             val ideGeneralFile = inputs.files.find { it.name == "ide.general.xml" }
             val uiLnfFile = inputs.files.find { it.name == "ui.lnf.xml" }
             val trustedPaths = inputs.files.find { it.name == "trusted-paths.xml" }
+            val editorFile = inputs.files.find { it.name == "editor.xml" }
 
             ideGeneralFile?.copyTo(
                 optionsDir.resolve("ide.general.xml"),
@@ -72,6 +73,11 @@ tasks {
 
             trustedPaths?.copyTo(
                 optionsDir.resolve("trusted-paths.xml"),
+                overwrite = true
+            )
+
+            editorFile?.copyTo(
+                optionsDir.resolve("editor.xml"),
                 overwrite = true
             )
         }

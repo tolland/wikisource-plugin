@@ -328,6 +328,35 @@ def test_worker_index_fanout_queues_index_subpages(
         "Page:Tractatus.djvu/3",
         asset_title,
     }
+    styles = session.exec(select(Page).where(Page.title == asset_title)).one()
+    assert styles.index_title == _INDEX_TITLE
+    assert styles.page_number is None
+
+
+def test_proofread_page_metadata_uses_content_model(session):
+    remote = RemotePage(
+        title="Page:Tractatus.djvu/7",
+        namespace_key=999,
+        namespace_canonical="Other",
+        content_model="proofread-page",
+        text="page content",
+        pageid=107,
+        revid=1007,
+        sha1="d" * 40,
+        size=200,
+    )
+    wiki = FakeWikiClient(pages={remote.title: remote})
+    site = Site(family="mywikisource", code="en")
+    session.add(site)
+    session.commit()
+    session.refresh(site)
+    session.add(FetchRequest(site_pk=site.pk, title=remote.title))
+    session.commit()
+
+    assert run_pending(session, lambda _: wiki) == 1
+    page = session.exec(select(Page).where(Page.title == remote.title)).one()
+    assert page.index_title == "Index:Tractatus.djvu"
+    assert page.page_number == 7
 
 
 def test_page_model_has_raw_text_not_proofread_sections(session):
