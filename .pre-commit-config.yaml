@@ -15,3 +15,9 @@ repos:
         entry: uv run black
         language: system
         types_or: [python, pyi]
+      - id: gradle-check
+        name: gradle check
+        entry: ./gradlew check
+        language: system
+        types_or: [kotlin, xml]
+        pass_filenames: false
