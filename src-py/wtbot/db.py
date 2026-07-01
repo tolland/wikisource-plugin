@@ -5,6 +5,8 @@ must use WAL, a busy timeout, and ``BEGIN IMMEDIATE`` for writes. We enforce all
 three here for the Python side via SQLAlchemy connection events.
 """
 
+import logging
+import time
 from collections.abc import Iterator
 
 from sqlalchemy import event
@@ -14,7 +16,12 @@ from sqlmodel import Session, SQLModel, create_engine
 # Importing the models registers them on SQLModel.metadata so create_all works.
 import wtbot.sqlmodel  # noqa: F401
 
+logging.basicConfig()
+logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
+
 DEFAULT_SQLITE_URL = "sqlite:///database.db"
+
+log = logging.getLogger("sqlite-lock-debug")
 
 
 def create_db_engine(url: str = DEFAULT_SQLITE_URL, *, echo: bool = False) -> Engine:
@@ -38,9 +45,23 @@ def create_db_engine(url: str = DEFAULT_SQLITE_URL, *, echo: bool = False) -> En
 
     @event.listens_for(engine, "begin")
     def _on_begin(conn):  # noqa: ANN001
+        conn.info["tx_start_time"] = time.monotonic()
+        log.warning("BEGIN conn=%s", id(conn))
         # IMMEDIATE takes the write lock up front, matching the Kotlin side and
         # avoiding the deferred-to-write upgrade deadlock under concurrency.
         conn.exec_driver_sql("BEGIN IMMEDIATE")
+
+    @event.listens_for(Engine, "commit")
+    def on_commit(conn):
+        started = conn.info.pop("tx_start_time", None)
+        elapsed = time.monotonic() - started if started else None
+        log.warning("COMMIT conn=%s elapsed=%s", id(conn), elapsed)
+
+    @event.listens_for(Engine, "rollback")
+    def on_rollback(conn):
+        started = conn.info.pop("tx_start_time", None)
+        elapsed = time.monotonic() - started if started else None
+        log.warning("ROLLBACK conn=%s elapsed=%s", id(conn), elapsed)
 
     return engine
 
