@@ -18,6 +18,7 @@ from wtbot.vfs.nodes import (
     StubDir,
     resolve,
 )
+from wtbot.vfs.store import PageStore
 
 """Unit tests for wtbot.vfs.nodes.resolve — path → typed node classification.
 
@@ -35,7 +36,7 @@ _INDEX_PATH = f"/{FAMILY}/{CODE}/{INDEX}"
 
 
 @pytest.fixture
-def seeded_session(engine):
+def store(engine):
     with Session(engine) as s:
         site = Site(family=FAMILY, code=CODE)
         s.add(site)
@@ -77,7 +78,7 @@ def seeded_session(engine):
             )
         )
         s.commit()
-        yield s
+        yield PageStore(s)
 
 
 @pytest.mark.parametrize(
@@ -107,25 +108,25 @@ def seeded_session(engine):
         (f"{_INDEX_PATH}/nosuch.css", Missing),
     ],
 )
-def test_resolve_classifies(seeded_session, path, expected):
-    assert type(resolve(seeded_session, path)) is expected
+def test_resolve_classifies(store, path, expected):
+    assert type(resolve(store, path)) is expected
 
 
-def test_resolve_carries_underlying_pages(seeded_session):
-    page_leaf = resolve(seeded_session, f"{_INDEX_PATH}/Pages/{PAGE_1}")
+def test_resolve_carries_underlying_pages(store):
+    page_leaf = resolve(store, f"{_INDEX_PATH}/Pages/{PAGE_1}")
     assert isinstance(page_leaf, PageLeaf)
     assert page_leaf.page.title == PAGE_1
 
     # Dual role: the synthetic wikitext leaf is backed by the Index page itself.
-    wikitext = resolve(seeded_session, f"{_INDEX_PATH}/wikitext")
+    wikitext = resolve(store, f"{_INDEX_PATH}/wikitext")
     assert isinstance(wikitext, IndexWikitext)
     assert wikitext.index.title == INDEX
 
-    file_wikitext = resolve(seeded_session, f"{_INDEX_PATH}/{FILE}/wikitext")
+    file_wikitext = resolve(store, f"{_INDEX_PATH}/{FILE}/wikitext")
     assert isinstance(file_wikitext, FileWikitext)
     assert file_wikitext.file_page.title == FILE
 
-    asset = resolve(seeded_session, f"{_INDEX_PATH}/styles.css")
+    asset = resolve(store, f"{_INDEX_PATH}/styles.css")
     assert isinstance(asset, IndexAssetLeaf)
     assert asset.name == "styles.css"
     assert asset.page.title == f"{INDEX}/styles.css"

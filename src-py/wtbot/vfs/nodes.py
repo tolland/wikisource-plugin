@@ -2,11 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sqlmodel import Session, select
-
 from wtbot.model import Page, Site
-from wtbot.model.namespace import NsRole
 from wtbot.vfs.paths import WikiPath
+from wtbot.vfs.store import PROOFREAD_INDEX_CONTENT_MODEL, PageStore
 
 """Typed resolution of wikisource:// paths.
 
@@ -31,8 +29,6 @@ match/cases on the node type, so the tree shape is defined exactly once.
 Nodes carry the ORM rows the resolver already fetched; operations must not
 re-query what the resolver proved to exist.
 """
-
-PROOFREAD_INDEX_CONTENT_MODEL = "proofread-index"
 
 STUB_CONTAINERS = ("Templates", "TranscludedFiles")
 
@@ -143,13 +139,7 @@ type WsNode = (
 )
 
 
-def _page_by_title(session: Session, site: Site, title: str) -> Page | None:
-    return session.exec(
-        select(Page).where(Page.site_pk == site.pk, Page.title == title)
-    ).first()
-
-
-def resolve(session: Session, raw_path: str) -> WsNode:
+def resolve(store: PageStore, raw_path: str) -> WsNode:
     path = WikiPath.parse(raw_path)
     parts = path.segments
 
@@ -158,9 +148,7 @@ def resolve(session: Session, raw_path: str) -> WsNode:
     if len(parts) < 2:
         return Missing(path)
 
-    site = session.exec(
-        select(Site).where(Site.family == parts[0], Site.code == parts[1])
-    ).first()
+    site = store.site(parts[0], parts[1])
     if site is None:
         return Missing(path)
     if len(parts) == 2:
@@ -169,7 +157,7 @@ def resolve(session: Session, raw_path: str) -> WsNode:
     index_title = path.index_title
     rest = path.rest
 
-    index_page = _page_by_title(session, site, index_title)
+    index_page = store.page(site, index_title)
     if index_page is None:
         return Missing(path)
 
@@ -182,17 +170,10 @@ def resolve(session: Session, raw_path: str) -> WsNode:
     if rest[0] == "Pages":
         if len(rest) == 1:
             return PagesDir(path, site, index_page)
-        page = session.exec(
-            select(Page).where(
-                Page.site_pk == site.pk,
-                Page.title == "/".join(rest[1:]),
-                # Membership filters: an arbitrary title addressed under this
-                # index's Pages/ must not resolve just because it exists
-                # somewhere on the site.
-                Page.namespace_role == NsRole.page,
-                Page.index_title == index_title,
-            )
-        ).first()
+        # proofread_page applies the membership filters: an arbitrary title
+        # addressed under this index's Pages/ must not resolve just because
+        # it exists somewhere on the site.
+        page = store.proofread_page(site, "/".join(rest[1:]), index_title)
         return PageLeaf(path, site, page) if page is not None else Missing(path)
 
     if len(rest) == 1 and rest[0] in STUB_CONTAINERS:
@@ -200,7 +181,7 @@ def resolve(session: Session, raw_path: str) -> WsNode:
 
     # File: leaf (wikitext/blob) beneath the File: dir
     if rest[-1] in ("wikitext", "blob") and "/".join(rest[:-1]).startswith("File:"):
-        file_page = _page_by_title(session, site, "/".join(rest[:-1]))
+        file_page = store.page(site, "/".join(rest[:-1]))
         if file_page is None:
             return Missing(path)
         if rest[-1] == "wikitext":
@@ -209,15 +190,11 @@ def resolve(session: Session, raw_path: str) -> WsNode:
 
     joined = "/".join(rest)
     if joined.startswith("File:"):
-        file_page = _page_by_title(session, site, joined)
+        file_page = store.page(site, joined)
         return FileDir(path, site, file_page) if file_page is not None else Missing(path)
 
     # Index-namespace subpage asset
-    asset = session.exec(
-        select(Page).where(
-            Page.site_pk == site.pk,
-            Page.title == f"{index_title}/{joined}",
-            Page.content_model != PROOFREAD_INDEX_CONTENT_MODEL,
-        )
-    ).first()
-    return IndexAssetLeaf(path, site, asset, joined) if asset is not None else Missing(path)
+    asset = store.page(site, f"{index_title}/{joined}")
+    if asset is None or asset.content_model == PROOFREAD_INDEX_CONTENT_MODEL:
+        return Missing(path)
+    return IndexAssetLeaf(path, site, asset, joined)
