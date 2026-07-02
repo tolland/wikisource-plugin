@@ -447,7 +447,7 @@ def test_read_file_wikitext(vfs_client):
 
     r = vfs_client.get("/vfs/content", params={"path": f"{_FILE_PATH}/wikitext"})
     assert r.status_code == 200
-    assert base64.b64decode(r.json()["content_base64"]).decode() == _FILE_BODY
+    assert base64.b64decode(r.json()["content_base64"]).decode() == _INDEX_BODY
 
 
 def test_read_blob_returns_501(vfs_client):
