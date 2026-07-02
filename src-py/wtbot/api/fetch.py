@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from wtbot.deps import get_session
-from wtbot.sqlmodel import FetchKind, FetchRequest, Page, Site
+from wtbot.model import FetchKind, FetchRequest, Page, Site
 from wtbot.worker import run_pending
 
 router = APIRouter(prefix="/fetch", tags=["fetch"])

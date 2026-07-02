@@ -3,7 +3,7 @@ from fastapi import HTTPException
 from sqlmodel import Session, select
 
 from wtbot.api.viewer import get_index_page, list_index_pages
-from wtbot.sqlmodel import NsRole, Page, Site
+from wtbot.model import NsRole, Page, Site
 
 
 def _add_page(

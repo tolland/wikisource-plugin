@@ -4,7 +4,7 @@ FetchRequest tree, a journal entry and a commit. Mostly this proves the schema
 
 from sqlmodel import select
 
-from wtbot.sqlmodel import (
+from wtbot.model import (
     Commit,
     EditJournal,
     FetchKind,

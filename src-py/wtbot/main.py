@@ -21,8 +21,8 @@ from wtbot.api import (
     viewer,
 )
 from wtbot.db import create_db_engine, init_db
+from wtbot.model import Site
 from wtbot.settings import WikiSettings
-from wtbot.sqlmodel import Site
 from wtbot.wiki.client import WikiClient, get_wiki_client
 from wtbot.worker import ClientFactory
 

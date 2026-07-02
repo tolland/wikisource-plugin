@@ -8,8 +8,8 @@ from sqlmodel import Session, select
 
 from wtbot.api.commit import list_pending_commits, run_commit_for_page
 from wtbot.commit_worker import run_pending_commits
-from wtbot.sqlmodel import Commit, CommitStatus, EditJournal, Page, Site
-from wtbot.sqlmodel.namespace import NsRole
+from wtbot.model import Commit, CommitStatus, EditJournal, Page, Site
+from wtbot.model.namespace import NsRole
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import RemotePage, SaveResult
 

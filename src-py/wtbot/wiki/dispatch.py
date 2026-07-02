@@ -9,7 +9,7 @@ binary scan, so the namespace decides before content_model does.
 
 from enum import Enum
 
-from wtbot.sqlmodel import NsRole, role_for_canonical
+from wtbot.model import NsRole, role_for_canonical
 from wtbot.wiki.wiki_types import RemotePage
 
 

@@ -20,7 +20,7 @@ from threading import Lock
 
 from sqlmodel import Session, select
 
-from wtbot.sqlmodel import Commit, CommitStatus, EditJournal, Page, Site
+from wtbot.model import Commit, CommitStatus, EditJournal, Page, Site
 from wtbot.wiki.client import WikiClient
 from wtbot.wiki.wiki_types import EditConflict
 

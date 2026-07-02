@@ -14,7 +14,7 @@ from sqlalchemy.engine import Engine
 from sqlmodel import Session, SQLModel, create_engine
 
 # Importing the models registers them on SQLModel.metadata so create_all works.
-import wtbot.sqlmodel  # noqa: F401
+import wtbot.model  # noqa: F401
 
 logging.basicConfig()
 dblogger = logging.getLogger("sqlite-lock-debug")

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
 
 from wtbot.deps import get_session
-from wtbot.sqlmodel import NsRole, Page
+from wtbot.model import NsRole, Page
 
 router = APIRouter(prefix="/pages", tags=["pages"])
 

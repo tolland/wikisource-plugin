@@ -8,8 +8,8 @@ from sqlmodel import Session, select
 
 from wtbot.api.schemas import WriteContentRequest
 from wtbot.api.vfs import _stat_one, list_children, read_content, write_content
-from wtbot.sqlmodel import EditJournal, FileBlob, Page, Site
-from wtbot.sqlmodel.namespace import NsRole
+from wtbot.model import EditJournal, FileBlob, Page, Site
+from wtbot.model.namespace import NsRole
 
 FAMILY = "wikisource"
 CODE = "en"

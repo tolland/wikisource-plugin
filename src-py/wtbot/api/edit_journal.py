@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
 
 from wtbot.deps import get_session
-from wtbot.sqlmodel import EditJournal
+from wtbot.model import EditJournal
 
 router = APIRouter(prefix="/edit-journal", tags=["edit-journal"])
 

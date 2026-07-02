@@ -3,7 +3,7 @@ from sqlmodel import Session, select
 
 from wtbot.api.pages import get_page, list_pages
 from wtbot.main import create_app
-from wtbot.sqlmodel import FileBlob, NsRole, Page, Site
+from wtbot.model import FileBlob, NsRole, Page, Site
 
 
 def test_app_exposes_object_routes(engine):

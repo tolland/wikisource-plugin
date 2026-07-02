@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
 
 from wtbot.deps import get_session
-from wtbot.sqlmodel import Namespace, NsRole
+from wtbot.model import Namespace, NsRole
 
 router = APIRouter(prefix="/namespaces", tags=["namespaces"])
 

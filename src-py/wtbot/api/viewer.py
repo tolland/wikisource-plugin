@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from wtbot.deps import get_session
-from wtbot.sqlmodel import Page
+from wtbot.model import Page
 
 router = APIRouter(prefix="/viewer", tags=["viewer"])
 

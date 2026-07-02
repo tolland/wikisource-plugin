@@ -4,8 +4,8 @@ from pathlib import Path
 import pytest
 from vcr_config import FIXTURES_DIR, cassette_exists, make_vcr
 
+from wtbot.model import FetchStatus, FileBlob, Page
 from wtbot.settings import WikiSettings
-from wtbot.sqlmodel import FetchStatus, FileBlob, Page
 from wtbot.wiki.client import PywikibotClient
 
 """VCR-backed integration tests for PywikibotClient.

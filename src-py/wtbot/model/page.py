@@ -4,7 +4,7 @@ from enum import Enum
 from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, SQLModel
 
-from wtbot.sqlmodel.namespace import NsRole
+from wtbot.model.namespace import NsRole
 
 
 class FetchState(str, Enum):

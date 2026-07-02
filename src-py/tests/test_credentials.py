@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
 from wtbot.main import create_app
-from wtbot.sqlmodel import Site, SiteCredential
+from wtbot.model import Site, SiteCredential
 from wtbot.wiki.client import FakeWikiClient
 
 

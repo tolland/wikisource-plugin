@@ -24,8 +24,8 @@ from wtbot.api.schemas import (
     WriteStatus,
 )
 from wtbot.deps import get_session
-from wtbot.sqlmodel import EditJournal, FileBlob, Page, Site
-from wtbot.sqlmodel.namespace import NsRole
+from wtbot.model import EditJournal, FileBlob, Page, Site
+from wtbot.model.namespace import NsRole
 
 """VFS read endpoints — surface A.
 

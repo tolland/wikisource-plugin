@@ -13,8 +13,7 @@ from pathlib import Path
 
 from sqlmodel import Session, select
 
-from wtbot.settings import WikiSettings
-from wtbot.sqlmodel import (
+from wtbot.model import (
     FetchRequest,
     FetchState,
     FetchStatus,
@@ -23,8 +22,9 @@ from wtbot.sqlmodel import (
     Site,
     role_for_canonical,
 )
-from wtbot.sqlmodel.fetch_request import FetchKind
-from wtbot.sqlmodel.namespace import NsRole
+from wtbot.model.fetch_request import FetchKind
+from wtbot.model.namespace import NsRole
+from wtbot.settings import WikiSettings
 from wtbot.timeutil import utcnow
 from wtbot.wiki.client import WikiClient, get_wiki_client
 from wtbot.wiki.namespaces import sync_namespaces
@@ -111,7 +111,7 @@ def _snapshot_request(req: FetchRequest) -> _ClaimedFetchRequest:
 
 def _maybe_sync_namespaces(session: Session, site: Site, client: WikiClient) -> None:
     """Sync siteinfo namespaces on first use of a site (no-op on subsequent calls)."""
-    from wtbot.sqlmodel import Namespace
+    from wtbot.model import Namespace
 
     try:
         already = session.exec(

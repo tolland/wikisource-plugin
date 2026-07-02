@@ -9,8 +9,8 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
 from wtbot.main import create_app
-from wtbot.sqlmodel import Commit, CommitStatus, EditJournal, Page, Site
-from wtbot.sqlmodel.namespace import NsRole
+from wtbot.model import Commit, CommitStatus, EditJournal, Page, Site
+from wtbot.model.namespace import NsRole
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import RemotePage
 

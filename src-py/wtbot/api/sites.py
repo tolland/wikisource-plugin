@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from wtbot.deps import get_session
-from wtbot.sqlmodel import Site, SiteCredential
+from wtbot.model import Site, SiteCredential
 from wtbot.timeutil import utcnow
 
 router = APIRouter(prefix="/sites", tags=["sites"])

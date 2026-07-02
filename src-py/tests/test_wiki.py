@@ -1,7 +1,7 @@
 import pytest
 
+from wtbot.model import NsRole
 from wtbot.settings import WikiSettings
-from wtbot.sqlmodel import NsRole
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.dispatch import Handling, classify, classify_remote
 from wtbot.wiki.wiki_types import PageNotFound, RemotePage

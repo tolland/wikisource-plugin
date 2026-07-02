@@ -6,15 +6,15 @@ These SQLModel classes define the SQLite schema shared by the IntelliJ plugin
 classes. See ``src-py/DESIGN.md`` for the rationale behind each table.
 """
 
-from wtbot.sqlmodel.commit import Commit, CommitStatus
-from wtbot.sqlmodel.edit_journal import EditJournal
-from wtbot.sqlmodel.fetch_request import FetchKind, FetchRequest, FetchStatus
-from wtbot.sqlmodel.file_blob import FileBlob
-from wtbot.sqlmodel.namespace import Namespace, NsRole, role_for_canonical
-from wtbot.sqlmodel.page import FetchState, Page
-from wtbot.sqlmodel.site import Site
-from wtbot.sqlmodel.site_credential import SiteCredential
-from wtbot.sqlmodel.transclusion import Transclusion
+from wtbot.model.commit import Commit, CommitStatus
+from wtbot.model.edit_journal import EditJournal
+from wtbot.model.fetch_request import FetchKind, FetchRequest, FetchStatus
+from wtbot.model.file_blob import FileBlob
+from wtbot.model.namespace import Namespace, NsRole, role_for_canonical
+from wtbot.model.page import FetchState, Page
+from wtbot.model.site import Site
+from wtbot.model.site_credential import SiteCredential
+from wtbot.model.transclusion import Transclusion
 
 __all__ = [
     "Site",

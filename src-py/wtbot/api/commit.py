@@ -10,7 +10,7 @@ from wtbot.api.schemas import (
 )
 from wtbot.commit_worker import run_pending_commit_for_page, run_pending_commits
 from wtbot.deps import get_session
-from wtbot.sqlmodel import Commit, CommitStatus, EditJournal, Page
+from wtbot.model import Commit, CommitStatus, EditJournal, Page
 
 router = APIRouter(prefix="/commits", tags=["commits"])
 
