@@ -3279,7 +3279,7 @@
         ]
       },
       "post": {
-        "description": "Local save only -- appends an EditJournal row. Does not touch the wiki\n(that happens later when the commit worker drains uncommitted journal\nrows via pywikibot) and does NOT touch Page.text: that field is the\ncached *remote* body, written only by the fetch worker on refresh, and\nis the diff base for conflict detection -- overwriting it here on every\nkeystroke-triggered save would silently destroy that base. read_content()\n/stat() serve the effective (edited-or-remote) body via\n_effective_body(), which reads this journal back.",
+        "description": "Local save only \u2014 appends to the edit journal and marks the page\ndirty; the wiki is untouched until the commit worker pushes. A base_revid\nmismatch against the cached remote revid returns status='conflict'.",
         "operationId": "write_content_vfs_content_post",
         "requestBody": {
           "content": {
@@ -3445,7 +3445,7 @@
     },
     "/vfs/stat/bulk": {
       "post": {
-        "description": "Batched stat() for refresh() sweeps over many cached paths at once.\n\nPage-under-Pages/ paths (the dominant case at real-library scale \u2014 one\nquery per site+index_title rather than one per page) are batched via\n`Page.title.in_(...)`; every other path shape falls back to `_stat_one`,\nsince sites/indexes/file-dirs are comparatively few per session.",
+        "description": "Batched stat() for refresh() sweeps over many cached paths at once.\nResults are in request order \u2014 index i answers paths[i].",
         "operationId": "stat_bulk_vfs_stat_bulk_post",
         "requestBody": {
           "content": {

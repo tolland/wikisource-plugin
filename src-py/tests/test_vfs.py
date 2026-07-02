@@ -7,9 +7,10 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
 from wtbot.api.schemas import WriteContentRequest
-from wtbot.api.vfs import _stat_one, list_children, read_content, write_content
+from wtbot.api.vfs import list_children, read_content, write_content
 from wtbot.model import EditJournal, FileBlob, Page, Site
 from wtbot.model.namespace import NsRole
+from wtbot.vfs import WikisourceVfs
 
 FAMILY = "wikisource"
 CODE = "en"
@@ -247,11 +248,19 @@ def test_stat_missing(vfs_client):
     assert r.json()["exists"] is False
 
 
+def test_stat_non_page_title_under_pages_is_missing(vfs_client):
+    """A title that exists on the site but is not a Page: of this index must
+    not resolve under the synthetic Pages/ container."""
+    r = vfs_client.get("/vfs/stat", params={"path": f"{_PAGES_PATH}/{FILE}"})
+    assert r.status_code == 200
+    assert r.json()["exists"] is False
+
+
 def test_stat_index_namespace_asset(engine):
     with Session(engine) as s:
         _add_index_asset_tree(s)
 
-        stat = _stat_one(s, f"{_INDEX_PATH}/styles.css")
+        stat = WikisourceVfs(s).stat(f"{_INDEX_PATH}/styles.css")
 
     assert stat.exists is True
     assert stat.name == "styles.css"
@@ -276,6 +285,8 @@ def test_stat_bulk_matches_individual_stat(vfs_client):
         f"{_FILE_PATH}/wikitext",
         "/wikisource/en/Index:NoSuch",
         f"{_PAGES_PATH}/Page:NoSuchPage.djvu/1",
+        f"{_PAGES_PATH}/{FILE}",
+        "/wikisource/en/Index:NoSuch/Pages/Page:NoSuchPage.djvu/1",
     ]
     bulk = vfs_client.post("/vfs/stat/bulk", json={"paths": paths})
     assert bulk.status_code == 200
@@ -470,11 +481,14 @@ def test_read_page(vfs_client):
 
 
 def test_read_file_wikitext(vfs_client):
+    """Must serve the File: page's own description body — matching what
+    stat() reports for the same path (and what write() targets) — not the
+    parent Index body."""
     import base64
 
     r = vfs_client.get("/vfs/content", params={"path": f"{_FILE_PATH}/wikitext"})
     assert r.status_code == 200
-    assert base64.b64decode(r.json()["content_base64"]).decode() == _INDEX_BODY
+    assert base64.b64decode(r.json()["content_base64"]).decode() == _FILE_BODY
 
 
 def test_read_blob_returns_501(vfs_client):
@@ -567,6 +581,21 @@ def test_write_page_conflict(vfs_client):
     body = r.json()
     assert body["status"] == "conflict"
     assert body["new_revid"] == 5003
+
+
+def test_write_blob_returns_error_status(vfs_client):
+    """The binary blob leaf is not a wikitext page; a write must be refused
+    rather than silently journalled against the File: description page."""
+    r = vfs_client.post(
+        "/vfs/content",
+        json={
+            "path": f"{_FILE_PATH}/blob",
+            "content_base64": _b64("x"),
+            "base_revid": None,
+        },
+    )
+    assert r.status_code == 200
+    assert r.json()["status"] == "error"
 
 
 def test_write_missing_page_returns_error_status(vfs_client):

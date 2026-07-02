@@ -1,0 +1,131 @@
+import pytest
+from sqlmodel import Session
+
+from wtbot.model import Page, Site
+from wtbot.model.namespace import NsRole
+from wtbot.vfs.nodes import (
+    FileBlobLeaf,
+    FileDir,
+    FileWikitext,
+    IndexAssetLeaf,
+    IndexDir,
+    IndexWikitext,
+    Missing,
+    PageLeaf,
+    PagesDir,
+    RootDir,
+    SiteDir,
+    StubDir,
+    resolve,
+)
+
+"""Unit tests for wtbot.vfs.nodes.resolve — path → typed node classification.
+
+These are the table-driven tests the resolver extraction exists for: no HTTP
+stack, one seeded session, one assertion per path shape.
+"""
+
+FAMILY = "wikisource"
+CODE = "en"
+INDEX = "Index:Wittgenstein - Tractatus Logico-Philosophicus, 1922.djvu"
+FILE = "File:Wittgenstein - Tractatus Logico-Philosophicus, 1922.djvu"
+PAGE_1 = "Page:Wittgenstein - Tractatus Logico-Philosophicus, 1922.djvu/1"
+
+_INDEX_PATH = f"/{FAMILY}/{CODE}/{INDEX}"
+
+
+@pytest.fixture
+def seeded_session(engine):
+    with Session(engine) as s:
+        site = Site(family=FAMILY, code=CODE)
+        s.add(site)
+        s.commit()
+        s.refresh(site)
+        s.add(
+            Page(
+                site_pk=site.pk,
+                title=INDEX,
+                namespace_role=NsRole.index,
+                content_model="proofread-index",
+            )
+        )
+        s.add(
+            Page(
+                site_pk=site.pk,
+                title=f"{INDEX}/styles.css",
+                namespace_role=NsRole.index,
+                content_model="sanitized-css",
+                index_title=INDEX,
+            )
+        )
+        s.add(
+            Page(
+                site_pk=site.pk,
+                title=FILE,
+                namespace_role=NsRole.file,
+                content_model="wikitext",
+            )
+        )
+        s.add(
+            Page(
+                site_pk=site.pk,
+                title=PAGE_1,
+                namespace_role=NsRole.page,
+                content_model="proofread-page",
+                index_title=INDEX,
+                page_number=1,
+            )
+        )
+        s.commit()
+        yield s
+
+
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        ("/", RootDir),
+        ("/wikisource", Missing),
+        (f"/{FAMILY}/{CODE}", SiteDir),
+        ("/nosuch/xx", Missing),
+        (_INDEX_PATH, IndexDir),
+        (f"{_INDEX_PATH}/", IndexDir),
+        (f"/{FAMILY}/{CODE}/Index:NoSuch", Missing),
+        (f"{_INDEX_PATH}/wikitext", IndexWikitext),
+        (f"{_INDEX_PATH}/Pages", PagesDir),
+        (f"{_INDEX_PATH}/Pages/{PAGE_1}", PageLeaf),
+        # exists on the site, but is not a Page: of this index
+        (f"{_INDEX_PATH}/Pages/{FILE}", Missing),
+        (f"{_INDEX_PATH}/Pages/Page:NoSuch.djvu/9", Missing),
+        (f"{_INDEX_PATH}/Templates", StubDir),
+        (f"{_INDEX_PATH}/TranscludedFiles", StubDir),
+        (f"{_INDEX_PATH}/Templates/deeper", Missing),
+        (f"{_INDEX_PATH}/{FILE}", FileDir),
+        (f"{_INDEX_PATH}/{FILE}/wikitext", FileWikitext),
+        (f"{_INDEX_PATH}/{FILE}/blob", FileBlobLeaf),
+        (f"{_INDEX_PATH}/File:NoSuch.djvu", Missing),
+        (f"{_INDEX_PATH}/styles.css", IndexAssetLeaf),
+        (f"{_INDEX_PATH}/nosuch.css", Missing),
+    ],
+)
+def test_resolve_classifies(seeded_session, path, expected):
+    assert type(resolve(seeded_session, path)) is expected
+
+
+def test_resolve_carries_underlying_pages(seeded_session):
+    page_leaf = resolve(seeded_session, f"{_INDEX_PATH}/Pages/{PAGE_1}")
+    assert isinstance(page_leaf, PageLeaf)
+    assert page_leaf.page.title == PAGE_1
+
+    # Dual role: the synthetic wikitext leaf is backed by the Index page itself.
+    wikitext = resolve(seeded_session, f"{_INDEX_PATH}/wikitext")
+    assert isinstance(wikitext, IndexWikitext)
+    assert wikitext.index.title == INDEX
+
+    file_wikitext = resolve(seeded_session, f"{_INDEX_PATH}/{FILE}/wikitext")
+    assert isinstance(file_wikitext, FileWikitext)
+    assert file_wikitext.file_page.title == FILE
+
+    asset = resolve(seeded_session, f"{_INDEX_PATH}/styles.css")
+    assert isinstance(asset, IndexAssetLeaf)
+    assert asset.name == "styles.css"
+    assert asset.page.title == f"{INDEX}/styles.css"

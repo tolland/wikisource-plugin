@@ -15,6 +15,7 @@ from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import RemotePage
 
 TITLE = "Page:Foo.djvu/1"
+INDEX_TITLE = "Index:Foo.djvu"
 PATH = "/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1"
 
 
@@ -29,6 +30,17 @@ def _setup(engine):
         s.commit()
         s.refresh(site)
 
+        # The VFS resolves Pages/ paths through their Index: page and the
+        # page's index_title link, so the fixture must model the cache state
+        # the fetch worker actually produces: index row + linked page.
+        s.add(
+            Page(
+                site_pk=site.pk,
+                title=INDEX_TITLE,
+                namespace_role=NsRole.index,
+                content_model="proofread-index",
+            )
+        )
         page = Page(
             site_pk=site.pk,
             title=TITLE,
@@ -36,6 +48,7 @@ def _setup(engine):
             content_model="proofread-page",
             text="original",
             revid=100,
+            index_title=INDEX_TITLE,
         )
         s.add(page)
         s.commit()
