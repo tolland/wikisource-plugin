@@ -1,7 +1,7 @@
 package org.limepepper.lang.wikitext.tool
 
 import com.intellij.icons.AllIcons
-import com.intellij.openapi.ide.CopyPasteManager
+import com.intellij.ide.util.treeView.TreeState
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
@@ -10,6 +10,7 @@ import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
+import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
@@ -32,12 +33,7 @@ import java.awt.BorderLayout
 import java.awt.datatransfer.StringSelection
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
-import javax.swing.JButton
-import javax.swing.JLabel
-import javax.swing.JPanel
-import javax.swing.JSplitPane
-import javax.swing.JTree
-import javax.swing.SwingUtilities
+import javax.swing.*
 import javax.swing.event.TreeExpansionEvent
 import javax.swing.event.TreeWillExpandListener
 import javax.swing.tree.DefaultMutableTreeNode
@@ -111,6 +107,7 @@ class MyToolWindowFactory : ToolWindowFactory {
                 if (firstChild.userObject != PLACEHOLDER) return
                 expandNode(node, vFile, model, fs)
             }
+
             override fun treeWillCollapse(event: TreeExpansionEvent) {}
         })
 
@@ -140,10 +137,7 @@ class MyToolWindowFactory : ToolWindowFactory {
 
         val refreshButton = JButton("Refresh").apply {
             addActionListener {
-                ApplicationManager.getApplication().executeOnPooledThread {
-                    fs?.refresh(false)
-                    populateRoot(rootNode, model, fs)
-                }
+                refreshTreePreservingState(tree, rootNode, model, fs)
             }
         }
         val toolbar = JPanel(BorderLayout()).apply { add(refreshButton, BorderLayout.WEST) }
@@ -236,36 +230,49 @@ class MyToolWindowFactory : ToolWindowFactory {
         rootNode: DefaultMutableTreeNode,
         model: DefaultTreeModel,
         fs: WtVirtualFileSystem?,
+        afterReload: (() -> Unit)? = null,
     ) {
         val backend = WtVfsService.instance.backend
+
         try {
             val result = backend.listChildren("/")
+
             SwingUtilities.invokeLater {
                 rootNode.removeAllChildren()
+
                 for (child in result.children) {
-                    val vFile: WtVirtualFile? = fs?.let { toVFile(it, child, null) }
+                    val vFile = fs?.let { toVFile(it, child, null) }
                     val node = fileNode(vFile, child.name)
+
+
                     try {
                         val sub = backend.listChildren(child.path)
                         for (gc in sub.children) {
                             val gvFile: WtVirtualFile? = fs?.let { toVFile(it, gc, vFile) }
                             val gNode = fileNode(gvFile, gc.name)
-                            if (gc.kind == NodeKind.directory) gNode.add(DefaultMutableTreeNode(PLACEHOLDER))
+                            if (gc.kind == NodeKind.directory) {
+                                gNode.add(DefaultMutableTreeNode(PLACEHOLDER))
+                            }
                             node.add(gNode)
                         }
                     } catch (_: VfsBackendException) {
                         node.add(DefaultMutableTreeNode(PLACEHOLDER))
                     }
+
                     rootNode.add(node)
                 }
+
                 model.reload(rootNode)
+                afterReload?.invoke()
             }
         } catch (e: VfsBackendException) {
             LOG.warn("VFS root load failed", e)
+
             SwingUtilities.invokeLater {
                 rootNode.removeAllChildren()
                 rootNode.add(DefaultMutableTreeNode("⚠ sidecar not running (${e.message})"))
                 model.reload(rootNode)
+                afterReload?.invoke()
             }
         }
     }
@@ -356,9 +363,11 @@ class MyToolWindowFactory : ToolWindowFactory {
                             for (c in containers.children) {
                                 sb.appendLine("      ${c.name}  [${c.kind}]")
                             }
-                        } catch (_: VfsBackendException) {}
+                        } catch (_: VfsBackendException) {
+                        }
                     }
-                } catch (_: VfsBackendException) {}
+                } catch (_: VfsBackendException) {
+                }
             }
             SwingUtilities.invokeLater {
                 label.text = "Status: ✓ connected"
@@ -391,4 +400,24 @@ class MyToolWindowFactory : ToolWindowFactory {
         private fun displayLabel(name: String): String =
             if (name.startsWith("Page:") && '/' in name) "Page/${name.substringAfterLast('/')}" else name
     }
+
+    // ----------------------------
+
+    private fun refreshTreePreservingState(
+        tree: Tree,
+        rootNode: DefaultMutableTreeNode,
+        model: DefaultTreeModel,
+        fs: WtVirtualFileSystem?,
+    ) {
+        val state = TreeState.createOn(tree)
+
+        ApplicationManager.getApplication().executeOnPooledThread {
+            fs?.refresh(false)
+
+            populateRoot(rootNode, model, fs) {
+                state.applyTo(tree)
+            }
+        }
+    }
+
 }

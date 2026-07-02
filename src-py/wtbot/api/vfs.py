@@ -544,7 +544,10 @@ def list_children(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/content", response_model=ReadContentResponse)
+@router.get(
+    "/content",
+    response_model=ReadContentResponse,
+)
 def read_content(
     path: str = Query(...),
     session: Session = Depends(get_session),
@@ -553,13 +556,17 @@ def read_content(
     if len(parts) < 4:
         raise HTTPException(status_code=400, detail="path does not refer to a file")
 
+    """
+    This assumes that everything is under the /family/code/Index:SomeIndex.ext
+    path system
+    """
     family, code, index_title = parts[0], parts[1], parts[2]
     rest = parts[3:]
     site = _get_site(session, family, code)
 
     container = rest[0] if rest else None
 
-    # Pages/{page title}
+    # synthetic container for out of tree Pages/{page title}
     if container == "Pages" and len(rest) >= 2:
         page_title = "/".join(rest[1:])
         page = session.exec(
@@ -574,14 +581,14 @@ def read_content(
         )
 
     # wikitext/blob leaf under File: dir
-    if rest[-1] in ("wikitext", "blob") and "/".join(rest[:-1]).startswith("File:"):
+    if rest[-1] in ("wikitext", "blob") or "/".join(rest[:-1]).startswith("File:"):
         file_title = "/".join(rest[:-1])
         if rest[-1] == "blob":
             raise HTTPException(
                 status_code=501, detail="blob streaming not yet implemented"
             )
         page = session.exec(
-            select(Page).where(Page.site_pk == site.pk, Page.title == file_title)
+            select(Page).where(Page.site_pk == site.pk, Page.title == index_title)
         ).first()
         if page is None:
             raise HTTPException(
