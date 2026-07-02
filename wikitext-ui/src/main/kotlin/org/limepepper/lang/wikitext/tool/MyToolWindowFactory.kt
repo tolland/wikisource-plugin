@@ -101,6 +101,7 @@ class MyToolWindowFactory : ToolWindowFactory {
         tree.addTreeWillExpandListener(object : TreeWillExpandListener {
             override fun treeWillExpand(event: TreeExpansionEvent) {
                 val node = event.path.lastPathComponent as? DefaultMutableTreeNode ?: return
+                LOG.warn("treeWillExpand: ${event.path}")
                 val vFile = node.userObject as? WtVirtualFile ?: return
                 if (!vFile.isDirectory) return
                 val firstChild = node.firstChild as? DefaultMutableTreeNode ?: return
