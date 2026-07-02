@@ -5,6 +5,7 @@ plugins {
     id("org.jetbrains.intellij.platform.module")
     id("org.jetbrains.grammarkit")
     id("com.diffplug.spotless")
+    id("class-inspector-tasks")
 }
 
 dependencies {
