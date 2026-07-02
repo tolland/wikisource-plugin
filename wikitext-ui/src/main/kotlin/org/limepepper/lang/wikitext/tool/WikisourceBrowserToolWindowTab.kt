@@ -1,29 +1,30 @@
 package org.limepepper.lang.wikitext.tool
 
 import com.intellij.icons.AllIcons
+import com.intellij.ide.util.treeView.NodeDescriptor
 import com.intellij.ide.util.treeView.TreeState
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.ui.ColoredTreeCellRenderer
 import com.intellij.ui.PopupHandler
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextArea
+import com.intellij.ui.tree.AsyncTreeModel
+import com.intellij.ui.tree.StructureTreeModel
 import com.intellij.ui.treeStructure.Tree
+import com.intellij.util.ui.tree.TreeUtil
 import org.limepepper.lang.wikitext.WtFileType
 import org.limepepper.lang.wikitext.vfs.WtVirtualFile
 import org.limepepper.lang.wikitext.vfs.WtVirtualFileSystem
-import org.limepepper.lang.wikitext.vfs.backend.ChildNode
 import org.limepepper.lang.wikitext.vfs.backend.NodeKind
 import org.limepepper.lang.wikitext.vfs.backend.VfsBackendException
 import org.limepepper.lang.wikitext.vfs.backend.WtVfsService
@@ -36,12 +37,6 @@ import javax.swing.JPanel
 import javax.swing.JSplitPane
 import javax.swing.JTree
 import javax.swing.SwingUtilities
-import javax.swing.event.TreeExpansionEvent
-import javax.swing.event.TreeWillExpandListener
-import javax.swing.tree.DefaultMutableTreeNode
-import javax.swing.tree.DefaultTreeModel
-
-private val BROWSER_LOG = logger<WikisourceBrowserToolWindowTab>()
 
 internal class WikisourceBrowserToolWindowTab(
     private val project: Project,
@@ -52,10 +47,14 @@ internal class WikisourceBrowserToolWindowTab(
         val fs: WtVirtualFileSystem? = VirtualFileManager.getInstance()
             .getFileSystem(WtVirtualFileSystem.PROTOCOL) as? WtVirtualFileSystem
 
-        val rootNode = DefaultMutableTreeNode("wikisource://")
-        rootNode.add(DefaultMutableTreeNode(LOADING))
-        val model = DefaultTreeModel(rootNode)
-        val tree = Tree(model)
+        // StructureTreeModel computes children on a background invoker thread
+        // (blocking sidecar calls are fine there); AsyncTreeModel marshals the
+        // results to the EDT and keeps expansion/selection stable across
+        // invalidations because the structure's elements are the path-cached
+        // WtVirtualFile instances.
+        val structure = WikisourceTreeStructure(fs)
+        val structureModel = StructureTreeModel(structure, toolWindow.disposable)
+        val tree = Tree(AsyncTreeModel(structureModel, toolWindow.disposable))
         tree.isRootVisible = true
         tree.cellRenderer = object : ColoredTreeCellRenderer() {
             override fun customizeCellRenderer(
@@ -67,40 +66,27 @@ internal class WikisourceBrowserToolWindowTab(
                 row: Int,
                 hasFocus: Boolean,
             ) {
-                val node = value as? DefaultMutableTreeNode
-                val vFile = node?.userObject as? WtVirtualFile
-                icon = when {
-                    vFile == null -> null
-                    vFile.isDirectory -> AllIcons.Nodes.Folder
-                    else -> WtFileType.icon
+                when (val element = elementOf(value)) {
+                    is WtVirtualFile -> {
+                        icon = if (element.isDirectory) AllIcons.Nodes.Folder else WtFileType.icon
+                        append(displayLabel(element.name))
+                    }
+                    else -> {
+                        icon = null
+                        append(element?.toString() ?: "")
+                    }
                 }
-                append(node?.toString() ?: value.toString())
             }
         }
 
         tree.addMouseListener(object : MouseAdapter() {
             override fun mouseClicked(e: MouseEvent) {
                 if (e.clickCount != 2) return
-                val node = tree.lastSelectedPathComponent as? DefaultMutableTreeNode ?: return
-                val vFile = node.userObject as? WtVirtualFile ?: return
+                val vFile = elementOf(tree.lastSelectedPathComponent) as? WtVirtualFile ?: return
                 if (!vFile.isDirectory) {
                     FileEditorManager.getInstance(project).openFile(vFile, true)
                 }
             }
-        })
-
-        tree.addTreeWillExpandListener(object : TreeWillExpandListener {
-            override fun treeWillExpand(event: TreeExpansionEvent) {
-                val node = event.path.lastPathComponent as? DefaultMutableTreeNode ?: return
-                BROWSER_LOG.warn("treeWillExpand: ${event.path}")
-                val vFile = node.userObject as? WtVirtualFile ?: return
-                if (!vFile.isDirectory) return
-                val firstChild = node.firstChild as? DefaultMutableTreeNode ?: return
-                if (firstChild.userObject != PLACEHOLDER) return
-                expandNode(node, vFile, model, fs)
-            }
-
-            override fun treeWillCollapse(event: TreeExpansionEvent) {}
         })
 
         val propertiesArea = JBTextArea(8, 60).apply {
@@ -110,8 +96,8 @@ internal class WikisourceBrowserToolWindowTab(
         }
 
         tree.addTreeSelectionListener {
-            val node = tree.lastSelectedPathComponent as? DefaultMutableTreeNode ?: return@addTreeSelectionListener
-            val vFile = node.userObject as? WtVirtualFile ?: return@addTreeSelectionListener
+            val vFile = elementOf(tree.lastSelectedPathComponent) as? WtVirtualFile
+                ?: return@addTreeSelectionListener
             showProperties(vFile, propertiesArea)
         }
 
@@ -125,11 +111,11 @@ internal class WikisourceBrowserToolWindowTab(
             },
         )
 
-        installContextMenu(tree, model, propertiesArea)
+        installContextMenu(tree, structureModel, propertiesArea)
 
         val refreshButton = JButton("Refresh").apply {
             addActionListener {
-                refreshTreePreservingState(tree, rootNode, model, fs)
+                refreshTreePreservingState(tree, structureModel, fs)
             }
         }
         val toolbar = JPanel(BorderLayout()).apply { add(refreshButton, BorderLayout.WEST) }
@@ -141,9 +127,7 @@ internal class WikisourceBrowserToolWindowTab(
         panel.add(toolbar, BorderLayout.NORTH)
         panel.add(split, BorderLayout.CENTER)
 
-        ApplicationManager.getApplication().executeOnPooledThread {
-            populateRoot(rootNode, model, fs)
-        }
+        TreeUtil.promiseExpand(tree, 1)
 
         return panel
     }
@@ -151,11 +135,11 @@ internal class WikisourceBrowserToolWindowTab(
     /** Stub menu: no cut/paste (VFS is read-only) - just open/copy-path/refresh-one. */
     private fun installContextMenu(
         tree: Tree,
-        model: DefaultTreeModel,
+        structureModel: StructureTreeModel<WikisourceTreeStructure>,
         propertiesArea: JBTextArea,
     ) {
         fun selectedFile(): WtVirtualFile? =
-            (tree.lastSelectedPathComponent as? DefaultMutableTreeNode)?.userObject as? WtVirtualFile
+            elementOf(tree.lastSelectedPathComponent) as? WtVirtualFile
 
         val group = DefaultActionGroup().apply {
             add(object : AnAction("Open") {
@@ -172,8 +156,7 @@ internal class WikisourceBrowserToolWindowTab(
             })
             add(object : AnAction("Refresh") {
                 override fun actionPerformed(e: AnActionEvent) {
-                    val node = tree.lastSelectedPathComponent as? DefaultMutableTreeNode ?: return
-                    val vFile = node.userObject as? WtVirtualFile ?: return
+                    val vFile = selectedFile() ?: return
                     ApplicationManager.getApplication().executeOnPooledThread {
                         try {
                             val stat = WtVfsService.instance.backend.stat(vFile.path)
@@ -181,8 +164,10 @@ internal class WikisourceBrowserToolWindowTab(
                         } catch (_: VfsBackendException) {
                             // Backend unreachable - leave cached state as-is.
                         }
+                        // Non-invalidated directories re-list from their
+                        // in-memory cachedChildren, so this is cheap.
+                        structureModel.invalidateAsync()
                         SwingUtilities.invokeLater {
-                            model.reload(node)
                             showProperties(vFile, propertiesArea)
                         }
                     }
@@ -206,106 +191,9 @@ internal class WikisourceBrowserToolWindowTab(
         }
     }
 
-    private fun toVFile(fs: WtVirtualFileSystem, child: ChildNode, parent: WtVirtualFile?): WtVirtualFile =
-        fs.getOrCreate(
-            path = child.path,
-            name = child.name,
-            isDir = child.kind == NodeKind.directory,
-            parent = parent,
-            stableId = child.stableId,
-            revid = child.revid,
-            contentModel = child.contentModel,
-        )
-
-    private fun populateRoot(
-        rootNode: DefaultMutableTreeNode,
-        model: DefaultTreeModel,
-        fs: WtVirtualFileSystem?,
-        afterReload: (() -> Unit)? = null,
-    ) {
-        val backend = WtVfsService.instance.backend
-
-        try {
-            val result = backend.listChildren("/")
-
-            SwingUtilities.invokeLater {
-                rootNode.removeAllChildren()
-
-                for (child in result.children) {
-                    val vFile = fs?.let { toVFile(it, child, null) }
-                    val node = fileNode(vFile, child.name)
-
-                    try {
-                        val sub = backend.listChildren(child.path)
-                        for (gc in sub.children) {
-                            val gvFile: WtVirtualFile? = fs?.let { toVFile(it, gc, vFile) }
-                            val gNode = fileNode(gvFile, gc.name)
-                            if (gc.kind == NodeKind.directory) {
-                                gNode.add(DefaultMutableTreeNode(PLACEHOLDER))
-                            }
-                            node.add(gNode)
-                        }
-                    } catch (_: VfsBackendException) {
-                        node.add(DefaultMutableTreeNode(PLACEHOLDER))
-                    }
-
-                    rootNode.add(node)
-                }
-
-                model.reload(rootNode)
-                afterReload?.invoke()
-            }
-        } catch (e: VfsBackendException) {
-            BROWSER_LOG.warn("VFS root load failed", e)
-
-            SwingUtilities.invokeLater {
-                rootNode.removeAllChildren()
-                rootNode.add(DefaultMutableTreeNode("⚠ sidecar not running (${e.message})"))
-                model.reload(rootNode)
-                afterReload?.invoke()
-            }
-        }
-    }
-
-    private fun expandNode(
-        node: DefaultMutableTreeNode,
-        vFile: WtVirtualFile,
-        model: DefaultTreeModel,
-        fs: WtVirtualFileSystem?,
-    ) {
-        ApplicationManager.getApplication().executeOnPooledThread {
-            try {
-                val result = WtVfsService.instance.backend.listChildren(vFile.path)
-                val builtChildren = mutableListOf<WtVirtualFile>()
-                val childNodes = result.children.map { child ->
-                    val childFile: WtVirtualFile? = fs?.let { toVFile(it, child, vFile) }
-                    if (childFile != null) builtChildren.add(childFile)
-                    val childNode = fileNode(childFile, child.name)
-                    if (child.kind == NodeKind.directory) childNode.add(DefaultMutableTreeNode(PLACEHOLDER))
-                    childNode
-                }
-                @Suppress("UNCHECKED_CAST")
-                vFile.cachedChildren = builtChildren.toTypedArray() as Array<VirtualFile>
-                SwingUtilities.invokeLater {
-                    node.removeAllChildren()
-                    childNodes.forEach { node.add(it) }
-                    model.reload(node)
-                }
-            } catch (e: VfsBackendException) {
-                BROWSER_LOG.warn("VFS children load failed for ${vFile.path}", e)
-                SwingUtilities.invokeLater {
-                    node.removeAllChildren()
-                    node.add(DefaultMutableTreeNode("⚠ ${e.message}"))
-                    model.reload(node)
-                }
-            }
-        }
-    }
-
     private fun refreshTreePreservingState(
         tree: Tree,
-        rootNode: DefaultMutableTreeNode,
-        model: DefaultTreeModel,
+        structureModel: StructureTreeModel<WikisourceTreeStructure>,
         fs: WtVirtualFileSystem?,
     ) {
         val state = TreeState.createOn(tree)
@@ -313,21 +201,22 @@ internal class WikisourceBrowserToolWindowTab(
         ApplicationManager.getApplication().executeOnPooledThread {
             fs?.refresh(false)
 
-            populateRoot(rootNode, model, fs) {
-                state.applyTo(tree)
+            // AsyncTreeModel already preserves expansion for elements that
+            // survive the invalidation; TreeState covers the rest (selection,
+            // paths whose nodes were dropped and re-listed). applyTo drives a
+            // TreeVisitor that awaits background child loading level by level.
+            structureModel.invalidateAsync().thenRun {
+                SwingUtilities.invokeLater { state.applyTo(tree) }
             }
         }
     }
 
     private companion object {
-        private const val LOADING = "Loading…"
-        private const val PLACEHOLDER = "…"
-
-        private fun fileNode(vFile: WtVirtualFile?, fallbackName: String): DefaultMutableTreeNode =
-            object : DefaultMutableTreeNode(vFile) {
-                override fun toString(): String =
-                    (userObject as? WtVirtualFile)?.let { displayLabel(it.name) } ?: fallbackName
-            }
+        /** Structure element behind a rendered tree node, if any. */
+        private fun elementOf(node: Any?): Any? {
+            val userObject = TreeUtil.getUserObject(node)
+            return (userObject as? NodeDescriptor<*>)?.element ?: userObject
+        }
 
         /**
          * Tree-display-only shorthand. `getName()`/`getPath()` on the underlying
