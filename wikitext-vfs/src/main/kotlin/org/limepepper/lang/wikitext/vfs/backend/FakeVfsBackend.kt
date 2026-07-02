@@ -113,4 +113,16 @@ class FakeVfsBackend : VfsBackend {
         e.revid = (e.revid ?: 0L) + 1
         return WriteResult(path, WriteStatus.ok, newRevid = e.revid)
     }
+
+    override fun renderPreview(path: String?, title: String?, wikitext: String): PreviewResult {
+        val escaped = wikitext
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+        val html = "<div class=\"mw-parser-output\"><p>$escaped</p></div>"
+        return PreviewResult(
+            title = title ?: path?.substringAfterLast('/') ?: "Preview",
+            htmlBase64 = Base64.getEncoder().encodeToString(html.toByteArray()),
+        )
+    }
 }

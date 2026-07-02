@@ -9,6 +9,7 @@ from wtbot.wiki.wiki_types import (
     PageNotFound,
     RemoteFileInfo,
     RemotePage,
+    RenderedPreview,
     SaveResult,
 )
 
@@ -43,6 +44,15 @@ class WikiClient(Protocol):
     ) -> SaveResult:
         """Push a new body for `title`. Raises EditConflict if the page's
         current revid != base_revid (when base_revid is not None)."""
+        ...
+
+    def render_preview(
+        self, title: str, wikitext: str, content_model: str | None = None
+    ) -> RenderedPreview:
+        """Render an unsaved body to HTML via ``action=parse`` (preview mode).
+        `title` gives templates/magic words their page context; `content_model`
+        (e.g. 'proofread-page') selects the ContentHandler when the model can't
+        be inferred from the title alone."""
         ...
 
 
@@ -186,6 +196,32 @@ class PywikibotClient:
         rev = page.latest_revision
         return SaveResult(revid=rev.revid, timestamp=rev.timestamp)
 
+    def render_preview(
+        self, title: str, wikitext: str, content_model: str | None = None
+    ) -> RenderedPreview:
+        params: dict[str, str] = {
+            "action": "parse",
+            "title": title,
+            "text": wikitext,
+            "prop": "text",
+            "preview": "1",
+            "disablelimitreport": "1",
+            "disableeditsection": "1",
+        }
+        if content_model:
+            params["contentmodel"] = content_model
+        data = self.site.simple_request(**params).submit()
+        html = data["parse"]["text"]
+        # formatversion=1 wraps the html as {'*': ...}; 2 returns it directly.
+        if isinstance(html, dict):
+            html = html.get("*", "")
+        return RenderedPreview(
+            title=title,
+            html=html,
+            server=f"{self.site.protocol()}://{self.site.hostname()}",
+            script_path=self.site.scriptpath(),
+        )
+
 
 class FakeWikiClient:
     """Network-free WikiClient backed by in-memory dicts."""
@@ -267,6 +303,19 @@ class FakeWikiClient:
         )
         self._pages[title] = updated
         return SaveResult(revid=new_revid, timestamp=updated.timestamp)
+
+    def render_preview(
+        self, title: str, wikitext: str, content_model: str | None = None
+    ) -> RenderedPreview:
+        import html as _html
+
+        return RenderedPreview(
+            title=title,
+            html=(
+                '<div class="mw-parser-output">'
+                f"<p>{_html.escape(wikitext)}</p></div>"
+            ),
+        )
 
 
 def get_wiki_client(settings: WikiSettings) -> WikiClient:

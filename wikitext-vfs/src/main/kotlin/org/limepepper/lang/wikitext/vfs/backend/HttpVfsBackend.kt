@@ -120,6 +120,23 @@ class HttpVfsBackend(
         }
     }
 
+    override fun renderPreview(path: String?, title: String?, wikitext: String): PreviewResult {
+        val body = buildJsonObject(
+            "path" to path,
+            "title" to title,
+            "wikitext" to wikitext,
+        )
+        val json = post("/preview/render", body)
+        return JsonReader(json).run {
+            PreviewResult(
+                title = string("title"),
+                htmlBase64 = string("html_base64"),
+                server = stringOrNull("server"),
+                scriptPath = stringOrNull("script_path"),
+            )
+        }
+    }
+
     // -------------------------------------------------------------------------
 
     private fun get(endpoint: String, vararg params: Pair<String, String>): String {

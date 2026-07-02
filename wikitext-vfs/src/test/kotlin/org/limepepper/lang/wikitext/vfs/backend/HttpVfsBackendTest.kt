@@ -130,6 +130,38 @@ class HttpVfsBackendTest {
         assertEquals(5003L, r.revid)
     }
 
+    @Test fun `renderPreview decodes base64 html and optional server fields`() {
+        val html = """<div class="mw-parser-output"><p>Hello <b>world</b></p></div>"""
+        val encoded = Base64.getEncoder().encodeToString(html.toByteArray())
+        handle(
+            "/preview/render",
+            """{"title":"Page:Foo.djvu/1","html_base64":"$encoded",
+               "server":"https://en.wikisource.org","script_path":"/w"}""",
+        )
+
+        val r = backend.renderPreview(
+            path = "/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1",
+            title = null,
+            wikitext = "Hello '''world'''",
+        )
+        assertEquals("Page:Foo.djvu/1", r.title)
+        assertEquals(html, r.decodeHtml())
+        assertEquals("https://en.wikisource.org", r.server)
+        assertEquals("/w", r.scriptPath)
+    }
+
+    @Test fun `renderPreview tolerates null server fields`() {
+        val encoded = Base64.getEncoder().encodeToString("<p>x</p>".toByteArray())
+        handle(
+            "/preview/render",
+            """{"title":"Scratch","html_base64":"$encoded","server":null,"script_path":null}""",
+        )
+
+        val r = backend.renderPreview(path = null, title = "Scratch", wikitext = "x")
+        assertNull(r.server)
+        assertNull(r.scriptPath)
+    }
+
     @Test fun `throws VfsBackendException on HTTP error`() {
         server.createContext("/vfs/stat") { ex ->
             val body = """{"detail":"not found"}""".toByteArray()

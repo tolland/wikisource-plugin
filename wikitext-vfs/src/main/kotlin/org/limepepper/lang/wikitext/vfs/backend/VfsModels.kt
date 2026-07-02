@@ -51,6 +51,23 @@ data class ContentResult(
 
 enum class WriteStatus { ok, conflict, error }
 
+/**
+ * Rendered live-preview HTML from POST /preview/render — the sidecar's proxy
+ * over MediaWiki's `action=parse`. HTML travels base64-encoded because
+ * [JsonReader] does not unescape JSON string values.
+ */
+data class PreviewResult(
+    val title: String,
+    val htmlBase64: String,
+    /** Wiki server origin, e.g. "https://en.wikisource.org" — null for fakes. */
+    val server: String? = null,
+    /** MediaWiki script path on [server], e.g. "/w". */
+    val scriptPath: String? = null,
+) {
+    fun decodeHtml(): String =
+        String(java.util.Base64.getDecoder().decode(htmlBase64), Charsets.UTF_8)
+}
+
 data class WriteResult(
     val path: String,
     val status: WriteStatus,

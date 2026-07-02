@@ -27,6 +27,21 @@ class SaveResult:
 
 
 @dataclass(frozen=True)
+class RenderedPreview:
+    """HTML produced by the wiki's parser for an in-progress (unsaved) body via
+    ``action=parse`` — the same call MediaWiki's own live preview makes.
+
+    ``server``/``script_path`` (e.g. 'https://en.wikisource.org' + '/w') let the
+    consumer link the wiki's ResourceLoader stylesheets and resolve relative
+    URLs; both are None when the client has no real wiki behind it."""
+
+    title: str
+    html: str
+    server: str | None = None
+    script_path: str | None = None
+
+
+@dataclass(frozen=True)
 class RemoteFileInfo:
     """Binary-file metadata from MediaWiki's imageinfo API (pywikibot FileInfo).
 
