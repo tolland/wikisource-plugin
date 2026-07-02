@@ -3279,7 +3279,7 @@
         ]
       },
       "post": {
-        "description": "Local save only -- appends an EditJournal row and updates the cached\nPage.text. Does not touch the wiki; that happens later when the commit\nworker drains uncommitted journal rows via pywikibot.",
+        "description": "Local save only -- appends an EditJournal row. Does not touch the wiki\n(that happens later when the commit worker drains uncommitted journal\nrows via pywikibot) and does NOT touch Page.text: that field is the\ncached *remote* body, written only by the fetch worker on refresh, and\nis the diff base for conflict detection -- overwriting it here on every\nkeystroke-triggered save would silently destroy that base. read_content()\n/stat() serve the effective (edited-or-remote) body via\n_effective_body(), which reads this journal back.",
         "operationId": "write_content_vfs_content_post",
         "requestBody": {
           "content": {

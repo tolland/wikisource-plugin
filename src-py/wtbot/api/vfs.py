@@ -62,8 +62,47 @@ def _ts(dt: datetime | None) -> str | None:
     return str(int(dt.timestamp() * 1000))
 
 
-def _page_node(path: str, page: Page) -> Node:
-    body = page.text or ""
+def _effective_body(session: Session, page: Page) -> str:
+    """The body read_content()/stat() should report for [page].
+
+    Page.text is the cached *remote* body -- written only by the fetch
+    worker on refresh from the wiki. Local IDE saves must never touch it, or
+    it stops meaning "what's on the wiki" and a refresh silently loses the
+    diff base. Instead, a save appends an EditJournal row; this reads the
+    most recent uncommitted one back, falling back to Page.text when there's
+    nothing uncommitted (never edited locally, or already pushed and
+    marked committed).
+    """
+    latest = session.exec(
+        select(EditJournal)
+        .where(EditJournal.page_pk == page.pk)
+        .where(EditJournal.committed == False)  # noqa: E712
+        .order_by(EditJournal.saved_at.desc())
+        .limit(1)
+    ).first()
+    if latest is not None:
+        return latest.body
+    return page.text or ""
+
+
+def _latest_uncommitted_bodies(session: Session, page_pks: list[int]) -> dict[int, str]:
+    """Batched form of [_effective_body]'s EditJournal lookup, for call sites
+    (stat_bulk) that already batch their Page query and shouldn't regress to
+    one EditJournal query per page."""
+    if not page_pks:
+        return {}
+    rows = session.exec(
+        select(EditJournal)
+        .where(EditJournal.page_pk.in_(page_pks))
+        .where(EditJournal.committed == False)  # noqa: E712
+        .order_by(EditJournal.saved_at)
+    ).all()
+    # Rows are ascending by saved_at, so the last write per page_pk wins.
+    return {row.page_pk: row.body for row in rows}
+
+
+def _page_node(session: Session, path: str, page: Page) -> Node:
+    body = _effective_body(session, page)
     return Node(
         path=path,
         name=page.title,
@@ -130,9 +169,11 @@ def _index_asset_name(index_title: str, title: str) -> str:
     return title
 
 
-def _index_asset_node(index_path: str, index_title: str, page: Page) -> Node:
+def _index_asset_node(
+    session: Session, index_path: str, index_title: str, page: Page
+) -> Node:
     name = _index_asset_name(index_title, page.title)
-    node = _page_node(f"{index_path}/{name}", page)
+    node = _page_node(session, f"{index_path}/{name}", page)
     node.name = name
     return node
 
@@ -220,7 +261,7 @@ def _stat_one(session: Session, path: str) -> Stat:
 
     # Index's own wikitext body (dual role: directory + proofread-index content)
     if container == "wikitext" and len(rest) == 1:
-        body = index_page.text or ""
+        body = _effective_body(session, index_page)
         return Stat(
             path=path,
             exists=True,
@@ -243,7 +284,7 @@ def _stat_one(session: Session, path: str) -> Stat:
         ).first()
         if page is None:
             return Stat(path=path, exists=False)
-        body = page.text or ""
+        body = _effective_body(session, page)
         return Stat(
             path=path,
             exists=True,
@@ -271,7 +312,7 @@ def _stat_one(session: Session, path: str) -> Stat:
         if file_page is None:
             return Stat(path=path, exists=False)
         if leaf == "wikitext":
-            body = file_page.text or ""
+            body = _effective_body(session, file_page)
             return Stat(
                 path=path,
                 exists=True,
@@ -311,7 +352,7 @@ def _stat_one(session: Session, path: str) -> Stat:
 
     asset_page = _get_index_asset(session, site, index_title, rest)
     if asset_page is not None:
-        body = asset_page.text or ""
+        body = _effective_body(session, asset_page)
         return Stat(
             path=path,
             exists=True,
@@ -366,12 +407,15 @@ def stat_bulk(
             select(Page).where(Page.site_pk == site.pk, Page.title.in_(titles))
         ).all()
         pages_by_title = {p.title: p for p in pages}
+        uncommitted_bodies = _latest_uncommitted_bodies(
+            session, [p.pk for p in pages if p.pk is not None]
+        )
         for i, path, page_title in entries:
             page = pages_by_title.get(page_title)
             if page is None:
                 results[i] = Stat(path=path, exists=False)
                 continue
-            body_text = page.text or ""
+            body_text = uncommitted_bodies.get(page.pk, page.text or "")
             results[i] = Stat(
                 path=path,
                 exists=True,
@@ -446,7 +490,7 @@ def list_children(
     # /{family}/{code}/{Index title} → Pages/ + File:/ + Templates/ + TranscludedFiles/
     if not rest:
         children: list[Node] = []
-        index_wikitext = _page_node(f"{index_path}/wikitext", index_page)
+        index_wikitext = _page_node(session, f"{index_path}/wikitext", index_page)
         index_wikitext.name = "wikitext"
         children.append(index_wikitext)
         children.append(_dir_node(f"{index_path}/Pages", "Pages"))
@@ -478,7 +522,8 @@ def list_children(
             or asset.title.startswith(f"{index_title}/")
         ]
         children.extend(
-            _index_asset_node(index_path, index_title, asset) for asset in index_assets
+            _index_asset_node(session, index_path, index_title, asset)
+            for asset in index_assets
         )
 
         children.append(_dir_node(f"{index_path}/Templates", "Templates"))
@@ -499,7 +544,7 @@ def list_children(
             return ListChildrenResponse(
                 parent_path=pages_path,
                 children=[
-                    _page_node(f"{pages_path}/{p.title}", p)
+                    _page_node(session, f"{pages_path}/{p.title}", p)
                     for p in sorted(pages, key=lambda p: p.page_number or 0)
                 ],
             )
@@ -526,7 +571,7 @@ def list_children(
             select(FileBlob).where(FileBlob.page_pk == file_page.pk)
         ).first()
         file_dir_path = f"{index_path}/{file_title}"
-        wikitext = _page_node(f"{file_dir_path}/wikitext", file_page)
+        wikitext = _page_node(session, f"{file_dir_path}/wikitext", file_page)
         wikitext.name = "wikitext"
         return ListChildrenResponse(
             parent_path=file_dir_path,
@@ -577,7 +622,9 @@ def read_content(
         return ReadContentResponse(
             path=path,
             revid=page.revid,
-            content_base64=base64.b64encode((page.text or "").encode()).decode(),
+            content_base64=base64.b64encode(
+                _effective_body(session, page).encode()
+            ).decode(),
         )
 
     # wikitext/blob leaf under File: dir
@@ -597,7 +644,9 @@ def read_content(
         return ReadContentResponse(
             path=path,
             revid=page.revid,
-            content_base64=base64.b64encode((page.text or "").encode()).decode(),
+            content_base64=base64.b64encode(
+                _effective_body(session, page).encode()
+            ).decode(),
         )
 
     asset_page = _get_index_asset(session, site, index_title, rest)
@@ -605,7 +654,9 @@ def read_content(
         return ReadContentResponse(
             path=path,
             revid=asset_page.revid,
-            content_base64=base64.b64encode((asset_page.text or "").encode()).decode(),
+            content_base64=base64.b64encode(
+                _effective_body(session, asset_page).encode()
+            ).decode(),
         )
 
     raise HTTPException(status_code=400, detail="path does not refer to a file")
@@ -621,9 +672,14 @@ def write_content(
     req: WriteContentRequest,
     session: Session = Depends(get_session),
 ) -> WriteResult:
-    """Local save only -- appends an EditJournal row and updates the cached
-    Page.text. Does not touch the wiki; that happens later when the commit
-    worker drains uncommitted journal rows via pywikibot."""
+    """Local save only -- appends an EditJournal row. Does not touch the wiki
+    (that happens later when the commit worker drains uncommitted journal
+    rows via pywikibot) and does NOT touch Page.text: that field is the
+    cached *remote* body, written only by the fetch worker on refresh, and
+    is the diff base for conflict detection -- overwriting it here on every
+    keystroke-triggered save would silently destroy that base. read_content()
+    /stat() serve the effective (edited-or-remote) body via
+    _effective_body(), which reads this journal back."""
     parts = _parse_path(req.path)
     if len(parts) < 4:
         return WriteResult(
@@ -687,7 +743,6 @@ def write_content(
     )
     session.add(journal)
 
-    page.text = body
     page.dirty = True
     page.local_modified_at = datetime.now(timezone.utc)
     session.add(page)

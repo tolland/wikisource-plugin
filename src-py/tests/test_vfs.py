@@ -293,6 +293,33 @@ def test_stat_bulk_empty(vfs_client):
     assert r.json()["results"] == []
 
 
+def test_stat_bulk_reflects_uncommitted_edit_length(vfs_client):
+    """The batched EditJournal lookup in stat_bulk's Pages/ grouping must
+    agree with the per-path fallback used everywhere else."""
+    edited_body = "{{recto}} much longer edited content than before."
+    w = vfs_client.post(
+        "/vfs/content",
+        json={
+            "path": f"{_PAGES_PATH}/{PAGE_1}",
+            "content_base64": _b64(edited_body),
+            "base_revid": 5003,
+        },
+    )
+    assert w.json()["status"] == "ok"
+
+    paths = [f"{_PAGES_PATH}/{PAGE_1}", f"{_PAGES_PATH}/{PAGE_2}"]
+    bulk = vfs_client.post("/vfs/stat/bulk", json={"paths": paths})
+    results = bulk.json()["results"]
+
+    assert results[0]["length"] == len(edited_body.encode())
+    assert results[0]["length"] != len(_PAGE_1_BODY.encode())
+    assert results[1]["length"] == len(_PAGE_2_BODY.encode())
+
+    for path, result in zip(paths, results):
+        individual = vfs_client.get("/vfs/stat", params={"path": path}).json()
+        assert result == individual, path
+
+
 # ---------------------------------------------------------------------------
 # list_children
 # ---------------------------------------------------------------------------
@@ -483,6 +510,12 @@ def _b64(s: str) -> str:
     return base64.b64encode(s.encode()).decode()
 
 
+def _unb64(s: str) -> str:
+    import base64
+
+    return base64.b64decode(s).decode()
+
+
 def test_write_page_ok(vfs_client, engine):
     new_body = "{{recto}} Edited page one content."
     r = vfs_client.post(
@@ -500,7 +533,9 @@ def test_write_page_ok(vfs_client, engine):
 
     with Session(engine) as s:
         page = s.exec(select(Page).where(Page.title == PAGE_1)).first()
-        assert page.text == new_body
+        # Page.text is the cached *remote* body -- a local save must never
+        # touch it, or a later refresh loses the diff base.
+        assert page.text == _PAGE_1_BODY
         assert page.dirty is True
 
         journal = s.exec(
@@ -510,6 +545,13 @@ def test_write_page_ok(vfs_client, engine):
         assert journal.body == new_body
         assert journal.base_revid == 5003
         assert journal.committed is False
+
+    # read_content/stat serve the uncommitted journal body, not Page.text.
+    r = vfs_client.get("/vfs/content", params={"path": f"{_PAGES_PATH}/{PAGE_1}"})
+    assert _unb64(r.json()["content_base64"]) == new_body
+
+    r = vfs_client.get("/vfs/stat", params={"path": f"{_PAGES_PATH}/{PAGE_1}"})
+    assert r.json()["length"] == len(new_body.encode())
 
 
 def test_write_page_conflict(vfs_client):
@@ -561,7 +603,65 @@ def test_write_index_namespace_asset(engine):
         ).one()
 
     assert result.status == "ok"
-    assert page.text == new_body
+    assert page.text == ".pagetext {}"  # unchanged -- still the cached remote body
     assert page.dirty is True
     assert journal.body == new_body
     assert journal.base_revid == 5005
+
+    with Session(engine) as s:
+        content = read_content(f"{_INDEX_PATH}/styles.css", session=s)
+    assert _unb64(content.content_base64) == new_body
+
+
+def test_write_twice_read_content_serves_latest_journal(vfs_client):
+    """Multiple saves before a commit -- read_content must serve the most
+    recent one, not the first."""
+    first = "{{recto}} first edit."
+    second = "{{recto}} second edit."
+    for body in (first, second):
+        r = vfs_client.post(
+            "/vfs/content",
+            json={
+                "path": f"{_PAGES_PATH}/{PAGE_1}",
+                "content_base64": _b64(body),
+                "base_revid": 5003,
+            },
+        )
+        assert r.json()["status"] == "ok"
+
+    r = vfs_client.get("/vfs/content", params={"path": f"{_PAGES_PATH}/{PAGE_1}"})
+    assert _unb64(r.json()["content_base64"]) == second
+
+
+def test_read_content_falls_back_to_page_text_once_journal_is_committed(
+    vfs_client, engine
+):
+    """Once the commit worker marks a journal committed (and, per its own
+    contract, the fetch worker has refreshed Page.text with the pushed
+    body), read_content must go back to serving Page.text -- a committed
+    journal is history, not the live edit."""
+    edited_body = "{{recto}} pushed to the wiki now."
+    r = vfs_client.post(
+        "/vfs/content",
+        json={
+            "path": f"{_PAGES_PATH}/{PAGE_1}",
+            "content_base64": _b64(edited_body),
+            "base_revid": 5003,
+        },
+    )
+    assert r.json()["status"] == "ok"
+
+    with Session(engine) as s:
+        page = s.exec(select(Page).where(Page.title == PAGE_1)).one()
+        journal = s.exec(
+            select(EditJournal).where(EditJournal.page_pk == page.pk)
+        ).one()
+        journal.committed = True
+        s.add(journal)
+        # Simulates the fetch worker's post-push refresh.
+        page.text = edited_body
+        s.add(page)
+        s.commit()
+
+    r = vfs_client.get("/vfs/content", params={"path": f"{_PAGES_PATH}/{PAGE_1}"})
+    assert _unb64(r.json()["content_base64"]) == edited_body
