@@ -51,7 +51,7 @@ public interface WtTypes {
   IElementType TABLE_CLOSE = new WtTokenType("TABLE_CLOSE[\"|}\"]");
   IElementType TABLE_OPEN = new WtTokenType("TABLE_OPEN[\"{|\"]");
   IElementType TEMPLATE_CLOSE = new WtTokenType("}}");
-  IElementType TEMPLATE_EQUALS = new WtTokenType("=");
+  IElementType TEMPLATE_EQUALS = new WtTokenType("TEMPLATE_EQUALS[=]");
   IElementType TEMPLATE_NAME = new WtTokenType("TEMPLATE_NAME");
   IElementType TEMPLATE_OPEN = new WtTokenType("{{");
   IElementType TEMPLATE_PARAM_TEXT = new WtTokenType("TEMPLATE_PARAM_TEXT");

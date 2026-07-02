@@ -22,7 +22,9 @@ idea {
 
 dependencies {
     intellijPlatform {
-        intellijIdea(intellijPlatformVersion)
+        intellijIdea(intellijPlatformVersion) {
+            useCache = true
+        }
         plugin("psiviewer", version = "2026.1")
         pluginModule(implementation(project(":wikitext-core")))
         pluginModule(implementation(project(":wikitext-vfs")))
@@ -34,6 +36,13 @@ dependencies {
 intellijPlatform {
     // Disable buildSearchableOptions for development
     buildSearchableOptions = false
+
+    caching {
+        ides {
+            enabled = true
+            path = rootProject.layout.projectDirectory.dir(".intellijPlatform/ides")
+        }
+    }
 }
 
 tasks {

@@ -258,15 +258,15 @@ ENTITY_REF        = "&" {ENTITY_NAME} ";"
 COMMENT_START = "<!--"
 COMMENT_END   = "-->"
 
-WS           = [ \t]
+WS=[\ \n\r\t\f\u2028\u2029\u0085]
 TAG_NAME_CHARS = [a-zA-Z][a-zA-Z0-9]*
 // minimal open-tag match: <name attr="val" attr2='val' ...> (no self-close
 // handling here -- self-closing e.g. <ref name="x"/> should be matched as
 // a SEPARATE, more specific rule before this one; see OPEN_TAG below split
 // into self-closing vs not)
 OPEN_TAG_HEAD  = "<" {TAG_NAME_CHARS}
-ATTR           = {WS}+ [a-zA-Z:-]+ ({WS}* "=" {WS}* (\"[^\"]*\" | '[^']*' | [^ \t\n>]+))?
-OPEN_TAG_SELFCLOSE = {OPEN_TAG_HEAD} {ATTR}* {WS}* "/>"
+ATTR           = {WS}+ [0-9a-zA-Z:-]+ ({WS}* "=" {WS}* (\"[^\"]*\" | '[^']*' | [^ \t\n>]+))?
+OPEN_TAG_SELFCLOSE = {OPEN_TAG_HEAD} {WS}* {ATTR}* {WS}* "/>"
 OPEN_TAG_FULL      = {OPEN_TAG_HEAD} {ATTR}* {WS}* ">"
 CLOSE_TAG          = "</" {TAG_NAME_CHARS} {WS}* ">"
 

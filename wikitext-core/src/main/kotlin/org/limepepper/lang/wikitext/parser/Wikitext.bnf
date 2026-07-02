@@ -64,7 +64,7 @@
     TABLE_OPEN='TABLE_OPEN["{|"]'
     // template
     TEMPLATE_CLOSE='}}'
-    TEMPLATE_EQUALS='='
+    TEMPLATE_EQUALS='TEMPLATE_EQUALS[=]'
     TEMPLATE_OPEN='{{'
     TEMPLATE_PARAM_TEXT='regexp:[^{}|=\[<]+'
     // <nowiki></nowiki>

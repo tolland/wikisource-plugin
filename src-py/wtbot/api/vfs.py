@@ -699,10 +699,15 @@ def write_content(
     page_title: str | None = None
     if rest and rest[0] == "Pages" and len(rest) >= 2:
         page_title = "/".join(rest[1:])
-    elif rest and rest[-1] == "wikitext" and "/".join(rest[:-1]).startswith("File:"):
+    elif rest and rest[-1] == "wikitext":
+        # wikitext is synthetic, the underlying is the parent in the path
+        page_title = index_title
+    elif "/".join(rest[:-1]).startswith("File:"):
         page_title = "/".join(rest[:-1])
     elif rest:
         page_title = _index_asset_title(index_title, rest)
+
+    print(f"page_title: {page_title}")
 
     if page_title is None:
         return WriteResult(

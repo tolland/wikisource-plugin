@@ -28,4 +28,9 @@ class WtLexerTest : WtLexerTestCase() {
 
     // templates
     fun testAuthorTemplate() = doTest()
+    fun testProofreadpage_index_template() = doTest()
+
+    // tags
+    fun testPagelist_tag() = doTest()
+
 }

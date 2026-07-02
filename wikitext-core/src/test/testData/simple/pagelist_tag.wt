@@ -1,0 +1,14 @@
+<pagelist />
+<pagelist attribute="value" />
+<pagelist attribute=value />
+<pagelist 1attribute=value />
+<pagelist 1to6=roman 1=3 7=1 />
+<pagelist to6=roman />
+<pagelist
+  1to6=roman
+  1=3
+  7=1
+/>
+<pagelist 1to6=roman 1=3 7=1></pagelist>
+<pagelist 1to6=roman 1=3 7=1>
+</pagelist>
