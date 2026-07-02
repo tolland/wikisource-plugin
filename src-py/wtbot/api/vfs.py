@@ -94,6 +94,10 @@ def _blob_node(path: str, blob: FileBlob | None) -> Node:
         kind=NodeKind.file,
         length=blob.size if blob else None,
         writable=False,
+        stable_id=None,
+        revid=None,
+        content_model=None,
+        timestamp=None,
     )
 
 
