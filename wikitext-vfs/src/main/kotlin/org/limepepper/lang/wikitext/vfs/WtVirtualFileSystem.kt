@@ -47,9 +47,20 @@ class WtVirtualFileSystem : VirtualFileSystem() {
         stableId: Long? = null,
         revid: Long? = null,
         contentModel: String? = null,
+        qualityLevel: Int? = null,
+        dirty: Boolean = false,
+        hasPageImage: Boolean = false,
     ): WtVirtualFile = cache.getOrPut(path) {
-        WtVirtualFile(this, name, path, isDir, parent, stableId, revid, contentModel)
-    }.also { if (parent != null) it.setParent(parent) }
+        WtVirtualFile(
+            this, name, path, isDir, parent, stableId, revid, contentModel,
+            qualityLevel, dirty, hasPageImage,
+        )
+    }.also {
+        if (parent != null) it.setParent(parent)
+        // Instances are cached by path; every sighting carries the freshest
+        // decoration metadata, so re-apply it to the cached instance too.
+        it.updateMeta(qualityLevel, dirty, hasPageImage)
+    }
 
     /** Stat the backend and return a [WtVirtualFile] if the path exists. */
     override fun findFileByPath(path: String): VirtualFile? {
@@ -65,6 +76,9 @@ class WtVirtualFileSystem : VirtualFileSystem() {
                 stableId = stat.stableId,
                 revid = stat.revid,
                 contentModel = stat.contentModel,
+                qualityLevel = stat.qualityLevel,
+                dirty = stat.dirty,
+                hasPageImage = stat.hasPageImage,
             )
         } catch (_: VfsBackendException) {
             null
@@ -87,7 +101,7 @@ class WtVirtualFileSystem : VirtualFileSystem() {
             try {
                 val stats = WtVfsService.instance.backend.statBulk(files.map { it.path })
                 for ((file, stat) in files.zip(stats)) {
-                    if (stat.exists) file.invalidateIfStale(stat.revid)
+                    if (stat.exists) file.invalidateIfStale(stat)
                 }
             } catch (_: VfsBackendException) {
                 // Backend unreachable — leave cached state as-is.

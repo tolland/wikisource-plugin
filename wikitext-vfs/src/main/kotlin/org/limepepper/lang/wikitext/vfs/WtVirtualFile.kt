@@ -40,6 +40,9 @@ class WtVirtualFile(
      * "sanitized-css", "json") — drives [getFileType] via [WtContentModel].
      */
     val contentModel: String? = null,
+    qualityLevel: Int? = null,
+    dirty: Boolean = false,
+    hasPageImage: Boolean = false,
 ) : VirtualFile() {
 
     // Populated either eagerly by the tool window (BG thread) or lazily on
@@ -52,17 +55,37 @@ class WtVirtualFile(
     @Volatile var revid: Long? = revid
         private set
 
+    // Decoration metadata, refreshed on every backend sighting of this path
+    // (stat, children listing). Drives tree colour-coding in the tool window.
+    /** ProofreadPage quality 0-4; null for non-proofread files and dirs. */
+    @Volatile var qualityLevel: Int? = qualityLevel
+        private set
+    /** Uncommitted local edits (EditJournal) exist for the backing page. */
+    @Volatile var dirty: Boolean = dirty
+        private set
+    /** A scan reference image is known; pixels via GET /pages/image. */
+    @Volatile var hasPageImage: Boolean = hasPageImage
+        private set
+
     fun setParent(p: WtVirtualFile) { _parent = p }
 
+    /** Refresh decoration metadata from a fresh backend sighting. */
+    fun updateMeta(qualityLevel: Int?, dirty: Boolean, hasPageImage: Boolean) {
+        this.qualityLevel = qualityLevel
+        this.dirty = dirty
+        this.hasPageImage = hasPageImage
+    }
+
     /**
-     * Called by [WtVirtualFileSystem.refresh] with a freshly fetched revid.
+     * Called by [WtVirtualFileSystem.refresh] with a freshly fetched stat.
      * Content is re-fetched lazily on next access when the revid has moved on;
      * children are always invalidated since listings carry no revid of their own.
      */
     @Synchronized
-    fun invalidateIfStale(freshRevid: Long?) {
-        if (freshRevid != revid) {
-            revid = freshRevid
+    fun invalidateIfStale(stat: StatResult) {
+        updateMeta(stat.qualityLevel, stat.dirty, stat.hasPageImage)
+        if (stat.revid != revid) {
+            revid = stat.revid
             cachedContent = null
         }
         cachedChildren = null
@@ -98,6 +121,9 @@ class WtVirtualFile(
                 stableId = child.stableId,
                 revid = child.revid,
                 contentModel = child.contentModel,
+                qualityLevel = child.qualityLevel,
+                dirty = child.dirty,
+                hasPageImage = child.hasPageImage,
             )
         }.toTypedArray() as Array<VirtualFile>
         cachedChildren = children
@@ -134,6 +160,9 @@ class WtVirtualFile(
                     WriteStatus.ok -> {
                         cachedContent = bytes
                         revid = result.newRevid
+                        // A local save is journalled, not pushed — the page is
+                        // now dirty relative to the wiki until committed.
+                        dirty = true
                     }
                     WriteStatus.conflict -> throw IOException(
                         "edit conflict saving $_path: ${result.message ?: "remote revision has changed"}"
@@ -169,6 +198,9 @@ class WtVirtualFile(
                 stableId = stat.stableId,
                 revid = stat.revid,
                 contentModel = stat.contentModel,
+                qualityLevel = stat.qualityLevel,
+                dirty = stat.dirty,
+                hasPageImage = stat.hasPageImage,
             )
     }
 }

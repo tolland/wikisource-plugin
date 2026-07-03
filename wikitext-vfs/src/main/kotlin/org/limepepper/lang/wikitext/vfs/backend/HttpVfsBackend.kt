@@ -40,6 +40,9 @@ class HttpVfsBackend(
                 timestamp = stringOrNull("timestamp"),
                 writable = boolOrDefault("writable", false),
                 contentModel = stringOrNull("content_model"),
+                qualityLevel = longOrNull("quality_level")?.toInt(),
+                dirty = boolOrDefault("dirty", false),
+                hasPageImage = boolOrDefault("has_page_image", false),
             )
         }
     }
@@ -60,6 +63,9 @@ class HttpVfsBackend(
                 timestamp = r.stringOrNull("timestamp"),
                 writable = r.boolOrDefault("writable", false),
                 contentModel = r.stringOrNull("content_model"),
+                qualityLevel = r.longOrNull("quality_level")?.toInt(),
+                dirty = r.boolOrDefault("dirty", false),
+                hasPageImage = r.boolOrDefault("has_page_image", false),
             )
         }
     }
@@ -80,6 +86,9 @@ class HttpVfsBackend(
                         timestamp = child.stringOrNull("timestamp"),
                         writable = child.boolOrDefault("writable", false),
                         contentModel = child.stringOrNull("content_model"),
+                        qualityLevel = child.longOrNull("quality_level")?.toInt(),
+                        dirty = child.boolOrDefault("dirty", false),
+                        hasPageImage = child.boolOrDefault("has_page_image", false),
                     )
                 },
             )

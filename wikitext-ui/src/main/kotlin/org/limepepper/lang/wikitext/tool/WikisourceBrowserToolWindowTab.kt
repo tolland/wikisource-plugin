@@ -15,7 +15,9 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.ui.ColoredTreeCellRenderer
+import com.intellij.ui.JBColor
 import com.intellij.ui.PopupHandler
+import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextArea
 import com.intellij.ui.tree.AsyncTreeModel
@@ -69,7 +71,23 @@ internal class WikisourceBrowserToolWindowTab(
                 when (val element = elementOf(value)) {
                     is WtVirtualFile -> {
                         icon = if (element.isDirectory) AllIcons.Nodes.Folder else WtFileType.icon
-                        append(displayLabel(element.name))
+                        // Dirty (uncommitted EditJournal edits) renders like a
+                        // modified file in VCS: blue name plus a star.
+                        val nameAttributes =
+                            if (element.dirty) DIRTY_ATTRIBUTES
+                            else SimpleTextAttributes.REGULAR_ATTRIBUTES
+                        append(displayLabel(element.name), nameAttributes)
+                        if (element.dirty) append(" *", DIRTY_ATTRIBUTES)
+                        // ProofreadPage quality bullet in the pagelist colours.
+                        element.qualityLevel?.let { level ->
+                            append(
+                                "  ●",
+                                SimpleTextAttributes(
+                                    SimpleTextAttributes.STYLE_PLAIN,
+                                    qualityColor(level),
+                                ),
+                            )
+                        }
                     }
                     else -> {
                         icon = null
@@ -160,7 +178,7 @@ internal class WikisourceBrowserToolWindowTab(
                     ApplicationManager.getApplication().executeOnPooledThread {
                         try {
                             val stat = WtVfsService.instance.backend.stat(vFile.path)
-                            if (stat.exists) vFile.invalidateIfStale(stat.revid)
+                            if (stat.exists) vFile.invalidateIfStale(stat)
                         } catch (_: VfsBackendException) {
                             // Backend unreachable - leave cached state as-is.
                         }
@@ -188,6 +206,9 @@ internal class WikisourceBrowserToolWindowTab(
             appendLine("length:    ${vFile.cachedContent?.size ?: "not loaded"}")
             appendLine("writable:  ${vFile.isWritable}")
             appendLine("contentModel: ${vFile.contentModel ?: "—"}")
+            appendLine("quality:   ${vFile.qualityLevel ?: "—"}")
+            appendLine("dirty:     ${vFile.dirty}")
+            appendLine("pageImage: ${vFile.hasPageImage}")
         }
     }
 
@@ -224,5 +245,19 @@ internal class WikisourceBrowserToolWindowTab(
          */
         private fun displayLabel(name: String): String =
             if (name.startsWith("Page:") && '/' in name) "Page/${name.substringAfterLast('/')}" else name
+
+        /** VCS-modified-style blue for files with uncommitted local edits. */
+        private val DIRTY_ATTRIBUTES =
+            SimpleTextAttributes(SimpleTextAttributes.STYLE_PLAIN, JBColor(0x0057D8, 0x589DF6))
+
+        /** ProofreadPage pagelist status colours, light/dark theme pairs. */
+        private fun qualityColor(level: Int): JBColor = when (level) {
+            0 -> JBColor(0x888888, 0x999999) // without text
+            1 -> JBColor(0xD65C5C, 0xE57373) // not proofread
+            2 -> JBColor(0x8E6BC7, 0x9575CD) // problematic
+            3 -> JBColor(0xC7A500, 0xE0C341) // proofread
+            4 -> JBColor(0x2E7D32, 0x66BB6A) // validated
+            else -> JBColor.GRAY
+        }
     }
 }

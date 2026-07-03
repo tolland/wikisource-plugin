@@ -21,6 +21,12 @@ data class StatResult(
     val writable: Boolean = false,
     /** Remote contentmodel, e.g. "proofread-index"/"proofread-page"/"wikitext". Null for dirs. */
     val contentModel: String? = null,
+    /** ProofreadPage quality 0-4 for proofread-page files; drives tree colour-coding. */
+    val qualityLevel: Int? = null,
+    /** Uncommitted local edits (EditJournal) exist for the backing page. */
+    val dirty: Boolean = false,
+    /** A scan reference image is known; pixels via GET /pages/image?path=&width=. */
+    val hasPageImage: Boolean = false,
 )
 
 data class ChildNode(
@@ -33,6 +39,9 @@ data class ChildNode(
     val timestamp: String? = null,
     val writable: Boolean = false,
     val contentModel: String? = null,
+    val qualityLevel: Int? = null,
+    val dirty: Boolean = false,
+    val hasPageImage: Boolean = false,
 )
 
 data class ListChildrenResult(
