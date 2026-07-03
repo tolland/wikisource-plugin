@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-An IntelliJ Platform plugin that adds Wikitext language support (`.wt` / `.wiki` files) to IntelliJ IDEA, paired with a Python sidecar (`wtbot`) that fetches content from MediaWiki via pywikibot and exchanges it with the plugin through a shared SQLite database.
+An IntelliJ Platform plugin that adds Wikitext language support (`.wt` / `.wiki` files) to IntelliJ IDEA, paired with a Python sidecar (`wtbot`) that fetches content from MediaWiki via pywikibot and exchanges it with the plugin through a shared SQLite database. For inspection purpose we also have a svelteKit based viewer app ./viewer which is not part of the main workflow but is conventient for inspection and debugging of state.
 
 ## Build and run commands
 

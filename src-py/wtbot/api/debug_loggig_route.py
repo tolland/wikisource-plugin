@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Callable
 
 from fastapi import Request, Response
@@ -17,12 +18,12 @@ class DebugLoggingRoute(APIRoute):
                 try:
                     # Try parsing and printing clean JSON
                     body_json = json.loads(body_bytes)
-                    print("\n--- DEBUG REQUEST BODY (JSON) ---")
-                    print(json.dumps(body_json, indent=2))
+                    logging.debug("\n--- DEBUG REQUEST BODY (JSON) ---")
+                    logging.debug(json.dumps(body_json, indent=2))
                 except json.JSONDecodeError:
                     # Fallback if it's plain text or binary
-                    print("\n--- DEBUG REQUEST BODY (RAW) ---")
-                    print(body_bytes.decode(errors="ignore"))
+                    logging.debug("\n--- DEBUG REQUEST BODY (RAW) ---")
+                    logging.debug(body_bytes.decode(errors="ignore"))
             else:
                 print("\n--- DEBUG REQUEST BODY: Empty ---")
 
