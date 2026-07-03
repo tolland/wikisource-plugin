@@ -312,8 +312,7 @@ class FakeWikiClient:
         return RenderedPreview(
             title=title,
             html=(
-                '<div class="mw-parser-output">'
-                f"<p>{_html.escape(wikitext)}</p></div>"
+                f'<div class="mw-parser-output"><p>{_html.escape(wikitext)}</p></div>'
             ),
         )
 
