@@ -153,7 +153,9 @@ class FilePageProcessor(PageProcessor):
     def postprocess(
         self, ctx: ProcessContext, cached: CachedPage, remote: RemotePage
     ) -> ProcessOutcome:
-        download_file_blob(ctx.session, ctx.site, cached, cached.title, ctx.client, ctx.blob_root)
+        download_file_blob(
+            ctx.session, ctx.site, cached, cached.title, ctx.client, ctx.blob_root
+        )
         return _DONE
 
 
@@ -189,9 +191,7 @@ def _store_page_images(
     """Upsert PageMeta scan-image URLs and mirror the proofread quality onto
     Page.quality_level."""
     try:
-        meta = session.exec(
-            select(PageMeta).where(PageMeta.page_pk == page_pk)
-        ).first()
+        meta = session.exec(select(PageMeta).where(PageMeta.page_pk == page_pk)).first()
         if meta is None:
             meta = PageMeta(page_pk=page_pk)
         if images.thumbnail_url is not None:
@@ -264,7 +264,9 @@ def _fan_out_index(ctx: ProcessContext, index_page: CachedPage) -> int:
     """
     session, req = ctx.session, ctx.request
     file_title = _index_to_file_title(req.title)
-    download_file_blob(session, ctx.site, index_page, file_title, ctx.client, ctx.blob_root)
+    download_file_blob(
+        session, ctx.site, index_page, file_title, ctx.client, ctx.blob_root
+    )
 
     # Prefer page_count set at upsert (from IndexPage.num_pages via
     # PywikibotClient); fall back to <pagelist> parsing for FakeWikiClient.

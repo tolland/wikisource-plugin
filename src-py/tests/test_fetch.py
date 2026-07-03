@@ -396,9 +396,7 @@ def test_proofread_page_fetch_populates_page_meta(session):
 
     page = session.exec(select(Page).where(Page.title == title)).one()
     assert page.quality_level == 1
-    meta = session.exec(
-        select(PageMeta).where(PageMeta.page_pk == page.pk)
-    ).one()
+    meta = session.exec(select(PageMeta).where(PageMeta.page_pk == page.pk)).one()
     assert meta.thumb_url == "https://upload.example/thumb/page45-500px.jpg"
     assert meta.source_image_url == "https://upload.example/full/page45.jpg"
 
@@ -471,9 +469,7 @@ def test_refetch_updates_existing_page_meta(session):
 
     page = session.exec(select(Page).where(Page.title == title)).one()
     assert page.quality_level == 3
-    metas = session.exec(
-        select(PageMeta).where(PageMeta.page_pk == page.pk)
-    ).all()
+    metas = session.exec(select(PageMeta).where(PageMeta.page_pk == page.pk)).all()
     assert len(metas) == 1
     assert metas[0].thumb_url == "https://upload.example/thumb/q3.jpg"
 
