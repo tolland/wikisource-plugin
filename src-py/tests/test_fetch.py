@@ -6,9 +6,9 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
 from wtbot.main import create_app
-from wtbot.model import FetchRequest, FetchStatus, FileBlob, Page, Site
+from wtbot.model import FetchRequest, FetchStatus, FileBlob, Page, PageMeta, Site
 from wtbot.wiki.client import FakeWikiClient
-from wtbot.wiki.wiki_types import RemotePage
+from wtbot.wiki.wiki_types import RemotePage, RemotePageImages
 from wtbot.worker import run_pending
 
 _INDEX_TITLE = "Index:Tractatus.djvu"
@@ -357,6 +357,125 @@ def test_proofread_page_metadata_uses_content_model(session):
     page = session.exec(select(Page).where(Page.title == remote.title)).one()
     assert page.index_title == "Index:Tractatus.djvu"
     assert page.page_number == 7
+
+
+def test_proofread_page_fetch_populates_page_meta(session):
+    """Fetching a proofread-page pulls the ProofreadPage scan-image URLs and
+    quality (prop=imageforpage|proofread) into PageMeta / Page.quality_level."""
+    title = "Page:Tractatus.djvu/45"
+    remote = RemotePage(
+        title=title,
+        namespace_key=104,
+        namespace_canonical="Page",
+        content_model="proofread-page",
+        text="page content",
+        pageid=145,
+        revid=1045,
+    )
+    wiki = FakeWikiClient(
+        pages={title: remote},
+        page_images={
+            title: RemotePageImages(
+                thumbnail_url="https://upload.example/thumb/page45-500px.jpg",
+                fullsize_url="https://upload.example/full/page45.jpg",
+                size=1280,
+                filename="Tractatus.djvu",
+                quality=1,
+                quality_text="Not proofread",
+            )
+        },
+    )
+    site = Site(family="mywikisource", code="en")
+    session.add(site)
+    session.commit()
+    session.refresh(site)
+    session.add(FetchRequest(site_pk=site.pk, title=title))
+    session.commit()
+
+    assert run_pending(session, lambda _: wiki) == 1
+
+    page = session.exec(select(Page).where(Page.title == title)).one()
+    assert page.quality_level == 1
+    meta = session.exec(
+        select(PageMeta).where(PageMeta.page_pk == page.pk)
+    ).one()
+    assert meta.thumb_url == "https://upload.example/thumb/page45-500px.jpg"
+    assert meta.source_image_url == "https://upload.example/full/page45.jpg"
+
+
+def test_proofread_page_fetch_without_images_creates_no_page_meta(session):
+    """A wiki without the ProofreadPage image API (FakeWikiClient default)
+    must not fail the fetch or leave an empty PageMeta row behind."""
+    title = "Page:Tractatus.djvu/46"
+    remote = RemotePage(
+        title=title,
+        namespace_key=104,
+        namespace_canonical="Page",
+        content_model="proofread-page",
+        text="page content",
+        pageid=146,
+        revid=1046,
+    )
+    wiki = FakeWikiClient(pages={title: remote})
+    site = Site(family="mywikisource", code="en")
+    session.add(site)
+    session.commit()
+    session.refresh(site)
+    session.add(FetchRequest(site_pk=site.pk, title=title))
+    session.commit()
+
+    assert run_pending(session, lambda _: wiki) == 1
+
+    page = session.exec(select(Page).where(Page.title == title)).one()
+    assert page.fetch_status == "done"
+    assert page.quality_level is None
+    assert (
+        session.exec(select(PageMeta).where(PageMeta.page_pk == page.pk)).first()
+        is None
+    )
+
+
+def test_refetch_updates_existing_page_meta(session):
+    """A second fetch with new image data updates the PageMeta row in place
+    rather than duplicating it."""
+    title = "Page:Tractatus.djvu/47"
+    remote = RemotePage(
+        title=title,
+        namespace_key=104,
+        namespace_canonical="Page",
+        content_model="proofread-page",
+        text="page content",
+        pageid=147,
+        revid=1047,
+    )
+
+    def images(quality: int) -> RemotePageImages:
+        return RemotePageImages(
+            thumbnail_url=f"https://upload.example/thumb/q{quality}.jpg",
+            fullsize_url=f"https://upload.example/full/q{quality}.jpg",
+            quality=quality,
+        )
+
+    site = Site(family="mywikisource", code="en")
+    session.add(site)
+    session.commit()
+    session.refresh(site)
+
+    for quality in (1, 3):
+        wiki = FakeWikiClient(
+            pages={title: remote}, page_images={title: images(quality)}
+        )
+        session.add(FetchRequest(site_pk=site.pk, title=title))
+        session.commit()
+        assert run_pending(session, lambda _: wiki) == 1
+
+    page = session.exec(select(Page).where(Page.title == title)).one()
+    assert page.quality_level == 3
+    metas = session.exec(
+        select(PageMeta).where(PageMeta.page_pk == page.pk)
+    ).all()
+    assert len(metas) == 1
+    assert metas[0].thumb_url == "https://upload.example/thumb/q3.jpg"
 
 
 def test_page_model_has_raw_text_not_proofread_sections(session):

@@ -9,6 +9,7 @@ from wtbot.wiki.wiki_types import (
     PageNotFound,
     RemoteFileInfo,
     RemotePage,
+    RemotePageImages,
     RenderedPreview,
     SaveResult,
 )
@@ -27,6 +28,13 @@ and ``download_file`` are all the fetch path needs. Two implementations:
 logging.basicConfig(level=logging.DEBUG)
 
 
+def _https(url: str | None) -> str | None:
+    """Normalise the API's protocol-relative //upload... URLs to https://."""
+    if url and url.startswith("//"):
+        return f"https:{url}"
+    return url
+
+
 @runtime_checkable
 class WikiClient(Protocol):
     def get_page(self, title: str) -> RemotePage: ...
@@ -34,6 +42,12 @@ class WikiClient(Protocol):
     def list_index_subpage_titles(self, title: str) -> list[str]: ...
 
     def get_file_info(self, title: str) -> RemoteFileInfo: ...
+
+    def get_page_images(self, title: str) -> RemotePageImages | None:
+        """ProofreadPage scan image URLs + proofread quality for a Page:
+        title, or None when the wiki/page has none (non-ProofreadPage wikis,
+        API errors) -- enrichment, never a fetch-failing call."""
+        ...
 
     def download_file(self, title: str, dest: Path) -> Path: ...
 
@@ -173,6 +187,49 @@ class PywikibotClient:
             height=getattr(fi, "height", None),
         )
 
+    def get_page_images(self, title: str) -> RemotePageImages | None:
+        # ProofreadPage's module is prop=imageforpage (prefix prppifp), but
+        # the *response* key is "imagesforpage"; prop=proofread rides along
+        # for the quality level. Deliberately a plain GET rather than a
+        # pywikibot api.Request: this is enrichment and must fail fast,
+        # while pywikibot's retry/throttle machinery turns one broken or
+        # unsupported endpoint into minutes of waiting, multiplied per
+        # fetched page. A miss just means no thumbnail until the next fetch.
+        try:
+            import requests
+
+            resp = requests.get(
+                self.site.base_url(self.site.apipath()),
+                params={
+                    "action": "query",
+                    "prop": "imageforpage|proofread",
+                    "titles": title,
+                    "prppifpprop": "filename|size|fullsize",
+                    "format": "json",
+                },
+                headers={"User-Agent": "wtbot (wikisource-plugin)"},
+                timeout=(5, 15),
+            )
+            data = resp.json()
+        except Exception as exc:  # noqa: BLE001 - enrichment only, never fatal
+            logging.debug("imageforpage query failed for %s: %s", title, exc)
+            return None
+        pages = (data.get("query") or {}).get("pages") or {}
+        for pdata in pages.values():
+            images = pdata.get("imagesforpage") or {}
+            proofread = pdata.get("proofread") or {}
+            if not images and not proofread:
+                continue
+            return RemotePageImages(
+                thumbnail_url=_https(images.get("thumbnail")),
+                fullsize_url=_https(images.get("fullsize")),
+                size=images.get("size"),
+                filename=images.get("filename"),
+                quality=proofread.get("quality"),
+                quality_text=proofread.get("quality_text"),
+            )
+        return None
+
     def download_file(self, title: str, dest: Path) -> Path:
         dest = Path(dest)
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -230,9 +287,11 @@ class FakeWikiClient:
         self,
         pages: dict[str, RemotePage] | None = None,
         files: dict[str, bytes] | None = None,
+        page_images: dict[str, RemotePageImages] | None = None,
     ):
         self._pages = dict(pages or {})
         self._files = dict(files or {})
+        self._page_images = dict(page_images or {})
 
     def get_page(self, title: str) -> RemotePage:
         try:
@@ -266,6 +325,9 @@ class FakeWikiClient:
             mime=mime,
             url=f"https://fake.wiki/images/{title.split(':', 1)[-1]}",
         )
+
+    def get_page_images(self, title: str) -> RemotePageImages | None:
+        return self._page_images.get(title)
 
     def download_file(self, title: str, dest: Path) -> Path:
         try:

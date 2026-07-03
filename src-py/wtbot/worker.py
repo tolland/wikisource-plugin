@@ -1,14 +1,4 @@
-"""Fetch worker: drains the FetchRequest queue, calls the wiki, writes results
-back into the cache.
-
-Kept as plain functions over a Session + a client factory so it is fully
-testable with FakeWikiClient and reusable from either the API (inline, today) or
-a future background loop / ``wtbot worker`` command.
-"""
-
-import re
 from collections.abc import Callable
-from dataclasses import dataclass
 from pathlib import Path
 
 from sqlmodel import Session, select
@@ -17,40 +7,36 @@ from wtbot.model import (
     FetchRequest,
     FetchState,
     FetchStatus,
-    FileBlob,
     Page,
     Site,
     role_for_canonical,
 )
-from wtbot.model.fetch_request import FetchKind
-from wtbot.model.namespace import NsRole
+from wtbot.page_processors import (
+    CachedPage,
+    ClaimedFetchRequest,
+    PageProcessor,
+    ProcessContext,
+    processor_for,
+)
 from wtbot.settings import WikiSettings
 from wtbot.timeutil import utcnow
 from wtbot.wiki.client import WikiClient, get_wiki_client
 from wtbot.wiki.namespaces import sync_namespaces
 from wtbot.wiki.wiki_types import PageNotFound, RemotePage
 
+"""Fetch worker: drains the FetchRequest queue, calls the wiki, writes results
+back into the cache.
+
+The worker owns the queue mechanics — claim, common Page upsert, progress
+bookkeeping. Everything type-specific (blobs, index fan-out, scan-image
+metadata) lives in ``wtbot.page_processors``, one class per page type.
+
+Kept as plain functions over a Session + a client factory so it is fully
+testable with FakeWikiClient and reusable from either the API (inline, today)
+or a future background loop / ``wtbot worker`` command.
+"""
+
 ClientFactory = Callable[[Site], WikiClient]
-
-
-@dataclass(frozen=True)
-class _ClaimedFetchRequest:
-    pk: int
-    site_pk: int
-    parent_pk: int | None
-    title: str
-    kind: FetchKind
-    depth: int
-
-
-@dataclass(frozen=True)
-class _CachedPage:
-    pk: int
-    title: str
-    namespace_role: NsRole
-    content_model: str | None
-    text: str | None
-    page_count: int | None
 
 
 def make_client_for_site(site: Site) -> WikiClient:
@@ -75,7 +61,7 @@ def run_pending(
     return handled
 
 
-def _claim_next(session: Session) -> _ClaimedFetchRequest | None:
+def _claim_next(session: Session) -> ClaimedFetchRequest | None:
     try:
         req = session.exec(
             select(FetchRequest)
@@ -96,10 +82,10 @@ def _claim_next(session: Session) -> _ClaimedFetchRequest | None:
         session.rollback()
 
 
-def _snapshot_request(req: FetchRequest) -> _ClaimedFetchRequest:
+def _snapshot_request(req: FetchRequest) -> ClaimedFetchRequest:
     if req.pk is None:
         raise RuntimeError("cannot process an unpersisted fetch request")
-    return _ClaimedFetchRequest(
+    return ClaimedFetchRequest(
         pk=req.pk,
         site_pk=req.site_pk,
         parent_pk=req.parent_pk,
@@ -130,7 +116,7 @@ def _maybe_sync_namespaces(session: Session, site: Site, client: WikiClient) -> 
 
 def _process(
     session: Session,
-    req: _ClaimedFetchRequest,
+    req: ClaimedFetchRequest,
     client_factory: ClientFactory,
     *,
     blob_root: Path | None = None,
@@ -144,26 +130,21 @@ def _process(
         client = client_factory(site)
         _maybe_sync_namespaces(session, site, client)
         remote = client.get_page(req.title)
-        page = _upsert_page(session, site, remote)
 
         # Drive behaviour from what was actually fetched, not from req.kind.
-        role = role_for_canonical(remote.namespace_canonical or "")
-        if role == NsRole.file:
-            # File: pages report content_model='wikitext' (the description page)
-            # but the real payload is the binary blob — always download it.
-            _download_file_blob(session, site, page, remote.title, client, blob_root)
-            progress_total = 1
-            progress_done = 1
-            status = FetchStatus.done
-        elif remote.content_model == "proofread-index" and req.depth > 0:
-            child_count = _fan_out_index(session, site, req, page, client, blob_root)
-            progress_total = 1 + child_count
-            progress_done = 1
-            status = FetchStatus.in_progress if child_count > 0 else FetchStatus.done
-        else:
-            progress_total = 1
-            progress_done = 1
-            status = FetchStatus.done
+        processor = processor_for(remote)
+        page = _upsert_page(session, site, remote, processor)
+        ctx = ProcessContext(
+            session=session,
+            site=site,
+            client=client,
+            request=req,
+            blob_root=blob_root,
+        )
+        outcome = processor.postprocess(ctx, page, remote)
+        status = outcome.status
+        progress_total = outcome.progress_total
+        progress_done = outcome.progress_done
     except PageNotFound:
         error_message = f"page not found: {req.title}"
     except Exception as exc:  # noqa: BLE001 - record any failure on the row
@@ -200,7 +181,7 @@ def _load_site_snapshot(session: Session, site_pk: int) -> Site:
 
 def _record_fetch_result(
     session: Session,
-    req: _ClaimedFetchRequest,
+    req: ClaimedFetchRequest,
     *,
     status: FetchStatus,
     progress_total: int | None,
@@ -249,110 +230,11 @@ def _update_parent_progress(session: Session, parent_pk: int) -> None:
     # Caller commits.
 
 
-def _download_file_blob(
-    session: Session,
-    site: Site,
-    page: _CachedPage,
-    file_title: str,
-    client: WikiClient,
-    blob_root: Path | None,
-) -> None:
-    """Fetch imageinfo + download binary for a File: page; upsert a FileBlob row."""
-    dest = _blob_path(blob_root, site, file_title)
-    try:
-        info = client.get_file_info(file_title)
-        actual = client.download_file(file_title, dest)
-    except PageNotFound:
-        return  # blob not available; proceed without FileBlob
-
-    try:
-        blob = session.exec(select(FileBlob).where(FileBlob.page_pk == page.pk)).first()
-        if blob is None:
-            blob = FileBlob(page_pk=page.pk)
-
-        blob.file_sha1 = info.file_sha1
-        blob.size = info.size
-        blob.mime = info.mime
-        blob.url = info.url
-        blob.upload_timestamp = info.upload_timestamp
-        blob.uploader = info.uploader
-        blob.upload_comment = info.upload_comment
-        blob.page_count = info.page_count
-        blob.width = info.width
-        blob.height = info.height
-        blob.local_path = str(actual)
-        blob.downloaded_at = utcnow()
-
-        session.add(blob)
-        session.commit()
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.rollback()
-
-
-def _fan_out_index(
-    session: Session,
-    site: Site,
-    req: _ClaimedFetchRequest,
-    index_page: _CachedPage,
-    client: WikiClient,
-    blob_root: Path | None,
-) -> int:
-    """Download the File: blob, parse page count, enqueue index children.
-
-    Returns the number of child FetchRequests created.
-    """
-    file_title = _index_to_file_title(req.title)
-    _download_file_blob(session, site, index_page, file_title, client, blob_root)
-
-    # Prefer page_count set by _upsert_page (from IndexPage.num_pages via
-    # PywikibotClient); fall back to <pagelist> parsing for FakeWikiClient.
-    page_count = index_page.page_count or _parse_page_count(index_page.text or "")
-    subpage_titles = client.list_index_subpage_titles(req.title)
-
-    try:
-        db_index_page = session.get(Page, index_page.pk)
-        if db_index_page is not None and page_count:
-            db_index_page.page_count = page_count
-            session.add(db_index_page)
-
-        basename = _index_basename(req.title)
-        child_specs: list[tuple[str, FetchKind]] = []
-        if page_count:
-            child_specs.extend(
-                (f"Page:{basename}/{n}", FetchKind.page)
-                for n in range(1, page_count + 1)
-            )
-        child_specs.extend((title, FetchKind.single) for title in subpage_titles)
-
-        seen_titles: set[str] = set()
-        child_count = 0
-        for title, kind in child_specs:
-            if title in seen_titles:
-                continue
-            seen_titles.add(title)
-            child = FetchRequest(
-                site_pk=req.site_pk,
-                parent_pk=req.pk,
-                title=title,
-                kind=kind,
-                depth=0,
-            )
-            session.add(child)
-            child_count += 1
-
-        session.commit()
-        return child_count
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.rollback()
-
-
-def _upsert_page(session: Session, site: Site, remote: RemotePage) -> _CachedPage:
+def _upsert_page(
+    session: Session, site: Site, remote: RemotePage, processor: PageProcessor
+) -> CachedPage:
+    """Write the common Page fields from the remote snapshot, then let the
+    type-specific processor enrich its own columns, in one transaction."""
     try:
         page = session.exec(
             select(Page).where(Page.site_pk == site.pk, Page.title == remote.title)
@@ -361,8 +243,7 @@ def _upsert_page(session: Session, site: Site, remote: RemotePage) -> _CachedPag
             page = Page(site_pk=site.pk, title=remote.title)
 
         page.namespace_key = remote.namespace_key
-        ns_role = role_for_canonical(remote.namespace_canonical or "")
-        page.namespace_role = ns_role
+        page.namespace_role = role_for_canonical(remote.namespace_canonical or "")
         page.content_model = remote.content_model
         page.text = remote.text
         page.pageid = remote.pageid
@@ -371,28 +252,9 @@ def _upsert_page(session: Session, site: Site, remote: RemotePage) -> _CachedPag
         page.contributor = remote.user
         page.comment = remote.comment
         page.sha1 = remote.sha1
-        # page_count from IndexPage.num_pages (PywikibotClient) takes priority;
-        # the <pagelist> fallback in _fan_out_index covers FakeWikiClient tests.
-        if remote.page_count is not None:
-            page.page_count = remote.page_count
-        # Derive index_title and page_number for ProofreadPage Page: rows.
-        # Title is always "Page:{basename}/{n}"; rsplit gives (basename, n).
-        if remote.content_model == "proofread-page" and page.index_title is None:
-            after_ns = remote.title.split(":", 1)[-1]  # "Foo.pdf/3"
-            base, _, num = after_ns.rpartition("/")
-            if base and num.isdigit():
-                page.index_title = f"Index:{base}"
-                page.page_number = int(num)
-        # Index namespace subpages such as Index:Foo.pdf/styles.css are assets
-        # of the proofread index, not proofread indexes themselves.
-        if (
-            ns_role == NsRole.index
-            and page.index_title is None
-            and remote.content_model != "proofread-index"
-        ):
-            parent_title, _, _ = remote.title.rpartition("/")
-            if parent_title:
-                page.index_title = parent_title
+
+        processor.enrich(page, remote)
+
         page.dirty = False
         page.fetch_status = FetchState.done
         page.fetch_error = None
@@ -401,7 +263,7 @@ def _upsert_page(session: Session, site: Site, remote: RemotePage) -> _CachedPag
         session.flush()
         if page.pk is None:
             raise RuntimeError(f"page {remote.title!r} did not get a primary key")
-        cached = _CachedPage(
+        cached = CachedPage(
             pk=page.pk,
             title=page.title,
             namespace_role=page.namespace_role,
@@ -416,52 +278,3 @@ def _upsert_page(session: Session, site: Site, remote: RemotePage) -> _CachedPag
         raise
     finally:
         session.rollback()
-
-
-# ---------------------------------------------------------------------------
-# Title helpers
-# ---------------------------------------------------------------------------
-
-
-def _index_basename(title: str) -> str:
-    """'Index:Foo.djvu' → 'Foo.djvu'"""
-    _, _, rest = title.partition(":")
-    return rest
-
-
-def _index_to_file_title(title: str) -> str:
-    """'Index:Foo.djvu' → 'File:Foo.djvu'"""
-    return "File:" + _index_basename(title)
-
-
-def _blob_path(blob_root: Path | None, site: Site, file_title: str) -> Path:
-    root = blob_root if blob_root is not None else Path("./blobs")
-    filename = file_title.split(":", 1)[-1].replace("/", "_")
-    return root / site.family / site.code / filename
-
-
-# ---------------------------------------------------------------------------
-# Pagelist parsing
-# ---------------------------------------------------------------------------
-
-
-def _parse_page_count(body: str) -> int | None:
-    """Extract total page count from a ProofreadPage <pagelist> tag.
-
-    Handles ``<pagelist to="N" .../>`` (explicit total) and the implicit form
-    where the maximum range bound is the page count.
-    """
-    m = re.search(r"<pagelist\b([^>]*)/>", body, re.IGNORECASE)
-    if not m:
-        return None
-    attrs = m.group(1)
-
-    to_m = re.search(r'\bto="(\d+)"', attrs)
-    if to_m:
-        return int(to_m.group(1))
-
-    # Fall back: max of all numeric range keys (NtoM or N).
-    nums = []
-    for start, end in re.findall(r"\b(\d+)(?:to(\d+))?\s*=", attrs):
-        nums.append(int(end) if end else int(start))
-    return max(nums) if nums else None

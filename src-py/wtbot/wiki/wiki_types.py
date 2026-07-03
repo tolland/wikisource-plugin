@@ -65,6 +65,23 @@ class RemoteFileInfo:
 
 
 @dataclass(frozen=True)
+class RemotePageImages:
+    """ProofreadPage per-page scan image + proofread status, from
+    ``prop=imageforpage|proofread`` (the response key is ``imagesforpage``).
+
+    URLs are normalised to https:// (the API returns protocol-relative).
+    ``size`` is the width reported by imageforpage for the served rendering.
+    """
+
+    thumbnail_url: str | None = None
+    fullsize_url: str | None = None
+    size: int | None = None
+    filename: str | None = None
+    quality: int | None = None  # ProofreadPage quality level 0-4
+    quality_text: str | None = None
+
+
+@dataclass(frozen=True)
 class RemotePage:
     """A plain snapshot of a wiki page, decoupled from pywikibot's Page object so
     the rest of the backend (dispatch, worker, tests) never imports pywikibot.
