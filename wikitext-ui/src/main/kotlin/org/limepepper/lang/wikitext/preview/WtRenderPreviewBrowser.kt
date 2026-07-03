@@ -73,7 +73,7 @@ class WtRenderPreviewBrowser(
 
     /**
      * Proofread workflow: flips the pane between the rendered preview and the
-     * page's reference scan. Set from the toolbar toggle in [WtEditorWithPreview].
+     * page's reference scan. Set from the toggle in [WtPreviewToolbar].
      */
     var showReferenceImage: Boolean = false
         set(value) {
@@ -83,7 +83,28 @@ class WtRenderPreviewBrowser(
             }
         }
 
+    /** Zoom applies only to the reference image, and only JCEF can zoom. */
+    val isZoomSupported: Boolean
+        get() = jcefBrowser != null
+
+    private var imageZoom = 1.0
+
+    fun zoomImage(factor: Double) {
+        imageZoom = (imageZoom * factor).coerceIn(0.2, 8.0)
+        applyZoom()
+    }
+
+    fun resetImageZoom() {
+        imageZoom = 1.0
+        applyZoom()
+    }
+
+    private fun applyZoom() {
+        jcefBrowser?.setZoomLevel(if (showReferenceImage) imageZoom else 1.0)
+    }
+
     init {
+        component.add(WtPreviewToolbar(this).component, BorderLayout.NORTH)
         val viewer: JComponent = jcefBrowser?.component ?: JBScrollPane(fallbackPane)
         component.add(viewer, BorderLayout.CENTER)
         reloadPreview()
@@ -164,6 +185,7 @@ class WtRenderPreviewBrowser(
         val browser = jcefBrowser
         if (browser != null) {
             browser.loadHTML(html)
+            applyZoom() // a load can reset CEF's zoom
         } else {
             fallbackPane?.text = html
             fallbackPane?.caretPosition = 0

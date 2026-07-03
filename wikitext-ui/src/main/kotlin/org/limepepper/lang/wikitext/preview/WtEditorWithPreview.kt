@@ -1,19 +1,19 @@
 package org.limepepper.lang.wikitext.preview
 
-import com.intellij.icons.AllIcons
-import com.intellij.openapi.actionSystem.ActionGroup
-import com.intellij.openapi.actionSystem.ActionUpdateThread
-import com.intellij.openapi.actionSystem.AnAction
-import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.actionSystem.DefaultActionGroup
-import com.intellij.openapi.actionSystem.ToggleAction
+import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.fileEditor.TextEditorWithPreview
 import com.intellij.openapi.fileEditor.TextEditorWithPreview.Layout
 
+/**
+ * The wikitext split editor. Both halves carry their own inset toolbar
+ * instead of actions on the platform's hover toolbar: the preview pane owns
+ * [WtPreviewToolbar] (mode toggle / reload / zoom / OCR) and the text editor
+ * gets [WtPageNavToolbar] as its header component (page back/forward).
+ */
 class WtEditorWithPreview(
     textEditor: TextEditor,
-    private val wtPreviewEditor: WtRenderPreviewBrowser,
+    wtPreviewEditor: WtRenderPreviewBrowser,
 ) : TextEditorWithPreview(
     textEditor,
     wtPreviewEditor,
@@ -23,44 +23,13 @@ class WtEditorWithPreview(
     init {
         // Initialize TextEditorWithPreview's lazy UI before disposal-sensitive editor switching can occur.
         component
+
+        (textEditor.editor as? EditorEx)?.let { editor ->
+            val navBar = WtPageNavToolbar(editor.component).component
+            // Permanent so the row comes back when the find bar (which shares
+            // the header slot) is closed.
+            editor.permanentHeaderComponent = navBar
+            editor.headerComponent = navBar
+        }
     }
-
-    override fun createRightToolbarActionGroup(): ActionGroup {
-        return DefaultActionGroup(
-            listOf(
-                ToggleReferenceImageAction(wtPreviewEditor),
-                ReloadPreviewAction(wtPreviewEditor),
-            ),
-        )
-    }
-}
-
-/**
- * Proofread workflow: swap the preview pane between the rendered wikitext and
- * the reference scan the transcription is being checked against.
- */
-private class ToggleReferenceImageAction(
-    private val previewEditor: WtRenderPreviewBrowser,
-) : ToggleAction(
-    "Show Reference Image",
-    "Show the page scan instead of the rendered preview",
-    AllIcons.Actions.Preview,
-) {
-    override fun isSelected(event: AnActionEvent): Boolean = previewEditor.showReferenceImage
-
-    override fun setSelected(event: AnActionEvent, state: Boolean) {
-        previewEditor.showReferenceImage = state
-    }
-
-    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
-}
-
-private class ReloadPreviewAction(
-    private val previewEditor: WtRenderPreviewBrowser,
-) : AnAction("Reload Preview", "Reload Wikitext preview", AllIcons.Actions.Refresh) {
-    override fun actionPerformed(event: AnActionEvent) {
-        previewEditor.reloadPreview()
-    }
-
-    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
 }

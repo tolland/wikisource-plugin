@@ -93,9 +93,14 @@ paid per keystroke.
 
 ## Reference image (transcription workflow)
 
-Proofreading is done against the page's scan, so the preview pane has a
-toolbar toggle (`ToggleReferenceImageAction` in `WtEditorWithPreview`) that
-swaps the rendered preview for the reference image. The image URL comes from
+Proofreading is done against the page's scan, so the preview pane can swap
+the rendered preview for the reference image. Both halves of the split editor
+carry a permanent inset toolbar instead of actions on the platform's
+hover/floating toolbar: the preview pane owns `WtPreviewToolbar` (one toolbar,
+two button sets switched by mode via action `update()` visibility — render:
+toggle/reload; image: toggle/zoom in/out/reset zoom/send-to-OCR stub), and the
+text editor gets `WtPageNavToolbar` as its header component with previous/next
+page stubs for walking the index. The image URL comes from
 `VfsBackend.pageImageUrl()`, which points at the sidecar's
 `GET /preview/page-image?path=…` — currently a **stub** returning a generated
 placeholder SVG labelled with the page title. The real implementation will
