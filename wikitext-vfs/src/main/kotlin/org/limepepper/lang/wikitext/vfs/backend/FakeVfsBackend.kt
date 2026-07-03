@@ -125,4 +125,10 @@ class FakeVfsBackend : VfsBackend {
             htmlBase64 = Base64.getEncoder().encodeToString(html.toByteArray()),
         )
     }
+
+    override fun pageImageUrl(path: String?, title: String?): String {
+        val svg = """<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1200">""" +
+            """<rect width="100%" height="100%" fill="#f8f4e8"/></svg>"""
+        return "data:image/svg+xml;base64," + Base64.getEncoder().encodeToString(svg.toByteArray())
+    }
 }

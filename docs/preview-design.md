@@ -90,3 +90,16 @@ Latency note: each preview is a network round trip, hence debounce + a
 monotonic request generation so stale responses never overwrite newer ones.
 The sidecar caches one `WikiClient` per site so pywikibot setup/login is not
 paid per keystroke.
+
+## Reference image (transcription workflow)
+
+Proofreading is done against the page's scan, so the preview pane has a
+toolbar toggle (`ToggleReferenceImageAction` in `WtEditorWithPreview`) that
+swaps the rendered preview for the reference image. The image URL comes from
+`VfsBackend.pageImageUrl()`, which points at the sidecar's
+`GET /preview/page-image?path=…` — currently a **stub** returning a generated
+placeholder SVG labelled with the page title. The real implementation will
+resolve the scan through ProofreadPage (`prop=imageforpage`, or the Index's
+`File:` plus page number → thumbnail URL) and redirect/proxy to it; since the
+plugin only ever dereferences this URL inside JCEF, that swap needs no client
+change.

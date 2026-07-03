@@ -71,6 +71,18 @@ class WtRenderPreviewBrowser(
     @Volatile
     private var disposed = false
 
+    /**
+     * Proofread workflow: flips the pane between the rendered preview and the
+     * page's reference scan. Set from the toolbar toggle in [WtEditorWithPreview].
+     */
+    var showReferenceImage: Boolean = false
+        set(value) {
+            if (field != value) {
+                field = value
+                reloadPreview()
+            }
+        }
+
     init {
         val viewer: JComponent = jcefBrowser?.component ?: JBScrollPane(fallbackPane)
         component.add(viewer, BorderLayout.CENTER)
@@ -94,14 +106,21 @@ class WtRenderPreviewBrowser(
             return
         }
 
+        if (showReferenceImage) {
+            // Building the URL is local; JCEF fetches the image itself.
+            requestGeneration.incrementAndGet() // invalidate in-flight renders
+            showHtml(referenceImageHtml())
+            return
+        }
+
         val wikitext = readWikitext()
         val generation = requestGeneration.incrementAndGet()
 
         ApplicationManager.getApplication().executeOnPooledThread {
             val html = try {
                 shellHtml(WtVfsService.instance.backend.renderPreview(
-                    path = (file as? WtVirtualFile)?.path,
-                    title = if (file is WtVirtualFile) null else file.nameWithoutExtension,
+                    path = vfsPath(),
+                    title = fallbackTitle(),
                     wikitext = wikitext,
                 ))
             } catch (e: Exception) {
@@ -114,6 +133,26 @@ class WtRenderPreviewBrowser(
                 }
             }
         }
+    }
+
+    private fun vfsPath(): String? = (file as? WtVirtualFile)?.path
+
+    private fun fallbackTitle(): String? =
+        if (file is WtVirtualFile) null else file.nameWithoutExtension
+
+    private fun referenceImageHtml(): String {
+        val url = WtVfsService.instance.backend.pageImageUrl(vfsPath(), fallbackTitle())
+        return """
+            <!DOCTYPE html>
+            <html>
+            <head><meta charset="utf-8"></head>
+            <body style="margin: 0; background: #3c3f41; text-align: center;">
+            <img src="$url" alt="reference scan"
+                 style="max-width: 100%; height: auto; margin: 12px auto;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.5);">
+            </body>
+            </html>
+        """.trimIndent()
     }
 
     private fun readWikitext(): String {

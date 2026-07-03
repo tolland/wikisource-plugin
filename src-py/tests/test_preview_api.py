@@ -138,6 +138,35 @@ def test_render_no_sites_configured_404(engine):
         assert resp.status_code == 404
 
 
+def test_page_image_by_path_labels_placeholder_with_title(preview_client):
+    resp = preview_client.get(
+        "/preview/page-image",
+        params={"path": f"/{FAMILY}/{CODE}/{INDEX}/Pages/{PAGE}"},
+    )
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("image/svg+xml")
+    assert PAGE in resp.text
+
+
+def test_page_image_by_title(preview_client):
+    resp = preview_client.get("/preview/page-image", params={"title": "Page:X.pdf/1"})
+    assert resp.status_code == 200
+    assert "Page:X.pdf/1" in resp.text
+
+
+def test_page_image_escapes_title_for_svg(preview_client):
+    resp = preview_client.get(
+        "/preview/page-image", params={"title": 'Page:A&B <"quoted">.pdf/1'}
+    )
+    assert resp.status_code == 200
+    assert "Page:A&amp;B &lt;" in resp.text
+
+
+def test_page_image_needs_path_or_title(preview_client):
+    resp = preview_client.get("/preview/page-image")
+    assert resp.status_code == 422
+
+
 def test_render_wiki_failure_becomes_502(engine):
     class ExplodingClient(FakeWikiClient):
         def render_preview(self, title, wikitext, content_model=None):

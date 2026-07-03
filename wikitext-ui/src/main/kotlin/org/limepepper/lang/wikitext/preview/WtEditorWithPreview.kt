@@ -6,6 +6,7 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.actionSystem.ToggleAction
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.fileEditor.TextEditorWithPreview
 import com.intellij.openapi.fileEditor.TextEditorWithPreview.Layout
@@ -27,10 +28,31 @@ class WtEditorWithPreview(
     override fun createRightToolbarActionGroup(): ActionGroup {
         return DefaultActionGroup(
             listOf(
+                ToggleReferenceImageAction(wtPreviewEditor),
                 ReloadPreviewAction(wtPreviewEditor),
             ),
         )
     }
+}
+
+/**
+ * Proofread workflow: swap the preview pane between the rendered wikitext and
+ * the reference scan the transcription is being checked against.
+ */
+private class ToggleReferenceImageAction(
+    private val previewEditor: WtRenderPreviewBrowser,
+) : ToggleAction(
+    "Show Reference Image",
+    "Show the page scan instead of the rendered preview",
+    AllIcons.Actions.Preview,
+) {
+    override fun isSelected(event: AnActionEvent): Boolean = previewEditor.showReferenceImage
+
+    override fun setSelected(event: AnActionEvent, state: Boolean) {
+        previewEditor.showReferenceImage = state
+    }
+
+    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
 }
 
 private class ReloadPreviewAction(

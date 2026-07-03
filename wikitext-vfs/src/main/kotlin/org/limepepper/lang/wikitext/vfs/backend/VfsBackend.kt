@@ -37,4 +37,12 @@ interface VfsBackend {
      * local scratch files (parsed against the sidecar's first configured site).
      */
     fun renderPreview(path: String?, title: String?, wikitext: String): PreviewResult
+
+    /**
+     * URL of the reference scan image for a ProofreadPage Page: — the source
+     * the transcription is being proofread against. Building the URL is local
+     * and cheap; the image itself is fetched by whoever renders it (JCEF).
+     * Currently the sidecar serves a placeholder (see /preview/page-image).
+     */
+    fun pageImageUrl(path: String?, title: String?): String
 }

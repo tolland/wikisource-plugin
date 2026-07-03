@@ -137,6 +137,16 @@ class HttpVfsBackend(
         }
     }
 
+    override fun pageImageUrl(path: String?, title: String?): String {
+        val query = listOfNotNull(
+            path?.let { "path" to it },
+            title?.let { "title" to it },
+        ).joinToString("&") { (k, v) ->
+            "${URLEncoder.encode(k, "UTF-8")}=${URLEncoder.encode(v, "UTF-8")}"
+        }
+        return "$baseUrl/preview/page-image?$query"
+    }
+
     // -------------------------------------------------------------------------
 
     private fun get(endpoint: String, vararg params: Pair<String, String>): String {

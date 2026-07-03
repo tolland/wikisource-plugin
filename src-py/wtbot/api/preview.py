@@ -1,7 +1,9 @@
 import base64
 import threading
+from xml.sax.saxutils import escape
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
@@ -129,4 +131,56 @@ def render_preview(
         html_base64=base64.b64encode(rendered.html.encode()).decode("ascii"),
         server=rendered.server,
         script_path=rendered.script_path,
+    )
+
+
+# Page-ish aspect ratio so the pane's layout matches a real scan later.
+_PLACEHOLDER_W, _PLACEHOLDER_H = 800, 1200
+
+
+def _placeholder_svg(title: str) -> str:
+    label = escape(title)
+    return f"""<svg xmlns="http://www.w3.org/2000/svg"
+     width="{_PLACEHOLDER_W}" height="{_PLACEHOLDER_H}"
+     viewBox="0 0 {_PLACEHOLDER_W} {_PLACEHOLDER_H}">
+  <rect width="100%" height="100%" fill="#f8f4e8"/>
+  <rect x="8" y="8" width="{_PLACEHOLDER_W - 16}" height="{_PLACEHOLDER_H - 16}"
+        fill="none" stroke="#b0a890" stroke-width="2" stroke-dasharray="12 8"/>
+  <line x1="8" y1="8" x2="{_PLACEHOLDER_W - 8}" y2="{_PLACEHOLDER_H - 8}"
+        stroke="#e0d8c4" stroke-width="2"/>
+  <line x1="{_PLACEHOLDER_W - 8}" y1="8" x2="8" y2="{_PLACEHOLDER_H - 8}"
+        stroke="#e0d8c4" stroke-width="2"/>
+  <text x="50%" y="46%" text-anchor="middle"
+        font-family="sans-serif" font-size="28" fill="#6b6250">{label}</text>
+  <text x="50%" y="52%" text-anchor="middle"
+        font-family="sans-serif" font-size="20" fill="#8a8069">reference scan not available yet</text>
+</svg>
+"""
+
+
+@router.get("/page-image")
+def page_image(
+    path: str | None = None,
+    title: str | None = None,
+    session: Session = Depends(get_session),
+) -> Response:
+    """Reference scan image for a Page: (the transcription workflow's source).
+
+    Stub: always returns a generated placeholder SVG labelled with the page
+    title. The real implementation will resolve the scan through ProofreadPage
+    (``prop=imageforpage``, or the Index's File plus page number → thumbnail
+    URL) and redirect or proxy to it — the plugin only ever sees this URL, so
+    that swap needs no client change.
+    """
+    if path:
+        _, resolved_title, _ = _resolve_target(session, path)
+    elif title:
+        resolved_title = title
+    else:
+        raise HTTPException(status_code=422, detail="need either path or title")
+
+    return Response(
+        content=_placeholder_svg(resolved_title),
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "no-store"},  # stub today, real scan tomorrow
     )
