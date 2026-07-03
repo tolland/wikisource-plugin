@@ -4,6 +4,7 @@ from sqlmodel import Session, select
 
 from wtbot.model import EditJournal, FileBlob, Page, Site
 from wtbot.model.namespace import Namespace, NsRole
+from wtbot.model.page_meta import FileMeta, IndexMeta, PageMeta, default_short_name
 
 """PageStore — all SQL for the VFS layers.
 
@@ -135,6 +136,54 @@ class PageStore:
     def blob(self, file_page: Page) -> FileBlob | None:
         return self.session.exec(
             select(FileBlob).where(FileBlob.page_pk == file_page.pk)
+        ).first()
+
+    # -- per-role metadata extensions ---------------------------------------
+
+    def index_meta(self, page: Page) -> IndexMeta | None:
+        return self.session.exec(
+            select(IndexMeta).where(IndexMeta.page_pk == page.pk)
+        ).first()
+
+    def short_name_taken(self, site_pk: int, short_name: str) -> bool:
+        return (
+            self.session.exec(
+                select(IndexMeta).where(
+                    IndexMeta.site_pk == site_pk,
+                    IndexMeta.short_name == short_name,
+                )
+            ).first()
+            is not None
+        )
+
+    def ensure_index_meta(self, page: Page) -> IndexMeta:
+        """Fetch-or-create the IndexMeta row, deriving a default short_name
+        from the title. Defaults can collide within a site (same base name,
+        different extension), so a numeric suffix deconflicts — the user is
+        expected to rename to something friendlier anyway."""
+        existing = self.index_meta(page)
+        if existing is not None:
+            return existing
+        base = default_short_name(page.title)
+        short = base
+        n = 2
+        while self.short_name_taken(page.site_pk, short):
+            short = f"{base}_{n}"
+            n += 1
+        meta = IndexMeta(page_pk=page.pk, site_pk=page.site_pk, short_name=short)
+        self.session.add(meta)
+        self.session.commit()
+        self.session.refresh(meta)
+        return meta
+
+    def page_meta(self, page: Page) -> PageMeta | None:
+        return self.session.exec(
+            select(PageMeta).where(PageMeta.page_pk == page.pk)
+        ).first()
+
+    def file_meta(self, page: Page) -> FileMeta | None:
+        return self.session.exec(
+            select(FileMeta).where(FileMeta.page_pk == page.pk)
         ).first()
 
     # -- edit journal -----------------------------------------------------------

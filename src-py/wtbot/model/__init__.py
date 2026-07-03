@@ -12,6 +12,13 @@ from wtbot.model.fetch_request import FetchKind, FetchRequest, FetchStatus
 from wtbot.model.file_blob import FileBlob
 from wtbot.model.namespace import Namespace, NsRole, role_for_canonical
 from wtbot.model.page import FetchState, Page
+from wtbot.model.page_meta import (
+    FileMeta,
+    FileOrigin,
+    IndexMeta,
+    PageMeta,
+    default_short_name,
+)
 from wtbot.model.site import Site
 from wtbot.model.site_credential import SiteCredential
 from wtbot.model.transclusion import Transclusion
@@ -23,6 +30,11 @@ __all__ = [
     "role_for_canonical",
     "Page",
     "FetchState",
+    "IndexMeta",
+    "PageMeta",
+    "FileMeta",
+    "FileOrigin",
+    "default_short_name",
     "FileBlob",
     "Transclusion",
     "FetchRequest",

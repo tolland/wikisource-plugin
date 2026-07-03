@@ -15,6 +15,7 @@ from wtbot.api import (
     file_blob,
     health,
     namespace,
+    page_meta,
     pages,
     sites,
     vfs,
@@ -113,6 +114,7 @@ def create_app(
     app.include_router(file_blob.router)
     app.include_router(health.router)
     app.include_router(namespace.router)
+    app.include_router(page_meta.router)
     app.include_router(pages.router)
     app.include_router(sites.router)
     app.include_router(vfs.router)

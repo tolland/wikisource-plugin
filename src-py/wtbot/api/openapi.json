@@ -674,6 +674,192 @@
         "title": "FileBlob",
         "type": "object"
       },
+      "FileMeta": {
+        "description": "Provenance for File: pages.\n\nFor images cropped out of a scan page, the crop geometry (in source\nraster pixels) records where the image came from \u2014 which is also exactly\nthe input a templated-region batch OCR run iterates over, so it is\ncaptured from day one rather than reconstructed later.",
+        "properties": {
+          "crop_h": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Crop H"
+          },
+          "crop_w": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Crop W"
+          },
+          "crop_x": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Crop X"
+          },
+          "crop_y": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Crop Y"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/FileOrigin",
+            "default": "remote"
+          },
+          "page_pk": {
+            "title": "Page Pk",
+            "type": "integer"
+          },
+          "pk": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pk"
+          },
+          "source_page_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Page Number"
+          },
+          "source_page_pk": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Page Pk"
+          }
+        },
+        "required": [
+          "page_pk"
+        ],
+        "title": "FileMeta",
+        "type": "object"
+      },
+      "FileMetaUpdate": {
+        "properties": {
+          "crop_h": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Crop H"
+          },
+          "crop_w": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Crop W"
+          },
+          "crop_x": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Crop X"
+          },
+          "crop_y": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Crop Y"
+          },
+          "origin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FileOrigin"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source_page_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Page Number"
+          },
+          "source_page_pk": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Page Pk"
+          }
+        },
+        "title": "FileMetaUpdate",
+        "type": "object"
+      },
+      "FileOrigin": {
+        "enum": [
+          "remote",
+          "paste",
+          "ocr"
+        ],
+        "title": "FileOrigin",
+        "type": "string"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -685,6 +871,54 @@
           }
         },
         "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "IndexMeta": {
+        "description": "Curated per-Index metadata.\n\n`short_name` seeds generated child names \u2014\n``File:{short_name}_page_{page}_image_{n}.jpg`` \u2014 because the full Index\ntitle (spaces, punctuation, extension) makes miserable filenames.\n\nUnique per *site*, not globally: the common scenario is a local staging\ninstance synced back to upstream wikisource, so generated names must be\ncollision-free within the site they will be pushed to; the same work\nstaged for two sites may happily reuse one short name.",
+        "properties": {
+          "page_pk": {
+            "title": "Page Pk",
+            "type": "integer"
+          },
+          "pk": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pk"
+          },
+          "short_name": {
+            "title": "Short Name",
+            "type": "string"
+          },
+          "site_pk": {
+            "title": "Site Pk",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "page_pk",
+          "site_pk",
+          "short_name"
+        ],
+        "title": "IndexMeta",
+        "type": "object"
+      },
+      "IndexMetaUpdate": {
+        "properties": {
+          "short_name": {
+            "title": "Short Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "short_name"
+        ],
+        "title": "IndexMetaUpdate",
         "type": "object"
       },
       "IndexPageDetail": {
@@ -1254,6 +1488,169 @@
           "title"
         ],
         "title": "Page",
+        "type": "object"
+      },
+      "PageMeta": {
+        "description": "Per-Page: (scan page) source-image values, for showing the page scan\nand its thumbnail next to the transcription in the client.\n\nRemote URLs come from imageinfo/ProofreadPage at fetch time; local paths\nare filled by the (future) raster cache that extracts page N from the\nbacking DjVu/PDF into blob_root.",
+        "properties": {
+          "page_pk": {
+            "title": "Page Pk",
+            "type": "integer"
+          },
+          "pk": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pk"
+          },
+          "raster_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raster Path"
+          },
+          "source_image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Image Url"
+          },
+          "thumb_height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumb Height"
+          },
+          "thumb_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumb Path"
+          },
+          "thumb_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumb Url"
+          },
+          "thumb_width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumb Width"
+          }
+        },
+        "required": [
+          "page_pk"
+        ],
+        "title": "PageMeta",
+        "type": "object"
+      },
+      "PageMetaUpdate": {
+        "properties": {
+          "raster_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Raster Path"
+          },
+          "source_image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Image Url"
+          },
+          "thumb_height": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumb Height"
+          },
+          "thumb_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumb Path"
+          },
+          "thumb_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumb Url"
+          },
+          "thumb_width": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thumb Width"
+          }
+        },
+        "title": "PageMetaUpdate",
         "type": "object"
       },
       "PendingCommitJournal": {
@@ -2807,6 +3204,324 @@
         "summary": "Get Page",
         "tags": [
           "pages"
+        ]
+      }
+    },
+    "/pages/{page_pk}/file-meta": {
+      "get": {
+        "operationId": "get_file_meta_pages__page_pk__file_meta_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_pk",
+            "required": true,
+            "schema": {
+              "title": "Page Pk",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileMeta"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get File Meta",
+        "tags": [
+          "page-meta"
+        ]
+      },
+      "put": {
+        "operationId": "put_file_meta_pages__page_pk__file_meta_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_pk",
+            "required": true,
+            "schema": {
+              "title": "Page Pk",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FileMetaUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileMeta"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put File Meta",
+        "tags": [
+          "page-meta"
+        ]
+      }
+    },
+    "/pages/{page_pk}/index-meta": {
+      "get": {
+        "operationId": "get_index_meta_pages__page_pk__index_meta_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_pk",
+            "required": true,
+            "schema": {
+              "title": "Page Pk",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndexMeta"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Index Meta",
+        "tags": [
+          "page-meta"
+        ]
+      },
+      "put": {
+        "operationId": "put_index_meta_pages__page_pk__index_meta_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_pk",
+            "required": true,
+            "schema": {
+              "title": "Page Pk",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IndexMetaUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndexMeta"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Index Meta",
+        "tags": [
+          "page-meta"
+        ]
+      }
+    },
+    "/pages/{page_pk}/index-meta/ensure": {
+      "post": {
+        "operationId": "ensure_index_meta_pages__page_pk__index_meta_ensure_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_pk",
+            "required": true,
+            "schema": {
+              "title": "Page Pk",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndexMeta"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ensure Index Meta",
+        "tags": [
+          "page-meta"
+        ]
+      }
+    },
+    "/pages/{page_pk}/page-meta": {
+      "get": {
+        "operationId": "get_page_meta_pages__page_pk__page_meta_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_pk",
+            "required": true,
+            "schema": {
+              "title": "Page Pk",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageMeta"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Page Meta",
+        "tags": [
+          "page-meta"
+        ]
+      },
+      "put": {
+        "operationId": "put_page_meta_pages__page_pk__page_meta_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "page_pk",
+            "required": true,
+            "schema": {
+              "title": "Page Pk",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PageMetaUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PageMeta"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Page Meta",
+        "tags": [
+          "page-meta"
         ]
       }
     },
