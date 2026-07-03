@@ -375,8 +375,11 @@ calls `run_pending` *inline*, so one HTTP call does enqueue → drain → write-
 pywikibot itself). `run_pending` is deliberately transport-agnostic so the same
 function backs a future background loop / `wtbot worker` command without change.
 
-Concurrency uses the documented SQLite discipline: WAL, `busy_timeout=5000`,
-`BEGIN IMMEDIATE` for every write — on both the Python and Kotlin sides.
+Concurrency uses the documented SQLite discipline: WAL and `busy_timeout=5000`
+on every connection. (An earlier rule additionally forced `BEGIN IMMEDIATE` on
+every transaction so the write lock was held for the whole request; holding the
+lock across request handling proved unreliable and was reverted to the driver's
+normal deferred locking — under WAL, readers need no lock at all.)
 
 The wiki call goes through the injectable `client_factory` on `app.state`, so
 tests drive the whole endpoint with a `FakeWikiClient` and no network.

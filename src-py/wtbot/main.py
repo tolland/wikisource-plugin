@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 from sqlalchemy.engine import Engine
+from sqlmodel import Session, select
 
 from wtbot.api import (
     commit as commit_api,
@@ -22,7 +23,7 @@ from wtbot.api import (
     viewer,
 )
 from wtbot.db import create_db_engine, init_db
-from wtbot.model import Site
+from wtbot.model import Site, SiteCredential
 from wtbot.settings import WikiSettings
 from wtbot.wiki.client import WikiClient, get_wiki_client
 from wtbot.worker import ClientFactory
@@ -60,22 +61,20 @@ def custom_openapi():
 
 def _make_db_client_factory(engine) -> ClientFactory:
     """Returns a ClientFactory that looks up SiteCredential from the DB
-    before falling back to an anonymous WikiSettings.
-
-    Uses AUTOCOMMIT for the credential SELECT so this never contends with the
-    BEGIN IMMEDIATE write lock held by the enclosing run_pending_commits session."""
+    before falling back to an anonymous WikiSettings."""
 
     def _factory(site: Site) -> WikiClient:
-        # AUTOCOMMIT bypasses the BEGIN IMMEDIATE engine event, so this read is
-        # safe to call from inside an active write session without deadlocking.
-        with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
-            row = conn.exec_driver_sql(
-                "SELECT username, password, bot_name FROM sitecredential WHERE site_pk = ?",
-                (site.pk,),
-            ).fetchone()
+        with Session(engine) as session:
+            cred = session.exec(
+                select(SiteCredential).where(SiteCredential.site_pk == site.pk)
+            ).first()
         overrides: dict = {}
-        if row:
-            overrides = dict(username=row[0], password=row[1], bot_name=row[2])
+        if cred:
+            overrides = dict(
+                username=cred.username,
+                password=cred.password,
+                bot_name=cred.bot_name,
+            )
         return get_wiki_client(WikiSettings.from_site(site, **overrides))
 
     return _factory

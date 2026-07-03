@@ -91,8 +91,8 @@ def _claim_next(session: Session) -> _ClaimedFetchRequest | None:
         session.commit()
         return claimed
     finally:
-        # A SELECT opens BEGIN IMMEDIATE in this app. The worker must not carry
-        # that transaction into pywikibot network calls.
+        # The worker must not carry an open transaction into pywikibot
+        # network calls.
         session.rollback()
 
 

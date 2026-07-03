@@ -72,12 +72,12 @@ PRAGMA journal_mode = WAL;
 PRAGMA busy_timeout = 5000;
 ```
 
-Writes must use `BEGIN IMMEDIATE` (not bare `BEGIN`) on both sides. The `FetchRequest` table is the job queue: the plugin inserts rows, pywikibot updates `status` as it works, child requests fan out from parent requests via `parent_pk`. The `Commit` table is the outbound log for edits pushed back to the wiki; `EditJournal` is the local per-save transaction log.
+Transaction handling is the driver's normal deferred style — an earlier eager `BEGIN IMMEDIATE`-on-every-transaction rule held the write lock across whole requests, proved unreliable, and was reverted. The `FetchRequest` table is the job queue: the plugin inserts rows, pywikibot updates `status` as it works, child requests fan out from parent requests via `parent_pk`. The `Commit` table is the outbound log for edits pushed back to the wiki; `EditJournal` is the local per-save transaction log.
 
 ### Python sidecar (`wtbot`)
 
 - `src-py/wtbot/main.py` — FastAPI app factory (`create_app`)
-- `src-py/wtbot/db.py` — SQLite engine + WAL/`BEGIN IMMEDIATE` pragma discipline
+- `src-py/wtbot/db.py` — SQLite engine + WAL/busy-timeout pragma discipline
 - `src-py/wtbot/sqlmodel/` — SQLModel ORM models, the **single source of truth** for the schema (`Site`, `Namespace`, `Page`, `Transclusion`, `FetchRequest`, `EditJournal`, `Commit`)
 - `src-py/wtbot/api/` — FastAPI routers (`health`, `sites`, …)
 - `src-py/DESIGN.md` — backend operations & data-model design

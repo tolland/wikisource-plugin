@@ -142,8 +142,8 @@ def _claim_next_page(session: Session, *, exclude: set[int]) -> int | None:
                 return page_pk
         return None
     finally:
-        # Even this read starts BEGIN IMMEDIATE in this application. End it
-        # before any later wiki/client work can happen.
+        # End the session's transaction so no state is carried into the
+        # wiki/client work that follows.
         session.rollback()
 
 
@@ -169,9 +169,9 @@ def _load_pending_page_commit(
 ) -> _PendingPageCommit | _OrphanedPendingPage | None:
     """Load and detach the exact local journal batch that will be pushed.
 
-    The session is always rolled back before returning. In this codebase a
-    SELECT opens ``BEGIN IMMEDIATE``, so keeping ORM objects attached while
-    calling the wiki would keep SQLite's write lock for the whole network call.
+    The session is always rolled back before returning: the push that
+    follows is a slow network call, and it must work from an immutable
+    snapshot rather than live ORM objects attached to an open transaction.
     """
     try:
         page = session.get(Page, page_pk)

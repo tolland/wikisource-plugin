@@ -1,12 +1,3 @@
-"""SQLite engine wiring and the IPC pragma discipline.
-
-Both processes that touch ``database.db`` (this backend and the IntelliJ plugin)
-must use WAL, a busy timeout, and ``BEGIN IMMEDIATE`` for writes. We enforce all
-three here for the Python side via SQLAlchemy connection events.
-"""
-
-import logging
-import time
 from collections.abc import Iterator
 
 from sqlalchemy import event
@@ -16,8 +7,20 @@ from sqlmodel import Session, SQLModel, create_engine
 # Importing the models registers them on SQLModel.metadata so create_all works.
 import wtbot.model  # noqa: F401
 
-logging.basicConfig()
-dblogger = logging.getLogger("sqlite-lock-debug")
+"""SQLite engine wiring and pragma discipline.
+
+Every connection gets WAL, a busy timeout, and foreign keys. Transaction
+handling is the driver's normal style: reads run in autocommit, and the
+write lock is taken when a write statement actually executes.
+
+An earlier iteration forced ``BEGIN IMMEDIATE`` on *every* transaction so
+the write lock was held from the first SELECT of a request to its commit.
+That proved unreliable — any second session (a concurrent request, a worker
+loop, a test fixture) stalled on ``busy_timeout`` behind a lock the holder
+mostly used for reading, and the workers/tests grew rollback and AUTOCOMMIT
+workarounds to escape it. Under WAL, readers need no lock at all, so the
+eager write lock bought nothing for the read-heavy VFS traffic.
+"""
 
 DEFAULT_SQLITE_URL = "sqlite:///database.db"
 
@@ -32,34 +35,11 @@ def create_db_engine(url: str = DEFAULT_SQLITE_URL, *, echo: bool = False) -> En
 
     @event.listens_for(engine, "connect")
     def _on_connect(dbapi_conn, _record):  # noqa: ANN001
-        # Disable pysqlite's implicit transaction handling so we control BEGIN
-        # ourselves (and can make it IMMEDIATE below).
-        dbapi_conn.isolation_level = None
         cur = dbapi_conn.cursor()
         cur.execute("PRAGMA journal_mode=WAL")
         cur.execute("PRAGMA busy_timeout=5000")
         cur.execute("PRAGMA foreign_keys=ON")
         cur.close()
-
-    @event.listens_for(engine, "begin")
-    def _on_begin(conn):  # noqa: ANN001
-        conn.info["tx_start_time"] = time.monotonic()
-        dblogger.debug("BEGIN conn=%s", id(conn))
-        # IMMEDIATE takes the write lock up front, matching the Kotlin side and
-        # avoiding the deferred-to-write upgrade deadlock under concurrency.
-        conn.exec_driver_sql("BEGIN IMMEDIATE")
-
-    @event.listens_for(Engine, "commit")
-    def on_commit(conn):
-        started = conn.info.pop("tx_start_time", None)
-        elapsed = time.monotonic() - started if started else None
-        dblogger.debug("COMMIT conn=%s elapsed=%s", id(conn), elapsed)
-
-    @event.listens_for(Engine, "rollback")
-    def on_rollback(conn):
-        started = conn.info.pop("tx_start_time", None)
-        elapsed = time.monotonic() - started if started else None
-        dblogger.debug("ROLLBACK conn=%s elapsed=%s", id(conn), elapsed)
 
     return engine
 

@@ -94,9 +94,8 @@ def test_ensure_index_meta_same_default_ok_across_sites(session):
 
 @pytest.fixture
 def seeded(engine):
-    # The session must be closed before requests run: the client opens its
-    # own BEGIN IMMEDIATE sessions and a lingering fixture session holds the
-    # SQLite write lock.
+    # Close the seeding session before requests run — fixtures must not
+    # hold a transaction open while the client's own sessions do work.
     with Session(engine) as s:
         site = _seed_site(s)
         index = _seed_index(s, site)
