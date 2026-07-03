@@ -106,17 +106,13 @@ def test_overlay_index_children_follow_subpage_flag(session, site):
     """With subpages disabled, a subpage-only asset disappears from the
     Index dir, but an asset explicitly linked via index_title stays."""
     _add_index_namespace(session, site, subpages=False)
-    names = [
-        c.name for c in WikisourceVfs(session).list_children(_INDEX_PATH).children
-    ]
+    names = [c.name for c in WikisourceVfs(session).list_children(_INDEX_PATH).children]
     assert "styles.css" in names  # linked via index_title
     assert "legacy.css" not in names  # subpage-only
 
 
 def test_overlay_index_children_include_subpages_when_enabled(session, site):
     _add_index_namespace(session, site, subpages=True)
-    names = [
-        c.name for c in WikisourceVfs(session).list_children(_INDEX_PATH).children
-    ]
+    names = [c.name for c in WikisourceVfs(session).list_children(_INDEX_PATH).children]
     assert "styles.css" in names
     assert "legacy.css" in names

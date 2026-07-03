@@ -8,3 +8,4 @@ Use:
 
 ```bash
 GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew <task>
+```

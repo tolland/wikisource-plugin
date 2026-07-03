@@ -42,8 +42,7 @@ def _seed_index(session: Session, site: Site, title: str = INDEX) -> Page:
 
 def test_default_short_name_tractatus():
     assert (
-        default_short_name(INDEX)
-        == "Wittgenstein-Tractatus_Logico-Philosophicus_1922"
+        default_short_name(INDEX) == "Wittgenstein-Tractatus_Logico-Philosophicus_1922"
     )
 
 
@@ -156,9 +155,7 @@ def test_index_meta_put_conflict_within_site(client, seeded):
 
 
 def test_index_meta_rejected_for_non_index(client, seeded):
-    r = client.put(
-        f"/pages/{seeded['page_pk']}/index-meta", json={"short_name": "X"}
-    )
+    r = client.put(f"/pages/{seeded['page_pk']}/index-meta", json={"short_name": "X"})
     assert r.status_code == 400
 
 

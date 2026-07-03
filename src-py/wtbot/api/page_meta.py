@@ -69,9 +69,7 @@ def _require_index_page(session: Session, page_pk: int) -> Page:
 
 
 @router.get("/{page_pk}/index-meta", response_model=IndexMeta)
-def get_index_meta(
-    page_pk: int, session: Session = Depends(get_session)
-) -> IndexMeta:
+def get_index_meta(page_pk: int, session: Session = Depends(get_session)) -> IndexMeta:
     page = _require_index_page(session, page_pk)
     meta = PageStore(session).index_meta(page)
     if meta is None:
@@ -101,9 +99,9 @@ def put_index_meta(
         )
     store = PageStore(session)
     meta = store.index_meta(page)
-    if (meta is None or meta.short_name != update.short_name) and store.short_name_taken(
-        page.site_pk, update.short_name
-    ):
+    if (
+        meta is None or meta.short_name != update.short_name
+    ) and store.short_name_taken(page.site_pk, update.short_name):
         raise HTTPException(
             status_code=409,
             detail=f"short_name already in use on this site: {update.short_name}",

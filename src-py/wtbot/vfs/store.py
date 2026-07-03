@@ -120,9 +120,7 @@ class PageStore:
         """Pages whose title starts with [prefix], case-sensitively. SQLite's
         LIKE is ASCII-case-insensitive, so it serves as the coarse index scan
         and Python refines to the exact prefix."""
-        escaped = (
-            prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-        )
+        escaped = prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         rows = self.session.exec(
             select(Page)
             .where(

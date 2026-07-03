@@ -191,7 +191,9 @@ def resolve(store: PageStore, raw_path: str) -> WsNode:
     joined = "/".join(rest)
     if joined.startswith("File:"):
         file_page = store.page(site, joined)
-        return FileDir(path, site, file_page) if file_page is not None else Missing(path)
+        return (
+            FileDir(path, site, file_page) if file_page is not None else Missing(path)
+        )
 
     # Index-namespace subpage asset
     asset = store.page(site, f"{index_title}/{joined}")

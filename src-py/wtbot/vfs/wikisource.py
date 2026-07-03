@@ -93,7 +93,9 @@ class WikisourceVfs:
             case Missing(path):
                 return Stat(path=path.raw, exists=False)
             case RootDir(path):
-                return Stat(path=path.raw, exists=True, name="/", kind=NodeKind.directory)
+                return Stat(
+                    path=path.raw, exists=True, name="/", kind=NodeKind.directory
+                )
             case SiteDir(path, site):
                 return Stat(
                     path=path.raw,
@@ -109,17 +111,23 @@ class WikisourceVfs:
                     kind=NodeKind.directory,
                     stable_id=index.pageid,
                     revid=index.revid,
-                    timestamp=ts_millis(index.local_modified_at or index.remote_timestamp),
+                    timestamp=ts_millis(
+                        index.local_modified_at or index.remote_timestamp
+                    ),
                     content_model=index.content_model,
                 )
             case IndexWikitext(path, _, index):
                 return self.mw.stat_page(path.raw, index, name="wikitext")
             case PagesDir(path):
-                return Stat(path=path.raw, exists=True, name="Pages", kind=NodeKind.directory)
+                return Stat(
+                    path=path.raw, exists=True, name="Pages", kind=NodeKind.directory
+                )
             case PageLeaf(path, _, page):
                 return self.mw.stat_page(path.raw, page, name=page.title)
             case StubDir(path, name):
-                return Stat(path=path.raw, exists=True, name=name, kind=NodeKind.directory)
+                return Stat(
+                    path=path.raw, exists=True, name=name, kind=NodeKind.directory
+                )
             case FileDir(path, _, file_page):
                 return Stat(
                     path=path.raw,
@@ -238,7 +246,9 @@ class WikisourceVfs:
         file_page = self.store.page(site, file_title)
         if file_page is not None:
             children.append(
-                _dir_node(f"{parent}/{file_title}", file_title, stable_id=file_page.pageid)
+                _dir_node(
+                    f"{parent}/{file_title}", file_title, stable_id=file_page.pageid
+                )
             )
 
         for asset in self._index_assets(site, index):
@@ -274,7 +284,9 @@ class WikisourceVfs:
             ],
         )
 
-    def _file_dir_children(self, path: WikiPath, file_page: Page) -> ListChildrenResponse:
+    def _file_dir_children(
+        self, path: WikiPath, file_page: Page
+    ) -> ListChildrenResponse:
         parent = path.normalized
         return ListChildrenResponse(
             parent_path=parent,
