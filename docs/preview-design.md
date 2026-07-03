@@ -120,9 +120,20 @@ toggle/reload; image: toggle/zoom in/out/reset zoom/send-to-OCR stub), and the
 text editor gets `WtPageNavToolbar` as its header component with previous/next
 page stubs for walking the index. The image URL comes from
 `VfsBackend.pageImageUrl()`, which points at the sidecar's
-`GET /preview/page-image?path=…` — currently a **stub** returning a generated
-placeholder SVG labelled with the page title. The real implementation will
-resolve the scan through ProofreadPage (`prop=imageforpage`, or the Index's
-`File:` plus page number → thumbnail URL) and redirect/proxy to it; since the
-plugin only ever dereferences this URL inside JCEF, that swap needs no client
-change.
+`GET /preview/page-image?path=…`. The endpoint serves the real scan raster by
+**proxying** it (a proxy rather than a redirect so a dead upstream URL can
+degrade to the placeholder instead of a broken image in JCEF):
+
+1. the cached `PageMeta` URL (populated at fetch time by
+   `ProofreadPageProcessor` from `prop=imageforpage`);
+2. if that is missing or its fetch fails — older sources often have the
+   backing `File:` deleted or replaced with one of a different page count —
+   one fail-fast `imageforpage` lookup for a fresh URL, persisted back to
+   `PageMeta` on success;
+3. otherwise a placeholder SVG labelled with the page title.
+
+Worst case is three single-shot requests (image, API lookup, image), each
+with its own timeout and **no retries** — a missing scan costs one round of
+that per toggle, never a retry loop. Successful proxied images carry
+`Cache-Control: private, max-age=600` so mode toggles don't refetch
+megabytes; the placeholder is `no-store`.
