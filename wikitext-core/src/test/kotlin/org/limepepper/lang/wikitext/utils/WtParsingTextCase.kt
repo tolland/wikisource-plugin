@@ -18,7 +18,9 @@ abstract class WtParsingTextCase : ParsingTestCase(
 
 
             val output = toParseTreeText(myFile, skipSpaces(), includeRanges())
-            println(output)
+
+            // @TODO want to be able to output parsing tokens
+            // println(output)
 
             checkResult("$name.parse", myFile)
             ensureNoErrorElements()

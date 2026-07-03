@@ -25,7 +25,7 @@ and ``download_file`` are all the fetch path needs. Two implementations:
 """
 
 
-logging.basicConfig(level=logging.DEBUG)
+# logging.basicConfig(level=logging.DEBUG)
 
 
 def _https(url: str | None) -> str | None:

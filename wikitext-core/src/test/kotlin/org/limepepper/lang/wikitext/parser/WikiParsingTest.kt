@@ -30,29 +30,6 @@ class WikiParsingTest : WtParsingTextCase() {
         return true
     }
 
-    fun testNestNestedParsing() {
-        val content = """
-            {{ph|class=_test|{{sc|nest this in a another template}}}}
-
-        """.trimIndent()
-        val myFile = parseFile(
-            "randomFile",
-            content
-        )
-        println(toParseTreeText(myFile, true, includeRanges()))
-    }
-
-    fun testSimpleTemplateParsing() {
-        val content = """
-            {{sc|This is rendered in small caps}}
-        """.trimIndent()
-        val myFile = parseFile(
-            "randomFile",
-            content
-        )
-        println(toParseTreeText(myFile, true, includeRanges()))
-    }
-
     fun testSourceTestParsing() {
         val content = """
 
@@ -77,7 +54,6 @@ class WikiParsingTest : WtParsingTextCase() {
             "randomFile",
             content
         )
-        println(toParseTreeText(myFile, true, includeRanges()))
     }
 
 }

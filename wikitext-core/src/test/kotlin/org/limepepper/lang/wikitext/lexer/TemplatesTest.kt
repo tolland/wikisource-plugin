@@ -19,7 +19,6 @@ class TemplatesTest {
         """.trimIndent()
 
         val tokens = LexerTestUtils.tokenize(content, WtLexer()).filter { it.type != TokenType.WHITE_SPACE }
-        LexerTestUtils.printTokens(tokens)
 
         assertTrue(tokens.none { it.type == TokenType.BAD_CHARACTER })
         assertEquals(WtTypes.TEMPLATE_OPEN, tokens[0].type)
@@ -32,11 +31,10 @@ class TemplatesTest {
         val content = """
             {{ph|class=_test|{{sc|nest this in a another template}}
             }}
-            
+
         """.trimIndent()
 
         val tokens = LexerTestUtils.tokenize(content, WtLexer()).filter { it.type != TokenType.WHITE_SPACE }
-        LexerTestUtils.printTokens(tokens)
 
         assertTrue(tokens.none { it.type == TokenType.BAD_CHARACTER })
         assertEquals(WtTypes.TEMPLATE_OPEN, tokens[0].type)

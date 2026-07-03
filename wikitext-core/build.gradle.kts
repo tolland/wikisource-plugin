@@ -49,7 +49,7 @@ tasks {
     }
 
     test {
-        systemProperty("LEXER_DEBUG", "true")
+        // systemProperty("LEXER_DEBUG", "true")
         this.testLogging {
             this.showStandardStreams = true
         }

@@ -1,10 +1,13 @@
 package org.limepepper.lang.wikitext.utils
 
 import com.intellij.lexer.Lexer
+import com.intellij.openapi.diagnostic.logger
 import com.intellij.psi.TokenType.WHITE_SPACE
 import com.intellij.psi.tree.IElementType
 import org.limepepper.lang.wikitext.lexer.WtLexer
 import kotlin.test.assertEquals
+
+private val LEXER_LOG = logger<LexerTestUtils>()
 
 data class TokenInfo(
     val type: IElementType,
