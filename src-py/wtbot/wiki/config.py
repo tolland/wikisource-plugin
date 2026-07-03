@@ -45,6 +45,14 @@ def configure_pywikibot(settings: WikiSettings) -> str:
 
     pwbconfig.base_dir = config_dir
 
+    # Retry policy (see WikiSettings): fail fast instead of pywikibot's
+    # default 15 retries with exponential backoff. Every failure mode we have
+    # actually hit -- missing token turning into rate limiting, a VCR cassette
+    # rejecting an unrecorded request, a dead local service -- was a bug that
+    # backoff only hid; a genuinely flaky link can raise these via env.
+    pwbconfig.max_retries = settings.max_retries
+    pwbconfig.retry_wait = settings.retry_wait
+
     if not hasattr(pwbconfig, "_wtbot_throttle_set"):
         pwbconfig.put_throttle = 1
         pwbconfig._wtbot_throttle_set = True

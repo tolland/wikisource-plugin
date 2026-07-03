@@ -22,6 +22,15 @@ class WikiSettings:
     ca_bundle: str | None = None  # CA cert for a self-signed local wiki (.lan)
     config_dir: str | None = None  # PYWIKIBOT_DIR; ephemeral temp dir if None
 
+    # Retry policy for wiki HTTP requests (applied to pywikibot's global
+    # max_retries/retry_wait). Fail-fast by default: repeated failures against
+    # a wiki are more often our bug (e.g. missing token -> rate limited) than a
+    # flaky network, and sitting in exponential backoff hides that. The knobs
+    # stay configurable (WTBOT_WIKI_MAX_RETRIES / WTBOT_WIKI_RETRY_WAIT) for
+    # genuinely unreliable links or future chaos testing.
+    max_retries: int = 0
+    retry_wait: float = 1.0
+
     @classmethod
     def from_env(cls, env: dict[str, str] | None = None) -> "WikiSettings":
         e = env if env is not None else os.environ
@@ -34,6 +43,8 @@ class WikiSettings:
             bot_name=e.get("WTBOT_WIKI_BOTNAME") or None,
             ca_bundle=e.get("WTBOT_WIKI_CA_BUNDLE") or None,
             config_dir=e.get("WTBOT_PWB_DIR") or None,
+            max_retries=int(e.get("WTBOT_WIKI_MAX_RETRIES", "0")),
+            retry_wait=float(e.get("WTBOT_WIKI_RETRY_WAIT", "1")),
         )
 
     @classmethod
@@ -53,6 +64,8 @@ class WikiSettings:
             # No credential fallback to env -- callers pass them as overrides
             ca_bundle=env.ca_bundle,
             config_dir=env.config_dir,
+            max_retries=env.max_retries,
+            retry_wait=env.retry_wait,
         )
         base.update(overrides)
         return cls(**base)

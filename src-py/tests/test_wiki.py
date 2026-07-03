@@ -85,6 +85,39 @@ class TestConfigInjection:
         assert os.environ["PYWIKIBOT_NO_USER_CONFIG"] == "1"
         assert os.environ["REQUESTS_CA_BUNDLE"] == str(tmp_path / "ca.pem")
 
+    def test_configure_applies_fail_fast_retry_policy(self, tmp_path):
+        """Default policy is no retries: repeated failures are more likely our
+        bug (missing token -> rate limited) than a flaky network, and backoff
+        just hides them. The knobs stay adjustable for chaos testing later."""
+        import pywikibot.config as pwbconfig
+
+        from wtbot.wiki.config import configure_pywikibot
+
+        configure_pywikibot(
+            WikiSettings(family="w", code="en", config_dir=str(tmp_path / "a"))
+        )
+        assert pwbconfig.max_retries == 0
+        assert pwbconfig.retry_wait == 1.0
+
+        configure_pywikibot(
+            WikiSettings(
+                family="w",
+                code="en",
+                config_dir=str(tmp_path / "b"),
+                max_retries=3,
+                retry_wait=2.5,
+            )
+        )
+        assert pwbconfig.max_retries == 3
+        assert pwbconfig.retry_wait == 2.5
+
+    def test_retry_policy_from_env(self):
+        env = {"WTBOT_WIKI_MAX_RETRIES": "5", "WTBOT_WIKI_RETRY_WAIT": "0.5"}
+        settings = WikiSettings.from_env(env)
+        assert settings.max_retries == 5
+        assert settings.retry_wait == 0.5
+        assert WikiSettings.from_env({}).max_retries == 0
+
     def test_configure_points_password_file_and_writes_user_config(self, tmp_path):
         import pywikibot.config as pwbconfig
 
