@@ -63,6 +63,12 @@ private class ToggleReferenceImageAction(
         previewEditor.showReferenceImage = state
     }
 
+    override fun update(event: AnActionEvent) {
+        super.update(event)
+        // Only proofread-page has a scan to toggle to.
+        event.presentation.isVisible = previewEditor.profile.hasReferenceImage
+    }
+
     override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
 }
 

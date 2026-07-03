@@ -17,12 +17,14 @@ class WtPreviewEditorProvider : FileEditorProvider, DumbAware {
 
     override fun createEditor(project: Project, file: VirtualFile): FileEditor {
         val textEditor = TextEditorProvider.getInstance().createEditor(project, file) as TextEditor
-        val previewEditor = WtRenderPreviewBrowser(file)
+        val profile = WtEditorProfile.forFile(file)
+        val previewEditor = WtRenderPreviewBrowser(file, profile)
 
-        return WtEditorWithPreview(
-            textEditor,
-            previewEditor,
-        )
+        return when (profile) {
+            WtEditorProfile.PROOFREAD_PAGE -> WtProofreadPageEditor(textEditor, previewEditor)
+            WtEditorProfile.PROOFREAD_INDEX -> WtProofreadIndexEditor(textEditor, previewEditor)
+            WtEditorProfile.WIKITEXT -> WtWikitextEditor(textEditor, previewEditor)
+        }
     }
 
     override fun getEditorTypeId(): String = EDITOR_TYPE_ID

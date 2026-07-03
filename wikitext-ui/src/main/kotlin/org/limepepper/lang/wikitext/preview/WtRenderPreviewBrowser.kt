@@ -40,6 +40,8 @@ private val PREVIEW_LOG = logger<WtRenderPreviewBrowser>()
  */
 class WtRenderPreviewBrowser(
     private val file: VirtualFile,
+    /** Drives which toolbar actions the pane offers (reference image, …). */
+    val profile: WtEditorProfile = WtEditorProfile.WIKITEXT,
 ) : UserDataHolderBase(), FileEditor, Disposable {
     private val component = JBPanel<JBPanel<*>>(BorderLayout())
 
@@ -73,10 +75,14 @@ class WtRenderPreviewBrowser(
 
     /**
      * Proofread workflow: flips the pane between the rendered preview and the
-     * page's reference scan. Set from the toggle in [WtPreviewToolbar].
+     * page's reference scan. Set from the toggle in [WtPreviewToolbar]; only
+     * profiles with a reference image (proofread-page) can turn it on.
      */
     var showReferenceImage: Boolean = false
         set(value) {
+            if (value && !profile.hasReferenceImage) {
+                return
+            }
             if (field != value) {
                 field = value
                 reloadPreview()

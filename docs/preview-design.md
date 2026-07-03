@@ -91,6 +91,24 @@ monotonic request generation so stale responses never overwrite newer ones.
 The sidecar caches one `WikiClient` per site so pywikibot setup/login is not
 paid per keystroke.
 
+## Editor selection by content model
+
+`WtPreviewEditorProvider` picks the split-editor subclass from the file's
+MediaWiki content model via `WtEditorProfile.forFile()` (backed by
+`WtVirtualFile.contentModel` / `WtContentModel`):
+
+| content model     | editor                   | reference image | page nav | notes |
+|-------------------|--------------------------|-----------------|----------|-------|
+| `proofread-page`  | `WtProofreadPageEditor`  | yes             | yes      | `<noinclude>` header/footer convention must survive round trips (buffer holds the serialized form verbatim today; three-field editing is future work) |
+| `proofread-index` | `WtProofreadIndexEditor` | no              | no       | body renders through `{{:MediaWiki:Proofreadpage_index_template}}` — already reflected in the preview since the sidecar passes the content model to `action=parse` |
+| anything else     | `WtWikitextEditor`       | no              | no       | unrestricted fallback (also all local scratch files, which carry no content model) |
+
+The subclasses are deliberately thin stubs: shared wiring stays in the sealed
+`WtEditorWithPreview` base, and each subclass is the anchor point where
+per-model behavior will grow. The profile also gates the preview toolbar
+(no reference-image toggle where there is no scan) and the editor header's
+page-navigation row.
+
 ## Reference image (transcription workflow)
 
 Proofreading is done against the page's scan, so the preview pane can swap
