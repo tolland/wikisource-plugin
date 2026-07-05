@@ -14,7 +14,7 @@ KNOWN_DEBUG_ROUTE_TAGS = frozenset({"preview", "vfs"})
 class LoggingConfig:
     root_level: int = logging.INFO
     sqlalchemy_echo: bool | str = False
-    trace_all_debug_routes: bool = True
+    trace_all_debug_routes: bool = False
     trace_debug_route_tags: Iterable[str] = field(default_factory=frozenset)
     body_limit_bytes: int = 131072
 
