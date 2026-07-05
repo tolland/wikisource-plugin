@@ -2,6 +2,7 @@ package org.limepepper.lang.wikitext.preview
 
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.editor.event.DocumentEvent
 import com.intellij.openapi.editor.event.DocumentListener
@@ -115,11 +116,13 @@ class WtRenderPreviewBrowser(
         component.add(viewer, BorderLayout.CENTER)
         reloadPreview()
 
-        FileDocumentManager.getInstance().getDocument(file)?.addDocumentListener(object : DocumentListener {
-            override fun documentChanged(event: DocumentEvent) {
-                scheduleReload()
-            }
-        }, this)
+        ReadAction.run<RuntimeException> {
+            FileDocumentManager.getInstance().getDocument(file)?.addDocumentListener(object : DocumentListener {
+                override fun documentChanged(event: DocumentEvent) {
+                    scheduleReload()
+                }
+            }, this)
+        }
     }
 
     private fun scheduleReload() {
@@ -182,10 +185,16 @@ class WtRenderPreviewBrowser(
         """.trimIndent()
     }
 
-    private fun readWikitext(): String {
-        val document = FileDocumentManager.getInstance().getDocument(file)
-        return document?.text ?: VfsUtilCore.loadText(file)
-    }
+    /**
+     * Runs in an explicit read action: callers include the Swing debounce
+     * [Timer], which fires on the EDT but — like any raw Swing callback on a
+     * modern platform — without the implicit read lock that IDE actions get.
+     */
+    private fun readWikitext(): String =
+        ReadAction.compute<String, RuntimeException> {
+            val document = FileDocumentManager.getInstance().getDocument(file)
+            document?.text ?: VfsUtilCore.loadText(file)
+        }
 
     private fun showHtml(html: String) {
         val browser = jcefBrowser
