@@ -3,16 +3,15 @@ import logging
 import threading
 from xml.sax.saxutils import escape
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from wtbot.api.debug_loggig_route import DebugLoggingRoute
+from wtbot.api.page_image import serve_scan_image
 from wtbot.deps import get_session
 from wtbot.model import Page, Site
-from wtbot.model.page_meta import PageMeta
-from wtbot.page_processors import _store_page_images
 from wtbot.settings import WikiSettings
 from wtbot.wiki.client import WikiClient
 from wtbot.wiki.wiki_types import RemotePageImages
@@ -49,8 +48,8 @@ def _parse_path(path: str) -> list[str]:
     return [s for s in path.strip("/").split("/") if s]
 
 
-def _resolve_target(session: Session, path: str) -> tuple[Site, str, Page | None]:
-    """Map a VFS path to (site, page title, cached Page row or None).
+def _resolve_target(session: Session, path: str) -> tuple[Site, str, str | None]:
+    """Map a VFS path to (site, page title, content model).
 
     Mirrors the path shapes served by wtbot.api.vfs. The title is derived from
     the path even when the page isn't cached yet, so a preview works before the
@@ -83,7 +82,7 @@ def _resolve_target(session: Session, path: str) -> tuple[Site, str, Page | None
     page = session.exec(
         select(Page).where(Page.site_pk == site.pk, Page.title == title)
     ).first()
-    return site, title, page
+    return site, title, page.content_model if page else None
 
 
 def _client_for(request: Request, site: Site) -> WikiClient:
@@ -109,8 +108,7 @@ def render_preview(
 ) -> PreviewResponse:
     content_model: str | None = None
     if body.path:
-        site, title, page = _resolve_target(session, body.path)
-        content_model = page.content_model if page else None
+        site, title, content_model = _resolve_target(session, body.path)
     else:
         if not body.title:
             raise HTTPException(status_code=422, detail="need either path or title")
@@ -119,9 +117,8 @@ def render_preview(
         if site is None:
             raise HTTPException(status_code=404, detail="no site configured")
 
-    # All reads are done. Release the session before the wiki round trip so
-    # this request never holds a database transaction (or its pooled
-    # connection) across multi-second network I/O on every debounced keystroke.
+    # All reads are done. Release the session now rather than holding it
+    # across a multi-second wiki round trip on every debounced keystroke.
     session.close()
 
     client = _client_for(request, site)
@@ -205,79 +202,41 @@ def _live_page_images(
 @router.get("/page-image")
 def page_image(
     request: Request,
+    background: BackgroundTasks,
     path: str | None = None,
     title: str | None = None,
+    width: int | None = None,
     session: Session = Depends(get_session),
 ) -> Response:
     """Reference scan image for a Page: (the transcription workflow's source).
 
-    Serves the scan raster by proxying it (proxy, not redirect, so a dead
-    upstream URL can degrade to the placeholder instead of a broken image
-    in the client):
-
-    1. cached PageMeta URL (populated at fetch time by ProofreadPageProcessor);
-    2. if that's missing or its fetch fails — the backing File: may have been
-       deleted or replaced since the fetch — one fail-fast imageforpage lookup
-       for a fresh URL, persisted back to PageMeta on success;
-    3. otherwise a placeholder SVG labelled with the page title.
-
-    Worst case is three single-shot requests (image, API lookup, image), each
-    with its own timeout and no retries.
+    Serves the real scan rendition (cached bytes via wtbot.api.page_image,
+    fed by the imageforpage URLs the fetch worker stored) when one is known,
+    and degrades to a generated placeholder SVG labelled with the page title
+    while it is not — an unfetched page still gets a split pane, just an
+    empty one. GET /pages/image is the canonical strict endpoint (404 when
+    no scan is known); this one exists for the preview pane's
+    graceful-degradation flow.
     """
     page: Page | None = None
-    site: Site | None = None
     if path:
-        site, resolved_title, page = _resolve_target(session, path)
+        site, resolved_title, _ = _resolve_target(session, path)
+        page = session.exec(
+            select(Page).where(Page.site_pk == site.pk, Page.title == resolved_title)
+        ).first()
     elif title:
         resolved_title = title
-        site = session.exec(select(Site)).first()
+        page = session.exec(select(Page).where(Page.title == title)).first()
     else:
         raise HTTPException(status_code=422, detail="need either path or title")
 
-    cached_url: str | None = None
-    if page is not None and page.pk is not None:
-        meta = session.exec(select(PageMeta).where(PageMeta.page_pk == page.pk)).first()
-        if meta is not None:
-            cached_url = meta.source_image_url or meta.thumb_url
-    page_pk = page.pk if page is not None else None
-
-    # Release the session before any network I/O (same reasoning as /render).
-    session.close()
-
-    fetched: tuple[bytes, str] | None = None
-    if cached_url is not None:
-        fetched = _fetch_image(cached_url)
-
-    if fetched is None and site is not None:
-        images = _live_page_images(request, site, resolved_title)
-        live_url = images.fullsize_url or images.thumbnail_url if images else None
-        if live_url is not None and live_url != cached_url:
-            fetched = _fetch_image(live_url)
-            if fetched is not None and page_pk is not None and images is not None:
-                # Best effort: heal the stale/missing PageMeta so the next
-                # request skips the extra lookup. Losing this write only
-                # costs that shortcut.
-                try:
-                    with Session(request.app.state.engine) as write_session:
-                        # commits internally
-                        _store_page_images(write_session, page_pk, images)
-                except Exception as exc:  # noqa: BLE001
-                    logging.debug(
-                        "PageMeta heal failed for %s: %s", resolved_title, exc
-                    )
-
-    if fetched is not None:
-        content, content_type = fetched
-        return Response(
-            content=content,
-            media_type=content_type,
-            # Scans are immutable in practice; cache briefly so mode toggles
-            # don't refetch megabytes, without hiding a File: replacement long.
-            headers={"Cache-Control": "private, max-age=600"},
-        )
+    if page is not None:
+        response = serve_scan_image(request, background, session, page, width)
+        if response is not None:
+            return response
 
     return Response(
         content=_placeholder_svg(resolved_title),
         media_type="image/svg+xml",
-        headers={"Cache-Control": "no-store"},
+        headers={"Cache-Control": "no-store"},  # placeholder until fetched
     )

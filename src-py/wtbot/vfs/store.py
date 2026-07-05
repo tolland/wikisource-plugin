@@ -17,6 +17,14 @@ the edit-journal write discipline.
 PROOFREAD_INDEX_CONTENT_MODEL = "proofread-index"
 
 
+def meta_has_image(meta: PageMeta | None) -> bool:
+    return meta is not None and (
+        meta.thumb_url is not None
+        or meta.source_image_url is not None
+        or meta.raster_path is not None
+    )
+
+
 class PageStore:
     def __init__(self, session: Session) -> None:
         self.session = session
@@ -178,6 +186,22 @@ class PageStore:
         return self.session.exec(
             select(PageMeta).where(PageMeta.page_pk == page.pk)
         ).first()
+
+    def page_metas_by_pks(self, page_pks: list[int]) -> dict[int, PageMeta]:
+        """Batched PageMeta lookup for listing/bulk-stat paths that already
+        batch their Page query."""
+        if not page_pks:
+            return {}
+        rows = self.session.exec(
+            select(PageMeta).where(PageMeta.page_pk.in_(page_pks))
+        ).all()
+        return {row.page_pk: row for row in rows}
+
+    def has_page_image(self, page: Page) -> bool:
+        """A scan reference image is known once the fetch worker stored a
+        thumb/source URL (or the raster cache filled a local path)."""
+        meta = self.page_meta(page)
+        return meta_has_image(meta)
 
     def file_meta(self, page: Page) -> FileMeta | None:
         return self.session.exec(

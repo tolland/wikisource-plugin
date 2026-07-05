@@ -2,16 +2,14 @@ import base64
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import Session, select
+from sqlmodel import Session
 
 from wtbot.main import create_app
 from wtbot.model import Page, Site
 from wtbot.model.namespace import NsRole
-from wtbot.model.page_meta import PageMeta
 from wtbot.wiki.client import FakeWikiClient
-from wtbot.wiki.wiki_types import RemotePageImages
 
-"""Tests for the /preview endpoints (split-editor live preview + page scan)."""
+"""Tests for the /preview/render endpoint (plugin split-editor live preview)."""
 
 FAMILY = "wikisource"
 CODE = "en"
@@ -24,12 +22,11 @@ def _decode(payload: dict) -> str:
 
 
 class RecordingWikiClient(FakeWikiClient):
-    """FakeWikiClient that records render_preview/get_page_images calls."""
+    """FakeWikiClient that records render_preview calls for assertions."""
 
-    def __init__(self, page_images=None):
-        super().__init__(page_images=page_images)
+    def __init__(self):
+        super().__init__()
         self.render_calls: list[tuple[str, str, str | None]] = []
-        self.image_lookups: list[str] = []
 
     def render_preview(self, title, wikitext, content_model=None):
         self.render_calls.append((title, wikitext, content_model))
@@ -145,105 +142,14 @@ def test_render_no_sites_configured_404(engine):
         assert resp.status_code == 404
 
 
-PAGE_PATH = f"/{FAMILY}/{CODE}/{INDEX}/Pages/{PAGE}"
-SCAN_URL = "https://uploads.example/scan/100.jpg"
-FRESH_SCAN_URL = "https://uploads.example/scan/replacement-100.jpg"
-
-
-@pytest.fixture
-def fetched_images(monkeypatch) -> dict[str, tuple[bytes, str] | None]:
-    """Route _fetch_image through an in-test URL→result table instead of the
-    network. Unknown URLs behave like dead links (None)."""
-    table: dict[str, tuple[bytes, str] | None] = {}
-    monkeypatch.setattr("wtbot.api.preview._fetch_image", lambda url: table.get(url))
-    return table
-
-
-def _page_pk(engine) -> int:
-    with Session(engine) as s:
-        return s.exec(select(Page).where(Page.title == PAGE)).one().pk
-
-
-def _add_page_meta(engine, url: str) -> None:
-    with Session(engine) as s:
-        s.add(PageMeta(page_pk=_page_pk(engine), source_image_url=url))
-        s.commit()
-
-
-def test_page_image_no_scan_anywhere_returns_placeholder(
-    preview_client, fetched_images
-):
-    resp = preview_client.get("/preview/page-image", params={"path": PAGE_PATH})
+def test_page_image_by_path_labels_placeholder_with_title(preview_client):
+    resp = preview_client.get(
+        "/preview/page-image",
+        params={"path": f"/{FAMILY}/{CODE}/{INDEX}/Pages/{PAGE}"},
+    )
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith("image/svg+xml")
     assert PAGE in resp.text
-
-
-def test_page_image_proxies_cached_pagemeta_url(
-    preview_client, engine, wiki_client, fetched_images
-):
-    _add_page_meta(engine, SCAN_URL)
-    fetched_images[SCAN_URL] = (b"JPEGBYTES", "image/jpeg")
-
-    resp = preview_client.get("/preview/page-image", params={"path": PAGE_PATH})
-    assert resp.status_code == 200
-    assert resp.content == b"JPEGBYTES"
-    assert resp.headers["content-type"] == "image/jpeg"
-    assert "max-age" in resp.headers["cache-control"]
-    # cache hit — no live lookup needed
-    assert wiki_client.image_lookups == []
-
-
-def test_page_image_stale_cached_url_heals_from_live_lookup(
-    preview_client, engine, wiki_client, fetched_images
-):
-    """The backing File: was replaced: the cached URL is dead, but a single
-    imageforpage lookup finds the fresh one, which is persisted back."""
-    _add_page_meta(engine, SCAN_URL)  # dead: not in fetched_images
-    wiki_client._page_images[PAGE] = RemotePageImages(fullsize_url=FRESH_SCAN_URL)
-    fetched_images[FRESH_SCAN_URL] = (b"FRESH", "image/png")
-
-    resp = preview_client.get("/preview/page-image", params={"path": PAGE_PATH})
-    assert resp.status_code == 200
-    assert resp.content == b"FRESH"
-    assert wiki_client.image_lookups == [PAGE]
-
-    with Session(engine) as s:
-        meta = s.exec(
-            select(PageMeta).where(PageMeta.page_pk == _page_pk(engine))
-        ).one()
-        assert meta.source_image_url == FRESH_SCAN_URL
-
-
-def test_page_image_deleted_file_degrades_to_placeholder(
-    preview_client, engine, wiki_client, fetched_images
-):
-    """File: deleted outright: dead cached URL, live lookup finds nothing —
-    placeholder, exactly one lookup, no retry loop."""
-    _add_page_meta(engine, SCAN_URL)  # dead
-
-    resp = preview_client.get("/preview/page-image", params={"path": PAGE_PATH})
-    assert resp.status_code == 200
-    assert resp.headers["content-type"].startswith("image/svg+xml")
-    assert wiki_client.image_lookups == [PAGE]
-
-
-def test_page_image_uncached_page_uses_live_lookup(
-    preview_client, engine, wiki_client, fetched_images
-):
-    """No PageMeta yet (fetched before scan support): live lookup fills in."""
-    wiki_client._page_images[PAGE] = RemotePageImages(fullsize_url=FRESH_SCAN_URL)
-    fetched_images[FRESH_SCAN_URL] = (b"LATE", "image/jpeg")
-
-    resp = preview_client.get("/preview/page-image", params={"path": PAGE_PATH})
-    assert resp.status_code == 200
-    assert resp.content == b"LATE"
-
-    with Session(engine) as s:
-        meta = s.exec(
-            select(PageMeta).where(PageMeta.page_pk == _page_pk(engine))
-        ).first()
-        assert meta is not None and meta.source_image_url == FRESH_SCAN_URL
 
 
 def test_page_image_by_title(preview_client):

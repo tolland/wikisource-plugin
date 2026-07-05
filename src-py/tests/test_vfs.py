@@ -10,6 +10,7 @@ from wtbot.api.schemas import WriteContentRequest
 from wtbot.api.vfs import list_children, read_content, write_content
 from wtbot.model import EditJournal, FileBlob, Page, Site
 from wtbot.model.namespace import NsRole
+from wtbot.model.page_meta import PageMeta
 from wtbot.vfs import WikisourceVfs
 
 FAMILY = "wikisource"
@@ -124,6 +125,7 @@ def vfs_client(engine, tmp_path) -> TestClient:
             revid=5003,
             index_title=INDEX,
             page_number=1,
+            quality_level=1,
         )
         p2 = Page(
             site_pk=site.pk,
@@ -138,6 +140,16 @@ def vfs_client(engine, tmp_path) -> TestClient:
         )
         s.add(p1)
         s.add(p2)
+        s.commit()
+        s.refresh(p1)
+        s.add(
+            PageMeta(
+                page_pk=p1.pk,
+                thumb_url="https://ws.example/thumb/page1-240px.jpg",
+                source_image_url="https://ws.example/thumb/page1-2419px.jpg",
+                thumb_width=240,
+            )
+        )
         s.commit()
 
     with TestClient(app) as c:
@@ -246,6 +258,48 @@ def test_stat_missing(vfs_client):
     r = vfs_client.get("/vfs/stat", params={"path": "/wikisource/en/Index:NoSuch"})
     assert r.status_code == 200
     assert r.json()["exists"] is False
+
+
+def test_stat_carries_decoration_fields(vfs_client):
+    """quality_level / dirty / has_page_image ride on stat so the tree can
+    colour-code without extra round trips."""
+    r = vfs_client.get("/vfs/stat", params={"path": f"{_PAGES_PATH}/{PAGE_1}"}).json()
+    assert r["quality_level"] == 1
+    assert r["dirty"] is False
+    assert r["has_page_image"] is True
+
+    # No PageMeta row for page 2 -- no scan image known (yet).
+    r = vfs_client.get("/vfs/stat", params={"path": f"{_PAGES_PATH}/{PAGE_2}"}).json()
+    assert r["quality_level"] is None
+    assert r["has_page_image"] is False
+
+
+def test_children_carry_decoration_fields(vfs_client):
+    children = vfs_client.get("/vfs/children", params={"path": _PAGES_PATH}).json()[
+        "children"
+    ]
+    by_name = {c["name"]: c for c in children}
+    assert by_name[PAGE_1]["quality_level"] == 1
+    assert by_name[PAGE_1]["has_page_image"] is True
+    assert by_name[PAGE_2]["has_page_image"] is False
+
+
+def test_stat_reports_dirty_after_local_save(vfs_client):
+    r = vfs_client.post(
+        "/vfs/content",
+        json={
+            "path": f"{_PAGES_PATH}/{PAGE_1}",
+            "content_base64": _b64("edited for dirty check"),
+            "base_revid": 5003,
+        },
+    )
+    assert r.json()["status"] == "ok"
+    assert (
+        vfs_client.get("/vfs/stat", params={"path": f"{_PAGES_PATH}/{PAGE_1}"}).json()[
+            "dirty"
+        ]
+        is True
+    )
 
 
 def test_stat_non_page_title_under_pages_is_missing(vfs_client):

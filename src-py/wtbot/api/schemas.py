@@ -59,6 +59,21 @@ class Node(BaseModel):
         description="Remote contentmodel (e.g. 'proofread-index', 'proofread-page', "
         "'sanitized-css', 'json'). None for directories/synthetic nodes.",
     )
+    quality_level: int | None = Field(
+        None,
+        description="ProofreadPage quality 0-4 for proofread-page files; drives "
+        "tree colour-coding. None for other kinds.",
+    )
+    dirty: bool = Field(
+        False,
+        description="True when uncommitted local edits (EditJournal) exist for "
+        "the backing page -- the 'modified vs backend' marker.",
+    )
+    has_page_image: bool = Field(
+        False,
+        description="True when a scan reference image is known for this page; "
+        "fetch pixels from GET /pages/image?path=...&width=...",
+    )
 
 
 class Stat(BaseModel):
@@ -71,6 +86,9 @@ class Stat(BaseModel):
     timestamp: str | None = None
     length: int | None = None
     content_model: str | None = None
+    quality_level: int | None = None
+    dirty: bool = False
+    has_page_image: bool = False
 
 
 class StatBulkRequest(BaseModel):

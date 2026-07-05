@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlmodel import Session
 
@@ -12,6 +12,16 @@ from wtbot.model import (
     PageMeta,
 )
 from wtbot.model.page_meta import SHORT_NAME_RE
+from wtbot.vfs.nodes import (
+    FileBlobLeaf,
+    FileDir,
+    FileWikitext,
+    IndexAssetLeaf,
+    IndexDir,
+    IndexWikitext,
+    PageLeaf,
+    resolve,
+)
 from wtbot.vfs.store import PROOFREAD_INDEX_CONTENT_MODEL, PageStore
 
 """Per-role Page metadata extensions (IndexMeta / PageMeta / FileMeta).
@@ -24,6 +34,50 @@ derive the default itself.
 """
 
 router = APIRouter(prefix="/pages", tags=["page-meta"])
+
+
+@router.get("/resolve", response_model=Page)
+def resolve_page(
+    path: str | None = Query(
+        None, description="wikisource:// VFS path, resolved via the overlay"
+    ),
+    family: str | None = Query(None),
+    code: str | None = Query(None),
+    title: str | None = Query(None, description="full title incl. namespace prefix"),
+    session: Session = Depends(get_session),
+) -> Page:
+    """Identity bridge between the two addressing schemes and the rich model:
+    map either a wikisource:// VFS path (what the client's editors/tree hold)
+    or a canonical (family, code, title) triple (what batch tooling holds) to
+    the backing Page row — whose pk keys the per-role metadata endpoints."""
+    store = PageStore(session)
+    if path is not None:
+        match resolve(store, path):
+            case PageLeaf(_, _, page) | IndexAssetLeaf(_, _, page, _):
+                return page
+            case IndexDir(_, _, index) | IndexWikitext(_, _, index):
+                return index
+            case (
+                FileDir(_, _, file_page)
+                | FileWikitext(_, _, file_page)
+                | FileBlobLeaf(_, _, file_page)
+            ):
+                return file_page
+            case _:
+                raise HTTPException(
+                    status_code=404, detail=f"no page behind path: {path}"
+                )
+    if family is not None and code is not None and title is not None:
+        site = store.site(family, code)
+        page = store.page(site, title) if site is not None else None
+        if page is None:
+            raise HTTPException(
+                status_code=404, detail=f"page not found: {family}/{code}/{title}"
+            )
+        return page
+    raise HTTPException(
+        status_code=400, detail="pass either ?path= or ?family=&code=&title="
+    )
 
 
 def _get_page(session: Session, page_pk: int) -> Page:

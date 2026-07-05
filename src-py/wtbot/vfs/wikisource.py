@@ -33,6 +33,7 @@ from wtbot.vfs.paths import WikiPath
 from wtbot.vfs.store import (
     PROOFREAD_INDEX_CONTENT_MODEL,
     PageStore,
+    meta_has_image,
 )
 
 """wikisource:// overlay — the ProofreadPage-aware VFS service.
@@ -187,17 +188,22 @@ class WikisourceVfs:
             titles = [page_title for _, _, page_title in entries]
             pages = self.store.proofread_pages_by_titles(site, titles, index_title)
             pages_by_title = {p.title: p for p in pages}
-            _page_pks = [p.pk for p in pages if p.pk is not None]
-            uncommitted = self.store.latest_uncommitted_bodies(
-                [p.pk for p in pages if p.pk is not None]
-            )
+            page_pks = [p.pk for p in pages if p.pk is not None]
+            uncommitted = self.store.latest_uncommitted_bodies(page_pks)
+            metas = self.store.page_metas_by_pks(page_pks)
             for i, raw, page_title in entries:
                 page = pages_by_title.get(page_title)
                 if page is None:
                     results[i] = Stat(path=raw, exists=False)
                     continue
                 body = uncommitted.get(page.pk, page.text or "")
-                results[i] = self.mw.stat_page(raw, page, name=page.title, body=body)
+                results[i] = self.mw.stat_page(
+                    raw,
+                    page,
+                    name=page.title,
+                    body=body,
+                    has_image=meta_has_image(metas.get(page.pk)),
+                )
 
         return [results[i] for i in range(len(paths))]
 
@@ -280,10 +286,15 @@ class WikisourceVfs:
     ) -> ListChildrenResponse:
         parent = path.normalized
         pages = self.store.proofread_pages(site, index.title)
+        metas = self.store.page_metas_by_pks([p.pk for p in pages if p.pk is not None])
         return ListChildrenResponse(
             parent_path=parent,
             children=[
-                self.mw.page_node(f"{parent}/{p.title}", p)
+                self.mw.page_node(
+                    f"{parent}/{p.title}",
+                    p,
+                    has_image=meta_has_image(metas.get(p.pk)),
+                )
                 for p in sorted(pages, key=lambda p: p.page_number or 0)
             ],
         )

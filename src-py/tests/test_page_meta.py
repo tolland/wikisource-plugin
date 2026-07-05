@@ -31,8 +31,15 @@ def _add_page(
     title: str,
     role: NsRole,
     cm: str,
+    index_title: str | None = None,
 ) -> Page:
-    page = Page(site_pk=site.pk, title=title, namespace_role=role, content_model=cm)
+    page = Page(
+        site_pk=site.pk,
+        title=title,
+        namespace_role=role,
+        content_model=cm,
+        index_title=index_title,
+    )
     session.add(page)
     session.commit()
     session.refresh(page)
@@ -104,7 +111,9 @@ def seeded(engine):
     with Session(engine) as s:
         site = _seed_site(s)
         index = _seed_index(s, site)
-        page = _add_page(s, site, PAGE_1, NsRole.page, "proofread-page")
+        page = _add_page(
+            s, site, PAGE_1, NsRole.page, "proofread-page", index_title=INDEX
+        )
         file_page = _add_page(s, site, FILE, NsRole.file, "wikitext")
         other_index = _seed_index(s, site, "Index:Other.djvu")
         pks = {
@@ -216,3 +225,55 @@ def test_file_meta_rejected_for_non_file(client, seeded):
 def test_meta_404_for_missing_page(client, seeded):
     assert client.get("/pages/99999/index-meta").status_code == 404
     assert client.put("/pages/99999/page-meta", json={}).status_code == 404
+
+
+# -- /pages/resolve — identity bridge -------------------------------------------
+
+_INDEX_PATH = f"/{FAMILY}/{CODE}/{INDEX}"
+
+
+def test_resolve_by_vfs_path(client, seeded):
+    r = client.get("/pages/resolve", params={"path": f"{_INDEX_PATH}/Pages/{PAGE_1}"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["pk"] == seeded["page_pk"]
+    assert body["title"] == PAGE_1
+
+    # Index dir resolves to the Index page itself (dual role).
+    r = client.get("/pages/resolve", params={"path": _INDEX_PATH})
+    assert r.json()["pk"] == seeded["index_pk"]
+    # ...as does its synthetic wikitext leaf.
+    r = client.get("/pages/resolve", params={"path": f"{_INDEX_PATH}/wikitext"})
+    assert r.json()["pk"] == seeded["index_pk"]
+
+
+def test_resolve_by_title_triple(client, seeded):
+    r = client.get(
+        "/pages/resolve",
+        params={"family": FAMILY, "code": CODE, "title": PAGE_1},
+    )
+    assert r.status_code == 200
+    assert r.json()["pk"] == seeded["page_pk"]
+
+
+def test_resolve_missing_and_bad_requests(client, seeded):
+    r = client.get("/pages/resolve", params={"path": f"{_INDEX_PATH}/Pages/Page:No/9"})
+    assert r.status_code == 404
+    # Synthetic containers have no backing page.
+    r = client.get("/pages/resolve", params={"path": f"{_INDEX_PATH}/Pages"})
+    assert r.status_code == 404
+    r = client.get(
+        "/pages/resolve",
+        params={"family": FAMILY, "code": CODE, "title": "Page:No/9"},
+    )
+    assert r.status_code == 404
+    assert client.get("/pages/resolve").status_code == 400
+
+
+def test_resolve_then_meta_roundtrip(client, seeded):
+    """The intended flow: VFS path -> pk -> per-role metadata."""
+    pk = client.get(
+        "/pages/resolve", params={"path": f"{_INDEX_PATH}/Pages/{PAGE_1}"}
+    ).json()["pk"]
+    r = client.put(f"/pages/{pk}/page-meta", json={"thumb_width": 240})
+    assert r.status_code == 200

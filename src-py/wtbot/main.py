@@ -16,6 +16,7 @@ from wtbot.api import (
     file_blob,
     health,
     namespace,
+    page_image,
     page_meta,
     pages,
     preview,
@@ -114,6 +115,7 @@ def create_app(
     app.include_router(file_blob.router)
     app.include_router(health.router)
     app.include_router(namespace.router)
+    app.include_router(page_image.router)
     app.include_router(page_meta.router)
     app.include_router(pages.router)
     app.include_router(preview.router)

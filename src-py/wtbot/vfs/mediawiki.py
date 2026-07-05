@@ -74,8 +74,18 @@ class MediaWikiVfs:
 
     # -- per-page content operations ------------------------------------------
 
-    def page_node(self, path: str, page: Page, name: str | None = None) -> Node:
+    def page_node(
+        self,
+        path: str,
+        page: Page,
+        name: str | None = None,
+        has_image: bool | None = None,
+    ) -> Node:
+        """`has_image` may be precomputed by batched callers (one PageMeta
+        query per listing); None means look it up here."""
         body = self.store.effective_body(page)
+        if has_image is None:
+            has_image = self.store.has_page_image(page)
         return Node(
             path=path,
             name=name if name is not None else page.title,
@@ -86,13 +96,23 @@ class MediaWikiVfs:
             length=len(body.encode()),
             writable=True,
             content_model=page.content_model,
+            quality_level=page.quality_level,
+            dirty=page.dirty,
+            has_page_image=has_image,
         )
 
     def stat_page(
-        self, raw_path: str, page: Page, name: str, body: str | None = None
+        self,
+        raw_path: str,
+        page: Page,
+        name: str,
+        body: str | None = None,
+        has_image: bool | None = None,
     ) -> Stat:
         if body is None:
             body = self.store.effective_body(page)
+        if has_image is None:
+            has_image = self.store.has_page_image(page)
         return Stat(
             path=raw_path,
             exists=True,
@@ -103,6 +123,9 @@ class MediaWikiVfs:
             timestamp=ts_millis(page.local_modified_at or page.remote_timestamp),
             length=len(body.encode()),
             content_model=page.content_model,
+            quality_level=page.quality_level,
+            dirty=page.dirty,
+            has_page_image=has_image,
         )
 
     def read_page(self, raw_path: str, page: Page) -> ReadContentResponse:

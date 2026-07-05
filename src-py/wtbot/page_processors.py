@@ -196,6 +196,7 @@ def _store_page_images(
             meta = PageMeta(page_pk=page_pk)
         if images.thumbnail_url is not None:
             meta.thumb_url = images.thumbnail_url
+            meta.thumb_width = images.size
         if images.fullsize_url is not None:
             meta.source_image_url = images.fullsize_url
         session.add(meta)
