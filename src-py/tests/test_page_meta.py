@@ -25,7 +25,13 @@ def _seed_site(session: Session, family: str = FAMILY, code: str = CODE) -> Site
     return site
 
 
-def _add_page(session: Session, site: Site, title: str, role: NsRole, cm: str) -> Page:
+def _add_page(
+    session: Session,
+    site: Site,
+    title: str,
+    role: NsRole,
+    cm: str,
+) -> Page:
     page = Page(site_pk=site.pk, title=title, namespace_role=role, content_model=cm)
     session.add(page)
     session.commit()

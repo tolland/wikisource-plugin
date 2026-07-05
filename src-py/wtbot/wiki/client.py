@@ -27,6 +27,12 @@ and ``download_file`` are all the fetch path needs. Two implementations:
 
 # logging.basicConfig(level=logging.DEBUG)
 
+# Width requested for the small tree/preview thumbnail. The API's default
+# rendition (no prppifpsize) is ~1280px -- that is ProofreadPage's edit-view
+# reference image, not a thumbnail; the /pages/image endpoint serves other
+# widths on demand by rewriting the thumb URL.
+PAGE_THUMB_WIDTH = 240
+
 
 def _https(url: str | None) -> str | None:
     """Normalise the API's protocol-relative //upload... URLs to https://."""
@@ -205,6 +211,7 @@ class PywikibotClient:
                     "prop": "imageforpage|proofread",
                     "titles": title,
                     "prppifpprop": "filename|size|fullsize",
+                    "prppifpsize": PAGE_THUMB_WIDTH,
                     "format": "json",
                 },
                 headers={"User-Agent": "wtbot (wikisource-plugin)"},

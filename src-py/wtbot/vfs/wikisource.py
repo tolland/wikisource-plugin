@@ -30,7 +30,10 @@ from wtbot.vfs.nodes import (
     resolve,
 )
 from wtbot.vfs.paths import WikiPath
-from wtbot.vfs.store import PROOFREAD_INDEX_CONTENT_MODEL, PageStore
+from wtbot.vfs.store import (
+    PROOFREAD_INDEX_CONTENT_MODEL,
+    PageStore,
+)
 
 """wikisource:// overlay — the ProofreadPage-aware VFS service.
 
@@ -184,6 +187,7 @@ class WikisourceVfs:
             titles = [page_title for _, _, page_title in entries]
             pages = self.store.proofread_pages_by_titles(site, titles, index_title)
             pages_by_title = {p.title: p for p in pages}
+            _page_pks = [p.pk for p in pages if p.pk is not None]
             uncommitted = self.store.latest_uncommitted_bodies(
                 [p.pk for p in pages if p.pk is not None]
             )
