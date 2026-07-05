@@ -110,8 +110,15 @@
         "description": "Outbound log -- one row per attempted push back to the wiki. Kept as a log\n(not an in-place overwrite of Page.revid) so a rejected edit-conflict attempt\nis visible and retriable rather than silently lost, and the IDE can show\n\"this save failed, here's why\" after the fact.",
         "properties": {
           "base_revid": {
-            "title": "Base Revid",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Revid"
           },
           "comment": {
             "anyOf": [
@@ -177,7 +184,6 @@
         },
         "required": [
           "page_pk",
-          "base_revid",
           "submitted_body"
         ],
         "title": "Commit",
@@ -1139,6 +1145,18 @@
             "description": "Remote contentmodel (e.g. 'proofread-index', 'proofread-page', 'sanitized-css', 'json'). None for directories/synthetic nodes.",
             "title": "Content Model"
           },
+          "dirty": {
+            "default": false,
+            "description": "True when uncommitted local edits (EditJournal) exist for the backing page -- the 'modified vs backend' marker.",
+            "title": "Dirty",
+            "type": "boolean"
+          },
+          "has_page_image": {
+            "default": false,
+            "description": "True when a scan reference image is known for this page; fetch pixels from GET /pages/image?path=...&width=...",
+            "title": "Has Page Image",
+            "type": "boolean"
+          },
           "kind": {
             "$ref": "#/components/schemas/NodeKind"
           },
@@ -1162,6 +1180,24 @@
             "description": "wikisource://-relative path, uniquely identifies the node",
             "title": "Path",
             "type": "string"
+          },
+          "placeholder": {
+            "default": false,
+            "description": "True when no remote revision backs this file \u2014 a missing proofread page's local stub, or a locally created page not pushed yet. Opening it starts a new transcription.",
+            "title": "Placeholder",
+            "type": "boolean"
+          },
+          "quality_level": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "ProofreadPage quality 0-4 for proofread-page files; drives tree colour-coding. None for other kinds.",
+            "title": "Quality Level"
           },
           "revid": {
             "anyOf": [
@@ -1776,6 +1812,81 @@
         "title": "PendingCommitPage",
         "type": "object"
       },
+      "PreviewRequest": {
+        "properties": {
+          "path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Path"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "wikitext": {
+            "title": "Wikitext",
+            "type": "string"
+          }
+        },
+        "required": [
+          "wikitext"
+        ],
+        "title": "PreviewRequest",
+        "type": "object"
+      },
+      "PreviewResponse": {
+        "properties": {
+          "html_base64": {
+            "title": "Html Base64",
+            "type": "string"
+          },
+          "script_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Script Path"
+          },
+          "server": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "html_base64"
+        ],
+        "title": "PreviewResponse",
+        "type": "object"
+      },
       "ReadContentResponse": {
         "properties": {
           "content_base64": {
@@ -2017,8 +2128,18 @@
             ],
             "title": "Content Model"
           },
+          "dirty": {
+            "default": false,
+            "title": "Dirty",
+            "type": "boolean"
+          },
           "exists": {
             "title": "Exists",
+            "type": "boolean"
+          },
+          "has_page_image": {
+            "default": false,
+            "title": "Has Page Image",
             "type": "boolean"
           },
           "kind": {
@@ -2056,6 +2177,22 @@
           "path": {
             "title": "Path",
             "type": "string"
+          },
+          "placeholder": {
+            "default": false,
+            "title": "Placeholder",
+            "type": "boolean"
+          },
+          "quality_level": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality Level"
           },
           "revid": {
             "anyOf": [
@@ -3165,6 +3302,168 @@
         ]
       }
     },
+    "/pages/image": {
+      "get": {
+        "operationId": "get_page_image_pages_image_get",
+        "parameters": [
+          {
+            "description": "wikisource:// VFS path of the Page: leaf",
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "description": "wikisource:// VFS path of the Page: leaf",
+              "title": "Path",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "width",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 4096,
+                  "minimum": 16,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Width"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Page Image",
+        "tags": [
+          "page-images"
+        ]
+      }
+    },
+    "/pages/resolve": {
+      "get": {
+        "description": "Identity bridge between the two addressing schemes and the rich model:\nmap either a wikisource:// VFS path (what the client's editors/tree hold)\nor a canonical (family, code, title) triple (what batch tooling holds) to\nthe backing Page row \u2014 whose pk keys the per-role metadata endpoints.",
+        "operationId": "resolve_page_pages_resolve_get",
+        "parameters": [
+          {
+            "description": "wikisource:// VFS path, resolved via the overlay",
+            "in": "query",
+            "name": "path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "wikisource:// VFS path, resolved via the overlay",
+              "title": "Path"
+            }
+          },
+          {
+            "in": "query",
+            "name": "family",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Family"
+            }
+          },
+          {
+            "in": "query",
+            "name": "code",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Code"
+            }
+          },
+          {
+            "description": "full title incl. namespace prefix",
+            "in": "query",
+            "name": "title",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "full title incl. namespace prefix",
+              "title": "Title"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resolve Page",
+        "tags": [
+          "page-meta"
+        ]
+      }
+    },
     "/pages/{page_pk}": {
       "get": {
         "operationId": "get_page_pages__page_pk__get",
@@ -3522,6 +3821,127 @@
         "summary": "Put Page Meta",
         "tags": [
           "page-meta"
+        ]
+      }
+    },
+    "/preview/page-image": {
+      "get": {
+        "description": "Reference scan image for a Page: (the transcription workflow's source).\n\nServes the real scan rendition (cached bytes via wtbot.api.page_image,\nfed by the imageforpage URLs the fetch worker stored) when one is known,\nand degrades to a generated placeholder SVG labelled with the page title\nwhile it is not \u2014 an unfetched page still gets a split pane, just an\nempty one. GET /pages/image is the canonical strict endpoint (404 when\nno scan is known); this one exists for the preview pane's\ngraceful-degradation flow.",
+        "operationId": "page_image_preview_page_image_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "path",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Path"
+            }
+          },
+          {
+            "in": "query",
+            "name": "title",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Title"
+            }
+          },
+          {
+            "in": "query",
+            "name": "width",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Width"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Page Image",
+        "tags": [
+          "preview"
+        ]
+      }
+    },
+    "/preview/render": {
+      "post": {
+        "operationId": "render_preview_preview_render_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Render Preview",
+        "tags": [
+          "preview"
         ]
       }
     },

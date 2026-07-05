@@ -99,6 +99,7 @@ class MediaWikiVfs:
             quality_level=page.quality_level,
             dirty=page.dirty,
             has_page_image=has_image,
+            placeholder=page.revid is None,
         )
 
     def stat_page(
@@ -126,13 +127,22 @@ class MediaWikiVfs:
             quality_level=page.quality_level,
             dirty=page.dirty,
             has_page_image=has_image,
+            placeholder=page.revid is None,
         )
 
-    def read_page(self, raw_path: str, page: Page) -> ReadContentResponse:
+    def read_page(
+        self, raw_path: str, page: Page, default_body: str | None = None
+    ) -> ReadContentResponse:
+        """`default_body` is served when the page has no body at all (a
+        placeholder stub with no local edits) — the overlay passes the
+        content-model scaffold so a new transcription opens well-formed."""
+        body = self.store.effective_body(page)
+        if not body and default_body is not None:
+            body = default_body
         return ReadContentResponse(
             path=raw_path,
             revid=page.revid,
-            content_base64=_b64(self.store.effective_body(page)),
+            content_base64=_b64(body),
         )
 
     def write_page(self, req: WriteContentRequest, page: Page) -> WriteResult:

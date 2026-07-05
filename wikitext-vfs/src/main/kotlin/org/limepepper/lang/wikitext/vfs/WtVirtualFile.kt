@@ -43,6 +43,7 @@ class WtVirtualFile(
     qualityLevel: Int? = null,
     dirty: Boolean = false,
     hasPageImage: Boolean = false,
+    placeholder: Boolean = false,
 ) : VirtualFile() {
 
     // Populated either eagerly by the tool window (BG thread) or lazily on
@@ -66,14 +67,24 @@ class WtVirtualFile(
     /** A scan reference image is known; pixels via GET /pages/image. */
     @Volatile var hasPageImage: Boolean = hasPageImage
         private set
+    /** No remote revision backs this file — a missing proofread page's
+     * local stub. Opening it starts a new transcription. */
+    @Volatile var placeholder: Boolean = placeholder
+        private set
 
     fun setParent(p: WtVirtualFile) { _parent = p }
 
     /** Refresh decoration metadata from a fresh backend sighting. */
-    fun updateMeta(qualityLevel: Int?, dirty: Boolean, hasPageImage: Boolean) {
+    fun updateMeta(
+        qualityLevel: Int?,
+        dirty: Boolean,
+        hasPageImage: Boolean,
+        placeholder: Boolean,
+    ) {
         this.qualityLevel = qualityLevel
         this.dirty = dirty
         this.hasPageImage = hasPageImage
+        this.placeholder = placeholder
     }
 
     /**
@@ -83,7 +94,7 @@ class WtVirtualFile(
      */
     @Synchronized
     fun invalidateIfStale(stat: StatResult) {
-        updateMeta(stat.qualityLevel, stat.dirty, stat.hasPageImage)
+        updateMeta(stat.qualityLevel, stat.dirty, stat.hasPageImage, stat.placeholder)
         if (stat.revid != revid) {
             revid = stat.revid
             cachedContent = null
@@ -124,6 +135,7 @@ class WtVirtualFile(
                 qualityLevel = child.qualityLevel,
                 dirty = child.dirty,
                 hasPageImage = child.hasPageImage,
+                placeholder = child.placeholder,
             )
         }.toTypedArray() as Array<VirtualFile>
         cachedChildren = children
@@ -201,6 +213,7 @@ class WtVirtualFile(
                 qualityLevel = stat.qualityLevel,
                 dirty = stat.dirty,
                 hasPageImage = stat.hasPageImage,
+                placeholder = stat.placeholder,
             )
     }
 }

@@ -82,6 +82,18 @@ class RemotePageImages:
 
 
 @dataclass(frozen=True)
+class IndexPageEntry:
+    """One pagination slot of a ProofreadPage index, from
+    ``list=proofreadpagesinindex`` (prefix prppii). ``pageid`` is None when
+    the slot has no created Page: yet — the API reports those as pageid 0,
+    which is how partially transcribed works announce their gaps."""
+
+    page_offset: int
+    title: str
+    pageid: int | None = None
+
+
+@dataclass(frozen=True)
 class RemotePage:
     """A plain snapshot of a wiki page, decoupled from pywikibot's Page object so
     the rest of the backend (dispatch, worker, tests) never imports pywikibot.

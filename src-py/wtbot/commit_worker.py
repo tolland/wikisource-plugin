@@ -41,7 +41,8 @@ class _PendingPageCommit:
     title: str
     site: Site
     journal_pks: tuple[int, ...]
-    base_revid: int
+    # None = the page does not exist remotely yet; the push is a creation.
+    base_revid: int | None
     body: str
     comment: str | None
 
@@ -198,8 +199,10 @@ def _load_pending_page_commit(
             raise RuntimeError(f"page {page_pk} has unpersisted journal rows")
 
         latest = pending[-1]
+        # None stays None: a placeholder stub (never on the wiki) pushes as a
+        # page *creation*, not an edit based on a fabricated revid 0.
         base_revid = (
-            latest.base_revid if latest.base_revid is not None else (page.revid or 0)
+            latest.base_revid if latest.base_revid is not None else page.revid
         )
         return _PendingPageCommit(
             page_pk=page_pk,

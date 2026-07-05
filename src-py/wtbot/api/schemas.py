@@ -74,6 +74,12 @@ class Node(BaseModel):
         description="True when a scan reference image is known for this page; "
         "fetch pixels from GET /pages/image?path=...&width=...",
     )
+    placeholder: bool = Field(
+        False,
+        description="True when no remote revision backs this file — a missing "
+        "proofread page's local stub, or a locally created page not pushed "
+        "yet. Opening it starts a new transcription.",
+    )
 
 
 class Stat(BaseModel):
@@ -89,6 +95,7 @@ class Stat(BaseModel):
     quality_level: int | None = None
     dirty: bool = False
     has_page_image: bool = False
+    placeholder: bool = False
 
 
 class StatBulkRequest(BaseModel):

@@ -22,7 +22,7 @@ class Commit(SQLModel, table=True):
     pk: int | None = Field(default=None, primary_key=True)
     page_pk: int = Field(foreign_key="page.pk", index=True)
 
-    base_revid: int  # revid the edit was based on (the conflict token)
+    base_revid: int | None = None  # revid the edit was based on; None = page creation
     submitted_body: str
     comment: str | None = None
 

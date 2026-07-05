@@ -4,7 +4,7 @@ from pathlib import Path
 
 from sqlmodel import Session, select
 
-from wtbot.model import FileBlob, Page, Site, role_for_canonical
+from wtbot.model import FetchState, FileBlob, Page, Site, role_for_canonical
 from wtbot.model.fetch_request import FetchKind, FetchRequest, FetchStatus
 from wtbot.model.namespace import NsRole
 from wtbot.model.page_meta import PageMeta
@@ -260,7 +260,15 @@ def download_file_blob(
 
 
 def _fan_out_index(ctx: ProcessContext, index_page: CachedPage) -> int:
-    """Download the File: blob, parse page count, enqueue index children.
+    """Download the File: blob, enumerate the index pagination, enqueue
+    fetches for pages that exist remotely and create placeholder stub rows
+    for the ones that do not.
+
+    Pagination comes from list=proofreadpagesinindex when available:
+    authoritative titles, and missing pages known up front — no fetch
+    request is wasted learning PageNotFound one page at a time. Wikis
+    without the API fall back to page_count interpolation, where every slot
+    is enqueued and existence is discovered the slow way.
 
     Returns the number of child FetchRequests created.
     """
@@ -280,20 +288,32 @@ def _fan_out_index(ctx: ProcessContext, index_page: CachedPage) -> int:
     # PywikibotClient); fall back to <pagelist> parsing for FakeWikiClient.
     page_count = index_page.page_count or parse_page_count(index_page.text or "")
     subpage_titles = ctx.client.list_index_subpage_titles(req.title)
+    entries = ctx.client.list_index_pages(req.title)
+
+    child_specs: list[tuple[str, FetchKind]] = []
+    stub_specs: list[tuple[str, int]] = []  # (title, page_number)
+    if entries is not None:
+        page_count = page_count or len(entries)
+        for entry in entries:
+            if entry.pageid is not None:
+                child_specs.append((entry.title, FetchKind.page))
+            else:
+                stub_specs.append((entry.title, entry.page_offset))
+    elif page_count:
+        basename = _index_basename(req.title)
+        child_specs.extend(
+            (f"Page:{basename}/{n}", FetchKind.page)
+            for n in range(1, page_count + 1)
+        )
+    child_specs.extend((title, FetchKind.single) for title in subpage_titles)
 
     try:
         if db_index_page is not None and page_count:
             db_index_page.page_count = page_count
             session.add(db_index_page)
 
-        basename = _index_basename(req.title)
-        child_specs: list[tuple[str, FetchKind]] = []
-        if page_count:
-            child_specs.extend(
-                (f"Page:{basename}/{n}", FetchKind.page)
-                for n in range(1, page_count + 1)
-            )
-        child_specs.extend((title, FetchKind.single) for title in subpage_titles)
+        for title, page_number in stub_specs:
+            _ensure_placeholder_page(session, req.site_pk, req.title, title, page_number)
 
         seen_titles: set[str] = set()
         child_count = 0
@@ -318,6 +338,38 @@ def _fan_out_index(ctx: ProcessContext, index_page: CachedPage) -> int:
         raise
     finally:
         session.rollback()
+
+
+def _ensure_placeholder_page(
+    session: Session,
+    site_pk: int,
+    index_title: str,
+    title: str,
+    page_number: int,
+) -> None:
+    """Create the local stub row for a proofread page that does not exist on
+    the wiki yet — the same provisional-Page shape as a pasted upload:
+    pageid/revid None means "exists locally only". Everything downstream
+    (listing, stat, editing, commit-as-create) then works with no special
+    cases. Never clobbers an existing row: the user may already have edits
+    journalled against a stub from an earlier fan-out."""
+    existing = session.exec(
+        select(Page).where(Page.site_pk == site_pk, Page.title == title)
+    ).first()
+    if existing is not None:
+        return
+    session.add(
+        Page(
+            site_pk=site_pk,
+            title=title,
+            namespace_role=NsRole.page,
+            content_model="proofread-page",
+            index_title=index_title,
+            page_number=page_number,
+            # We *know* the remote state: absent. The fetch is complete.
+            fetch_status=FetchState.done,
+        )
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -27,6 +27,8 @@ data class StatResult(
     val dirty: Boolean = false,
     /** A scan reference image is known; pixels via GET /pages/image?path=&width=. */
     val hasPageImage: Boolean = false,
+    /** No remote revision backs this file — a missing proofread page's local stub. */
+    val placeholder: Boolean = false,
 )
 
 data class ChildNode(
@@ -42,6 +44,7 @@ data class ChildNode(
     val qualityLevel: Int? = null,
     val dirty: Boolean = false,
     val hasPageImage: Boolean = false,
+    val placeholder: Boolean = false,
 )
 
 data class ListChildrenResult(

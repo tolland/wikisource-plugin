@@ -43,6 +43,7 @@ class HttpVfsBackend(
                 qualityLevel = longOrNull("quality_level")?.toInt(),
                 dirty = boolOrDefault("dirty", false),
                 hasPageImage = boolOrDefault("has_page_image", false),
+                placeholder = boolOrDefault("placeholder", false),
             )
         }
     }
@@ -66,6 +67,7 @@ class HttpVfsBackend(
                 qualityLevel = r.longOrNull("quality_level")?.toInt(),
                 dirty = r.boolOrDefault("dirty", false),
                 hasPageImage = r.boolOrDefault("has_page_image", false),
+                placeholder = r.boolOrDefault("placeholder", false),
             )
         }
     }
@@ -89,6 +91,7 @@ class HttpVfsBackend(
                         qualityLevel = child.longOrNull("quality_level")?.toInt(),
                         dirty = child.boolOrDefault("dirty", false),
                         hasPageImage = child.boolOrDefault("has_page_image", false),
+                        placeholder = child.boolOrDefault("placeholder", false),
                     )
                 },
             )

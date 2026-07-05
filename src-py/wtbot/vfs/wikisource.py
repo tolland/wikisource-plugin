@@ -79,6 +79,18 @@ def _index_to_file_title(index_title: str) -> str:
     return f"File:{rest}"
 
 
+def proofread_page_scaffold() -> str:
+    """Conventional skeleton for a not-yet-created proofread page, matching
+    what ProofreadPage's own editor prepopulates: quality "not proofread",
+    empty header/body/footer sections. Served as the *opening* body of a
+    placeholder (never persisted) so the first save is well-formed."""
+    return (
+        '<noinclude><pagequality level="1" user="" /></noinclude>'
+        "\n\n"
+        "<noinclude></noinclude>"
+    )
+
+
 class WikisourceVfs:
     """ProofreadPage overlay over the local page cache.
 
@@ -315,6 +327,13 @@ class WikisourceVfs:
 
     def read(self, raw_path: str) -> ReadContentResponse:
         match resolve(self.store, raw_path):
+            case PageLeaf(path, _, page) if page.revid is None:
+                # Placeholder stub: open with the content-model scaffold so a
+                # fresh transcription starts well-formed (local edits, once
+                # journalled, take precedence via effective_body).
+                return self.mw.read_page(
+                    path.raw, page, default_body=proofread_page_scaffold()
+                )
             case (
                 PageLeaf(path, _, page)
                 | IndexWikitext(path, _, page)

@@ -50,16 +50,17 @@ class WtVirtualFileSystem : VirtualFileSystem() {
         qualityLevel: Int? = null,
         dirty: Boolean = false,
         hasPageImage: Boolean = false,
+        placeholder: Boolean = false,
     ): WtVirtualFile = cache.getOrPut(path) {
         WtVirtualFile(
             this, name, path, isDir, parent, stableId, revid, contentModel,
-            qualityLevel, dirty, hasPageImage,
+            qualityLevel, dirty, hasPageImage, placeholder,
         )
     }.also {
         if (parent != null) it.setParent(parent)
         // Instances are cached by path; every sighting carries the freshest
         // decoration metadata, so re-apply it to the cached instance too.
-        it.updateMeta(qualityLevel, dirty, hasPageImage)
+        it.updateMeta(qualityLevel, dirty, hasPageImage, placeholder)
     }
 
     /** Stat the backend and return a [WtVirtualFile] if the path exists. */
@@ -79,6 +80,7 @@ class WtVirtualFileSystem : VirtualFileSystem() {
                 qualityLevel = stat.qualityLevel,
                 dirty = stat.dirty,
                 hasPageImage = stat.hasPageImage,
+                placeholder = stat.placeholder,
             )
         } catch (_: VfsBackendException) {
             null

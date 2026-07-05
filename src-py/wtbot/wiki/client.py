@@ -6,6 +6,7 @@ from typing import Protocol, runtime_checkable
 from wtbot.settings import WikiSettings
 from wtbot.wiki.wiki_types import (
     EditConflict,
+    IndexPageEntry,
     PageNotFound,
     RemoteFileInfo,
     RemotePage,
@@ -53,6 +54,13 @@ class WikiClient(Protocol):
         """ProofreadPage scan image URLs + proofread quality for a Page:
         title, or None when the wiki/page has none (non-ProofreadPage wikis,
         API errors) -- enrichment, never a fetch-failing call."""
+        ...
+
+    def list_index_pages(self, title: str) -> list[IndexPageEntry] | None:
+        """Authoritative pagination of a ProofreadPage index
+        (list=proofreadpagesinindex): every slot with its real title, missing
+        pages marked by pageid None. None when the API is unavailable --
+        callers fall back to page_count interpolation."""
         ...
 
     def download_file(self, title: str, dest: Path) -> Path: ...
@@ -237,6 +245,43 @@ class PywikibotClient:
             )
         return None
 
+    def list_index_pages(self, title: str) -> list[IndexPageEntry] | None:
+        # Same plain-GET/fail-soft rationale as get_page_images: this powers
+        # fan-out optimisation and placeholder discovery, not correctness --
+        # a miss just means the page_count fallback path.
+        try:
+            import requests
+
+            resp = requests.get(
+                self.site.base_url(self.site.apipath()),
+                params={
+                    "action": "query",
+                    "list": "proofreadpagesinindex",
+                    "prppiititle": title,
+                    "prppiiprop": "ids|title",
+                    "prppiilimit": 500,
+                    "format": "json",
+                },
+                headers={"User-Agent": "wtbot (wikisource-plugin)"},
+                timeout=(5, 15),
+            )
+            data = resp.json()
+        except Exception as exc:  # noqa: BLE001 - fall back to page_count
+            logging.debug("proofreadpagesinindex failed for %s: %s", title, exc)
+            return None
+        entries = (data.get("query") or {}).get("proofreadpagesinindex")
+        if not isinstance(entries, list):
+            return None
+        return [
+            IndexPageEntry(
+                page_offset=e["pageoffset"],
+                title=e["title"],
+                pageid=e["pageid"] or None,  # the API reports missing as 0
+            )
+            for e in entries
+            if "pageoffset" in e and "title" in e
+        ] or None
+
     def download_file(self, title: str, dest: Path) -> Path:
         dest = Path(dest)
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -295,10 +340,12 @@ class FakeWikiClient:
         pages: dict[str, RemotePage] | None = None,
         files: dict[str, bytes] | None = None,
         page_images: dict[str, RemotePageImages] | None = None,
+        index_pages: dict[str, list[IndexPageEntry]] | None = None,
     ):
         self._pages = dict(pages or {})
         self._files = dict(files or {})
         self._page_images = dict(page_images or {})
+        self._index_pages = dict(index_pages or {})
 
     def get_page(self, title: str) -> RemotePage:
         try:
@@ -335,6 +382,9 @@ class FakeWikiClient:
 
     def get_page_images(self, title: str) -> RemotePageImages | None:
         return self._page_images.get(title)
+
+    def list_index_pages(self, title: str) -> list[IndexPageEntry] | None:
+        return self._index_pages.get(title)
 
     def download_file(self, title: str, dest: Path) -> Path:
         try:

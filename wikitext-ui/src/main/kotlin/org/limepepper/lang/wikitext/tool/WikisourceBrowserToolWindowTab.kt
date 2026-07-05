@@ -72,10 +72,14 @@ internal class WikisourceBrowserToolWindowTab(
                     is WtVirtualFile -> {
                         icon = if (element.isDirectory) AllIcons.Nodes.Folder else WtFileType.icon
                         // Dirty (uncommitted EditJournal edits) renders like a
-                        // modified file in VCS: blue name plus a star.
-                        val nameAttributes =
-                            if (element.dirty) DIRTY_ATTRIBUTES
-                            else SimpleTextAttributes.REGULAR_ATTRIBUTES
+                        // modified file in VCS: blue name plus a star. A
+                        // placeholder (page not created on the wiki yet) is
+                        // grey italic until it has local edits.
+                        val nameAttributes = when {
+                            element.dirty -> DIRTY_ATTRIBUTES
+                            element.placeholder -> SimpleTextAttributes.GRAYED_ITALIC_ATTRIBUTES
+                            else -> SimpleTextAttributes.REGULAR_ATTRIBUTES
+                        }
                         append(displayLabel(element.name), nameAttributes)
                         if (element.dirty) append(" *", DIRTY_ATTRIBUTES)
                         // ProofreadPage quality bullet in the pagelist colours.
@@ -209,6 +213,7 @@ internal class WikisourceBrowserToolWindowTab(
             appendLine("quality:   ${vFile.qualityLevel ?: "—"}")
             appendLine("dirty:     ${vFile.dirty}")
             appendLine("pageImage: ${vFile.hasPageImage}")
+            appendLine("placeholder: ${vFile.placeholder}")
         }
     }
 
