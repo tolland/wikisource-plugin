@@ -1,5 +1,6 @@
 import json
 import logging
+from email.message import Message
 from typing import Callable
 
 from fastapi import Request, Response
@@ -21,19 +22,60 @@ def _route_logger(route: APIRoute) -> logging.Logger:
     return logging.getLogger(f"{__name__}.{route.name}")
 
 
+def _media_type(content_type: str | None) -> str | None:
+    if not content_type:
+        return None
+    message = Message()
+    message["content-type"] = content_type
+    return message.get_content_type().lower()
+
+
+def _is_text_media_type(media_type: str | None) -> bool:
+    if media_type is None:
+        return True
+    if media_type.startswith("text/"):
+        return True
+    if media_type in {
+        "application/javascript",
+        "application/json",
+        "application/sql",
+        "application/x-www-form-urlencoded",
+        "application/xml",
+    }:
+        return True
+    return media_type.endswith("+json") or media_type.endswith("+xml")
+
+
+def _body_summary(body: bytes, content_type: str | None) -> str:
+    media_type = _media_type(content_type)
+    content_type_summary = media_type or "unknown content type"
+    return f"<{content_type_summary}; {len(body)} bytes; body not logged>"
+
+
 def _format_body(body: bytes, content_type: str | None) -> str:
+    media_type = _media_type(content_type)
+    if not _is_text_media_type(media_type):
+        return _body_summary(body, content_type)
+
     limit = _body_limit()
     truncated = limit > 0 and len(body) > limit
     visible = body[:limit] if truncated else body
 
-    if "json" in (content_type or "").lower():
+    if media_type and (
+        media_type == "application/json" or media_type.endswith("+json")
+    ):
         try:
             parsed = json.loads(visible)
             text = json.dumps(parsed, indent=2)
-        except (UnicodeDecodeError, json.JSONDecodeError):
+        except UnicodeDecodeError:
+            return _body_summary(body, content_type)
+        except json.JSONDecodeError:
             text = visible.decode(errors="replace")
     else:
-        text = visible.decode(errors="replace")
+        try:
+            text = visible.decode()
+        except UnicodeDecodeError:
+            return _body_summary(body, content_type)
 
     if truncated:
         text += f"\n... truncated {len(body) - limit} bytes ..."

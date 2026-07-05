@@ -264,7 +264,9 @@ def _fan_out_index(ctx: ProcessContext, index_page: CachedPage) -> int:
     Returns the number of child FetchRequests created.
     """
     session, req = ctx.session, ctx.request
+
     file_title = _index_to_file_title(req.title)
+
     download_file_blob(
         session, ctx.site, index_page, file_title, ctx.client, ctx.blob_root
     )
