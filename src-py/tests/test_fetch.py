@@ -7,6 +7,7 @@ from sqlmodel import Session, select
 
 from wtbot.main import create_app
 from wtbot.model import FetchRequest, FetchStatus, FileBlob, Page, PageMeta, Site
+from wtbot.model.page_meta import IndexMeta
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import RemotePage, RemotePageImages
 from wtbot.worker import run_pending
@@ -261,6 +262,16 @@ def test_index_fanout_creates_pages_and_children(app_with_index_fanout, engine):
         styles = next(p for p in pages if p.title == f"{_INDEX_TITLE}/styles.css")
         assert styles.text == ".pagetext { font-variant-numeric: oldstyle-nums; }"
         assert styles.content_model == "sanitized-css"
+
+    # IndexMeta was seeded with a filename-safe default short_name.
+    with Session(engine) as s:
+        index_page = s.exec(select(Page).where(Page.title == _INDEX_TITLE)).first()
+        meta = s.exec(
+            select(IndexMeta).where(IndexMeta.page_pk == index_page.pk)
+        ).first()
+        assert meta is not None
+        assert meta.site_pk == index_page.site_pk
+        assert meta.short_name == "Tractatus"
 
     # FileBlob row exists for the index (via the File: download).
     with Session(engine) as s:

@@ -9,6 +9,7 @@ from wtbot.model.fetch_request import FetchKind, FetchRequest, FetchStatus
 from wtbot.model.namespace import NsRole
 from wtbot.model.page_meta import PageMeta
 from wtbot.timeutil import utcnow
+from wtbot.vfs.store import PageStore
 from wtbot.wiki.client import WikiClient
 from wtbot.wiki.wiki_types import PageNotFound, RemotePage, RemotePageImages
 
@@ -271,13 +272,16 @@ def _fan_out_index(ctx: ProcessContext, index_page: CachedPage) -> int:
         session, ctx.site, index_page, file_title, ctx.client, ctx.blob_root
     )
 
+    db_index_page = session.get(Page, index_page.pk)
+    if db_index_page is not None:
+        PageStore(session).ensure_index_meta(db_index_page)
+
     # Prefer page_count set at upsert (from IndexPage.num_pages via
     # PywikibotClient); fall back to <pagelist> parsing for FakeWikiClient.
     page_count = index_page.page_count or parse_page_count(index_page.text or "")
     subpage_titles = ctx.client.list_index_subpage_titles(req.title)
 
     try:
-        db_index_page = session.get(Page, index_page.pk)
         if db_index_page is not None and page_count:
             db_index_page.page_count = page_count
             session.add(db_index_page)
