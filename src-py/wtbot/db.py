@@ -25,7 +25,9 @@ eager write lock bought nothing for the read-heavy VFS traffic.
 DEFAULT_SQLITE_URL = "sqlite:///database.db"
 
 
-def create_db_engine(url: str = DEFAULT_SQLITE_URL, *, echo: bool = False) -> Engine:
+def create_db_engine(
+    url: str = DEFAULT_SQLITE_URL, *, echo: bool | str = False
+) -> Engine:
     engine = create_engine(
         url,
         echo=echo,

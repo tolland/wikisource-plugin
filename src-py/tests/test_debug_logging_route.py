@@ -36,7 +36,8 @@ async def test_debug_logging_route_does_not_log_body_at_debug(caplog):
         response = await client.post("/echo", json={"value": "secret"})
 
     assert response.status_code == 200
-    assert "TRACE REQUEST BODY" not in caplog.text
+    assert "request body" not in caplog.text
+    assert "response 200 body" not in caplog.text
     assert "secret" not in caplog.text
 
 
@@ -49,5 +50,6 @@ async def test_debug_logging_route_logs_body_at_trace(caplog):
         response = await client.post("/echo", json={"value": "visible"})
 
     assert response.status_code == 200
-    assert "TRACE REQUEST BODY (JSON)" in caplog.text
+    assert "POST /echo request body" in caplog.text
     assert '"value": "visible"' in caplog.text
+    assert "POST /echo response 200 body" in caplog.text

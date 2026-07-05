@@ -25,6 +25,8 @@ from wtbot.api import (
     viewer,
 )
 from wtbot.db import create_db_engine, init_db
+from wtbot.logging_config import LOGGING_CONFIG, LoggingConfig, configure_logging
+from wtbot.logging_config import sqlalchemy_echo as configured_sqlalchemy_echo
 from wtbot.model import Site, SiteCredential
 from wtbot.settings import WikiSettings
 from wtbot.wiki.client import WikiClient, get_wiki_client
@@ -36,12 +38,6 @@ This is the plugin-facing contract: a thin FastAPI app over the SQLite cache.
 Surfaces (VFS, cache-fill, commit) are described in ``src-py/DESIGN.md``; only a
 health check and a sites vertical slice are wired up so far.
 """
-
-# logging.basicConfig(
-#     level=logging.INFO,
-#     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-#     datefmt="%Y-%m-%d %H:%M:%S",
-# )
 
 
 def custom_openapi():
@@ -86,11 +82,13 @@ def create_app(
     engine: Engine | None = None,
     client_factory: ClientFactory | None = None,
     blob_root: Path | str | None = None,
+    logging_config: LoggingConfig = LOGGING_CONFIG,
 ) -> FastAPI:
     """Build the app. Pass an ``engine`` to point at a different database, a
     ``client_factory`` to inject a fake wiki client, and a ``blob_root`` for
     the file-blob download cache (all three are used by tests)."""
-    engine = engine or create_db_engine()
+    configure_logging(logging_config)
+    engine = engine or create_db_engine(echo=configured_sqlalchemy_echo(logging_config))
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
