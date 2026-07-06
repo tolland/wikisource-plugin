@@ -56,11 +56,6 @@ class Page(SQLModel, table=True):
     # deliberately distinct from remote_timestamp -- conflating them is a known bug class.
     dirty: bool = Field(default=False, index=True)
 
-    # Page-role specific (null otherwise)
-    index_title: str | None = Field(default=None, index=True)
-    page_number: int | None = None
-    quality_level: int | None = None  # ProofreadPage <pagequality level="N"/>, 0-4
-
     # Index-role specific (null otherwise)
     page_count: int | None = (
         None  # total pages per the Index <pagelist> (wikitext source)

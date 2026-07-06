@@ -3,7 +3,7 @@ from sqlmodel import Session
 
 from wtbot.model import Page, Site
 from wtbot.model.namespace import NsRole
-from wtbot.model.page_meta import default_short_name
+from wtbot.model.page_meta import PageMeta, default_short_name
 from wtbot.vfs.store import PageStore
 
 """Tests for the per-role Page metadata extensions (IndexMeta / PageMeta /
@@ -38,9 +38,11 @@ def _add_page(
         title=title,
         namespace_role=role,
         content_model=cm,
-        index_title=index_title,
     )
     session.add(page)
+    session.flush()
+    if index_title is not None:
+        session.add(PageMeta(page_pk=page.pk, index_title=index_title))
     session.commit()
     session.refresh(page)
     return page

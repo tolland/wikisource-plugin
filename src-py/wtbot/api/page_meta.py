@@ -92,6 +92,9 @@ class IndexMetaUpdate(BaseModel):
 
 
 class PageMetaUpdate(BaseModel):
+    index_title: str | None = None
+    page_number: int | None = None
+    quality_level: int | None = None
     source_image_url: str | None = None
     thumb_url: str | None = None
     thumb_width: int | None = None

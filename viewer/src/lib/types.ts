@@ -87,9 +87,6 @@ export interface CachedPage {
   sha1?: string | null;
   local_modified_at?: string | null;
   dirty: boolean;
-  index_title?: string | null;
-  page_number?: number | null;
-  quality_level?: number | null;
   page_count?: number | null;
   fetch_status: string;
   fetch_error?: string | null;

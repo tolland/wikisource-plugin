@@ -30,11 +30,7 @@ from wtbot.vfs.nodes import (
     resolve,
 )
 from wtbot.vfs.paths import WikiPath
-from wtbot.vfs.store import (
-    PROOFREAD_INDEX_CONTENT_MODEL,
-    PageStore,
-    meta_has_image,
-)
+from wtbot.vfs.store import PROOFREAD_INDEX_CONTENT_MODEL, PageStore
 
 """wikisource:// overlay — the ProofreadPage-aware VFS service.
 
@@ -214,7 +210,7 @@ class WikisourceVfs:
                     page,
                     name=page.title,
                     body=body,
-                    has_image=meta_has_image(metas.get(page.pk)),
+                    meta=metas.get(page.pk),
                 )
 
         return [results[i] for i in range(len(paths))]
@@ -299,15 +295,16 @@ class WikisourceVfs:
         parent = path.normalized
         pages = self.store.proofread_pages(site, index.title)
         metas = self.store.page_metas_by_pks([p.pk for p in pages if p.pk is not None])
+
+        def page_number(p: Page) -> int:
+            meta = metas.get(p.pk)
+            return meta.page_number or 0 if meta is not None else 0
+
         return ListChildrenResponse(
             parent_path=parent,
             children=[
-                self.mw.page_node(
-                    f"{parent}/{p.title}",
-                    p,
-                    has_image=meta_has_image(metas.get(p.pk)),
-                )
-                for p in sorted(pages, key=lambda p: p.page_number or 0)
+                self.mw.page_node(f"{parent}/{p.title}", p, meta=metas.get(p.pk))
+                for p in sorted(pages, key=page_number)
             ],
         )
 

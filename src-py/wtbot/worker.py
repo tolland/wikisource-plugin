@@ -11,6 +11,7 @@ from wtbot.model import (
     Site,
     role_for_canonical,
 )
+from wtbot.model.page_meta import PageMeta
 from wtbot.page_processors import (
     CachedPage,
     ClaimedFetchRequest,
@@ -263,6 +264,14 @@ def _upsert_page(
         session.flush()
         if page.pk is None:
             raise RuntimeError(f"page {remote.title!r} did not get a primary key")
+
+        meta = session.exec(
+            select(PageMeta).where(PageMeta.page_pk == page.pk)
+        ).first()
+        target = meta if meta is not None else PageMeta(page_pk=page.pk)
+        if processor.enrich_meta(target, remote) and meta is None:
+            session.add(target)
+
         cached = CachedPage(
             pk=page.pk,
             title=page.title,

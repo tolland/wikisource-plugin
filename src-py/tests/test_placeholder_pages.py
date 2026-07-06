@@ -5,6 +5,7 @@ from sqlmodel import Session, select
 
 from wtbot.main import create_app
 from wtbot.model import EditJournal, FetchRequest, FetchStatus, Page, Site
+from wtbot.model.page_meta import PageMeta
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import IndexPageEntry, RemotePage
 from wtbot.worker import run_pending
@@ -86,20 +87,24 @@ def _unb64(s: str) -> str:
 def test_fanout_creates_stubs_and_fetches_only_existing(engine, tmp_path):
     _seed_and_fan_out(engine, tmp_path)
     with Session(engine) as s:
-        pages = s.exec(
-            select(Page).where(Page.index_title == INDEX).order_by(Page.page_number)
+        rows = s.exec(
+            select(Page, PageMeta)
+            .join(PageMeta, PageMeta.page_pk == Page.pk)
+            .where(PageMeta.index_title == INDEX)
+            .order_by(PageMeta.page_number)
         ).all()
-        assert [p.page_number for p in pages] == [1, 2, 3, 4, 5]
-        stubs = [p for p in pages if p.revid is None]
-        assert [p.page_number for p in stubs] == [1, 2, 3, 4]
-        for stub in stubs:
+        pages = [page for page, _ in rows]
+        assert [meta.page_number for _, meta in rows] == [1, 2, 3, 4, 5]
+        stubs = [(page, meta) for page, meta in rows if page.revid is None]
+        assert [meta.page_number for _, meta in stubs] == [1, 2, 3, 4]
+        for stub, _ in stubs:
             assert stub.pageid is None
             assert stub.text is None
             assert stub.content_model == "proofread-page"
             assert stub.dirty is False
 
         # Page 5 was fetched for real.
-        page5 = next(p for p in pages if p.page_number == 5)
+        page5 = next(page for page, meta in rows if meta.page_number == 5)
         assert page5.revid == 105
         assert page5.text == _PAGE_5_BODY
 

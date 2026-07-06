@@ -68,8 +68,10 @@ class IndexMeta(SQLModel, table=True):
 
 
 class PageMeta(SQLModel, table=True):
-    """Per-Page: (scan page) source-image values, for showing the page scan
-    and its thumbnail next to the transcription in the client.
+    """Per-Page: ProofreadPage metadata — the structural link to the owning
+    Index: (also used by Index-namespace assets like styles.css), the
+    proofread quality, and the (scan page) source-image values for showing
+    the page scan and its thumbnail next to the transcription in the client.
 
     Remote URLs come from imageinfo/ProofreadPage at fetch time; local paths
     are filled by the (future) raster cache that extracts page N from the
@@ -80,6 +82,11 @@ class PageMeta(SQLModel, table=True):
 
     pk: int | None = Field(default=None, primary_key=True)
     page_pk: int = Field(foreign_key="page.pk", index=True)
+
+    # ProofreadPage structure (derived from the title / Index fan-out)
+    index_title: str | None = Field(default=None, index=True)
+    page_number: int | None = None
+    quality_level: int | None = None  # ProofreadPage <pagequality level="N"/>, 0-4
 
     # Remote (from the wiki's imageinfo / ProofreadPage APIs)
     source_image_url: str | None = None  # full-size page raster

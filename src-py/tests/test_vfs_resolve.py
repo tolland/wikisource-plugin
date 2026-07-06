@@ -3,6 +3,7 @@ from sqlmodel import Session
 
 from wtbot.model import Page, Site
 from wtbot.model.namespace import NsRole
+from wtbot.model.page_meta import PageMeta
 from wtbot.vfs.nodes import (
     FileBlobLeaf,
     FileDir,
@@ -50,15 +51,13 @@ def store(engine):
                 content_model="proofread-index",
             )
         )
-        s.add(
-            Page(
-                site_pk=site.pk,
-                title=f"{INDEX}/styles.css",
-                namespace_role=NsRole.index,
-                content_model="sanitized-css",
-                index_title=INDEX,
-            )
+        styles = Page(
+            site_pk=site.pk,
+            title=f"{INDEX}/styles.css",
+            namespace_role=NsRole.index,
+            content_model="sanitized-css",
         )
+        s.add(styles)
         s.add(
             Page(
                 site_pk=site.pk,
@@ -67,16 +66,16 @@ def store(engine):
                 content_model="wikitext",
             )
         )
-        s.add(
-            Page(
-                site_pk=site.pk,
-                title=PAGE_1,
-                namespace_role=NsRole.page,
-                content_model="proofread-page",
-                index_title=INDEX,
-                page_number=1,
-            )
+        page_1 = Page(
+            site_pk=site.pk,
+            title=PAGE_1,
+            namespace_role=NsRole.page,
+            content_model="proofread-page",
         )
+        s.add(page_1)
+        s.flush()
+        s.add(PageMeta(page_pk=styles.pk, index_title=INDEX))
+        s.add(PageMeta(page_pk=page_1.pk, index_title=INDEX, page_number=1))
         s.commit()
         yield PageStore(s)
 

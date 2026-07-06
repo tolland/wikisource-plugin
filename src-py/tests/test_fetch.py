@@ -340,8 +340,11 @@ def test_worker_index_fanout_queues_index_subpages(
         asset_title,
     }
     styles = session.exec(select(Page).where(Page.title == asset_title)).one()
-    assert styles.index_title == _INDEX_TITLE
-    assert styles.page_number is None
+    styles_meta = session.exec(
+        select(PageMeta).where(PageMeta.page_pk == styles.pk)
+    ).one()
+    assert styles_meta.index_title == _INDEX_TITLE
+    assert styles_meta.page_number is None
 
 
 def test_proofread_page_metadata_uses_content_model(session):
@@ -366,13 +369,14 @@ def test_proofread_page_metadata_uses_content_model(session):
 
     assert run_pending(session, lambda _: wiki) == 1
     page = session.exec(select(Page).where(Page.title == remote.title)).one()
-    assert page.index_title == "Index:Tractatus.djvu"
-    assert page.page_number == 7
+    meta = session.exec(select(PageMeta).where(PageMeta.page_pk == page.pk)).one()
+    assert meta.index_title == "Index:Tractatus.djvu"
+    assert meta.page_number == 7
 
 
 def test_proofread_page_fetch_populates_page_meta(session):
     """Fetching a proofread-page pulls the ProofreadPage scan-image URLs and
-    quality (prop=imageforpage|proofread) into PageMeta / Page.quality_level."""
+    quality (prop=imageforpage|proofread) into PageMeta."""
     title = "Page:Tractatus.djvu/45"
     remote = RemotePage(
         title=title,
@@ -406,15 +410,16 @@ def test_proofread_page_fetch_populates_page_meta(session):
     assert run_pending(session, lambda _: wiki) == 1
 
     page = session.exec(select(Page).where(Page.title == title)).one()
-    assert page.quality_level == 1
     meta = session.exec(select(PageMeta).where(PageMeta.page_pk == page.pk)).one()
+    assert meta.quality_level == 1
     assert meta.thumb_url == "https://upload.example/thumb/page45-500px.jpg"
     assert meta.source_image_url == "https://upload.example/full/page45.jpg"
 
 
-def test_proofread_page_fetch_without_images_creates_no_page_meta(session):
+def test_proofread_page_fetch_without_images_leaves_image_fields_empty(session):
     """A wiki without the ProofreadPage image API (FakeWikiClient default)
-    must not fail the fetch or leave an empty PageMeta row behind."""
+    must not fail the fetch; the PageMeta row still carries the structural
+    index link but no image values."""
     title = "Page:Tractatus.djvu/46"
     remote = RemotePage(
         title=title,
@@ -437,11 +442,12 @@ def test_proofread_page_fetch_without_images_creates_no_page_meta(session):
 
     page = session.exec(select(Page).where(Page.title == title)).one()
     assert page.fetch_status == "done"
-    assert page.quality_level is None
-    assert (
-        session.exec(select(PageMeta).where(PageMeta.page_pk == page.pk)).first()
-        is None
-    )
+    meta = session.exec(select(PageMeta).where(PageMeta.page_pk == page.pk)).one()
+    assert meta.index_title == "Index:Tractatus.djvu"
+    assert meta.page_number == 46
+    assert meta.quality_level is None
+    assert meta.thumb_url is None
+    assert meta.source_image_url is None
 
 
 def test_refetch_updates_existing_page_meta(session):
@@ -479,9 +485,9 @@ def test_refetch_updates_existing_page_meta(session):
         assert run_pending(session, lambda _: wiki) == 1
 
     page = session.exec(select(Page).where(Page.title == title)).one()
-    assert page.quality_level == 3
     metas = session.exec(select(PageMeta).where(PageMeta.page_pk == page.pk)).all()
     assert len(metas) == 1
+    assert metas[0].quality_level == 3
     assert metas[0].thumb_url == "https://upload.example/thumb/q3.jpg"
 
 

@@ -68,13 +68,16 @@ class PageStore:
         )
 
     def proofread_pages(self, site: Site, index_title: str) -> list[Page]:
-        """All Page:-namespace members of one index."""
+        """All Page:-namespace members of one index (linked via
+        PageMeta.index_title)."""
         return list(
             self.session.exec(
-                select(Page).where(
+                select(Page)
+                .join(PageMeta, PageMeta.page_pk == Page.pk)
+                .where(
                     Page.site_pk == site.pk,
                     Page.namespace_role == NsRole.page,
-                    Page.index_title == index_title,
+                    PageMeta.index_title == index_title,
                 )
             ).all()
         )
@@ -83,11 +86,13 @@ class PageStore:
         """One Page: title, required to be a member of [index_title] — an
         arbitrary title must not resolve just because it exists on the site."""
         return self.session.exec(
-            select(Page).where(
+            select(Page)
+            .join(PageMeta, PageMeta.page_pk == Page.pk)
+            .where(
                 Page.site_pk == site.pk,
                 Page.title == title,
                 Page.namespace_role == NsRole.page,
-                Page.index_title == index_title,
+                PageMeta.index_title == index_title,
             )
         ).first()
 
@@ -98,27 +103,30 @@ class PageStore:
         and individual stat must never disagree."""
         return list(
             self.session.exec(
-                select(Page).where(
+                select(Page)
+                .join(PageMeta, PageMeta.page_pk == Page.pk)
+                .where(
                     Page.site_pk == site.pk,
                     Page.title.in_(titles),
                     Page.namespace_role == NsRole.page,
-                    Page.index_title == index_title,
+                    PageMeta.index_title == index_title,
                 )
             ).all()
         )
 
     def index_linked_assets(self, site: Site, index_title: str) -> list[Page]:
-        """Index-namespace pages tied to [index_title] via their index_title
-        link (as opposed to being title-wise subpages — see
-        MediaWikiVfs.subpages for that half)."""
+        """Index-namespace pages tied to [index_title] via their
+        PageMeta.index_title link (as opposed to being title-wise subpages —
+        see MediaWikiVfs.subpages for that half)."""
         return list(
             self.session.exec(
                 select(Page)
+                .join(PageMeta, PageMeta.page_pk == Page.pk)
                 .where(
                     Page.site_pk == site.pk,
                     Page.namespace_role == NsRole.index,
                     Page.content_model != PROOFREAD_INDEX_CONTENT_MODEL,
-                    Page.index_title == index_title,
+                    PageMeta.index_title == index_title,
                 )
                 .order_by(Page.title)
             ).all()

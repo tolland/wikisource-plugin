@@ -11,7 +11,8 @@ from wtbot.api.schemas import (
     WriteStatus,
 )
 from wtbot.model import Page, Site
-from wtbot.vfs.store import PageStore
+from wtbot.model.page_meta import PageMeta
+from wtbot.vfs.store import PageStore, meta_has_image
 
 """mediawiki:// — the title-addressed layer.
 
@@ -44,6 +45,12 @@ def _b64(body: str) -> str:
     return base64.b64encode(body.encode()).decode()
 
 
+_UNRESOLVED = object()
+"""Sentinel default for the `meta` parameters below: None is a legitimate
+precomputed answer (page has no PageMeta row), so absence needs its own
+marker."""
+
+
 def title_namespace_name(title: str) -> str:
     """The namespace prefix of a title ('' for the main namespace). Whether
     the prefix is a *real* namespace is decided against the site's Namespace
@@ -74,18 +81,24 @@ class MediaWikiVfs:
 
     # -- per-page content operations ------------------------------------------
 
+    def _resolve_meta(
+        self, page: Page, meta: PageMeta | None | object
+    ) -> PageMeta | None:
+        """`meta` may be precomputed by batched callers (one PageMeta query
+        per listing); the _UNRESOLVED default means look it up here."""
+        if meta is _UNRESOLVED:
+            return self.store.page_meta(page)
+        return meta if isinstance(meta, PageMeta) else None
+
     def page_node(
         self,
         path: str,
         page: Page,
         name: str | None = None,
-        has_image: bool | None = None,
+        meta: PageMeta | None | object = _UNRESOLVED,
     ) -> Node:
-        """`has_image` may be precomputed by batched callers (one PageMeta
-        query per listing); None means look it up here."""
         body = self.store.effective_body(page)
-        if has_image is None:
-            has_image = self.store.has_page_image(page)
+        resolved = self._resolve_meta(page, meta)
         return Node(
             path=path,
             name=name if name is not None else page.title,
@@ -96,9 +109,9 @@ class MediaWikiVfs:
             length=len(body.encode()),
             writable=True,
             content_model=page.content_model,
-            quality_level=page.quality_level,
+            quality_level=resolved.quality_level if resolved is not None else None,
             dirty=page.dirty,
-            has_page_image=has_image,
+            has_page_image=meta_has_image(resolved),
             placeholder=page.revid is None,
         )
 
@@ -108,12 +121,11 @@ class MediaWikiVfs:
         page: Page,
         name: str,
         body: str | None = None,
-        has_image: bool | None = None,
+        meta: PageMeta | None | object = _UNRESOLVED,
     ) -> Stat:
         if body is None:
             body = self.store.effective_body(page)
-        if has_image is None:
-            has_image = self.store.has_page_image(page)
+        resolved = self._resolve_meta(page, meta)
         return Stat(
             path=raw_path,
             exists=True,
@@ -124,9 +136,9 @@ class MediaWikiVfs:
             timestamp=ts_millis(page.local_modified_at or page.remote_timestamp),
             length=len(body.encode()),
             content_model=page.content_model,
-            quality_level=page.quality_level,
+            quality_level=resolved.quality_level if resolved is not None else None,
             dirty=page.dirty,
-            has_page_image=has_image,
+            has_page_image=meta_has_image(resolved),
             placeholder=page.revid is None,
         )
 

@@ -44,17 +44,17 @@ def _add_index_asset_tree(session: Session) -> None:
             content_model="proofread-index",
         )
     )
-    session.add(
-        Page(
-            site_pk=site.pk,
-            title=INDEX_STYLES,
-            namespace_role=NsRole.index,
-            content_model="sanitized-css",
-            text=".pagetext {}",
-            revid=5005,
-            index_title=INDEX,
-        )
+    styles = Page(
+        site_pk=site.pk,
+        title=INDEX_STYLES,
+        namespace_role=NsRole.index,
+        content_model="sanitized-css",
+        text=".pagetext {}",
+        revid=5005,
     )
+    session.add(styles)
+    session.flush()
+    session.add(PageMeta(page_pk=styles.pk, index_title=INDEX))
     session.commit()
 
 
@@ -90,9 +90,10 @@ def vfs_client(engine, tmp_path) -> TestClient:
             text=".pagetext {}",
             pageid=1005,
             revid=5005,
-            index_title=INDEX,
         )
         s.add(index_styles)
+        s.flush()
+        s.add(PageMeta(page_pk=index_styles.pk, index_title=INDEX))
 
         file_page = Page(
             site_pk=site.pk,
@@ -123,9 +124,6 @@ def vfs_client(engine, tmp_path) -> TestClient:
             text=_PAGE_1_BODY,
             pageid=1003,
             revid=5003,
-            index_title=INDEX,
-            page_number=1,
-            quality_level=1,
         )
         p2 = Page(
             site_pk=site.pk,
@@ -135,21 +133,24 @@ def vfs_client(engine, tmp_path) -> TestClient:
             text=_PAGE_2_BODY,
             pageid=1004,
             revid=5004,
-            index_title=INDEX,
-            page_number=2,
         )
         s.add(p1)
         s.add(p2)
         s.commit()
         s.refresh(p1)
+        s.refresh(p2)
         s.add(
             PageMeta(
                 page_pk=p1.pk,
+                index_title=INDEX,
+                page_number=1,
+                quality_level=1,
                 thumb_url="https://ws.example/thumb/page1-240px.jpg",
                 source_image_url="https://ws.example/thumb/page1-2419px.jpg",
                 thumb_width=240,
             )
         )
+        s.add(PageMeta(page_pk=p2.pk, index_title=INDEX, page_number=2))
         s.commit()
 
     with TestClient(app) as c:

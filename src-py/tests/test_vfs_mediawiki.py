@@ -2,6 +2,7 @@ import pytest
 
 from wtbot.model import Page, Site
 from wtbot.model.namespace import Namespace, NsRole
+from wtbot.model.page_meta import PageMeta
 from wtbot.vfs.mediawiki import MediaWikiVfs, title_namespace_name
 from wtbot.vfs.store import PageStore
 from wtbot.vfs.wikisource import WikisourceVfs
@@ -38,15 +39,15 @@ def site(session) -> Site:
             content_model="proofread-index",
         )
     )
-    session.add(
-        Page(
-            site_pk=site.pk,
-            title=LINKED_SUBPAGE,
-            namespace_role=NsRole.index,
-            content_model="sanitized-css",
-            index_title=INDEX,
-        )
+    linked = Page(
+        site_pk=site.pk,
+        title=LINKED_SUBPAGE,
+        namespace_role=NsRole.index,
+        content_model="sanitized-css",
     )
+    session.add(linked)
+    session.flush()
+    session.add(PageMeta(page_pk=linked.pk, index_title=INDEX))
     session.add(
         Page(
             site_pk=site.pk,

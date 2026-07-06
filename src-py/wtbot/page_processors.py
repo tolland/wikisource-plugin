@@ -19,9 +19,9 @@ The worker fetches a RemotePage and upserts the common Page fields; what
 happens *around* that differs by page type. Each type gets a processor
 class implementing [PageProcessor]:
 
-  ProofreadPageProcessor   Page:  — derive index_title/page_number, pull the
-                           scan image URLs + quality (prop=imageforpage)
-                           into PageMeta / Page.quality_level
+  ProofreadPageProcessor   Page:  — derive PageMeta.index_title/page_number,
+                           pull the scan image URLs + quality
+                           (prop=imageforpage) into PageMeta
   ProofreadIndexProcessor  Index: — page_count, File: blob, child fan-out
   IndexAssetProcessor      Index:Foo.djvu/styles.css — link to its index
   FilePageProcessor        File:  — download the binary blob
@@ -85,6 +85,13 @@ class PageProcessor:
         """Adjust type-specific Page columns. Runs inside the upsert
         transaction; must not touch the network or the session."""
 
+    def enrich_meta(self, meta: PageMeta, remote: RemotePage) -> bool:
+        """Adjust type-specific PageMeta columns; return True when the row
+        carries data worth persisting (the upsert only inserts a new PageMeta
+        row on True). Runs inside the upsert transaction; must not touch the
+        network or the session."""
+        return False
+
     def postprocess(
         self, ctx: ProcessContext, cached: CachedPage, remote: RemotePage
     ) -> ProcessOutcome:
@@ -98,14 +105,16 @@ class DefaultProcessor(PageProcessor):
 
 
 class ProofreadPageProcessor(PageProcessor):
-    def enrich(self, page: Page, remote: RemotePage) -> None:
+    def enrich_meta(self, meta: PageMeta, remote: RemotePage) -> bool:
         # Title is always "Page:{basename}/{n}"; rsplit gives (basename, n).
-        if page.index_title is None:
+        if meta.index_title is None:
             after_ns = remote.title.split(":", 1)[-1]  # "Foo.pdf/3"
             base, _, num = after_ns.rpartition("/")
             if base and num.isdigit():
-                page.index_title = f"Index:{base}"
-                page.page_number = int(num)
+                meta.index_title = f"Index:{base}"
+                meta.page_number = int(num)
+                return True
+        return False
 
     def postprocess(
         self, ctx: ProcessContext, cached: CachedPage, remote: RemotePage
@@ -140,11 +149,13 @@ class IndexAssetProcessor(PageProcessor):
     """Index namespace subpages such as Index:Foo.pdf/styles.css are assets
     of the proofread index, not proofread indexes themselves."""
 
-    def enrich(self, page: Page, remote: RemotePage) -> None:
-        if page.index_title is None:
+    def enrich_meta(self, meta: PageMeta, remote: RemotePage) -> bool:
+        if meta.index_title is None:
             parent_title, _, _ = remote.title.rpartition("/")
             if parent_title:
-                page.index_title = parent_title
+                meta.index_title = parent_title
+                return True
+        return False
 
 
 class FilePageProcessor(PageProcessor):
@@ -189,8 +200,7 @@ def processor_for(remote: RemotePage) -> PageProcessor:
 def _store_page_images(
     session: Session, page_pk: int, images: RemotePageImages
 ) -> None:
-    """Upsert PageMeta scan-image URLs and mirror the proofread quality onto
-    Page.quality_level."""
+    """Upsert PageMeta scan-image URLs and proofread quality."""
     try:
         meta = session.exec(select(PageMeta).where(PageMeta.page_pk == page_pk)).first()
         if meta is None:
@@ -200,13 +210,9 @@ def _store_page_images(
             meta.thumb_width = images.size
         if images.fullsize_url is not None:
             meta.source_image_url = images.fullsize_url
-        session.add(meta)
-
         if images.quality is not None:
-            page = session.get(Page, page_pk)
-            if page is not None:
-                page.quality_level = images.quality
-                session.add(page)
+            meta.quality_level = images.quality
+        session.add(meta)
 
         session.commit()
     except Exception:
@@ -359,17 +365,18 @@ def _ensure_placeholder_page(
     ).first()
     if existing is not None:
         return
+    page = Page(
+        site_pk=site_pk,
+        title=title,
+        namespace_role=NsRole.page,
+        content_model="proofread-page",
+        # We *know* the remote state: absent. The fetch is complete.
+        fetch_status=FetchState.done,
+    )
+    session.add(page)
+    session.flush()
     session.add(
-        Page(
-            site_pk=site_pk,
-            title=title,
-            namespace_role=NsRole.page,
-            content_model="proofread-page",
-            index_title=index_title,
-            page_number=page_number,
-            # We *know* the remote state: absent. The fetch is complete.
-            fetch_status=FetchState.done,
-        )
+        PageMeta(page_pk=page.pk, index_title=index_title, page_number=page_number)
     )
 
 

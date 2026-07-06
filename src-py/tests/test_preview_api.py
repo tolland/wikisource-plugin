@@ -7,6 +7,7 @@ from sqlmodel import Session
 from wtbot.main import create_app
 from wtbot.model import Page, Site
 from wtbot.model.namespace import NsRole
+from wtbot.model.page_meta import PageMeta
 from wtbot.wiki.client import FakeWikiClient
 
 """Tests for the /preview/render endpoint (plugin split-editor live preview)."""
@@ -50,16 +51,16 @@ def preview_client(engine, wiki_client) -> TestClient:
         s.add(site)
         s.commit()
         s.refresh(site)
-        s.add(
-            Page(
-                site_pk=site.pk,
-                title=PAGE,
-                namespace_role=NsRole.page,
-                content_model="proofread-page",
-                text="old cached body",
-                index_title=INDEX,
-            )
+        page = Page(
+            site_pk=site.pk,
+            title=PAGE,
+            namespace_role=NsRole.page,
+            content_model="proofread-page",
+            text="old cached body",
         )
+        s.add(page)
+        s.flush()
+        s.add(PageMeta(page_pk=page.pk, index_title=INDEX))
         s.commit()
     with TestClient(app) as c:
         yield c

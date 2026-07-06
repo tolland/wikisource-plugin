@@ -117,7 +117,8 @@ def serve_scan_image(
     known. Shared by GET /pages/image (canonical, 404 on None) and the
     preview pane's GET /preview/page-image (placeholder SVG on None)."""
     store = PageStore(session)
-    url = _rendition_url(store.page_meta(page), width)
+    meta = store.page_meta(page)
+    url = _rendition_url(meta, width)
     if url is None:
         return None
 
@@ -136,8 +137,8 @@ def serve_scan_image(
         request.app.state.engine,
         blob_root,
         page.site_pk,
-        page.index_title,
-        page.page_number,
+        meta.index_title if meta is not None else None,
+        meta.page_number if meta is not None else None,
         width,
     )
 
@@ -160,10 +161,12 @@ def _warm_next_page(
     try:
         with Session(engine) as session:
             nxt = session.exec(
-                select(Page).where(
+                select(Page)
+                .join(PageMeta, PageMeta.page_pk == Page.pk)
+                .where(
                     Page.site_pk == site_pk,
-                    Page.index_title == index_title,
-                    Page.page_number == page_number + 1,
+                    PageMeta.index_title == index_title,
+                    PageMeta.page_number == page_number + 1,
                 )
             ).first()
             if nxt is None or nxt.pk is None:
