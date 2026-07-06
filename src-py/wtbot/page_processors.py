@@ -302,8 +302,7 @@ def _fan_out_index(ctx: ProcessContext, index_page: CachedPage) -> int:
     elif page_count:
         basename = _index_basename(req.title)
         child_specs.extend(
-            (f"Page:{basename}/{n}", FetchKind.page)
-            for n in range(1, page_count + 1)
+            (f"Page:{basename}/{n}", FetchKind.page) for n in range(1, page_count + 1)
         )
     child_specs.extend((title, FetchKind.single) for title in subpage_titles)
 
@@ -313,7 +312,9 @@ def _fan_out_index(ctx: ProcessContext, index_page: CachedPage) -> int:
             session.add(db_index_page)
 
         for title, page_number in stub_specs:
-            _ensure_placeholder_page(session, req.site_pk, req.title, title, page_number)
+            _ensure_placeholder_page(
+                session, req.site_pk, req.title, title, page_number
+            )
 
         seen_titles: set[str] = set()
         child_count = 0

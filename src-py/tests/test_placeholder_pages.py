@@ -34,7 +34,9 @@ _ENTRIES = [
 ] + [IndexPageEntry(page_offset=5, title=PAGE_5, pageid=11605)]
 
 
-def _remote(title: str, cm: str, ns: str, key: int, text: str, revid: int) -> RemotePage:
+def _remote(
+    title: str, cm: str, ns: str, key: int, text: str, revid: int
+) -> RemotePage:
     return RemotePage(
         title=title,
         namespace_key=key,
@@ -131,11 +133,7 @@ def test_refanout_does_not_clobber_edited_stub(engine, tmp_path):
         s.commit()
         stub_pk = stub.pk
 
-        s.add(
-            FetchRequest(
-                site_pk=stub.site_pk, title=INDEX, depth=1
-            )
-        )
+        s.add(FetchRequest(site_pk=stub.site_pk, title=INDEX, depth=1))
         s.commit()
         run_pending(s, lambda _: wiki, blob_root=tmp_path / "blobs")
 
@@ -208,7 +206,9 @@ def test_placeholder_opens_with_scaffold_and_saves_as_edit(engine, tmp_path):
 def test_committing_placeholder_creates_remote_page(engine, tmp_path):
     wiki = _seed_and_fan_out(engine, tmp_path)
     path = f"{_PAGES_PATH}/Page:Sparse.pdf/4"
-    app = create_app(engine=engine, blob_root=tmp_path / "blobs", client_factory=lambda site: wiki)
+    app = create_app(
+        engine=engine, blob_root=tmp_path / "blobs", client_factory=lambda site: wiki
+    )
     with TestClient(app) as c:
         w = c.post(
             "/vfs/content",

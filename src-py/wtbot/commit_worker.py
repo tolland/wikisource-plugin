@@ -201,9 +201,7 @@ def _load_pending_page_commit(
         latest = pending[-1]
         # None stays None: a placeholder stub (never on the wiki) pushes as a
         # page *creation*, not an edit based on a fabricated revid 0.
-        base_revid = (
-            latest.base_revid if latest.base_revid is not None else page.revid
-        )
+        base_revid = latest.base_revid if latest.base_revid is not None else page.revid
         return _PendingPageCommit(
             page_pk=page_pk,
             title=page.title,
