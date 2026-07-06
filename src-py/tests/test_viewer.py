@@ -3,7 +3,7 @@ from fastapi import HTTPException
 from sqlmodel import Session, select
 
 from wtbot.api.viewer import get_index_page, list_index_pages
-from wtbot.model import NsRole, Page, Site
+from wtbot.model import IndexMeta, NsRole, Page, Site
 
 
 def _add_page(
@@ -29,10 +29,19 @@ def _add_page(
         namespace_role=role,
         content_model=content_model,
         text=text,
-        page_count=12 if content_model == "proofread-index" else None,
         revid=123,
     )
     session.add(page)
+    session.flush()
+    if content_model == "proofread-index":
+        session.add(
+            IndexMeta(
+                page_pk=page.pk,
+                site_pk=site.pk,
+                short_name=title,
+                page_count=12,
+            )
+        )
     session.commit()
     session.refresh(page)
     session.expunge(page)

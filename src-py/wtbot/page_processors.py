@@ -22,7 +22,7 @@ class implementing [PageProcessor]:
   ProofreadPageProcessor   Page:  — derive PageMeta.index_title/page_number,
                            pull the scan image URLs + quality
                            (prop=imageforpage) into PageMeta
-  ProofreadIndexProcessor  Index: — page_count, File: blob, child fan-out
+  ProofreadIndexProcessor  Index: — IndexMeta.page_count, File: blob, fan-out
   IndexAssetProcessor      Index:Foo.djvu/styles.css — link to its index
   FilePageProcessor        File:  — download the binary blob
   DefaultProcessor         anything else
@@ -56,7 +56,6 @@ class CachedPage:
     namespace_role: NsRole
     content_model: str | None
     text: str | None
-    page_count: int | None
 
 
 @dataclass(frozen=True)
@@ -126,18 +125,18 @@ class ProofreadPageProcessor(PageProcessor):
 
 
 class ProofreadIndexProcessor(PageProcessor):
-    def enrich(self, page: Page, remote: RemotePage) -> None:
-        # page_count from IndexPage.num_pages (PywikibotClient) takes priority;
-        # the <pagelist> fallback in postprocess covers FakeWikiClient tests.
-        if remote.page_count is not None:
-            page.page_count = remote.page_count
-
     def postprocess(
         self, ctx: ProcessContext, cached: CachedPage, remote: RemotePage
     ) -> ProcessOutcome:
         if ctx.request.depth <= 0:
+            # No fan-out, but still record page_count from the cheap sources
+            # (IndexPage.num_pages, or the <pagelist> in the body) so a
+            # depth-0 index fetch populates it just like the old enrich did.
+            _record_index_page_count(
+                ctx, cached, remote.page_count or parse_page_count(cached.text or "")
+            )
             return _DONE
-        child_count = _fan_out_index(ctx, cached)
+        child_count = _fan_out_index(ctx, cached, remote)
         return ProcessOutcome(
             status=FetchStatus.in_progress if child_count > 0 else FetchStatus.done,
             progress_total=1 + child_count,
@@ -195,6 +194,28 @@ def processor_for(remote: RemotePage) -> PageProcessor:
 # ---------------------------------------------------------------------------
 # Shared side-effect helpers
 # ---------------------------------------------------------------------------
+
+
+def _record_index_page_count(
+    ctx: ProcessContext, cached: CachedPage, page_count: int | None
+) -> None:
+    """Ensure the Index's IndexMeta row exists and record [page_count] on it,
+    in its own short transaction (postprocess runs outside the upsert)."""
+    if not page_count:
+        return
+    session = ctx.session
+    try:
+        db_index_page = session.get(Page, cached.pk)
+        if db_index_page is None:
+            return
+        store = PageStore(session)
+        store.set_index_page_count(store.ensure_index_meta(db_index_page), page_count)
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.rollback()
 
 
 def _store_page_images(
@@ -265,7 +286,9 @@ def download_file_blob(
         session.rollback()
 
 
-def _fan_out_index(ctx: ProcessContext, index_page: CachedPage) -> int:
+def _fan_out_index(
+    ctx: ProcessContext, index_page: CachedPage, remote: RemotePage
+) -> int:
     """Download the File: blob, enumerate the index pagination, enqueue
     fetches for pages that exist remotely and create placeholder stub rows
     for the ones that do not.
@@ -286,13 +309,15 @@ def _fan_out_index(ctx: ProcessContext, index_page: CachedPage) -> int:
         session, ctx.site, index_page, file_title, ctx.client, ctx.blob_root
     )
 
+    store = PageStore(session)
     db_index_page = session.get(Page, index_page.pk)
-    if db_index_page is not None:
-        PageStore(session).ensure_index_meta(db_index_page)
+    index_meta = (
+        store.ensure_index_meta(db_index_page) if db_index_page is not None else None
+    )
 
-    # Prefer page_count set at upsert (from IndexPage.num_pages via
-    # PywikibotClient); fall back to <pagelist> parsing for FakeWikiClient.
-    page_count = index_page.page_count or parse_page_count(index_page.text or "")
+    # Prefer page_count from IndexPage.num_pages (via PywikibotClient); fall
+    # back to <pagelist> parsing for FakeWikiClient.
+    page_count = remote.page_count or parse_page_count(index_page.text or "")
     subpage_titles = ctx.client.list_index_subpage_titles(req.title)
     entries = ctx.client.list_index_pages(req.title)
 
@@ -313,9 +338,8 @@ def _fan_out_index(ctx: ProcessContext, index_page: CachedPage) -> int:
     child_specs.extend((title, FetchKind.single) for title in subpage_titles)
 
     try:
-        if db_index_page is not None and page_count:
-            db_index_page.page_count = page_count
-            session.add(db_index_page)
+        if index_meta is not None and page_count:
+            store.set_index_page_count(index_meta, page_count)
 
         for title, page_number in stub_specs:
             _ensure_placeholder_page(

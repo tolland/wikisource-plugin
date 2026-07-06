@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from wtbot.deps import get_session
-from wtbot.model import Page
+from wtbot.model import IndexMeta, Page
 
 router = APIRouter(prefix="/viewer", tags=["viewer"])
 
@@ -23,11 +23,11 @@ class IndexPageDetail(IndexPageSummary):
     body: str
 
 
-def _summary(page: Page) -> IndexPageSummary:
+def _summary(page: Page, page_count: int | None) -> IndexPageSummary:
     return IndexPageSummary(
         pk=page.pk or 0,
         title=page.title,
-        page_count=page.page_count,
+        page_count=page_count,
         revid=page.revid,
         content_model=page.content_model,
         body_length=len(page.text or ""),
@@ -41,7 +41,8 @@ def list_index_pages(session: Session = Depends(get_session)) -> list[IndexPageS
         .where(Page.content_model == PROOFREAD_INDEX_CONTENT_MODEL)
         .order_by(Page.title)
     ).all()
-    return [_summary(page) for page in pages]
+    counts = _page_counts(session, [p.pk for p in pages if p.pk is not None])
+    return [_summary(page, counts.get(page.pk)) for page in pages]
 
 
 @router.get("/indexes/{page_pk}", response_model=IndexPageDetail)
@@ -52,5 +53,14 @@ def get_index_page(
     if page is None or page.content_model != PROOFREAD_INDEX_CONTENT_MODEL:
         raise HTTPException(status_code=404, detail="index page not found")
 
-    summary = _summary(page)
+    page_count = _page_counts(session, [page.pk]).get(page.pk)
+    summary = _summary(page, page_count)
     return IndexPageDetail(**summary.model_dump(), body=page.text or "")
+
+
+def _page_counts(session: Session, page_pks: list[int]) -> dict[int, int | None]:
+    """Index page_count now lives on IndexMeta; look it up per Index page_pk."""
+    if not page_pks:
+        return {}
+    rows = session.exec(select(IndexMeta).where(IndexMeta.page_pk.in_(page_pks))).all()
+    return {row.page_pk: row.page_count for row in rows}

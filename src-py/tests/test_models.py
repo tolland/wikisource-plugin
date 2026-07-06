@@ -51,7 +51,6 @@ def test_index_fanout_and_journal(session):
         site_pk=site.pk,
         title="Index:Tractatus.djvu",
         namespace_role=NsRole.index,
-        page_count=2,
     )
     session.add(index)
     session.commit()

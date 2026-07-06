@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
 from wtbot.main import create_app
-from wtbot.model import EditJournal, FetchRequest, FetchStatus, Page, Site
+from wtbot.model import EditJournal, FetchRequest, FetchStatus, IndexMeta, Page, Site
 from wtbot.model.page_meta import PageMeta
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import IndexPageEntry, RemotePage
@@ -93,7 +93,6 @@ def test_fanout_creates_stubs_and_fetches_only_existing(engine, tmp_path):
             .where(PageMeta.index_title == INDEX)
             .order_by(PageMeta.page_number)
         ).all()
-        pages = [page for page, _ in rows]
         assert [meta.page_number for _, meta in rows] == [1, 2, 3, 4, 5]
         stubs = [(page, meta) for page, meta in rows if page.revid is None]
         assert [meta.page_number for _, meta in stubs] == [1, 2, 3, 4]
@@ -123,9 +122,13 @@ def test_fanout_creates_stubs_and_fetches_only_existing(engine, tmp_path):
         ).one()
         assert parent.status == FetchStatus.done
         assert parent.progress_total == 2
-        # page_count derived from the pagination when <pagelist> is bare.
+        # page_count derived from the pagination when <pagelist> is bare,
+        # recorded on the Index's IndexMeta row.
         index_row = s.exec(select(Page).where(Page.title == INDEX)).one()
-        assert index_row.page_count == 5
+        index_meta = s.exec(
+            select(IndexMeta).where(IndexMeta.page_pk == index_row.pk)
+        ).one()
+        assert index_meta.page_count == 5
 
 
 def test_refanout_does_not_clobber_edited_stub(engine, tmp_path):

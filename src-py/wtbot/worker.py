@@ -265,9 +265,7 @@ def _upsert_page(
         if page.pk is None:
             raise RuntimeError(f"page {remote.title!r} did not get a primary key")
 
-        meta = session.exec(
-            select(PageMeta).where(PageMeta.page_pk == page.pk)
-        ).first()
+        meta = session.exec(select(PageMeta).where(PageMeta.page_pk == page.pk)).first()
         target = meta if meta is not None else PageMeta(page_pk=page.pk)
         if processor.enrich_meta(target, remote) and meta is None:
             session.add(target)
@@ -278,7 +276,6 @@ def _upsert_page(
             namespace_role=page.namespace_role,
             content_model=page.content_model,
             text=page.text,
-            page_count=page.page_count,
         )
         session.commit()
         return cached

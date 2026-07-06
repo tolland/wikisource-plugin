@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from vcr_config import FIXTURES_DIR, cassette_exists, make_vcr
 
-from wtbot.model import FetchStatus, FileBlob, Page
+from wtbot.model import FetchStatus, FileBlob, IndexMeta, Page
 from wtbot.settings import WikiSettings
 from wtbot.wiki.client import PywikibotClient
 
@@ -183,14 +183,15 @@ def test_en_ws_fanout_index(engine, tmp_path):
 
     index_page = body["page"]
     assert index_page["content_model"] == "proofread-index"
-    assert index_page["page_count"] is not None and index_page["page_count"] > 0
 
     with Session(engine) as s:
         all_pages = s.exec(select(Page)).all()
-        # index + all page children
-        assert len(all_pages) == 1 + index_page["page_count"]
-
         idx = next(p for p in all_pages if p.title == PEIRCE_INDEX)
+        index_meta = s.exec(select(IndexMeta).where(IndexMeta.page_pk == idx.pk)).one()
+        assert index_meta.page_count is not None and index_meta.page_count > 0
+        # index + all page children
+        assert len(all_pages) == 1 + index_meta.page_count
+
         fb = s.exec(select(FileBlob).where(FileBlob.page_pk == idx.pk)).first()
         assert fb is not None
         assert fb.mime == "application/pdf"
@@ -297,13 +298,14 @@ def test_lan_fanout_index(engine, tmp_path):
 
     index_page = body["page"]
     assert index_page["content_model"] == "proofread-index"
-    assert index_page["page_count"] is not None and index_page["page_count"] > 0
 
     with Session(engine) as s:
         all_pages = s.exec(select(Page)).all()
-        assert len(all_pages) == 1 + index_page["page_count"]
-
         idx = next(p for p in all_pages if p.title == PEIRCE_INDEX)
+        index_meta = s.exec(select(IndexMeta).where(IndexMeta.page_pk == idx.pk)).one()
+        assert index_meta.page_count is not None and index_meta.page_count > 0
+        assert len(all_pages) == 1 + index_meta.page_count
+
         fb = s.exec(select(FileBlob).where(FileBlob.page_pk == idx.pk)).first()
         assert fb is not None
         assert fb.mime == "application/pdf"

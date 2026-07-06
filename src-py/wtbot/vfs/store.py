@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 
+from sqlalchemy import func
 from sqlmodel import Session, select
 
 from wtbot.model import EditJournal, FileBlob, Page, Site
@@ -15,6 +16,21 @@ the edit-journal write discipline.
 """
 
 PROOFREAD_INDEX_CONTENT_MODEL = "proofread-index"
+
+
+def canonical_title(title: str) -> str:
+    """MediaWiki treats underscores and spaces as equivalent in titles, so
+    the same Index: can reach us in either form — a fetched Page: keeps the
+    wiki's literal title (spaces), while a fan-out stub is generated from the
+    request title (often underscores). We preserve whatever was stored and
+    normalize only for comparison. See `_index_title_matches`."""
+    return title.replace("_", " ")
+
+
+def _index_title_matches(index_title: str):
+    """SQL predicate comparing PageMeta.index_title to [index_title] with the
+    underscore/space normalization applied to both sides."""
+    return func.replace(PageMeta.index_title, "_", " ") == canonical_title(index_title)
 
 
 def meta_has_image(meta: PageMeta | None) -> bool:
@@ -77,7 +93,7 @@ class PageStore:
                 .where(
                     Page.site_pk == site.pk,
                     Page.namespace_role == NsRole.page,
-                    PageMeta.index_title == index_title,
+                    _index_title_matches(index_title),
                 )
             ).all()
         )
@@ -92,7 +108,7 @@ class PageStore:
                 Page.site_pk == site.pk,
                 Page.title == title,
                 Page.namespace_role == NsRole.page,
-                PageMeta.index_title == index_title,
+                _index_title_matches(index_title),
             )
         ).first()
 
@@ -109,7 +125,7 @@ class PageStore:
                     Page.site_pk == site.pk,
                     Page.title.in_(titles),
                     Page.namespace_role == NsRole.page,
-                    PageMeta.index_title == index_title,
+                    _index_title_matches(index_title),
                 )
             ).all()
         )
@@ -126,7 +142,7 @@ class PageStore:
                     Page.site_pk == site.pk,
                     Page.namespace_role == NsRole.index,
                     Page.content_model != PROOFREAD_INDEX_CONTENT_MODEL,
-                    PageMeta.index_title == index_title,
+                    _index_title_matches(index_title),
                 )
                 .order_by(Page.title)
             ).all()
@@ -189,6 +205,14 @@ class PageStore:
         self.session.commit()
         self.session.refresh(meta)
         return meta
+
+    def set_index_page_count(self, meta: IndexMeta, page_count: int) -> None:
+        """Record the Index's total page count on its IndexMeta row. Staged
+        on the session (not committed) so it lands in the caller's fan-out
+        transaction alongside the stub rows and child requests."""
+        if meta.page_count != page_count:
+            meta.page_count = page_count
+            self.session.add(meta)
 
     def page_meta(self, page: Page) -> PageMeta | None:
         return self.session.exec(

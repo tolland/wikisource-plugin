@@ -13,6 +13,7 @@ from fastapi import (
     Request,
     Response,
 )
+from sqlalchemy import func
 from sqlmodel import Session, select
 
 from wtbot.deps import get_session
@@ -20,7 +21,7 @@ from wtbot.model import Page
 from wtbot.model.page_meta import PageMeta
 from wtbot.settings import WikiSettings
 from wtbot.vfs.nodes import PageLeaf, resolve
-from wtbot.vfs.store import PageStore
+from wtbot.vfs.store import PageStore, canonical_title
 
 """Scan-image bytes for proofread pages.
 
@@ -165,7 +166,8 @@ def _warm_next_page(
                 .join(PageMeta, PageMeta.page_pk == Page.pk)
                 .where(
                     Page.site_pk == site_pk,
-                    PageMeta.index_title == index_title,
+                    func.replace(PageMeta.index_title, "_", " ")
+                    == canonical_title(index_title),
                     PageMeta.page_number == page_number + 1,
                 )
             ).first()

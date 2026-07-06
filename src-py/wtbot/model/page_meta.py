@@ -64,6 +64,7 @@ class IndexMeta(SQLModel, table=True):
     site_pk: int = Field(foreign_key="site.pk", index=True)
 
     short_name: str
+    page_count: int | None = None  # total pages per the Index (pagelist/IndexPage)
     # Room to grow: image_name_pattern, OCR region templates, ...
 
 

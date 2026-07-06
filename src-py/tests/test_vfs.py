@@ -76,7 +76,6 @@ def vfs_client(engine, tmp_path) -> TestClient:
             namespace_role=NsRole.index,
             content_model="proofread-index",
             text=_INDEX_BODY,
-            page_count=2,
             pageid=1001,
             revid=5001,
         )

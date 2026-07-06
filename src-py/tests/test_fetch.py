@@ -222,10 +222,8 @@ def test_index_fanout_creates_pages_and_children(app_with_index_fanout, engine):
     assert req["progress_total"] == 5  # 1 index + 3 pages + styles.css
     assert req["progress_done"] == 5
 
-    # Index page carries page_count (from <pagelist> wikitext).
     page = body["page"]
     assert page is not None
-    assert page["page_count"] == 3
 
     # Blob was written to the configured blob_root.
     blob_file = tmp_path / "blobs" / "mywikisource" / "en" / "Tractatus.djvu"
@@ -254,6 +252,14 @@ def test_index_fanout_creates_pages_and_children(app_with_index_fanout, engine):
         titles = {p.title for p in pages}
         assert _INDEX_TITLE in titles
         assert f"{_INDEX_TITLE}/styles.css" in titles
+
+        # page_count (from <pagelist> wikitext) is recorded on IndexMeta.
+        index_row = next(p for p in pages if p.title == _INDEX_TITLE)
+        index_meta = s.exec(
+            select(IndexMeta).where(IndexMeta.page_pk == index_row.pk)
+        ).one()
+        assert index_meta.page_count == 3
+
         for n in range(1, 4):
             assert f"Page:Tractatus.djvu/{n}" in titles
         page_one = next(p for p in pages if p.title == "Page:Tractatus.djvu/1")

@@ -56,11 +56,6 @@ class Page(SQLModel, table=True):
     # deliberately distinct from remote_timestamp -- conflating them is a known bug class.
     dirty: bool = Field(default=False, index=True)
 
-    # Index-role specific (null otherwise)
-    page_count: int | None = (
-        None  # total pages per the Index <pagelist> (wikitext source)
-    )
-
     fetch_status: FetchState = FetchState.unfetched
     fetch_error: str | None = None
 

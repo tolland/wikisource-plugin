@@ -117,3 +117,43 @@ def test_overlay_index_children_include_subpages_when_enabled(session, site):
     names = [c.name for c in WikisourceVfs(session).list_children(_INDEX_PATH).children]
     assert "styles.css" in names
     assert "legacy.css" in names
+
+
+def test_proofread_pages_match_across_underscore_space(session):
+    """MediaWiki treats '_' and ' ' as equivalent in titles, so a fetched
+    Page: (wiki's literal spaced title) and a fan-out stub (generated from the
+    underscore request title) can carry different index_title spellings for
+    the same Index. The membership query must match both."""
+    site = Site(family=FAMILY, code=CODE)
+    session.add(site)
+    session.commit()
+    session.refresh(site)
+
+    spaced = "Index:Unreported RTT Pathway Removals at MSE FT.pdf"
+    underscored = "Index:Unreported_RTT_Pathway_Removals_at_MSE_FT.pdf"
+
+    real = Page(
+        site_pk=site.pk,
+        title="Page:Unreported RTT Pathway Removals at MSE FT.pdf/5",
+        namespace_role=NsRole.page,
+        content_model="proofread-page",
+    )
+    stub = Page(
+        site_pk=site.pk,
+        title="Page:Unreported_RTT_Pathway_Removals_at_MSE_FT.pdf/1",
+        namespace_role=NsRole.page,
+        content_model="proofread-page",
+    )
+    session.add(real)
+    session.add(stub)
+    session.flush()
+    # Real page linked with spaces; stub linked with underscores.
+    session.add(PageMeta(page_pk=real.pk, index_title=spaced, page_number=5))
+    session.add(PageMeta(page_pk=stub.pk, index_title=underscored, page_number=1))
+    session.commit()
+
+    store = PageStore(session)
+    # Querying by either spelling returns both members.
+    for query_title in (spaced, underscored):
+        titles = {p.title for p in store.proofread_pages(site, query_title)}
+        assert titles == {real.title, stub.title}, query_title
