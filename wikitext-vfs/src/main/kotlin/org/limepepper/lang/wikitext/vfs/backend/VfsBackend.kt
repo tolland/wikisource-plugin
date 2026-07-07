@@ -39,6 +39,14 @@ interface VfsBackend {
     fun renderPreview(path: String?, title: String?, wikitext: String): PreviewResult
 
     /**
+     * Navigation metadata for a ProofreadPage Page: leaf — its page number,
+     * position within the index, and the previous/next sibling paths that
+     * the editor's page back/forward actions open. Throws
+     * [VfsBackendException] when [path] is not a proofread page.
+     */
+    fun pageNav(path: String): PageNavResult
+
+    /**
      * URL of the reference scan image for a ProofreadPage Page: — the source
      * the transcription is being proofread against. Building the URL is local
      * and cheap; the image itself is fetched by whoever renders it (JCEF).

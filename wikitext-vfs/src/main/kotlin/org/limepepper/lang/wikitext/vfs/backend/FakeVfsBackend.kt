@@ -126,6 +126,32 @@ class FakeVfsBackend : VfsBackend {
         )
     }
 
+    override fun pageNav(path: String): PageNavResult {
+        val e = entries[path]
+        if (e == null || e.kind != NodeKind.file) {
+            throw VfsBackendException("not a proofread page: $path")
+        }
+        val parentPath = childrenOf.entries.firstOrNull { path in it.value }?.key
+            ?: throw VfsBackendException("not a proofread page: $path")
+        // Registration order stands in for the real backend's page_number sort.
+        val siblings = childrenOf[parentPath].orEmpty()
+            .mapNotNull { entries[it] }
+            .filter { it.kind == NodeKind.file }
+        val pos = siblings.indexOfFirst { it.path == path }
+        fun entryOf(s: Entry?): PageNavEntry? = s?.let { PageNavEntry(it.path, it.name) }
+        val indexPath = parentPath.removeSuffix("/Pages")
+        return PageNavResult(
+            current = PageNavEntry(e.path, e.name),
+            indexPath = indexPath,
+            indexTitle = indexPath.substringAfterLast('/'),
+            pageCount = siblings.size,
+            position = pos + 1,
+            total = siblings.size,
+            prev = entryOf(siblings.getOrNull(pos - 1)),
+            next = entryOf(siblings.getOrNull(pos + 1)),
+        )
+    }
+
     override fun pageImageUrl(path: String?, title: String?): String {
         val svg = """<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1200">""" +
             """<rect width="100%" height="100%" fill="#f8f4e8"/></svg>"""

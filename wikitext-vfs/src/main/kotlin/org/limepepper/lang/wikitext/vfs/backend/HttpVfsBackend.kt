@@ -149,6 +149,34 @@ class HttpVfsBackend(
         }
     }
 
+    override fun pageNav(path: String): PageNavResult {
+        val json = get("/pages/nav", "path" to path)
+        // current/prev/next carry the same field names (path/title/page_number),
+        // so each is read from its own extracted sub-object — never from the
+        // full response, where JsonReader's first-occurrence scan would cross
+        // object boundaries.
+        fun entry(r: JsonReader?): PageNavEntry? = r?.run {
+            PageNavEntry(
+                path = string("path"),
+                title = string("title"),
+                pageNumber = longOrNull("page_number")?.toInt(),
+            )
+        }
+        return JsonReader(json).run {
+            PageNavResult(
+                current = entry(objectOrNull("current"))
+                    ?: throw VfsBackendException("malformed /pages/nav response: no 'current'"),
+                indexPath = string("index_path"),
+                indexTitle = string("index_title"),
+                pageCount = longOrNull("page_count")?.toInt(),
+                position = longOrNull("position")?.toInt() ?: 0,
+                total = longOrNull("total")?.toInt() ?: 0,
+                prev = entry(objectOrNull("prev")),
+                next = entry(objectOrNull("next")),
+            )
+        }
+    }
+
     override fun pageImageUrl(path: String?, title: String?): String {
         val query = listOfNotNull(
             path?.let { "path" to it },

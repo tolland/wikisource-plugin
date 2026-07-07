@@ -80,6 +80,31 @@ data class PreviewResult(
         String(java.util.Base64.getDecoder().decode(htmlBase64), Charsets.UTF_8)
 }
 
+/** One Page: in [PageNavResult], addressed the way files are opened — by VFS path. */
+data class PageNavEntry(
+    val path: String,
+    val title: String,
+    val pageNumber: Int? = null,
+)
+
+/**
+ * Page-navigation metadata for a proofread Page: leaf, from GET /pages/nav —
+ * where the page sits within its index and which siblings the editor's
+ * back/forward buttons should open. Sibling order matches the Pages/ listing.
+ */
+data class PageNavResult(
+    val current: PageNavEntry,
+    val indexPath: String,
+    val indexTitle: String,
+    /** The index's total page count (IndexMeta), when known. */
+    val pageCount: Int? = null,
+    /** 1-based position among the index's currently cached pages. */
+    val position: Int,
+    val total: Int,
+    val prev: PageNavEntry? = null,
+    val next: PageNavEntry? = null,
+)
+
 data class WriteResult(
     val path: String,
     val status: WriteStatus,

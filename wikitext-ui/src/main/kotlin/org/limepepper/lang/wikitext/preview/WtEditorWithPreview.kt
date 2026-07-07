@@ -34,7 +34,7 @@ sealed class WtEditorWithPreview(
 
         if (profile.hasPageNavigation) {
             (textEditor.editor as? EditorEx)?.let { editor ->
-                val navBar = WtPageNavToolbar(editor.component).component
+                val navBar = WtPageNavToolbar(editor.component, textEditor.file).component
                 // Permanent so the row comes back when the find bar (which
                 // shares the header slot) is closed.
                 editor.permanentHeaderComponent = navBar

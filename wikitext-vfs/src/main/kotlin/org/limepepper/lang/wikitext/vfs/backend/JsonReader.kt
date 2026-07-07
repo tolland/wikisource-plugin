@@ -61,6 +61,44 @@ internal class JsonReader(private val json: String) {
     }
 
     /**
+     * Extracts a nested JSON object value for [key] as its own [JsonReader],
+     * or null when the key is absent or its value is `null`. The returned
+     * reader sees only the nested object's text, so its field keys cannot
+     * collide with same-named keys elsewhere in the parent.
+     */
+    fun objectOrNull(key: String): JsonReader? {
+        val keyToken = "\"$key\""
+        var i = json.indexOf(keyToken)
+        if (i == -1) return null
+        i += keyToken.length
+        while (i < json.length && json[i].isWhitespace()) i++
+        if (i >= json.length || json[i] != ':') return null
+        i++
+        while (i < json.length && json[i].isWhitespace()) i++
+        if (i >= json.length || json[i] != '{') return null
+        val start = i
+        var depth = 0
+        var inString = false
+        while (i < json.length) {
+            val c = json[i]
+            when {
+                inString -> when (c) {
+                    '\\' -> i++ // skip the escaped char
+                    '"' -> inString = false
+                }
+                c == '"' -> inString = true
+                c == '{' -> depth++
+                c == '}' -> {
+                    depth--
+                    if (depth == 0) return JsonReader(json.substring(start, i + 1))
+                }
+            }
+            i++
+        }
+        return null
+    }
+
+    /**
      * Extracts a JSON array value for [key] and maps each element object
      * through [block]. Objects must be flat (no nested arrays/objects).
      */
