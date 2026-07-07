@@ -99,7 +99,7 @@ MediaWiki content model via `WtEditorProfile.forFile()` (backed by
 
 | content model     | editor                   | reference image | page nav | notes |
 |-------------------|--------------------------|-----------------|----------|-------|
-| `proofread-page`  | `WtProofreadPageEditor`  | yes             | yes      | `<noinclude>` header/footer convention must survive round trips (buffer holds the serialized form verbatim today; three-field editing is future work) |
+| `proofread-page`  | `WtProofreadPageEditor`  | yes             | yes      | editor half is a three-field `WtProofreadPageForm` (header/body/footer) over the serialized buffer; the `<noinclude>` convention is parsed/reassembled by `ProofreadPageParts` and survives round trips |
 | `proofread-index` | `WtProofreadIndexEditor` | no              | no       | body renders through `{{:MediaWiki:Proofreadpage_index_template}}` — already reflected in the preview since the sidecar passes the content model to `action=parse` |
 | anything else     | `WtWikitextEditor`       | no              | no       | unrestricted fallback (also all local scratch files, which carry no content model) |
 
@@ -117,8 +117,8 @@ carry a permanent inset toolbar instead of actions on the platform's
 hover/floating toolbar: the preview pane owns `WtPreviewToolbar` (one toolbar,
 two button sets switched by mode via action `update()` visibility — render:
 toggle/reload; image: toggle/zoom in/out/reset zoom/send-to-OCR stub), and the
-text editor gets `WtPageNavToolbar` as its header component with previous/next
-page stubs for walking the index. The image URL comes from
+proofread editor's `WtProofreadPageForm` carries `WtPageNavToolbar` across its
+top with previous/next page stubs for walking the index. The image URL comes from
 `VfsBackend.pageImageUrl()`, which points at the sidecar's
 `GET /preview/page-image?path=…`. The endpoint serves the real scan raster by
 **proxying** it (a proxy rather than a redirect so a dead upstream URL can

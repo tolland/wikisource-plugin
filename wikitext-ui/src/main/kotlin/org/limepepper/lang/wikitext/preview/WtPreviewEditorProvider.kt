@@ -21,7 +21,7 @@ class WtPreviewEditorProvider : FileEditorProvider, DumbAware {
         val previewEditor = WtRenderPreviewBrowser(file, profile)
 
         return when (profile) {
-            WtEditorProfile.PROOFREAD_PAGE -> WtProofreadPageEditor(textEditor, previewEditor)
+            WtEditorProfile.PROOFREAD_PAGE -> WtProofreadPageEditor(project, textEditor, previewEditor)
             WtEditorProfile.PROOFREAD_INDEX -> WtProofreadIndexEditor(textEditor, previewEditor)
             WtEditorProfile.WIKITEXT -> WtWikitextEditor(textEditor, previewEditor)
         }

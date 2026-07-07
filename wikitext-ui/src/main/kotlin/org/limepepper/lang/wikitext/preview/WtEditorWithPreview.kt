@@ -1,21 +1,19 @@
 package org.limepepper.lang.wikitext.preview
 
-import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.fileEditor.TextEditorWithPreview
 
 /**
  * Base of the wikitext split editors. One concrete subclass exists per
  * [WtEditorProfile] — [WtPreviewEditorProvider] picks it from the file's
- * MediaWiki content model. Shared wiring lives here; the subclasses are the
- * stubs where per-model behavior (ProofreadPage header/footer handling,
- * index-specific forms, …) will grow.
+ * MediaWiki content model. Shared wiring lives here; the subclasses are where
+ * per-model behavior (ProofreadPage header/footer handling, index-specific
+ * forms, …) grows.
  *
- * Both halves carry their own inset toolbar instead of actions on the
- * platform's hover toolbar: the preview pane owns [WtPreviewToolbar]
- * (mode toggle / reload / zoom / OCR) and, for profiles with page
- * navigation, the text editor gets [WtPageNavToolbar] as its header
- * component (page back/forward).
+ * The preview pane carries its own inset [WtPreviewToolbar] (mode toggle /
+ * reload / zoom / OCR) instead of actions on the platform's hover toolbar.
+ * Page navigation is a proofread-page concern and lives in
+ * [WtProofreadPageForm] alongside the header/body/footer fields it belongs to.
  */
 sealed class WtEditorWithPreview(
     textEditor: TextEditor,
@@ -31,16 +29,6 @@ sealed class WtEditorWithPreview(
     init {
         // Initialize TextEditorWithPreview's lazy UI before disposal-sensitive editor switching can occur.
         component
-
-        if (profile.hasPageNavigation) {
-            (textEditor.editor as? EditorEx)?.let { editor ->
-                val navBar = WtPageNavToolbar(editor.component, textEditor.file).component
-                // Permanent so the row comes back when the find bar (which
-                // shares the header slot) is closed.
-                editor.permanentHeaderComponent = navBar
-                editor.headerComponent = navBar
-            }
-        }
     }
 }
 
