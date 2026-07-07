@@ -6,11 +6,21 @@
 |Author=[[Author:J._L._Austin|J. L. Austin]]
 |Translator=
 |Validation_date=
-|Pages=<pagelist
-  1to6=roman
-  1=3
-  7=1
-/>
+|Pages=Title
+<pagelist from=1 to=1
+
+ />
+===Frontmatter===
+<pagelist from=2 to=4
+ 2to4=roman
+2=4
+ />
+Contents
+<pagelist from=5 to=8
+ 5to7=roman
+  5=7
+8=blank
+ />
 |Volumes=
 |Remarks=
 |tmplver=

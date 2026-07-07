@@ -133,6 +133,7 @@ public class WtParser implements PsiParser, LightPsiParser {
 
   /* ********************************************************** */
   // internal_link
+  //               | heading
   //               | html_tag
   //               | verbatim_tag
   //               | comment
@@ -141,11 +142,13 @@ public class WtParser implements PsiParser, LightPsiParser {
   //               | LINK_DISPLAY_TEXT
   //               | CHAR_ENTITY_REF
   //               | ENTITY_REF
+  //               | PRE_START
   public static boolean inline_item(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "inline_item")) return false;
     boolean r;
     Marker m = enter_section_(b, l, _NONE_, INLINE_ITEM, "<inline item>");
     r = internal_link(b, l + 1);
+    if (!r) r = heading(b, l + 1);
     if (!r) r = html_tag(b, l + 1);
     if (!r) r = verbatim_tag(b, l + 1);
     if (!r) r = comment(b, l + 1);
@@ -154,6 +157,7 @@ public class WtParser implements PsiParser, LightPsiParser {
     if (!r) r = consumeToken(b, LINK_DISPLAY_TEXT);
     if (!r) r = consumeToken(b, CHAR_ENTITY_REF);
     if (!r) r = consumeToken(b, ENTITY_REF);
+    if (!r) r = consumeToken(b, PRE_START);
     exit_section_(b, l, m, r, false, null);
     return r;
   }

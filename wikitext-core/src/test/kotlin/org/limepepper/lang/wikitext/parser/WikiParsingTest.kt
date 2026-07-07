@@ -15,6 +15,10 @@ class WikiParsingTest : WtParsingTextCase() {
     fun testWikiTableSimple() = doTest()
     fun testTableWithMathTag() = doTest()
 
+    // templates
+    fun testAuthorTemplate() = doTest()
+    fun testProofreadpage_index_template() = doTest()
+
     fun testParsingTestData() {
         doTest()
     }

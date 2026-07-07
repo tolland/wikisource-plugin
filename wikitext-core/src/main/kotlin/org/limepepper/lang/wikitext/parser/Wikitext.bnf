@@ -122,6 +122,8 @@
     COMMENT_START='regexp:<!--'
     COMMENT_END='regexp:-->'
     COMMENT_CONTENT='regexp:[^-]+|-[^-]|-'
+
+    PRE_START='PRE_START[" "]'
   ]
 }
 
@@ -221,6 +223,7 @@ private paragraph_content ::= inline_item+
 // with the lexer, but are currently dead -- see lexer/bnf cross-reference).
 // Add them here once WikitextLexer.flex actually emits them.
 inline_item ::= internal_link
+              | heading
               | html_tag
               | verbatim_tag
               | comment
@@ -229,6 +232,7 @@ inline_item ::= internal_link
               | LINK_DISPLAY_TEXT
               | CHAR_ENTITY_REF
               | ENTITY_REF
+              | PRE_START
 
 // =========================================================================
 // --- Links ---

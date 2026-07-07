@@ -1,11 +1,10 @@
 {| class="wikitable"
-|+ Caption text
 |-
-! Header text !! Header text !! Header text
-|-
-| Example || Example || Example
-|-
-| Example || Example || Example
-|-
-| Example || Example || Example
+| Example || Example
+
+=== header3 ===
+
+ === not a header3 ===
+
+ || Example
 |}

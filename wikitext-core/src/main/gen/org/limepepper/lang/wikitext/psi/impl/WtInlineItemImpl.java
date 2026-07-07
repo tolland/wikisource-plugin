@@ -36,6 +36,12 @@ public class WtInlineItemImpl extends ASTWrapperPsiElement implements WtInlineIt
 
   @Override
   @Nullable
+  public WtHeading getHeading() {
+    return findChildByClass(WtHeading.class);
+  }
+
+  @Override
+  @Nullable
   public WtHtmlTag getHtmlTag() {
     return findChildByClass(WtHtmlTag.class);
   }

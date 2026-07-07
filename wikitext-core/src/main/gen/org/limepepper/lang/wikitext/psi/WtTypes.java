@@ -44,6 +44,7 @@ public interface WtTypes {
   IElementType NUMBERED = new WtTokenType("#");
   IElementType OPEN_TAG_HEAD = new WtTokenType("OPEN_TAG_HEAD");
   IElementType PLAIN_TEXT = new WtTokenType("PLAIN_TEXT");
+  IElementType PRE_START = new WtTokenType("PRE_START[\" \"]");
   IElementType RBRACK = new WtTokenType("]");
   IElementType SINGLE_APOS = new WtTokenType("SINGLE_APOS");
   IElementType TABLE_CELL_SEP = new WtTokenType("TABLE_CELL_SEP");

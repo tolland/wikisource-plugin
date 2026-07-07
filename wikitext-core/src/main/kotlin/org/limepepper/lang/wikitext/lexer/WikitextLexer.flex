@@ -41,19 +41,39 @@ import org.limepepper.lang.wikitext.psi.WtTypes;
     final FrameKind kind;
     final String tagName;  // non-null only for HTML_TAG / VERBATIM frames
     Frame(int state, FrameKind kind, String tagName) {
-      this.state = state; this.kind = kind; this.tagName = tagName;
+      this.state = state;
+      this.kind = kind; this.tagName = tagName;
     }
   }
 
   private final Deque<Frame> frames = new ArrayDeque<Frame>();
 
+  // Helper to ensure that if we push a frame while at the start of a line,
+  // it safely restores to the normal mid-line state when it pops.
+  private int getNormalState(int state) {
+    if (state == YYINITIAL) return WIKI_TEXT;
+    if (state == TEMPLATE_BOL) return TEMPLATE;
+    if (state == LINK_BOL) return LINK;
+    if (state == TABLE_BOL) return TABLE;
+    return state;
+  }
+
+  // Helper to find the matching BOL state when an unterminated heading forces an emergency EOL pop
+  private int getBolState(int normalState) {
+    if (normalState == WIKI_TEXT) return YYINITIAL;
+    if (normalState == TEMPLATE) return TEMPLATE_BOL;
+    if (normalState == LINK) return LINK_BOL;
+    if (normalState == TABLE) return TABLE_BOL;
+    return normalState;
+  }
+
   private void pushFrame(int newState, FrameKind kind) {
-    frames.push(new Frame(yystate(), kind, null));
+    frames.push(new Frame(getNormalState(yystate()), kind, null));
     yybegin(newState);
   }
 
   private void pushFrame(int newState, FrameKind kind, String tagName) {
-    frames.push(new Frame(yystate(), kind, tagName));
+    frames.push(new Frame(getNormalState(yystate()), kind, tagName));
     yybegin(newState);
   }
 
@@ -178,6 +198,7 @@ import org.limepepper.lang.wikitext.psi.WtTypes;
   private void closeHeadingFrameUnterminated() {
     popFrame();
   }
+
   private IElementType pipeTokenForContext() {
     FrameKind k = currentKind();
     if (k == FrameKind.TEMPLATE || k == FrameKind.TEMPLATE_PARAM) {
@@ -197,35 +218,8 @@ LINE_WS      = [ \t]
 EOL          = \r\n | \r | \n
 ANY          = [^]
 
-// A line-start run of '=' opens a heading FRAME (FrameKind.HEADING) rather
-// than being matched as one whole-line token. We deliberately do NOT
-// pre-validate the whole line with a regex anymore: that approach greedily
-// matched through to the FIRST '=' that happened to be followed by
-// whitespace+EOL, which is wrong when an earlier '=' inside nested content
-// (e.g. "<code>e=mc^2</code>") looks like a plausible closer but isn't one
-// at all -- it's just inert text inside a tag, never evaluated as a
-// heading-closer candidate once that tag's frame is on top of the stack.
-//
-// Instead: H_START commits to heading-mode lexing optimistically; content
-// is lexed through the SAME frame-aware machinery as everywhere else
-// (templates, links, tags all just work inside headings); and the close-
-// matcher only accepts a trailing '=' run as the heading's closer when the
-// HEADING frame is the one ON TOP of the stack (i.e. we're not nested
-// inside some other construct) AND it's immediately followed by line-end.
-// Hitting EOL/EOF while still inside a HEADING frame is reported as an
-// unterminated heading -- a real error for the PARSER to flag, not a
-// silent reinterpretation as plain text (see closeHeadingFrameUnterminated
-// and project discussion on fail-fast semantics).
-H_START = {LINE_WS}{0,3} "="{1,6}
+H_START      = "="{1,6}
 
-// Coalesces runs of "boring" text into one token instead of one PLAIN_TEXT
-// per character (cf. markdown.flex's {ALPHANUM}+ run, handlebars.flex's
-// !([^]*"{{"[^]*) "everything up to X" pattern). Excludes every character
-// that starts a delimiter recognized in the body state: '{' '[' '<'
-// (templates/links/tags), '\r' '\n' (line boundaries), and '=' (heading
-// closer candidate, only actually meaningful while inside a HEADING frame,
-// but excluding it unconditionally just means a bare mid-text '=' becomes
-// its own single-char token when it turns out not to close anything).
 NOT_DELIM = [^{}\[\]<\r\n=&*#:;]
 PLAIN_TEXT_RUN = {NOT_DELIM}+
 
@@ -280,32 +274,43 @@ CLOSE_TAG          = "</" {TAG_NAME_CHARS} {WS}* ">"
 %state HTML_TAG
 %state VERBATIM_TAG
 
+// Companion Beginning-of-Line States
+%state TEMPLATE_BOL
+%state LINK_BOL
+%state TABLE_BOL
+
 %%
 
 // =========================================================================
-// YYINITIAL -- LINE-START GATE ONLY. This state is re-entered after every
-// NEWLINE (see WIKI_TEXT's {EOL} rule below) and is where the file starts.
-// It recognizes ONLY the things that are syntactically meaningful at line
-// start (headings, list markers, table-open) and otherwise falls straight
-// through into WIKI_TEXT, which is where ordinary content -- templates,
-// links, tags, plain text -- actually lives. This split is what fixes the
-// earlier bug where "{|" / "==" / list markers were being recognized
-// mid-paragraph: those rules simply don't exist in WIKI_TEXT at all, so
-// e.g. a stray "{|" mid-sentence is just two ordinary characters there.
-//
-// IMPORTANT: nothing here pushes a "return to YYINITIAL" frame for the
-// ordinary case -- once we fall through to WIKI_TEXT we STAY there
-// (mid-paragraph, mid-template, wherever) until an actual NEWLINE is
-// lexed, at which point WIKI_TEXT's {EOL} rule sends us back here. This
-// mirrors markdown.flex's YYINITIAL/AFTER_LINE_START split (its
-// resetState()/popState() pair) but we don't need an explicit stack for
-// it because there's only ever one "body" state to return to, not a
-// frame-specific one -- the REAL nesting (templates/links/tables/tags)
-// is still tracked by the existing `frames` stack, completely orthogonal
-// to this line-start/body distinction.
+// CONTEXTUAL TOLERANCE LOOKAHEADS (Executed first inside BOL environments)
 // =========================================================================
 
-<YYINITIAL> {
+<TEMPLATE_BOL> {
+  // Swallows padding whitespace safely if followed by structural layout tokens
+  {LINE_WS}+ / "|"   { return WHITE_SPACE; }
+  {LINE_WS}+ / "}}"  { return WHITE_SPACE; }
+  {LINE_WS}+ / "{{"  { return WHITE_SPACE; }
+}
+
+<LINK_BOL> {
+  {LINE_WS}+ / "|"   { return WHITE_SPACE; }
+  {LINE_WS}+ / "]]"  { return WHITE_SPACE; }
+  {LINE_WS}+ / "[["  { return WHITE_SPACE; }
+}
+
+<TABLE_BOL> {
+  // Matches spaces before any table syntax rule (|, ||, |-, |}, !) without turning into PRE_START
+  {LINE_WS}+ / "|"   { return WHITE_SPACE; }
+  {LINE_WS}+ / "!"   { return WHITE_SPACE; }
+  {LINE_WS}+ / "{|"  { return WHITE_SPACE; }
+}
+
+
+// =========================================================================
+// LINE-START GATES
+// =========================================================================
+
+<YYINITIAL, TEMPLATE_BOL, LINK_BOL, TABLE_BOL> {
   "{|"   { pushFrame(TABLE, FrameKind.TABLE); return WtTypes.TABLE_OPEN; }
 
   // Heading open marker. Optimistically commits to heading-mode lexing --
@@ -319,16 +324,32 @@ CLOSE_TAG          = "</" {TAG_NAME_CHARS} {WS}* ">"
     return WtTypes.H_START;
   }
 
-  // List markers ARE safe as simple line-start prefix tokens (unlike '='),
-  // because they have no closing delimiter to disambiguate against -- a
-  // bullet just IS a bullet, nothing later in the line un-makes it.
-  {LINE_WS}{0,3} "*"+ { yybegin(WIKI_TEXT); return WtTypes.BULLET; }
-  {LINE_WS}{0,3} "#"+ { yybegin(WIKI_TEXT); return WtTypes.NUMBERED; }
-  {LINE_WS}{0,3} ":"+ { yybegin(WIKI_TEXT); return WtTypes.INDENT; }
-  {LINE_WS}{0,3} ";"+ { yybegin(WIKI_TEXT); return WtTypes.DEF_TERM; }
+  // List marker evaluation rules take priority over raw leading space rules
+  {LINE_WS}{0,3} "*"+ { yybegin(getNormalState(yystate())); return WtTypes.BULLET; }
+  {LINE_WS}{0,3} "#"+ { yybegin(getNormalState(yystate())); return WtTypes.NUMBERED; }
+  {LINE_WS}{0,3} ":"+ { yybegin(getNormalState(yystate())); return WtTypes.INDENT; }
+  {LINE_WS}{0,3} ";"+ { yybegin(getNormalState(yystate())); return WtTypes.DEF_TERM; }
 
-  {EOL}  { return WtTypes.NEWLINE; } // blank line
-  {ANY}  { yypushback(1); yybegin(WIKI_TEXT); } // not a line-start construct -- fall through, re-lex same char in WIKI_TEXT
+  // Detect leading space(s) that trigger preformatted rendering blocks.
+  // Transitions smoothly into the normal inline body state to ensure internal markup works.
+  // Note: Adjust 'WtTypes.PRE_START' to match whatever element type your implementation uses.
+  {LINE_WS}+ { yybegin(getNormalState(yystate())); return WtTypes.PRE_START; }
+
+  {EOL}  { return WtTypes.NEWLINE; } // Blank line; maintains current BOL context
+}
+
+// Fallbacks if nothing structural matched at line-start
+<YYINITIAL> {
+    {ANY} { yypushback(1); yybegin(WIKI_TEXT); }
+}
+<TEMPLATE_BOL> {
+    {ANY} { yypushback(1); yybegin(TEMPLATE); }
+}
+<LINK_BOL> {
+    {ANY} { yypushback(1); yybegin(LINK); }
+}
+<TABLE_BOL> {
+    {ANY}       { yypushback(1); yybegin(TABLE); }
 }
 
 // =========================================================================
@@ -366,18 +387,22 @@ CLOSE_TAG          = "</" {TAG_NAME_CHARS} {WS}* ">"
     return WtTypes.PLAIN_TEXT; // '=' run at EOL outside any heading -- just text
   }
 
+  "="+ {LINE_WS}* {
+    if (inHeadingFrame() && zzMarkedPos >= zzEndRead) {
+      popFrame();
+      return WtTypes.H_END;
+    }
+    return WtTypes.PLAIN_TEXT;
+  }
+
   {EOL} {
     if (inHeadingFrame()) {
-      // Ran off the end of the line (or hit EOF via the EOF-safe EOL set)
-      // while still inside a HEADING frame -- no closing '=' run was ever
-      // found at this nesting depth. Fail-fast: this is reported as an
-      // unterminated heading, for the PARSER to flag as an error, not
-      // silently reinterpreted as a plain paragraph spanning the rest of
-      // the heading's content. We still emit NEWLINE and pop back to
-      // YYINITIAL so subsequent lines lex normally.
+      int restoreState = frames.isEmpty() ? WIKI_TEXT : frames.peek().state;
       closeHeadingFrameUnterminated();
+      yybegin(getBolState(restoreState));
+    } else {
+      yybegin(YYINITIAL);
     }
-    yybegin(YYINITIAL);
     return WtTypes.NEWLINE;
   }
 
@@ -385,7 +410,9 @@ CLOSE_TAG          = "</" {TAG_NAME_CHARS} {WS}* ">"
   {ANY}            { return WtTypes.PLAIN_TEXT; } // single leftover delimiter char (e.g. bare '=' not followed by EOL, or stray '}'/']' with no opener)
 }
 
-// ---- Template: {{ name | param | key=value | {{nested}} }} -------------
+// =========================================================================
+// TEMPLATE Contexts
+// =========================================================================
 
 <TEMPLATE_NAME> {
   // template name runs until first '|' or '}}', may itself contain a
@@ -415,11 +442,18 @@ CLOSE_TAG          = "</" {TAG_NAME_CHARS} {WS}* ">"
   {CHAR_ENTITY_REF} { return WtTypes.CHAR_ENTITY_REF; }
   {ENTITY_REF}       { return WtTypes.ENTITY_REF; }
 
-  [^{}|=\[<]+  { return WtTypes.TEMPLATE_PARAM_TEXT; }
-  {ANY}       { return WtTypes.PLAIN_TEXT; }
+  {EOL} {
+    yybegin(TEMPLATE_BOL);
+    return WtTypes.NEWLINE;
+  }
+
+  [^{}|=\[<\r\n]+  { return WtTypes.TEMPLATE_PARAM_TEXT; } // Added \r\n exclusion
+  {ANY}            { return WtTypes.PLAIN_TEXT; }
 }
 
-// ---- Wikilink: [[ target | display | [[nested]] ]] ---------------------
+// =========================================================================
+// WIKILINK Contexts
+// =========================================================================
 
 <LINK_TARGET> {
   "]]"        { popFrame(); return WtTypes.LINK_CLOSE; }
@@ -443,13 +477,18 @@ CLOSE_TAG          = "</" {TAG_NAME_CHARS} {WS}* ">"
   {CHAR_ENTITY_REF} { return WtTypes.CHAR_ENTITY_REF; }
   {ENTITY_REF}       { return WtTypes.ENTITY_REF; }
 
-  [^\]{|<&]+    { return WtTypes.LINK_DISPLAY_TEXT; }
-  {ANY}       { return WtTypes.PLAIN_TEXT; }
+  {EOL} {
+    yybegin(LINK_BOL);
+    return WtTypes.NEWLINE;
+  }
+
+  [^\]{|<&\r\n]+    { return WtTypes.LINK_DISPLAY_TEXT; } // Added \r\n exclusion
+  {ANY}             { return WtTypes.PLAIN_TEXT; }
 }
 
-// ---- Table: {| ... | cell | cell {{template}} ... |} -------------------
-// NB: real MediaWiki table syntax is line-start-sensitive (|-, !, |+) --
-// this only shows the brace/pipe nesting piece, not full table grammar.
+// =========================================================================
+// TABLE Contexts
+// =========================================================================
 
 <TABLE> {
   "{{"        { pushFrame(TEMPLATE_NAME, FrameKind.TEMPLATE); return WtTypes.TEMPLATE_OPEN; }
@@ -466,17 +505,18 @@ CLOSE_TAG          = "</" {TAG_NAME_CHARS} {WS}* ">"
   {CHAR_ENTITY_REF} { return WtTypes.CHAR_ENTITY_REF; }
   {ENTITY_REF}       { return WtTypes.ENTITY_REF; }
 
-  [^{}\[\]|<]+ { return WtTypes.TABLE_CELL_TEXT; }
-  {ANY}       { return WtTypes.PLAIN_TEXT; }
+  {EOL} {
+    yybegin(TABLE_BOL);
+    return WtTypes.NEWLINE;
+  }
+
+  [^{}\[\]|<\r\n]+ { return WtTypes.TABLE_CELL_TEXT; } // Added \r\n exclusion
+  {ANY}            { return WtTypes.PLAIN_TEXT; }
 }
 
-// ---- HTML/XML-style comments: <!-- ... --> --------------------------
-// Content is NEVER rendered (stricter than noinclude -- not even
-// conditionally transcluded), so it's scanned as opaque text, same as a
-// verbatim tag's content, but keyed off the fixed "<!--"/"-->" delimiter
-// rather than a matched tag name -- see the COMMENT_START/COMMENT_END
-// macro comment above for the "[^\\-]|(-[^\\-])" technique this borrows
-// directly from IntelliJ's bundled _XmlLexer.flex/_HtmlLexer.flex.
+// =========================================================================
+// OPAQUE Contexts (Comments / Verbatim Tags)
+// =========================================================================
 
 <COMMENT> {
   {COMMENT_END} { popFrame(); return WtTypes.COMMENT_END; }

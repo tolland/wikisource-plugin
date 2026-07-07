@@ -12,6 +12,9 @@ public interface WtInlineItem extends NavigatablePsiElement {
   WtComment getComment();
 
   @Nullable
+  WtHeading getHeading();
+
+  @Nullable
   WtHtmlTag getHtmlTag();
 
   @Nullable

@@ -1,0 +1,22 @@
+{| class="wikitable"
+|+ Caption text
+|-
+! Header text !! Header text !! Header text
+|-
+| Example || Example
+
+=== header3 ===
+
+ === not a header3 ===
+
+        this head 8 leading chars
+
+# the following leading space is ignored by wikitext parser
+# but captured as PRE_START by WtKexer
+
+ || Example
+|-
+| Example || Example || Example
+|-
+| Example || Example || Example
+|}
