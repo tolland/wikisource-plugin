@@ -1,5 +1,4 @@
 import re
-from enum import Enum
 
 from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, SQLModel
@@ -41,33 +40,6 @@ SHORT_NAME_RE = re.compile(r"^[\w\-]+$", re.ASCII)
 File: titles (no spaces, slashes, colons or other reserved characters)."""
 
 
-class IndexMeta(SQLModel, table=True):
-    """Curated per-Index metadata.
-
-    `short_name` seeds generated child names —
-    ``File:{short_name}_page_{page}_image_{n}.jpg`` — because the full Index
-    title (spaces, punctuation, extension) makes miserable filenames.
-
-    Unique per *site*, not globally: the common scenario is a local staging
-    instance synced back to upstream wikisource, so generated names must be
-    collision-free within the site they will be pushed to; the same work
-    staged for two sites may happily reuse one short name.
-    """
-
-    __table_args__ = (
-        UniqueConstraint("site_pk", "short_name", name="uq_indexmeta_site_short"),
-        UniqueConstraint("page_pk", name="uq_indexmeta_page"),
-    )
-
-    pk: int | None = Field(default=None, primary_key=True)
-    page_pk: int = Field(foreign_key="page.pk", index=True)
-    site_pk: int = Field(foreign_key="site.pk", index=True)
-
-    short_name: str
-    page_count: int | None = None  # total pages per the Index (pagelist/IndexPage)
-    # Room to grow: image_name_pattern, OCR region templates, ...
-
-
 class PageMeta(SQLModel, table=True):
     """Per-Page: ProofreadPage metadata — the structural link to the owning
     Index: (also used by Index-namespace assets like styles.css), the
@@ -98,32 +70,3 @@ class PageMeta(SQLModel, table=True):
     # Local (raster cache under blob_root; None until extracted)
     raster_path: str | None = None
     thumb_path: str | None = None
-
-
-class FileOrigin(str, Enum):
-    remote = "remote"  # fetched from the wiki
-    paste = "paste"  # screenshot pasted in the editor
-    ocr = "ocr"  # produced by a templated-region OCR run
-
-
-class FileMeta(SQLModel, table=True):
-    """Provenance for File: pages.
-
-    For images cropped out of a scan page, the crop geometry (in source
-    raster pixels) records where the image came from — which is also exactly
-    the input a templated-region batch OCR run iterates over, so it is
-    captured from day one rather than reconstructed later.
-    """
-
-    __table_args__ = (UniqueConstraint("page_pk", name="uq_filemeta_page"),)
-
-    pk: int | None = Field(default=None, primary_key=True)
-    page_pk: int = Field(foreign_key="page.pk", index=True)
-
-    origin: FileOrigin = FileOrigin.remote
-    source_page_pk: int | None = Field(default=None, foreign_key="page.pk")
-    source_page_number: int | None = None
-    crop_x: int | None = None
-    crop_y: int | None = None
-    crop_w: int | None = None
-    crop_h: int | None = None

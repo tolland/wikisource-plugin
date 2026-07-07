@@ -6,8 +6,15 @@ from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
 from wtbot.main import create_app
-from wtbot.model import FetchRequest, FetchStatus, FileBlob, Page, PageMeta, Site
-from wtbot.model.page_meta import IndexMeta
+from wtbot.model import (
+    FetchRequest,
+    FetchStatus,
+    FileBlob,
+    IndexMeta,
+    Page,
+    PageMeta,
+    Site,
+)
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import RemotePage, RemotePageImages
 from wtbot.worker import run_pending

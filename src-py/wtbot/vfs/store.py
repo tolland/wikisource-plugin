@@ -3,9 +3,9 @@ from datetime import datetime, timezone
 from sqlalchemy import func
 from sqlmodel import Session, select
 
-from wtbot.model import EditJournal, FileBlob, Page, Site
+from wtbot.model import EditJournal, FileBlob, FileMeta, IndexMeta, Page, Site
 from wtbot.model.namespace import Namespace, NsRole
-from wtbot.model.page_meta import FileMeta, IndexMeta, PageMeta, default_short_name
+from wtbot.model.page_meta import PageMeta, default_short_name
 
 """PageStore — all SQL for the VFS layers.
 

@@ -109,7 +109,7 @@ tasks {
         args(listOf("nosplash"))
 
         argumentProviders += CommandLineArgumentProvider {
-            listOf(rootProject.file("test-project").toString())
+            listOf(rootProject.projectDir.parentFile.resolve("test-project").toString())
         }
 
         systemProperty("idea.auto.reload.plugins", "true")

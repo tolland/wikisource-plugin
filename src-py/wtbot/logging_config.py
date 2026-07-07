@@ -1,6 +1,10 @@
 import logging
-from collections.abc import Iterable
+import os
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
+from pathlib import Path
+
+from dotenv import load_dotenv
 
 from wtbot.log_levels import TRACE, install_trace_logging
 
@@ -8,6 +12,10 @@ DEFAULT_LOG_FORMAT = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
 DEFAULT_LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 DEBUG_ROUTE_LOGGER = "wtbot.api.debug_loggig_route"
 KNOWN_DEBUG_ROUTE_TAGS = frozenset({"preview", "vfs"})
+DOTENV_PATH = Path(".env")
+
+_TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
+_FALSE_VALUES = frozenset({"0", "false", "no", "off", ""})
 
 
 @dataclass(frozen=True)
@@ -18,16 +26,83 @@ class LoggingConfig:
     trace_debug_route_tags: Iterable[str] = field(default_factory=frozenset)
     body_limit_bytes: int = 131072
 
+    @classmethod
+    def from_env(cls, env: Mapping[str, str] | None = None) -> "LoggingConfig":
+        e = env if env is not None else os.environ
+        default = cls()
+        return cls(
+            root_level=_get_log_level(e.get("WTBOT_LOG_LEVEL"), default.root_level),
+            sqlalchemy_echo=_get_sqlalchemy_echo(
+                e.get("WTBOT_SQLALCHEMY_ECHO"), default.sqlalchemy_echo
+            ),
+            trace_all_debug_routes=_get_bool(
+                e.get("WTBOT_TRACE_ALL_DEBUG_ROUTES"),
+                default.trace_all_debug_routes,
+            ),
+            trace_debug_route_tags=_get_tags(e.get("WTBOT_TRACE_DEBUG_ROUTE_TAGS")),
+            body_limit_bytes=_get_int(
+                e.get("WTBOT_DEBUG_ROUTE_BODY_LIMIT_BYTES"),
+                default.body_limit_bytes,
+            ),
+        )
+
+    @classmethod
+    def from_dotenv(cls, path: Path | str = DOTENV_PATH) -> "LoggingConfig":
+        load_dotenv(path, override=False)
+        return cls.from_env()
+
+
+def _get_log_level(value: str | None, default: int) -> int:
+    if value is None:
+        return default
+    if value.isdigit():
+        return int(value)
+    return logging.getLevelNamesMapping().get(value.upper(), default)
+
+
+def _get_bool(value: str | None, default: bool) -> bool:
+    if value is None:
+        return default
+    normalized = value.strip().lower()
+    if normalized in _TRUE_VALUES:
+        return True
+    if normalized in _FALSE_VALUES:
+        return False
+    return default
+
+
+def _get_sqlalchemy_echo(value: str | None, default: bool | str) -> bool | str:
+    if value is None:
+        return default
+    if value.strip().lower() == "debug":
+        return "debug"
+    return _get_bool(value, bool(default))
+
+
+def _get_tags(value: str | None) -> frozenset[str]:
+    if value is None:
+        return frozenset()
+    return frozenset(tag.strip() for tag in value.split(",") if tag.strip())
+
+
+def _get_int(value: str | None, default: int) -> int:
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
+
 
 # Static application logging configuration.
 #
-# Common edits while debugging:
-#   - sqlalchemy_echo=True              logs SQL statements
-#   - sqlalchemy_echo="debug"           logs SQL statements and result rows
-#   - trace_debug_route_tags={"vfs"}    dumps VFS request/response bodies
-#   - trace_all_debug_routes=True       dumps every DebugLoggingRoute body
-#   - body_limit_bytes=0                disables body truncation
-LOGGING_CONFIG = LoggingConfig()
+# .env overrides:
+#   - WTBOT_LOG_LEVEL=DEBUG
+#   - WTBOT_SQLALCHEMY_ECHO=true|debug
+#   - WTBOT_TRACE_DEBUG_ROUTE_TAGS=vfs,preview
+#   - WTBOT_TRACE_ALL_DEBUG_ROUTES=true
+#   - WTBOT_DEBUG_ROUTE_BODY_LIMIT_BYTES=0
+LOGGING_CONFIG = LoggingConfig.from_dotenv()
 
 
 def debug_route_logger_name(tag: str) -> str:

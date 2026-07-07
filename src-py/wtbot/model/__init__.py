@@ -10,12 +10,11 @@ from wtbot.model.commit import Commit, CommitStatus
 from wtbot.model.edit_journal import EditJournal
 from wtbot.model.fetch_request import FetchKind, FetchRequest, FetchStatus
 from wtbot.model.file_blob import FileBlob
+from wtbot.model.file_meta import FileMeta, FileOrigin
+from wtbot.model.index_meta import IndexMeta
 from wtbot.model.namespace import Namespace, NsRole, role_for_canonical
 from wtbot.model.page import FetchState, Page
 from wtbot.model.page_meta import (
-    FileMeta,
-    FileOrigin,
-    IndexMeta,
     PageMeta,
     default_short_name,
 )
