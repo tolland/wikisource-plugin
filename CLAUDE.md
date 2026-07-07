@@ -6,6 +6,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 An IntelliJ Platform plugin that adds Wikitext language support (`.wt` / `.wiki` files) to IntelliJ IDEA, paired with a Python sidecar (`wtbot`) that fetches content from MediaWiki via pywikibot and exchanges it with the plugin through a shared SQLite database. For inspection purpose we also have a svelteKit based viewer app ./viewer which is not part of the main workflow but is conventient for inspection and debugging of state.
 
+## Code style
+
+### Python
+
+We are using modern python version 3.13 and above for generics, type aliases, better f-strings, and unpacking kwargs. please use modern python
+
+Use of uv. The project is built in a environment which has a local pypi mirror
+so uv.lock contains LAN local urls, so don't commit uv.lock to the repo.
+
+Due to a bug in pycharm, please put file-based docstrings under the imports, so the imports are the first block in the page.
+
+### Kotlin
+
+Prefer a class per file structure for substantial implementations. This does not apply for wholly owned or dataclasses which are associated with a main class.
+
 ## Build and run commands
 
 ### Kotlin/Gradle (plugin)
@@ -26,13 +41,6 @@ Dependencies are managed with `uv` (`pyproject.toml` + `uv.lock`).
 uv run fastapi dev src-py/wtbot/main.py   # start FastAPI dev server
 uv run pytest                              # run Python tests
 ```
-
-We are using modern python version 3.13 and above for generics, type aliases, better f-strings, and unpacking kwargs. please use modern python
-
-Use of uv. The project is built in a environment which has a local pypi mirror
-so uv.lock contains LAN local urls, so don't commit uv.lock to the repo.
-
-Due to a bug in pycharm, please put file-based docstrings under the imports, so the imports are the first block in the page.
 
 ## Architecture
 
