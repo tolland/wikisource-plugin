@@ -172,6 +172,11 @@ class PendingCommitPage(BaseModel):
     current_revid: int | None = None
     base_revid: int
     comment: str | None = None
+    base_body: str | None = Field(
+        None,
+        description="Cached remote body (Page.text) the local edits are diffed "
+        "against; None when the page was never fetched (page creation).",
+    )
     submitted_body: str
     pending_count: int
     first_saved_at: str

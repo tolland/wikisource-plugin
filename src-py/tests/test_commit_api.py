@@ -102,6 +102,23 @@ def test_commit_endpoint_pushes_pending_edits(engine):
         assert commit.result_revid == 101
 
 
+def test_pending_commits_include_original_body_for_diff(engine):
+    _setup(engine)
+    app = create_app(engine=engine, client_factory=lambda site: FakeWikiClient())
+    with TestClient(app) as c:
+        write = c.post(
+            "/vfs/content",
+            json={"path": PATH, "content_base64": _b64("edited"), "base_revid": 100},
+        )
+        assert write.status_code == 200
+
+        resp = c.get("/commits/pending")
+        assert resp.status_code == 200
+        [pending] = resp.json()
+        assert pending["base_body"] == "original"
+        assert pending["submitted_body"] == "edited"
+
+
 def test_commit_endpoint_noop_when_nothing_pending(engine):
     _setup(engine)
     app = create_app(engine=engine, client_factory=lambda site: FakeWikiClient())

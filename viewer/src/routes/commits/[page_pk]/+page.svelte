@@ -3,15 +3,8 @@
   import { page as routePage } from '$app/state';
   import { onMount } from 'svelte';
   import { approvePendingCommit, listPendingCommits } from '$lib/api';
+  import { buildLineDiff } from '$lib/diff';
   import type { Commit, PendingCommitPage } from '$lib/types';
-
-  type DiffKind = 'same' | 'added' | 'removed';
-
-  interface DiffLine {
-    kind: DiffKind;
-    text: string;
-    index: number;
-  }
 
   let item: PendingCommitPage | null = $state(null);
   let loading = $state(true);
@@ -35,31 +28,10 @@
     return value.split('\n').length;
   }
 
-  function diffLines(staged: PendingCommitPage): DiffLine[] {
-    if (staged.journals.length < 2) {
-      return staged.submitted_body.split('\n').map((text, index) => ({
-        kind: 'same',
-        text,
-        index
-      }));
-    }
-
-    const before = staged.journals[0].body.split('\n');
-    const after = staged.submitted_body.split('\n');
-    const rows: DiffLine[] = [];
-    const total = Math.max(before.length, after.length);
-    for (let index = 0; index < total; index += 1) {
-      const oldLine = before[index];
-      const newLine = after[index];
-      if (oldLine === newLine) {
-        rows.push({ kind: 'same', text: newLine ?? '', index });
-      } else {
-        if (oldLine !== undefined) rows.push({ kind: 'removed', text: oldLine, index });
-        if (newLine !== undefined) rows.push({ kind: 'added', text: newLine, index });
-      }
-    }
-    return rows;
-  }
+  const diff = $derived.by(() => {
+    const staged = item;
+    return staged ? buildLineDiff(staged.base_body ?? '', staged.submitted_body) : null;
+  });
 
   async function loadPage(): Promise<void> {
     loading = true;
@@ -153,10 +125,51 @@
 
       <section class="diff">
         <div class="section-title">
-          <p class="eyebrow">{item.journals.length > 1 ? 'Save diff' : 'Submitted text'}</p>
-          <span>{formatDate(item.latest_saved_at)}</span>
+          <p class="eyebrow">Final change vs original</p>
+          {#if diff}
+            <span class="diff-stats">
+              <span class="stat-added">+{diff.added.toLocaleString()}</span>
+              <span class="stat-removed">-{diff.removed.toLocaleString()}</span>
+              <span>{formatDate(item.latest_saved_at)}</span>
+            </span>
+          {/if}
         </div>
-        <pre aria-label="Staged wikitext">{#each diffLines(item) as row}<span class={row.kind}>{row.kind === 'added' ? '+ ' : row.kind === 'removed' ? '- ' : '  '}{row.text || ' '}</span>{'\n'}{/each}</pre>
+
+        {#if item.base_body == null}
+          <p class="diff-note">
+            No cached original for this page (new page or never fetched) — the whole submitted
+            text is shown as added.
+          </p>
+        {:else if item.current_revid != null && item.current_revid !== item.base_revid}
+          <p class="diff-note">
+            The cached copy is revision {item.current_revid} but this edit was based on revision
+            {item.base_revid}; the diff below compares against the cached copy.
+          </p>
+        {/if}
+
+        {#if diff}
+          {#if diff.blocks.length === 0}
+            <div class="empty">The submitted text is identical to the original.</div>
+          {:else}
+            <div class="diff-blocks" aria-label="Staged wikitext diff">
+              {#each diff.blocks as block}
+                {#if block.skippedBefore > 0}
+                  <div class="diff-skip">
+                    {block.skippedBefore.toLocaleString()} unchanged line{block.skippedBefore === 1
+                      ? ''
+                      : 's'} hidden
+                  </div>
+                {/if}
+                <div class="diff-block">
+                  <div class="diff-block-header">
+                    @@ -{block.oldStart},{block.oldLines} +{block.newStart},{block.newLines} @@
+                  </div>
+                  <pre>{#each block.rows as row}<span class={row.kind}><span class="lineno">{row.oldNo ?? ''}</span><span class="lineno">{row.newNo ?? ''}</span><span class="marker">{row.kind === 'added' ? '+' : row.kind === 'removed' ? '-' : ' '}</span>{row.text || ' '}</span>{'\n'}{/each}</pre>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        {/if}
       </section>
     </article>
   {:else}
@@ -281,33 +294,107 @@
     gap: 1rem;
   }
 
+  .diff-stats {
+    display: flex;
+    gap: 0.6rem;
+    align-items: baseline;
+    font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
+
+  .stat-added {
+    color: #286b4c;
+  }
+
+  .stat-removed {
+    color: #a13c22;
+  }
+
+  .diff-note {
+    border: 1px solid rgba(156, 86, 50, 0.32);
+    border-radius: 10px;
+    background: rgba(255, 241, 214, 0.7);
+    color: #73583d;
+    font-size: 0.84rem;
+    margin: 0.75rem 0 0;
+    padding: 0.6rem 0.85rem;
+  }
+
+  .diff-blocks {
+    display: grid;
+    gap: 0.6rem;
+    margin-top: 0.75rem;
+  }
+
+  .diff-skip {
+    color: #73583d;
+    font-family: "Avenir Next", "Gill Sans", sans-serif;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    padding: 0.15rem 0.4rem;
+    text-align: center;
+    text-transform: uppercase;
+  }
+
+  .diff-block {
+    border: 1px solid rgba(72, 49, 31, 0.14);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .diff-block-header {
+    background: #3a2c1f;
+    color: #d8c6a8;
+    font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+    font-size: 0.76rem;
+    padding: 0.45rem 1rem;
+  }
+
   pre {
     width: 100%;
     max-height: 66vh;
     overflow: auto;
-    border: 1px solid rgba(72, 49, 31, 0.14);
-    border-radius: 12px;
     background: #241b13;
     color: #fff8e6;
     font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
     font-size: 0.86rem;
     line-height: 1.55;
-    margin: 0.75rem 0 0;
-    padding: 1rem;
+    margin: 0;
+    padding: 0.6rem 0;
     white-space: pre-wrap;
   }
 
-  pre span {
+  pre > span {
     display: block;
     min-height: 1.55em;
+    padding: 0 1rem 0 0.4rem;
   }
 
-  pre span.added {
+  pre > span.added {
+    background: rgba(64, 128, 90, 0.28);
     color: #a7f0ba;
   }
 
-  pre span.removed {
+  pre > span.removed {
+    background: rgba(150, 62, 40, 0.3);
     color: #ffb4a2;
+  }
+
+  .lineno {
+    display: inline-block;
+    width: 3.2em;
+    color: rgba(255, 248, 230, 0.42);
+    text-align: right;
+    padding-right: 0.6em;
+    user-select: none;
+  }
+
+  .marker {
+    display: inline-block;
+    width: 1.1em;
+    user-select: none;
   }
 
   @media (max-width: 800px) {

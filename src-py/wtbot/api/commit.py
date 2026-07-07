@@ -74,6 +74,7 @@ def list_pending_commits(
                 current_revid=page.revid,
                 base_revid=base_revid,
                 comment=latest.comment,
+                base_body=page.text,
                 submitted_body=latest.body,
                 pending_count=len(journals),
                 first_saved_at=journals[0].saved_at.isoformat(),

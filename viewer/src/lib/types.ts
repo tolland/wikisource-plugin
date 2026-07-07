@@ -134,6 +134,7 @@ export interface PendingCommitPage {
   current_revid?: number | null;
   base_revid: number;
   comment?: string | null;
+  base_body?: string | null;
   submitted_body: string;
   pending_count: number;
   first_saved_at: string;
