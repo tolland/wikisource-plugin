@@ -44,5 +44,17 @@
             implementation="org.limepepper.lang.wikitext.preview.WtPreviewEditorProvider"
         />
 
+        <codeInsight.inlayProvider
+            language="Wikitext"
+            implementationClass="org.limepepper.lang.wikitext.inlay.ProofreadInlayProvider"
+        />
+
     </extensions>
+
+    <applicationListeners>
+        <listener
+            class="org.limepepper.lang.wikitext.inlay.ProofreadEditorListener"
+            topic="com.intellij.openapi.editor.event.EditorFactoryListener"
+        />
+    </applicationListeners>
 </idea-plugin>
