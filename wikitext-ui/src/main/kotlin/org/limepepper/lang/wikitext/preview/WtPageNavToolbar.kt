@@ -29,7 +29,12 @@ private val NAV_LOG = logger<WtPageNavToolbar>()
  * open the previous/next Page: of the same index, resolved once per editor
  * from the sidecar's GET /pages/nav (see [PageNavResult]).
  */
-internal class WtPageNavToolbar(targetComponent: JComponent, file: VirtualFile?) {
+internal class WtPageNavToolbar(
+    targetComponent: JComponent,
+    file: VirtualFile?,
+    /** Extra actions appended after a separator (e.g. the form/raw toggle). */
+    trailingActions: List<AnAction> = emptyList(),
+) {
     val component: JComponent
 
     /** Nav metadata for [file]; null until the background fetch lands (or
@@ -52,6 +57,10 @@ internal class WtPageNavToolbar(targetComponent: JComponent, file: VirtualFile?)
             ) { nav?.next },
             PagePositionLabel { nav },
         )
+        if (trailingActions.isNotEmpty()) {
+            group.addSeparator()
+            trailingActions.forEach(group::add)
+        }
         val toolbar = ActionManager.getInstance()
             .createActionToolbar("WikitextPageNavToolbar", group, true)
         toolbar.targetComponent = targetComponent

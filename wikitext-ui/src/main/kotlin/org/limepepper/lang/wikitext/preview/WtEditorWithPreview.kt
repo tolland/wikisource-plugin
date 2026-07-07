@@ -13,7 +13,8 @@ import com.intellij.openapi.fileEditor.TextEditorWithPreview
  * The preview pane carries its own inset [WtPreviewToolbar] (mode toggle /
  * reload / zoom / OCR) instead of actions on the platform's hover toolbar.
  * Page navigation is a proofread-page concern and lives in
- * [WtProofreadPageForm] alongside the header/body/footer fields it belongs to.
+ * [WtProofreadFormTextEditor]'s toolbar, above the header/body/footer form
+ * and the raw-mode toggle it belongs with.
  */
 sealed class WtEditorWithPreview(
     textEditor: TextEditor,

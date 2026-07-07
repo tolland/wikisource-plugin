@@ -10,12 +10,19 @@ class ProofreadPagePartsTest {
         "== References ==\n\nNHS England. 2025a." +
         "<noinclude>{{rh||5|}}</noinclude>"
 
+    // A page with both a pagequality tag and a running header in the first
+    // <noinclude>, and an empty footer.
+    private val fullSample = "<noinclude><pagequality level=\"1\" user=\"Admin\" />{{rh|xii||Preface||}}</noinclude>" +
+        "in the sort of added depth and dimension that only binocular vision affords;\n" +
+        "Wittgenstein's pragmatism." +
+        "<noinclude></noinclude>"
+
     @Test
     fun decomposesTheStandardPage() {
         val parts = ProofreadPageParts.decompose(sample)
         assertEquals(
             ProofreadPageParts(
-                header = "<pagequality level=\"1\" user=\"Admin\" />",
+                header = ProofreadPageHeader(PageQuality(level = 1, user = "Admin"), ""),
                 body = "== References ==\n\nNHS England. 2025a.",
                 footer = "{{rh||5|}}",
             ),
@@ -24,22 +31,85 @@ class ProofreadPagePartsTest {
     }
 
     @Test
+    fun extractsPagequalityAndHeaderRemainder() {
+        val parts = ProofreadPageParts.decompose(fullSample)!!
+        assertEquals(PageQuality(level = 1, user = "Admin"), parts.header.quality)
+        assertEquals("{{rh|xii||Preface||}}", parts.header.text)
+        assertEquals("", parts.footer)
+    }
+
+    @Test
     fun roundTripsSerializedForm() {
-        val parts = ProofreadPageParts.decompose(sample)!!
-        assertEquals(sample, parts.compose())
+        assertEquals(sample, ProofreadPageParts.decompose(sample)!!.compose())
+        assertEquals(fullSample, ProofreadPageParts.decompose(fullSample)!!.compose())
     }
 
     @Test
     fun composeMatchesTheWireShape() {
-        val parts = ProofreadPageParts(header = "H", body = "B", footer = "F")
+        val parts = ProofreadPageParts(
+            header = ProofreadPageHeader(quality = null, text = "H"),
+            body = "B",
+            footer = "F",
+        )
         assertEquals("<noinclude>H</noinclude>B<noinclude>F</noinclude>", parts.compose())
+    }
+
+    @Test
+    fun composesQualityTagBackIntoHeader() {
+        val parts = ProofreadPageParts(
+            header = ProofreadPageHeader(PageQuality(level = 3, user = "Alice"), "{{rh|2|TITLE|}}"),
+            body = "B",
+            footer = "",
+        )
+        assertEquals(
+            "<noinclude><pagequality level=\"3\" user=\"Alice\" />{{rh|2|TITLE|}}</noinclude>" +
+                "B<noinclude></noinclude>",
+            parts.compose(),
+        )
+    }
+
+    @Test
+    fun newPageGeneratesTheEmptySkeleton() {
+        assertEquals(
+            "<noinclude><pagequality level=\"1\" user=\"Admin\" /></noinclude>" +
+                "<noinclude></noinclude>",
+            ProofreadPageParts.newPage("Admin").compose(),
+        )
+        assertEquals(
+            "<noinclude><pagequality level=\"3\" user=\"Bob\" /></noinclude>" +
+                "<noinclude></noinclude>",
+            ProofreadPageParts.newPage("Bob", PageQuality.PROOFREAD).compose(),
+        )
+    }
+
+    @Test
+    fun headerWithoutQualityTagIsKeptVerbatim() {
+        val text = "<noinclude>{{rh|xii||Preface||}}</noinclude>body<noinclude></noinclude>"
+        val parts = ProofreadPageParts.decompose(text)!!
+        assertNull(parts.header.quality)
+        assertEquals("{{rh|xii||Preface||}}", parts.header.text)
+        assertEquals(text, parts.compose())
+    }
+
+    @Test
+    fun qualityTagNotAtHeaderStartStaysInText() {
+        // pywikibot would silently drop the prefix here; we keep the whole
+        // section as opaque text so the round trip stays lossless.
+        val header = "x<pagequality level=\"1\" user=\"Admin\" />"
+        val parsed = ProofreadPageHeader.parse(header)
+        assertNull(parsed.quality)
+        assertEquals(header, parsed.text)
+        assertEquals(header, parsed.compose())
     }
 
     @Test
     fun handlesEmptyHeaderBodyAndFooter() {
         val text = "<noinclude></noinclude><noinclude></noinclude>"
         val parts = ProofreadPageParts.decompose(text)
-        assertEquals(ProofreadPageParts("", "", ""), parts)
+        assertEquals(
+            ProofreadPageParts(ProofreadPageHeader(quality = null, text = ""), "", ""),
+            parts,
+        )
         assertEquals(text, parts!!.compose())
     }
 
@@ -77,7 +147,7 @@ class ProofreadPagePartsTest {
         // The V1 layout wraps the header in <div class="pagetext">; the closing
         // </div> lives outside the three fields, so we decline to edit it in
         // structured mode rather than lose the tag on round trip.
-        val v1 = "<noinclude><div class=\"pagetext\">hdr</div></noinclude>" +
+        val v1 = "<noinclude><pagequality level=\"1\" user=\"Admin\" /><div class=\"pagetext\">hdr</div></noinclude>" +
             "body<noinclude>ftr</noinclude>"
         assertNull(ProofreadPageParts.decompose(v1))
     }

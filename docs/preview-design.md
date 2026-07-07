@@ -99,7 +99,7 @@ MediaWiki content model via `WtEditorProfile.forFile()` (backed by
 
 | content model     | editor                   | reference image | page nav | notes |
 |-------------------|--------------------------|-----------------|----------|-------|
-| `proofread-page`  | `WtProofreadPageEditor`  | yes             | yes      | editor half is a three-field `WtProofreadPageForm` (header/body/footer) over the serialized buffer; the `<noinclude>` convention is parsed/reassembled by `ProofreadPageParts` and survives round trips |
+| `proofread-page`  | `WtProofreadPageEditor`  | yes             | yes      | editor half is a three-field `WtProofreadPageForm` (header/body/footer, plus the page-quality level combo) over the serialized buffer; the `<noinclude>` convention and the `<pagequality/>` tag are parsed/reassembled by `ProofreadPageParts` and survive round trips; a toolbar toggle reverts to the plain text editor over the raw buffer |
 | `proofread-index` | `WtProofreadIndexEditor` | no              | no       | body renders through `{{:MediaWiki:Proofreadpage_index_template}}` — already reflected in the preview since the sidecar passes the content model to `action=parse` |
 | anything else     | `WtWikitextEditor`       | no              | no       | unrestricted fallback (also all local scratch files, which carry no content model) |
 
@@ -109,6 +109,48 @@ per-model behavior will grow. The profile also gates the preview toolbar
 (no reference-image toggle where there is no scan) and the editor header's
 page-navigation row.
 
+## Proofread page form
+
+The `proofread-page` editor half (`WtProofreadFormTextEditor`) is a card
+stack under one toolbar: the default card is `WtProofreadPageForm` — three
+fields matching the web edit form (`wpHeaderTextbox` / `wpTextbox1` /
+`wpFooterTextbox`) — and the other card is the plain platform text editor
+over the raw serialized buffer, reachable via a toolbar toggle (useful when
+the structure gets in the way, or the buffer is malformed and needs
+hand-repair). Both cards edit the same document, so switching never loses
+work.
+
+Design decisions:
+
+* **The serialized buffer stays canonical.** The form is a *view*: the file's
+  single document keeps holding
+  `<noinclude><pagequality …/>header</noinclude>body<noinclude>footer</noinclude>`,
+  so save, VFS write-back, and the preview pipeline are untouched. Sync is
+  bidirectional (decompose on buffer change, compose on field change) with a
+  re-entrancy guard; a buffer that doesn't round-trip (empty, unbalanced
+  tags, legacy V1 `<div class="pagetext">` layout) drops the form to a raw
+  single field instead of risking corruption. `ProofreadPageParts` /
+  `ProofreadPageHeader` / `PageQuality` are a Kotlin port of pywikibot's
+  `_decompose_page` / `_compose_page` / `FullHeader`, made strictly lossless
+  (pywikibot drops text preceding a mid-header `<pagequality/>`; we treat the
+  tag as data only at the section start). `ProofreadPageParts.newPage(user)`
+  generates the empty skeleton for pages created on the fly, mirroring
+  pywikibot's `_create_empty_page`.
+* **`<pagequality/>` is a control, not text.** Like the web editor's radio
+  group, the tag is kept out of the header field and surfaced as a level
+  combo (0–4) plus the recorded user; recomposition writes it back in
+  pywikibot's `TEMPLATE_V2` format.
+* **Each field is a light PSI file, not a bare document.** The fields are
+  editors over `LightVirtualFile`s with `WtFileType`, so each section has its
+  own PSI tree and gets the full highlighting stack — lexer highlighter *and*
+  `WtAnnotator` (heading colors are annotator-based, so a `createDocument`
+  buffer shows none of them). The cost is that the fragments are separate
+  PSI files from the real page file; cross-section references don't resolve.
+  A future alternative keeps *one* editor over the real document — restoring
+  the direct PSI correspondence — and renders the section separation with the
+  inlay model plus guarded blocks over the `<noinclude>` framing; the sync
+  logic in `WtProofreadPageForm` is where the variants would share code.
+
 ## Reference image (transcription workflow)
 
 Proofreading is done against the page's scan, so the preview pane can swap
@@ -117,8 +159,8 @@ carry a permanent inset toolbar instead of actions on the platform's
 hover/floating toolbar: the preview pane owns `WtPreviewToolbar` (one toolbar,
 two button sets switched by mode via action `update()` visibility — render:
 toggle/reload; image: toggle/zoom in/out/reset zoom/send-to-OCR stub), and the
-proofread editor's `WtProofreadPageForm` carries `WtPageNavToolbar` across its
-top with previous/next page stubs for walking the index. The image URL comes from
+proofread editor half carries `WtPageNavToolbar` across its top with
+previous/next page actions for walking the index and the form/raw toggle. The image URL comes from
 `VfsBackend.pageImageUrl()`, which points at the sidecar's
 `GET /preview/page-image?path=…`. The endpoint serves the real scan raster by
 **proxying** it (a proxy rather than a redirect so a dead upstream URL can

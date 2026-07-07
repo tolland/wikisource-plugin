@@ -2,20 +2,26 @@ package org.limepepper.lang.wikitext.preview
 
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.editor.event.DocumentEvent
 import com.intellij.openapi.editor.event.DocumentListener
 import com.intellij.openapi.editor.ex.EditorEx
+import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.ComboBox
+import com.intellij.testFramework.LightVirtualFile
 import com.intellij.ui.JBColor
 import com.intellij.ui.OnePixelSplitter
+import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.JBUI
 import org.limepepper.lang.wikitext.WtFileType
 import java.awt.BorderLayout
+import java.awt.FlowLayout
 import java.awt.Font
 import javax.swing.JComponent
 import javax.swing.JPanel
@@ -23,25 +29,33 @@ import javax.swing.JPanel
 /**
  * The header / body / footer editing surface for a `proofread-page`, the
  * three-field equivalent of MediaWiki's ProofreadPage edit form
- * (`wpHeaderTextbox` / `wpTextbox1` / `wpFooterTextbox`).
+ * (`wpHeaderTextbox` / `wpTextbox1` / `wpFooterTextbox` plus the page-quality
+ * radio group, shown here as a level combo next to the header field).
  *
  * The canonical document stays the file's single serialized buffer
- * (`<noinclude>header</noinclude>body<noinclude>footer</noinclude>`) so save,
- * PSI, and the preview keep working unchanged; this form is a *view* over it.
- * Three in-memory editor documents mirror the sections and are kept in sync
- * with the file document in both directions:
+ * (`<noinclude><pagequality …/>header</noinclude>body<noinclude>footer</noinclude>`)
+ * so save, PSI, and the preview keep working unchanged; this form is a *view*
+ * over it. Each section is backed by its own [LightVirtualFile] with
+ * [WtFileType] — a real (light) PSI file, so the fields get the full
+ * lexer-highlighter *and* annotator stack, not just a bare document. The
+ * fields are kept in sync with the file document in both directions:
  *
  *  - file → fields: on any change to the file buffer (external edit, undo,
- *    reload) the buffer is [ProofreadPageParts.decompose]d and the fields are
- *    refreshed.
- *  - fields → file: on any change to a field the three are
- *    [ProofreadPageParts.compose]d back into the file buffer.
+ *    reload, raw-mode typing) the buffer is [ProofreadPageParts.decompose]d
+ *    and the fields (and the quality combo) are refreshed.
+ *  - fields → file: on any change to a field or the quality level the parts
+ *    are [ProofreadPageParts.compose]d back into the file buffer.
  *
  * A [syncing] guard breaks the feedback loop so a write in one direction never
  * bounces back and resets carets. When the buffer is not in a recognised,
  * round-trippable layout (empty, malformed, or the legacy `<div>` V1 format —
  * see [ProofreadPageParts.decompose]) the form drops to a single raw field
  * bound verbatim to the buffer, so no page is ever corrupted.
+ *
+ * An alternative single-editor implementation — one document with the
+ * `<noinclude>` framing folded away behind inlays and protected by guarded
+ * regions instead of split fields — is planned; this class is where the two
+ * variants would share their sync logic.
  */
 class WtProofreadPageForm(
     private val project: Project,
@@ -51,18 +65,41 @@ class WtProofreadPageForm(
 
     private val editorFactory = EditorFactory.getInstance()
 
-    private val headerEditor = createSectionEditor()
-    private val bodyEditor = createSectionEditor()
-    private val footerEditor = createSectionEditor()
+    private val headerEditor = createSectionEditor("proofread-header.wt")
+    private val bodyEditor = createSectionEditor("proofread-body.wt")
+    private val footerEditor = createSectionEditor("proofread-footer.wt")
 
-    private val headerSection = section("Header", headerEditor)
+    /** Guards against the sync feedback loop (see the class doc). */
+    private var syncing = false
+
+    /**
+     * The `<pagequality/>` tag of the current page, kept out of the header
+     * field (like the web editor's radio group). Level is user-editable via
+     * [qualityCombo]; the user attribution is carried through unchanged.
+     */
+    private var quality: PageQuality? = null
+
+    private val qualityCombo = ComboBox(PageQuality.LEVELS.toList().toTypedArray()).apply {
+        renderer = SimpleListCellRenderer.create("") { "$it — ${PageQuality.levelName(it)}" }
+        addActionListener { if (!syncing) qualityLevelPicked() }
+    }
+
+    private val qualityUserLabel = JBLabel().apply {
+        foreground = JBColor.GRAY
+    }
+
+    private val qualityRow: JComponent = JPanel(FlowLayout(FlowLayout.LEFT, JBUI.scale(6), 0)).apply {
+        isOpaque = false
+        add(JBLabel("Page quality:"))
+        add(qualityCombo)
+        add(qualityUserLabel)
+    }
+
+    private val headerSection = section("Header", headerEditor, qualityRow)
     private val footerSection = section("Footer", footerEditor)
 
     private val bodyFooterSplitter = OnePixelSplitter(true, BODY_FOOTER_SPLIT)
     private val rootSplitter = OnePixelSplitter(true, HEADER_SPLIT)
-
-    /** Guards against the sync feedback loop (see the class doc). */
-    private var syncing = false
 
     /**
      * Whether the buffer parsed into header/body/footer. `false` means raw
@@ -81,7 +118,6 @@ class WtProofreadPageForm(
         rootSplitter.firstComponent = headerSection
         rootSplitter.secondComponent = bodyFooterSplitter
 
-        component.add(WtPageNavToolbar(bodyEditor.component, textEditor.file).component, BorderLayout.NORTH)
         component.add(rootSplitter, BorderLayout.CENTER)
 
         loadFromFile()
@@ -107,10 +143,11 @@ class WtProofreadPageForm(
     private fun loadFromFile() {
         val parts = ProofreadPageParts.decompose(fileDocument.text)
         structured = parts != null
+        quality = parts?.header?.quality
         withSync {
             ApplicationManager.getApplication().runWriteAction {
                 if (parts != null) {
-                    setSection(headerEditor.document, parts.header)
+                    setSection(headerEditor.document, parts.header.text)
                     setSection(bodyEditor.document, parts.body)
                     setSection(footerEditor.document, parts.footer)
                 } else {
@@ -119,20 +156,34 @@ class WtProofreadPageForm(
                     setSection(footerEditor.document, "")
                 }
             }
+            quality?.let {
+                qualityCombo.selectedItem = it.level
+                qualityUserLabel.text = "user: ${it.user}"
+            }
         }
         // In raw mode only the body field is shown; collapse the header/footer
-        // panes so they leave no gap in the splitters.
+        // panes so they leave no gap in the splitters. The quality row also
+        // hides when the header carries no pagequality tag.
+        qualityRow.isVisible = structured && quality != null
         headerSection.isVisible = structured
         footerSection.isVisible = structured
         rootSplitter.proportion = if (structured) HEADER_SPLIT else 0f
         bodyFooterSplitter.proportion = if (structured) BODY_FOOTER_SPLIT else 1f
     }
 
-    /** Reassemble the three fields and push the result into the file buffer. */
+    private fun qualityLevelPicked() {
+        val current = quality ?: return
+        val level = qualityCombo.selectedItem as? Int ?: return
+        if (level == current.level) return
+        quality = current.copy(level = level)
+        writeToFile()
+    }
+
+    /** Reassemble the parts and push the result into the file buffer. */
     private fun writeToFile() {
         val newText = if (structured) {
             ProofreadPageParts(
-                header = headerEditor.document.text,
+                header = ProofreadPageHeader(quality, headerEditor.document.text),
                 body = bodyEditor.document.text,
                 footer = footerEditor.document.text,
             ).compose()
@@ -160,9 +211,18 @@ class WtProofreadPageForm(
         }
     }
 
-    private fun createSectionEditor(): EditorEx {
-        val document = editorFactory.createDocument("")
-        val editor = editorFactory.createEditor(document, project, WtFileType, false) as EditorEx
+    /**
+     * Each section is a real editor over a [LightVirtualFile] with
+     * [WtFileType], so the document has a PSI file behind it and the daemon
+     * runs the full highlighting stack (lexer highlighter + annotator) —
+     * a plain [EditorFactory.createDocument] document gets neither.
+     */
+    private fun createSectionEditor(name: String): EditorEx {
+        val file = LightVirtualFile(name, WtFileType, "")
+        val document = ReadAction.compute<Document?, RuntimeException> {
+            FileDocumentManager.getInstance().getDocument(file)
+        } ?: editorFactory.createDocument("")
+        val editor = editorFactory.createEditor(document, project, file, false) as EditorEx
         editor.settings.apply {
             isLineNumbersShown = false
             isLineMarkerAreaShown = false
@@ -173,14 +233,23 @@ class WtProofreadPageForm(
         return editor
     }
 
-    private fun section(title: String, editor: EditorEx): JComponent {
+    private fun section(title: String, editor: EditorEx, titleTrailer: JComponent? = null): JComponent {
         val label = JBLabel(title).apply {
             border = JBUI.Borders.empty(3, 6)
             font = font.deriveFont(Font.BOLD, font.size - 1f)
             foreground = JBColor.GRAY
         }
+        val north: JComponent = if (titleTrailer == null) {
+            label
+        } else {
+            JPanel(BorderLayout()).apply {
+                isOpaque = false
+                add(label, BorderLayout.WEST)
+                add(titleTrailer, BorderLayout.CENTER)
+            }
+        }
         return JPanel(BorderLayout()).apply {
-            add(label, BorderLayout.NORTH)
+            add(north, BorderLayout.NORTH)
             add(editor.component, BorderLayout.CENTER)
         }
     }
