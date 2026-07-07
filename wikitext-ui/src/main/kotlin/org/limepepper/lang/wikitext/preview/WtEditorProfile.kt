@@ -1,6 +1,7 @@
 package org.limepepper.lang.wikitext.preview
 
 import com.intellij.openapi.vfs.VirtualFile
+import org.limepepper.lang.wikitext.preview.WtEditorProfile.Companion.forFile
 import org.limepepper.lang.wikitext.vfs.WtContentModel
 import org.limepepper.lang.wikitext.vfs.WtVirtualFile
 

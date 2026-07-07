@@ -1,12 +1,7 @@
 package org.limepepper.lang.wikitext.preview
 
 import com.intellij.icons.AllIcons
-import com.intellij.openapi.actionSystem.ActionManager
-import com.intellij.openapi.actionSystem.ActionUpdateThread
-import com.intellij.openapi.actionSystem.AnAction
-import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.actionSystem.DefaultActionGroup
-import com.intellij.openapi.actionSystem.ToggleAction
+import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.ui.JBColor
 import com.intellij.util.ui.JBUI

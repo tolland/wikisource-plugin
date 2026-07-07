@@ -15,7 +15,9 @@
             implementationClass="org.limepepper.lang.wikitext.highlighting.WtAnnotator"
         />
 
-        <defaultLiveTemplates file="/liveTemplates/Wikitext.xml"/>
+        <defaultLiveTemplates
+            file="/liveTemplates/Wikitext.xml"
+        />
 
         <liveTemplateContext
             contextId="WIKITEXT"
