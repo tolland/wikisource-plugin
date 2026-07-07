@@ -224,9 +224,9 @@ class WtProofreadPageForm(
         } ?: editorFactory.createDocument("")
         val editor = editorFactory.createEditor(document, project, file, false) as EditorEx
         editor.settings.apply {
-            isLineNumbersShown = false
-            isLineMarkerAreaShown = false
-            isFoldingOutlineShown = false
+            isLineNumbersShown = true
+            isLineMarkerAreaShown = true
+            isFoldingOutlineShown = true
             additionalColumnsCount = 0
             isUseSoftWraps = true
         }
