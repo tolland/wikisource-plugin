@@ -2,7 +2,7 @@
   <component name="Trusted.Paths">
     <option name="TRUSTED_PROJECT_PATHS">
       <map>
-        <entry key="$USER_HOME$/Sync/projects/java/wikisource_plugin/wikisource/test-project" value="true"/>
+        <entry key="$USER_HOME$/Sync/projects/java/wikisource_plugin/test-project" value="true"/>
       </map>
     </option>
   </component>
