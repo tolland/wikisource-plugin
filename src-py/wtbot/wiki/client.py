@@ -68,10 +68,17 @@ class WikiClient(Protocol):
     def get_namespaces(self): ...  # returns pwb NamespacesDict or None
 
     def save_page(
-        self, title: str, text: str, base_revid: int | None, comment: str | None
+        self,
+        title: str,
+        text: str,
+        base_revid: int | None,
+        comment: str | None,
+        *,
+        force: bool = False,
     ) -> SaveResult:
         """Push a new body for `title`. Raises EditConflict if the page's
-        current revid != base_revid (when base_revid is not None)."""
+        current revid != base_revid (when base_revid is not None), unless
+        force=True."""
         ...
 
     def render_preview(
@@ -293,10 +300,16 @@ class PywikibotClient:
         return self.site.namespaces
 
     def save_page(
-        self, title: str, text: str, base_revid: int | None, comment: str | None
+        self,
+        title: str,
+        text: str,
+        base_revid: int | None,
+        comment: str | None,
+        *,
+        force: bool = False,
     ) -> SaveResult:
         page = self._pwb.Page(self.site, title)
-        if base_revid is not None and page.exists():
+        if not force and base_revid is not None and page.exists():
             current_revid = page.latest_revision.revid
             if current_revid != base_revid:
                 raise EditConflict(title, base_revid, current_revid)
@@ -400,11 +413,17 @@ class FakeWikiClient:
         return None
 
     def save_page(
-        self, title: str, text: str, base_revid: int | None, comment: str | None
+        self,
+        title: str,
+        text: str,
+        base_revid: int | None,
+        comment: str | None,
+        *,
+        force: bool = False,
     ) -> SaveResult:
         existing = self._pages.get(title)
         current_revid = existing.revid if existing else None
-        if base_revid is not None and current_revid != base_revid:
+        if not force and base_revid is not None and current_revid != base_revid:
             raise EditConflict(title, base_revid, current_revid)
         new_revid = (current_revid or 0) + 1
         updated = (

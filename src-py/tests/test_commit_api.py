@@ -119,6 +119,65 @@ def test_pending_commits_include_original_body_for_diff(engine):
         assert pending["submitted_body"] == "edited"
 
 
+def test_commit_endpoint_can_force_overwrite_conflict(engine):
+    site, page = _setup(engine)
+    fake = FakeWikiClient(
+        pages={
+            TITLE: RemotePage(
+                title=TITLE,
+                namespace_key=0,
+                namespace_canonical="Page",
+                content_model="proofread-page",
+                text="someone else's edit",
+                revid=200,
+            )
+        }
+    )
+    app = create_app(engine=engine, client_factory=lambda site: fake)
+    with TestClient(app) as c:
+        write = c.post(
+            "/vfs/content",
+            json={"path": PATH, "content_base64": _b64("edited"), "base_revid": 100},
+        )
+        assert write.status_code == 200
+
+        resp = c.post(f"/commits/{page.pk}?force=true", json={})
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "success"
+        assert resp.json()["base_revid"] == 100
+        assert resp.json()["result_revid"] == 201
+
+    assert fake._pages[TITLE].text == "edited"
+
+
+def test_cancel_pending_commit_discards_local_edits(engine):
+    site, page = _setup(engine)
+    app = create_app(engine=engine, client_factory=lambda site: FakeWikiClient())
+    with TestClient(app) as c:
+        write = c.post(
+            "/vfs/content",
+            json={"path": PATH, "content_base64": _b64("edited"), "base_revid": 100},
+        )
+        assert write.status_code == 200
+
+        resp = c.delete(f"/commits/{page.pk}/pending")
+        assert resp.status_code == 200
+        assert resp.json()["handled"] == 1
+
+        pending = c.get("/commits/pending")
+        assert pending.status_code == 200
+        assert pending.json() == []
+
+    with Session(engine) as s:
+        assert (
+            s.exec(select(EditJournal).where(EditJournal.page_pk == page.pk)).all()
+            == []
+        )
+        updated = s.get(Page, page.pk)
+        assert updated.dirty is False
+        assert updated.text == "original"
+
+
 def test_commit_endpoint_noop_when_nothing_pending(engine):
     _setup(engine)
     app = create_app(engine=engine, client_factory=lambda site: FakeWikiClient())

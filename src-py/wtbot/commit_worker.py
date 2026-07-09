@@ -94,6 +94,8 @@ def run_pending_commit_for_page(
     session: Session,
     page_pk: int,
     client_factory: ClientFactory,
+    *,
+    force: bool = False,
 ) -> bool:
     """Push one page's pending local edits.
 
@@ -103,7 +105,7 @@ def run_pending_commit_for_page(
     """
     with _worker_lock:
         try:
-            return _push_page(session, page_pk, client_factory)
+            return _push_page(session, page_pk, client_factory, force=force)
         finally:
             session.rollback()
 
@@ -148,7 +150,13 @@ def _claim_next_page(session: Session, *, exclude: set[int]) -> int | None:
         session.rollback()
 
 
-def _push_page(session: Session, page_pk: int, client_factory: ClientFactory) -> bool:
+def _push_page(
+    session: Session,
+    page_pk: int,
+    client_factory: ClientFactory,
+    *,
+    force: bool = False,
+) -> bool:
     """Return True if the page was successfully pushed, False on conflict/error."""
     pending = _load_pending_page_commit(session, page_pk)
     if isinstance(pending, _OrphanedPendingPage):
@@ -160,7 +168,7 @@ def _push_page(session: Session, page_pk: int, client_factory: ClientFactory) ->
     if pending is None:
         return True
 
-    outcome = _save_pending_page(pending, client_factory)
+    outcome = _save_pending_page(pending, client_factory, force=force)
     _record_commit_outcome(session, pending, outcome)
     return outcome.status == CommitStatus.success
 
@@ -229,13 +237,17 @@ def _copy_site(site: Site) -> Site:
 
 
 def _save_pending_page(
-    pending: _PendingPageCommit, client_factory: ClientFactory
+    pending: _PendingPageCommit, client_factory: ClientFactory, *, force: bool = False
 ) -> _CommitOutcome:
     """Perform the remote save without any DB transaction held."""
     try:
         client = client_factory(pending.site)
         result = client.save_page(
-            pending.title, pending.body, pending.base_revid, pending.comment
+            pending.title,
+            pending.body,
+            pending.base_revid,
+            pending.comment,
+            force=force,
         )
         return _CommitOutcome(
             status=CommitStatus.success,

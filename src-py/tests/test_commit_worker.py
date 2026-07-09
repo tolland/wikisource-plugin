@@ -6,7 +6,11 @@ from types import SimpleNamespace
 
 from sqlmodel import Session, select
 
-from wtbot.api.commit import list_pending_commits, run_commit_for_page
+from wtbot.api.commit import (
+    cancel_pending_commit_for_page,
+    list_pending_commits,
+    run_commit_for_page,
+)
 from wtbot.commit_worker import run_pending_commits
 from wtbot.model import Commit, CommitStatus, EditJournal, Page, Site
 from wtbot.model.namespace import NsRole
@@ -47,10 +51,16 @@ class SaveHookClient(FakeWikiClient):
         self._on_save = on_save
 
     def save_page(
-        self, title: str, text: str, base_revid: int | None, comment: str | None
+        self,
+        title: str,
+        text: str,
+        base_revid: int | None,
+        comment: str | None,
+        *,
+        force: bool = False,
     ) -> SaveResult:
         self._on_save()
-        return super().save_page(title, text, base_revid, comment)
+        return super().save_page(title, text, base_revid, comment, force=force)
 
 
 def test_push_single_save_succeeds(engine):
@@ -292,6 +302,65 @@ def test_pending_commit_api_lists_and_pushes_one_page(engine):
         assert commit.submitted_body == "draft 2 final"
 
         assert list_pending_commits(session=s) == []
+
+
+def test_pending_commit_api_can_force_overwrite_conflict(engine):
+    site, page = _setup(engine)
+    fake = FakeWikiClient(
+        pages={
+            TITLE: RemotePage(
+                title=TITLE,
+                namespace_key=0,
+                namespace_canonical="Page",
+                content_model="proofread-page",
+                text="someone else's edit",
+                revid=200,
+            )
+        }
+    )
+
+    with Session(engine) as s:
+        s.add(EditJournal(page_pk=page.pk, base_revid=100, body="my edit"))
+        s.commit()
+
+    request = SimpleNamespace(
+        app=SimpleNamespace(state=SimpleNamespace(client_factory=_client_factory(fake)))
+    )
+    with Session(engine) as s:
+        commit = run_commit_for_page(page.pk, request, session=s, force=True)
+        assert commit.status == CommitStatus.success
+        assert commit.base_revid == 100
+        assert commit.result_revid == 201
+
+        updated = s.get(Page, page.pk)
+        assert updated.revid == 201
+        assert updated.dirty is False
+        assert list_pending_commits(session=s) == []
+
+    assert fake._pages[TITLE].text == "my edit"
+
+
+def test_pending_commit_api_can_cancel_local_edits(engine):
+    site, page = _setup(engine)
+    with Session(engine) as s:
+        db_page = s.get(Page, page.pk)
+        db_page.dirty = True
+        s.add(db_page)
+        s.add(EditJournal(page_pk=page.pk, base_revid=100, body="draft"))
+        s.commit()
+
+    with Session(engine) as s:
+        result = cancel_pending_commit_for_page(page.pk, session=s)
+        assert result.handled == 1
+        assert list_pending_commits(session=s) == []
+
+        updated = s.get(Page, page.pk)
+        assert updated.dirty is False
+        assert updated.text == "original"
+        assert (
+            s.exec(select(EditJournal).where(EditJournal.page_pk == page.pk)).all()
+            == []
+        )
 
 
 def test_no_pending_edits_is_a_noop(engine):

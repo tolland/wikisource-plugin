@@ -6,6 +6,7 @@ import type {
   ListChildrenResponse,
   CachedPage,
   Commit,
+  CommitRunResponse,
   PendingCommitPage,
   ReadContentResponse,
   Site,
@@ -110,8 +111,17 @@ export function listPendingCommits(): Promise<PendingCommitPage[]> {
   return getJson<PendingCommitPage[]>('/commits/pending');
 }
 
-export function approvePendingCommit(pagePk: number): Promise<Commit> {
-  return postJson<Commit>(`/commits/${pagePk}`, {});
+export function approvePendingCommit(pagePk: number, force = false): Promise<Commit> {
+  const suffix = force ? '?force=true' : '';
+  return postJson<Commit>(`/commits/${pagePk}${suffix}`, {});
+}
+
+export async function cancelPendingCommit(pagePk: number): Promise<CommitRunResponse> {
+  const response = await fetch(`/api/commits/${pagePk}/pending`, { method: 'DELETE' });
+  if (!response.ok) {
+    throw new Error(`${response.status} ${response.statusText}`);
+  }
+  return response.json() as Promise<CommitRunResponse>;
 }
 
 export function listVfsChildren(path: string): Promise<ListChildrenResponse> {

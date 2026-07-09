@@ -115,7 +115,15 @@ def run_commits(
 
 @router.post("/{page_pk}", response_model=Commit)
 def run_commit_for_page(
-    page_pk: int, request: Request, session: Session = Depends(get_session)
+    page_pk: int,
+    request: Request,
+    session: Session = Depends(get_session),
+    force: Annotated[
+        bool,
+        Query(
+            description="When true, push the pending body without enforcing base_revid."
+        ),
+    ] = False,
 ) -> Commit:
     pending = session.exec(
         select(EditJournal.pk)
@@ -130,7 +138,7 @@ def run_commit_for_page(
         raise HTTPException(status_code=404, detail="no pending edits for page")
 
     factory = request.app.state.client_factory
-    run_pending_commit_for_page(session, page_pk, factory)
+    run_pending_commit_for_page(session, page_pk, factory, force=force)
     commit = session.exec(
         select(Commit)
         .where(Commit.page_pk == page_pk)
@@ -139,6 +147,35 @@ def run_commit_for_page(
     if commit is None:
         raise HTTPException(status_code=500, detail="commit result was not recorded")
     return commit
+
+
+@router.delete("/{page_pk}/pending", response_model=CommitRunResponse)
+def cancel_pending_commit_for_page(
+    page_pk: int, session: Session = Depends(get_session)
+) -> CommitRunResponse:
+    rows = session.exec(
+        select(EditJournal).where(
+            EditJournal.page_pk == page_pk,
+            EditJournal.committed == False,  # noqa: E712
+        )
+    ).all()
+    if not rows:
+        return CommitRunResponse(handled=0)
+
+    try:
+        for row in rows:
+            session.delete(row)
+
+        page = session.get(Page, page_pk)
+        if page is not None:
+            page.dirty = False
+            session.add(page)
+
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    return CommitRunResponse(handled=len(rows))
 
 
 @router.get("/{commit_pk}", response_model=Commit)

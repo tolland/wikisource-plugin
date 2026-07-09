@@ -35,7 +35,9 @@ class WtRenderPreviewBrowser(
 ) : UserDataHolderBase(), FileEditor, Disposable {
     private val component = JBPanel<JBPanel<*>>(BorderLayout())
 
-    private val renderPane = WtRenderPreviewPane(file).also { Disposer.register(this, it) }
+    private val renderPane = WtRenderPreviewPane(file).also {
+        Disposer.register(this, it)
+    }
 
     private val imagePane: WtReferenceImagePane? =
         if (profile.hasReferenceImage) {

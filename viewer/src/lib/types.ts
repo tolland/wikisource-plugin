@@ -119,6 +119,10 @@ export interface Commit {
   created_at: string;
 }
 
+export interface CommitRunResponse {
+  handled: number;
+}
+
 export interface PendingCommitJournal {
   pk: number;
   base_revid?: number | null;

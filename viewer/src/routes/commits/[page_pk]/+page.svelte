@@ -2,13 +2,13 @@
   import { goto } from '$app/navigation';
   import { page as routePage } from '$app/state';
   import { onMount } from 'svelte';
-  import { approvePendingCommit, listPendingCommits } from '$lib/api';
+  import { approvePendingCommit, cancelPendingCommit, listPendingCommits } from '$lib/api';
   import { buildLineDiff } from '$lib/diff';
   import type { Commit, PendingCommitPage } from '$lib/types';
 
   let item: PendingCommitPage | null = $state(null);
   let loading = $state(true);
-  let approving = $state(false);
+  let action: 'approve' | 'force' | 'cancel' | null = $state(null);
   let error = $state('');
   let lastCommit: Commit | null = $state(null);
 
@@ -32,6 +32,14 @@
     const staged = item;
     return staged ? buildLineDiff(staged.base_body ?? '', staged.submitted_body) : null;
   });
+  const hasRevisionWarning = $derived.by(() => {
+    const staged = item;
+    return staged?.current_revid != null && staged.current_revid !== staged.base_revid;
+  });
+  const canForceOverwrite = $derived.by(() => {
+    const commit = lastCommit;
+    return hasRevisionWarning || commit?.status === 'conflict';
+  });
 
   async function loadPage(): Promise<void> {
     loading = true;
@@ -46,14 +54,14 @@
     }
   }
 
-  async function approvePage(): Promise<void> {
+  async function approvePage(force = false): Promise<void> {
     if (!item) return;
 
-    approving = true;
+    action = force ? 'force' : 'approve';
     error = '';
     lastCommit = null;
     try {
-      lastCommit = await approvePendingCommit(item.page_pk);
+      lastCommit = await approvePendingCommit(item.page_pk, force);
       if (lastCommit.status === 'success') {
         await goto('/commits');
       } else {
@@ -62,7 +70,23 @@
     } catch (err) {
       error = err instanceof Error ? err.message : 'Commit failed';
     } finally {
-      approving = false;
+      action = null;
+    }
+  }
+
+  async function cancelPage(): Promise<void> {
+    if (!item) return;
+    if (!window.confirm('Discard all pending local saves for this page?')) return;
+
+    action = 'cancel';
+    error = '';
+    try {
+      await cancelPendingCommit(item.page_pk);
+      await goto('/commits');
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Failed to cancel staged edit';
+    } finally {
+      action = null;
     }
   }
 
@@ -105,9 +129,24 @@
             <span>{item.submitted_body.length.toLocaleString()} characters</span>
           </div>
         </div>
-        <button class="approve" type="button" onclick={() => approvePage()} disabled={approving}>
-          {approving ? 'Pushing...' : 'Approve page'}
-        </button>
+        <div class="actions">
+          <button class="approve" type="button" onclick={() => approvePage()} disabled={action !== null}>
+            {action === 'approve' ? 'Pushing...' : 'Approve page'}
+          </button>
+          {#if canForceOverwrite}
+            <button
+              class="force"
+              type="button"
+              onclick={() => approvePage(true)}
+              disabled={action !== null}
+            >
+              {action === 'force' ? 'Overwriting...' : 'Force overwrite'}
+            </button>
+          {/if}
+          <button class="cancel" type="button" onclick={() => cancelPage()} disabled={action !== null}>
+            {action === 'cancel' ? 'Cancelling...' : 'Cancel'}
+          </button>
+        </div>
       </header>
 
       <section class="history">
@@ -117,6 +156,7 @@
             <li>
               <strong>#{journal.pk}</strong>
               <span>{formatDate(journal.saved_at)}</span>
+              <span>#{journal.base_revid}</span>
               <small>{journal.body.length.toLocaleString()} chars</small>
             </li>
           {/each}
@@ -140,10 +180,12 @@
             No cached original for this page (new page or never fetched) — the whole submitted
             text is shown as added.
           </p>
-        {:else if item.current_revid != null && item.current_revid !== item.base_revid}
+        {:else if hasRevisionWarning}
           <p class="diff-note">
-            The cached copy is revision {item.current_revid} but this edit was based on revision
-            {item.base_revid}; the diff below compares against the cached copy.
+            The diff is against the cached remote body currently stored in Page.text at revision
+            {item.current_revid}. This pending edit was based on revision {item.base_revid}, so
+            this is not a three-way conflict resolution view and may not show the exact text from
+            the base revision.
           </p>
         {/if}
 
@@ -235,12 +277,17 @@
     overflow-wrap: anywhere;
   }
 
-  .approve {
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.55rem;
+  }
+
+  .actions button {
     cursor: pointer;
     border: 0;
     border-radius: 12px;
-    background: #286b4c;
-    color: #fffdf5;
     font-family: "Avenir Next", "Gill Sans", sans-serif;
     font-size: 0.78rem;
     font-weight: 800;
@@ -250,7 +297,23 @@
     white-space: nowrap;
   }
 
-  .approve:disabled {
+  .approve {
+    background: #286b4c;
+    color: #fffdf5;
+  }
+
+  .force {
+    background: #7f2f22;
+    color: #fff8e6;
+  }
+
+  .cancel {
+    border: 1px solid rgba(72, 49, 31, 0.24);
+    background: rgba(255, 252, 240, 0.78);
+    color: #73583d;
+  }
+
+  .actions button:disabled {
     cursor: progress;
     opacity: 0.62;
   }
@@ -270,9 +333,17 @@
   .history li {
     border-top: 1px solid rgba(72, 49, 31, 0.12);
     display: grid;
-    grid-template-columns: 5rem minmax(0, 1fr) auto;
+    grid-template-columns: 5rem minmax(0, 1fr) minmax(0, 1fr) auto;
     gap: 0.75rem;
     padding-top: 0.5rem;
+  }
+
+  .history li > :nth-child(2) {
+      justify-self: start;
+  }
+
+  .history li > :nth-child(3) {
+      justify-self: end;
   }
 
   .history span,
