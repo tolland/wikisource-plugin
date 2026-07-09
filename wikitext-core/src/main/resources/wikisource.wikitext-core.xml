@@ -11,16 +11,5 @@
             language="Wikitext"
             implementationClass="org.limepepper.lang.wikitext.parser.WtParserDefinition"/>
 
-        <fileType
-            name="ProofreadPage"
-            implementationClass="org.limepepper.lang.wikitext.WtProofreadPageFileType"
-            fieldName="INSTANCE"
-            language="Proofread-page"
-        />
-
-        <lang.parserDefinition
-            language="Proofread-page"
-            implementationClass="org.limepepper.lang.wikitext.parser.WtProofreadPageParserDefinition"/>
-
     </extensions>
 </idea-plugin>
