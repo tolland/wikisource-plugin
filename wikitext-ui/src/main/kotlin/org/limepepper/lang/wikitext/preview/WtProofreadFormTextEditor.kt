@@ -1,13 +1,16 @@
 package org.limepepper.lang.wikitext.preview
 
-import com.intellij.icons.AllIcons
-import com.intellij.openapi.actionSystem.ActionUpdateThread
-import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.actionSystem.ToggleAction
+import com.intellij.codeHighlighting.BackgroundEditorHighlighter
+import com.intellij.ide.structureView.StructureViewBuilder
+import com.intellij.openapi.actionSystem.ActionGroup
+import com.intellij.openapi.fileEditor.FileEditorLocation
+import com.intellij.openapi.fileEditor.FileEditorState
+import com.intellij.openapi.fileEditor.FileEditorStateLevel
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
+import org.jetbrains.annotations.Unmodifiable
 import java.awt.BorderLayout
 import java.awt.CardLayout
 import javax.swing.JComponent
@@ -66,35 +69,57 @@ class WtProofreadFormTextEditor(
             form.preferredFocusComponent
         }
 
+    override fun getState(level: FileEditorStateLevel): FileEditorState {
+        return delegate.getState(level)
+    }
+
+    override fun setState(state: FileEditorState, exactState: Boolean) {
+        delegate.setState(state, exactState)
+    }
+
+    override fun selectNotify() {
+        delegate.selectNotify()
+    }
+
+    override fun deselectNotify() {
+        delegate.deselectNotify()
+    }
+
+    override fun getBackgroundHighlighter(): BackgroundEditorHighlighter? {
+        return delegate.backgroundHighlighter
+    }
+
+    override fun getCurrentLocation(): FileEditorLocation? {
+        return delegate.currentLocation
+    }
+
+    override fun getStructureViewBuilder(): StructureViewBuilder? {
+        return delegate.structureViewBuilder
+    }
+
     // Kotlin interface delegation only implements *abstract* members, so the
     // platform's deprecated default getFile() (which logs a PluginException)
     // was still in effect here — a @NotNull override is required.
     override fun getFile(): VirtualFile = delegate.file
+    override fun getFilesToRefresh(): @Unmodifiable List<VirtualFile> {
+        return delegate.filesToRefresh
+    }
+
+    override fun getTabActions(): ActionGroup? {
+        return delegate.tabActions
+    }
 
     override fun dispose() {
         Disposer.dispose(form)
         Disposer.dispose(delegate)
     }
 
+    override fun isEditorLoaded(): Boolean {
+        return delegate.isEditorLoaded()
+    }
+
     private companion object {
         const val CARD_FORM = "form"
         const val CARD_RAW = "raw"
     }
-}
-
-/** Flips [WtProofreadFormTextEditor] between the three-field form and the raw buffer. */
-private class ToggleRawModeAction(
-    private val editor: WtProofreadFormTextEditor,
-) : ToggleAction(
-    "Edit Raw Page Text",
-    "Edit the serialized <noinclude> form directly instead of the header/body/footer fields",
-    AllIcons.Actions.ToggleVisibility,
-) {
-    override fun isSelected(event: AnActionEvent): Boolean = editor.rawMode
-
-    override fun setSelected(event: AnActionEvent, state: Boolean) {
-        editor.rawMode = state
-    }
-
-    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
 }

@@ -30,8 +30,50 @@ public class WtTableImpl extends ASTWrapperPsiElement implements WtTable {
 
   @Override
   @NotNull
-  public List<WtInlineItem> getInlineItemList() {
-    return PsiTreeUtil.getChildrenOfTypeAsList(this, WtInlineItem.class);
+  public List<WtComment> getCommentList() {
+    return PsiTreeUtil.getChildrenOfTypeAsList(this, WtComment.class);
+  }
+
+  @Override
+  @NotNull
+  public List<WtHeading> getHeadingList() {
+    return PsiTreeUtil.getChildrenOfTypeAsList(this, WtHeading.class);
+  }
+
+  @Override
+  @NotNull
+  public List<WtHtmlTag> getHtmlTagList() {
+    return PsiTreeUtil.getChildrenOfTypeAsList(this, WtHtmlTag.class);
+  }
+
+  @Override
+  @NotNull
+  public List<WtInternalLink> getInternalLinkList() {
+    return PsiTreeUtil.getChildrenOfTypeAsList(this, WtInternalLink.class);
+  }
+
+  @Override
+  @NotNull
+  public List<WtListItem> getListItemList() {
+    return PsiTreeUtil.getChildrenOfTypeAsList(this, WtListItem.class);
+  }
+
+  @Override
+  @NotNull
+  public List<WtTable> getTableList() {
+    return PsiTreeUtil.getChildrenOfTypeAsList(this, WtTable.class);
+  }
+
+  @Override
+  @NotNull
+  public List<WtTemplate> getTemplateList() {
+    return PsiTreeUtil.getChildrenOfTypeAsList(this, WtTemplate.class);
+  }
+
+  @Override
+  @NotNull
+  public List<WtVerbatimTag> getVerbatimTagList() {
+    return PsiTreeUtil.getChildrenOfTypeAsList(this, WtVerbatimTag.class);
   }
 
 }

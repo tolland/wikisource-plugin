@@ -12,14 +12,14 @@ import com.intellij.extapi.psi.ASTWrapperPsiElement;
 import org.limepepper.lang.wikitext.psi.*;
 import org.limepepper.lang.wikitext.parser.WtPsiImplUtil;
 
-public class WtHtmlTagImpl extends ASTWrapperPsiElement implements WtHtmlTag {
+public class WtContainedElementImpl extends ASTWrapperPsiElement implements WtContainedElement {
 
-  public WtHtmlTagImpl(@NotNull ASTNode node) {
+  public WtContainedElementImpl(@NotNull ASTNode node) {
     super(node);
   }
 
   public void accept(@NotNull WtVisitor visitor) {
-    visitor.visitHtmlTag(this);
+    visitor.visitContainedElement(this);
   }
 
   @Override
@@ -74,24 +74,6 @@ public class WtHtmlTagImpl extends ASTWrapperPsiElement implements WtHtmlTag {
   @NotNull
   public List<WtVerbatimTag> getVerbatimTagList() {
     return PsiTreeUtil.getChildrenOfTypeAsList(this, WtVerbatimTag.class);
-  }
-
-  @Override
-  @Nullable
-  public PsiElement getHtmlTagClose() {
-    return findChildByType(HTML_TAG_CLOSE);
-  }
-
-  @Override
-  @Nullable
-  public PsiElement getHtmlTagOpen() {
-    return findChildByType(HTML_TAG_OPEN);
-  }
-
-  @Override
-  @Nullable
-  public PsiElement getHtmlTagSelfclose() {
-    return findChildByType(HTML_TAG_SELFCLOSE);
   }
 
 }

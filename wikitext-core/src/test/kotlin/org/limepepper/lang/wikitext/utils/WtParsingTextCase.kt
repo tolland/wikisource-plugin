@@ -27,10 +27,10 @@ abstract class WtParsingTextCase : ParsingTestCase(
             }
 
             // @TODO want to be able to output parsing tokens
-            // println(output)
+            println(output)
 
-            checkResult("$name.parse", myFile)
             ensureNoErrorElements()
+            checkResult("$name.parse", myFile)
 
 
         } catch (e: IOException) {

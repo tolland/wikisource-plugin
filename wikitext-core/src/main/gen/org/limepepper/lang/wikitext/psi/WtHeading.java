@@ -8,8 +8,8 @@ import com.intellij.psi.NavigatablePsiElement;
 
 public interface WtHeading extends NavigatablePsiElement {
 
-  @NotNull
-  List<WtInlineItem> getInlineItemList();
+  @Nullable
+  WtContainedElement getContainedElement();
 
   @Nullable
   PsiElement getHEnd();

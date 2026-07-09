@@ -1,0 +1,6 @@
+Wikitext File(0,33)
+  WtHeadingImpl(WtElementType.HEADING)(0,33)
+    PsiElement(WtTokenType.H_START)('=')(0,1)
+    WtContainedElementImpl(WtElementType.CONTAINED_ELEMENT)(1,32)
+      PsiElement(WtTokenType.PLAIN_TEXT)(' This is a wikitext header one ')(1,32)
+    PsiElement(WtTokenType.H_END)('=')(32,33)

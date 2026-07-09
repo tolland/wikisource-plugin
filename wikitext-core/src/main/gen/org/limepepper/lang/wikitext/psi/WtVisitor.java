@@ -11,6 +11,10 @@ public class WtVisitor extends PsiElementVisitor {
     visitNavigatablePsiElement(o);
   }
 
+  public void visitContainedElement(@NotNull WtContainedElement o) {
+    visitNavigatablePsiElement(o);
+  }
+
   public void visitHeading(@NotNull WtHeading o) {
     visitNavigatablePsiElement(o);
   }
@@ -19,19 +23,11 @@ public class WtVisitor extends PsiElementVisitor {
     visitNavigatablePsiElement(o);
   }
 
-  public void visitInlineItem(@NotNull WtInlineItem o) {
-    visitNavigatablePsiElement(o);
-  }
-
   public void visitInternalLink(@NotNull WtInternalLink o) {
     visitNavigatablePsiElement(o);
   }
 
   public void visitListItem(@NotNull WtListItem o) {
-    visitNavigatablePsiElement(o);
-  }
-
-  public void visitParagraph(@NotNull WtParagraph o) {
     visitNavigatablePsiElement(o);
   }
 

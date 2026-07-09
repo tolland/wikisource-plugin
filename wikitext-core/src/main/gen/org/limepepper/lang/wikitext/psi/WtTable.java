@@ -9,6 +9,27 @@ import com.intellij.psi.NavigatablePsiElement;
 public interface WtTable extends NavigatablePsiElement {
 
   @NotNull
-  List<WtInlineItem> getInlineItemList();
+  List<WtComment> getCommentList();
+
+  @NotNull
+  List<WtHeading> getHeadingList();
+
+  @NotNull
+  List<WtHtmlTag> getHtmlTagList();
+
+  @NotNull
+  List<WtInternalLink> getInternalLinkList();
+
+  @NotNull
+  List<WtListItem> getListItemList();
+
+  @NotNull
+  List<WtTable> getTableList();
+
+  @NotNull
+  List<WtTemplate> getTemplateList();
+
+  @NotNull
+  List<WtVerbatimTag> getVerbatimTagList();
 
 }

@@ -7,9 +7,7 @@ import com.intellij.ide.util.treeView.smartTree.Sorter
 import com.intellij.openapi.editor.Editor
 import com.intellij.psi.PsiFile
 import org.limepepper.lang.wikitext.psi.WtHeading
-import org.limepepper.lang.wikitext.psi.WtInlineItem
 import org.limepepper.lang.wikitext.psi.WtInternalLink
-import org.limepepper.lang.wikitext.psi.WtParagraph
 import org.limepepper.lang.wikitext.psi.WtTemplate
 import kotlin.jvm.java
 
@@ -36,9 +34,7 @@ class WtStructureViewModel(
     override fun getSuitableClasses(): Array<Class<*>> {
         return arrayOf(
             WtHeading::class.java,
-            WtInlineItem::class.java,
             WtInternalLink::class.java,
-            WtParagraph::class.java,
             WtTemplate::class.java
         )
     }

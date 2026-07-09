@@ -29,9 +29,9 @@ public class WtHeadingImpl extends ASTWrapperPsiElement implements WtHeading {
   }
 
   @Override
-  @NotNull
-  public List<WtInlineItem> getInlineItemList() {
-    return PsiTreeUtil.getChildrenOfTypeAsList(this, WtInlineItem.class);
+  @Nullable
+  public WtContainedElement getContainedElement() {
+    return findChildByClass(WtContainedElement.class);
   }
 
   @Override

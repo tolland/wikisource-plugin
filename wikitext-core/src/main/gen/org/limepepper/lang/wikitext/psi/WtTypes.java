@@ -9,12 +9,11 @@ import org.limepepper.lang.wikitext.psi.impl.*;
 public interface WtTypes {
 
   IElementType COMMENT = new WtElementType("COMMENT");
+  IElementType CONTAINED_ELEMENT = new WtElementType("CONTAINED_ELEMENT");
   IElementType HEADING = new WtElementType("HEADING");
   IElementType HTML_TAG = new WtElementType("HTML_TAG");
-  IElementType INLINE_ITEM = new WtElementType("INLINE_ITEM");
   IElementType INTERNAL_LINK = new WtElementType("INTERNAL_LINK");
   IElementType LIST_ITEM = new WtElementType("LIST_ITEM");
-  IElementType PARAGRAPH = new WtElementType("PARAGRAPH");
   IElementType TABLE = new WtElementType("TABLE");
   IElementType TEMPLATE = new WtElementType("TEMPLATE");
   IElementType VERBATIM_TAG = new WtElementType("VERBATIM_TAG");
@@ -67,23 +66,20 @@ public interface WtTypes {
       if (type == COMMENT) {
         return new WtCommentImpl(node);
       }
+      else if (type == CONTAINED_ELEMENT) {
+        return new WtContainedElementImpl(node);
+      }
       else if (type == HEADING) {
         return new WtHeadingImpl(node);
       }
       else if (type == HTML_TAG) {
         return new WtHtmlTagImpl(node);
       }
-      else if (type == INLINE_ITEM) {
-        return new WtInlineItemImpl(node);
-      }
       else if (type == INTERNAL_LINK) {
         return new WtInternalLinkImpl(node);
       }
       else if (type == LIST_ITEM) {
         return new WtListItemImpl(node);
-      }
-      else if (type == PARAGRAPH) {
-        return new WtParagraphImpl(node);
       }
       else if (type == TABLE) {
         return new WtTableImpl(node);

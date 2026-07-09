@@ -33,4 +33,7 @@ class WtLexerTest : WtLexerTestCase() {
     // tags
     fun testPagelist_tag() = doTest()
 
+    // content model
+    fun testProofread_page_1() = doTest()
+
 }

@@ -51,6 +51,16 @@
 
     </extensions>
 
+<!--    <actions>-->
+<!--        <action-->
+<!--            id="org.limepepper.lang.wikitext.actions.ProofreadAction"-->
+<!--            class="org.limepepper.lang.wikitext.preview.ToggleRawModeAction"-->
+<!--            text="Proofread"-->
+<!--            description="Proofread the current document"-->
+<!--            icon="AllIcons.Actions.Check"-->
+<!--        />-->
+<!--    </actions>-->
+
     <applicationListeners>
         <listener
             class="org.limepepper.lang.wikitext.inlay.ProofreadEditorListener"

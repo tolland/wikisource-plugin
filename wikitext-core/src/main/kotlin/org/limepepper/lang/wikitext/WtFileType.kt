@@ -5,7 +5,7 @@ import com.intellij.openapi.fileTypes.LanguageFileType
 import javax.swing.Icon
 
 /**
- * File type definition for WikiText markup files
+ * File type definition for generic WikiText markup files
  */
 object WtFileType : LanguageFileType(WtLanguage) {
 

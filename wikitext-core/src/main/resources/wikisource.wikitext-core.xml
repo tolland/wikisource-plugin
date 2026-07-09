@@ -1,15 +1,26 @@
 <idea-plugin>
     <extensions defaultExtensionNs="com.intellij">
         <fileType
-                name="Wikitext"
-                implementationClass="org.limepepper.lang.wikitext.WtFileType"
-                fieldName="INSTANCE"
-                language="Wikitext"
-                extensions="wt;wiki"/>
+            name="Wikitext"
+            implementationClass="org.limepepper.lang.wikitext.WtFileType"
+            fieldName="INSTANCE"
+            language="Wikitext"
+            extensions="wt;wiki"/>
 
         <lang.parserDefinition
-                language="Wikitext"
-                implementationClass="org.limepepper.lang.wikitext.parser.WtParserDefinition"/>
+            language="Wikitext"
+            implementationClass="org.limepepper.lang.wikitext.parser.WtParserDefinition"/>
+
+        <fileType
+            name="ProofreadPage"
+            implementationClass="org.limepepper.lang.wikitext.WtProofreadPageFileType"
+            fieldName="INSTANCE"
+            language="Proofread-page"
+        />
+
+        <lang.parserDefinition
+            language="Proofread-page"
+            implementationClass="org.limepepper.lang.wikitext.parser.WtProofreadPageParserDefinition"/>
 
     </extensions>
 </idea-plugin>

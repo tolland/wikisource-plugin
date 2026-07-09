@@ -6,7 +6,7 @@ import org.jetbrains.annotations.*;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.NavigatablePsiElement;
 
-public interface WtListItem extends NavigatablePsiElement {
+public interface WtContainedElement extends NavigatablePsiElement {
 
   @NotNull
   List<WtComment> getCommentList();

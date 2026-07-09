@@ -7,11 +7,10 @@ import com.intellij.ide.util.treeView.smartTree.TreeElement
 import com.intellij.navigation.ItemPresentation
 import com.intellij.psi.NavigatablePsiElement
 import com.intellij.psi.PsiElement
+import org.limepepper.lang.wikitext.psi.WtContainedElement
 import org.limepepper.lang.wikitext.psi.WtHeading
 import org.limepepper.lang.wikitext.psi.WtFile
-import org.limepepper.lang.wikitext.psi.WtInlineItem
 import org.limepepper.lang.wikitext.psi.WtInternalLink
-import org.limepepper.lang.wikitext.psi.WtParagraph
 import org.limepepper.lang.wikitext.psi.WtTemplate
 
 
@@ -40,16 +39,8 @@ class WtStructureViewElement(val element: NavigatablePsiElement) : StructureView
     private fun structureChildren(): List<NavigatablePsiElement> =
         when (element) {
             is WtFile -> element.children.filterIsInstance<NavigatablePsiElement>()
-            is WtHeading -> element.inlineItemList
-            is WtParagraph -> element.inlineItemList
-            is WtInlineItem -> listOfNotNull(
-                element.internalLink,
-                element.htmlTag,
-                element.verbatimTag,
-                element.template
-            )
-            is WtInternalLink -> element.inlineItemList
-            is WtTemplate -> element.inlineItemList
+            is WtInternalLink -> element.getListItemList()
+            is WtTemplate -> element.getTemplateList()
             else -> emptyList()
         }
 
@@ -57,10 +48,9 @@ class WtStructureViewElement(val element: NavigatablePsiElement) : StructureView
         when (element) {
             is WtFile -> element.name
             is WtHeading -> "H${element.level}: ${element.trimmedText()}"
-            is WtParagraph -> element.trimmedText()
             is WtTemplate -> "{{${element.templateName?.text?.trim().orEmpty()}}}"
             is WtInternalLink -> "[[${element.linkTarget?.text?.trim().orEmpty()}]]"
-            is WtInlineItem -> element.trimmedText()
+            is WtContainedElement -> element.trimmedText()
             else -> element.name ?: element.trimmedText()
         }.ifBlank { element.toString() }
 

@@ -9,8 +9,8 @@ import org.limepepper.lang.wikitext.WtLanguage
 
 class WtFile(viewProvider: FileViewProvider) : PsiFileBase(viewProvider, WtLanguage) {
 
-    val commands: Collection<WtParagraph>
-        get() = PsiTreeUtil.findChildrenOfType(this, WtParagraph::class.java)
+//    val commands: Collection<WtContentElement>
+//        get() = PsiTreeUtil.findChildrenOfType(this, WtContentElement::class.java)
 
     override fun getFileType(): FileType = WtFileType
 
