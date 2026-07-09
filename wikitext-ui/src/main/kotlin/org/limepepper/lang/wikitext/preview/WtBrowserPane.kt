@@ -10,7 +10,6 @@ import org.cef.browser.CefFrame
 import org.cef.handler.CefLoadHandlerAdapter
 import javax.swing.JComponent
 import javax.swing.JEditorPane
-import kotlin.math.ln
 
 /**
  * A browser surface shared by the preview panes: a JCEF browser where
@@ -20,9 +19,9 @@ import kotlin.math.ln
  * panes without a reload.
  *
  * Zoom notes (JCEF only):
- *  - CEF's `setZoomLevel` takes a *logarithmic* level where level n renders
- *    at 1.2^n scale, so the user-facing [zoomScale] (1.0 = 100%) is converted
- *    with `ln(scale)/ln(1.2)`.
+ *  - [JBCefBrowser.setZoomLevel] takes a plain scale factor (1.0 = 100%) and
+ *    converts to CEF's logarithmic zoom level internally — do not pre-convert
+ *    (raw CEF `CefBrowser.setZoomLevel` is the API that takes the log level).
  *  - CEF resets the zoom whenever a navigation commits, and `loadHTML` is
  *    asynchronous — setting the zoom right after it is a lost update. The
  *    pane re-applies the zoom from an `onLoadEnd` handler instead.
@@ -73,7 +72,7 @@ abstract class WtBrowserPane : Disposable {
     }
 
     private fun applyZoom() {
-        jcefBrowser?.setZoomLevel(ln(zoomScale) / ln(ZOOM_LEVEL_BASE))
+        jcefBrowser?.setZoomLevel(zoomScale)
     }
 
     protected fun showHtml(html: String) {
@@ -91,8 +90,5 @@ abstract class WtBrowserPane : Disposable {
     private companion object {
         const val MIN_ZOOM = 0.2
         const val MAX_ZOOM = 8.0
-
-        /** CEF renders zoom level n at 1.2^n scale. */
-        const val ZOOM_LEVEL_BASE = 1.2
     }
 }
