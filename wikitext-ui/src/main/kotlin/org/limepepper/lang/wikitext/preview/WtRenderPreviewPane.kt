@@ -1,15 +1,22 @@
 package org.limepepper.lang.wikitext.preview
 
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.ui.components.JBScrollPane
+import com.intellij.ui.jcef.JBCefApp
+import com.intellij.ui.jcef.JBCefBrowser
 import org.limepepper.lang.wikitext.vfs.WtVirtualFile
 import org.limepepper.lang.wikitext.vfs.backend.PreviewResult
 import org.limepepper.lang.wikitext.vfs.backend.WtVfsService
 import java.util.concurrent.atomic.AtomicLong
+import javax.swing.JComponent
+import javax.swing.JEditorPane
 import javax.swing.Timer
 
 private val PREVIEW_LOG = logger<WtRenderPreviewPane>()
@@ -19,11 +26,29 @@ private val PREVIEW_LOG = logger<WtRenderPreviewPane>()
  * text to the wtbot sidecar's `POST /preview/render`, which proxies
  * MediaWiki's `action=parse` — the same API the browser's live preview uses —
  * so templates, ProofreadPage quality headers, and site CSS all match what a
- * save would produce.
+ * save would produce. The HTML is shown in a JCEF browser, falling back to a
+ * Swing [JEditorPane] where JCEF is unavailable (some remote-dev and headless
+ * setups) — Swing's own HTML support is far behind the wiki's markup.
  */
 class WtRenderPreviewPane(
     private val file: VirtualFile,
-) : WtBrowserPane() {
+) : Disposable {
+    private val jcefBrowser: JBCefBrowser? =
+        if (JBCefApp.isSupported()) {
+            JBCefBrowser().also { Disposer.register(this, it) }
+        } else {
+            null
+        }
+
+    private val fallbackPane: JEditorPane? =
+        if (jcefBrowser == null) {
+            JEditorPane("text/html", "").apply { isEditable = false }
+        } else {
+            null
+        }
+
+    val component: JComponent = jcefBrowser?.component ?: JBScrollPane(fallbackPane)
+
     // Debounce keystrokes: every reload is a network round trip through the
     // sidecar to the wiki, so wait for a typing pause rather than 250ms.
     private val reloadTimer = Timer(500) { reload() }.apply {
@@ -147,9 +172,18 @@ class WtRenderPreviewPane(
         """.trimIndent()
     }
 
+    private fun showHtml(html: String) {
+        val browser = jcefBrowser
+        if (browser != null) {
+            browser.loadHTML(html)
+        } else {
+            fallbackPane?.text = html
+            fallbackPane?.caretPosition = 0
+        }
+    }
+
     override fun dispose() {
         disposed = true
         reloadTimer.stop()
-        super.dispose()
     }
 }

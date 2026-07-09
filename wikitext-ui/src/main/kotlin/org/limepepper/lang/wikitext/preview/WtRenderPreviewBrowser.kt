@@ -13,6 +13,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.components.JBPanel
 import java.awt.BorderLayout
 import java.awt.CardLayout
+import java.awt.Rectangle
 import java.beans.PropertyChangeListener
 import javax.swing.JComponent
 
@@ -72,10 +73,6 @@ class WtRenderPreviewBrowser(
             }
         }
 
-    /** Zoom applies only to the reference image, and only JCEF can zoom. */
-    val isZoomSupported: Boolean
-        get() = imagePane?.isZoomSupported == true
-
     fun zoomImage(factor: Double) {
         imagePane?.zoomBy(factor)
     }
@@ -83,6 +80,9 @@ class WtRenderPreviewBrowser(
     fun resetImageZoom() {
         imagePane?.resetZoom()
     }
+
+    /** The drag-selected OCR region of the scan, in image pixel coordinates. */
+    fun referenceSelection(): Rectangle? = imagePane?.selection
 
     init {
         component.add(WtPreviewToolbar(this).component, BorderLayout.NORTH)

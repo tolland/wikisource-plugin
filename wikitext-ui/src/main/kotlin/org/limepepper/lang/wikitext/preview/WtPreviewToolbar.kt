@@ -93,22 +93,12 @@ private class ReloadPreviewAction(
     }
 }
 
-/** Base for the image-mode zoom actions — also greyed out without JCEF. */
-private abstract class ZoomAction(
-    private val previewEditor: WtRenderPreviewBrowser,
-    text: String,
-    description: String,
-    icon: javax.swing.Icon,
-) : ModeAction(previewEditor, imageMode = true, text, description, icon) {
-    override fun update(event: AnActionEvent) {
-        super.update(event)
-        event.presentation.isEnabled = previewEditor.isZoomSupported
-    }
-}
-
 private class ZoomInAction(
     private val previewEditor: WtRenderPreviewBrowser,
-) : ZoomAction(previewEditor, "Zoom In", "Zoom into the reference image", AllIcons.General.ZoomIn) {
+) : ModeAction(
+    previewEditor, imageMode = true,
+    "Zoom In", "Zoom into the reference image", AllIcons.General.ZoomIn,
+) {
     override fun actionPerformed(event: AnActionEvent) {
         previewEditor.zoomImage(1.25)
     }
@@ -116,7 +106,10 @@ private class ZoomInAction(
 
 private class ZoomOutAction(
     private val previewEditor: WtRenderPreviewBrowser,
-) : ZoomAction(previewEditor, "Zoom Out", "Zoom out of the reference image", AllIcons.General.ZoomOut) {
+) : ModeAction(
+    previewEditor, imageMode = true,
+    "Zoom Out", "Zoom out of the reference image", AllIcons.General.ZoomOut,
+) {
     override fun actionPerformed(event: AnActionEvent) {
         previewEditor.zoomImage(1 / 1.25)
     }
@@ -124,21 +117,25 @@ private class ZoomOutAction(
 
 private class ResetZoomAction(
     private val previewEditor: WtRenderPreviewBrowser,
-) : ZoomAction(previewEditor, "Reset Zoom", "Reset the reference image zoom to 100%", AllIcons.General.ActualZoom) {
+) : ModeAction(
+    previewEditor, imageMode = true,
+    "Reset Zoom", "Fit the reference image to the pane", AllIcons.General.ActualZoom,
+) {
     override fun actionPerformed(event: AnActionEvent) {
         previewEditor.resetImageZoom()
     }
 }
 
 private class SendToOcrAction(
-    previewEditor: WtRenderPreviewBrowser,
+    private val previewEditor: WtRenderPreviewBrowser,
 ) : ModeAction(
     previewEditor, imageMode = true,
-    "Send to OCR", "Send the reference image to the OCR backend", AllIcons.Actions.Upload,
+    "Send to OCR", "Send the selected region of the scan to the OCR backend", AllIcons.Actions.Upload,
 ) {
     override fun actionPerformed(event: AnActionEvent) {
-        // Stub: will POST the page's scan to the sidecar's OCR endpoint and
-        // offer the recognized text to the editor.
-        TOOLBAR_LOG.info("Send to OCR: not implemented yet")
+        // Stub: will POST the selected region of the scan (the whole scan if
+        // nothing is selected) to the sidecar's OCR endpoint and offer the
+        // recognized text to the editor.
+        TOOLBAR_LOG.info("Send to OCR: not implemented yet (selection=${previewEditor.referenceSelection()})")
     }
 }

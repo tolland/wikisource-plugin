@@ -1,6 +1,10 @@
 package org.limepepper.lang.wikitext.vfs.backend
 
+import java.awt.Color
+import java.awt.image.BufferedImage
+import java.io.ByteArrayOutputStream
 import java.util.Base64
+import javax.imageio.ImageIO
 
 /**
  * In-memory [VfsBackend] for tests and offline use.
@@ -153,8 +157,17 @@ class FakeVfsBackend : VfsBackend {
     }
 
     override fun pageImageUrl(path: String?, title: String?): String {
-        val svg = """<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1200">""" +
-            """<rect width="100%" height="100%" fill="#f8f4e8"/></svg>"""
-        return "data:image/svg+xml;base64," + Base64.getEncoder().encodeToString(svg.toByteArray())
+        // PNG rather than SVG: the scan viewer decodes with ImageIO, which
+        // has no SVG support.
+        val image = BufferedImage(800, 1200, BufferedImage.TYPE_INT_RGB)
+        image.createGraphics().apply {
+            color = Color(0xF8, 0xF4, 0xE8)
+            fillRect(0, 0, image.width, image.height)
+            color = Color.GRAY
+            drawString("fake page scan${title?.let { ": $it" } ?: ""}", 40, 60)
+            dispose()
+        }
+        val bytes = ByteArrayOutputStream().also { ImageIO.write(image, "png", it) }.toByteArray()
+        return "data:image/png;base64," + Base64.getEncoder().encodeToString(bytes)
     }
 }
