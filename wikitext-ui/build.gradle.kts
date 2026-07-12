@@ -16,5 +16,6 @@ dependencies {
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")
     intellijPlatform {
         testFramework(TestFrameworkType.Platform)
+        bundledModule("intellij.platform.ui.jcef")
     }
 }

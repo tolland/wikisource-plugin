@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-An IntelliJ Platform plugin that adds Wikitext language support (`.wt` / `.wiki` files) to IntelliJ IDEA, paired with a Python sidecar (`wtbot`) that fetches content from MediaWiki via pywikibot and exchanges it with the plugin through a shared SQLite database. For inspection purpose we also have a svelteKit based viewer app ./viewer which is not part of the main workflow but is conventient for inspection and debugging of state.
+An IntelliJ Platform plugin that adds Wikitext language support (`.wt` / `.wiki` files) to IntelliJ IDEA, paired with a Python sidecar (`wtbot`) that fetches content from MediaWiki via pywikibot and exchanges it with the plugin through a shared SQLite database. For inspection purpose we also have a svelteKit based viewer app ./viewer which is not part of the main workflow but is convenient for inspection and debugging of state, and is used for out-of-band approval of edits.
 
 ## Code style
 
@@ -102,4 +102,4 @@ The `LEXER_DEBUG=true` system property is set during `./gradlew test` to enable 
 
 ### Target platform
 
-IntelliJ IDEA **2026.1** (`intellijPlatformVersion` in `gradle.properties`). The sandbox config in `sandbox-config/` is copied into the sandbox on each `prepareSandbox` task run.
+IntelliJ IDEA **2026.2 RC**, exact build **262.8665.176** (`intellijPlatformVersion` in `gradle.properties`). The sandbox config in `sandbox-config/` is copied into the sandbox on each `prepareSandbox` task run.
