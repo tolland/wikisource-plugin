@@ -48,6 +48,7 @@ class ProofreadInlayProvider : InlayHintsProvider<NoSettings> {
     override val description: String
         get() = MyMessageBundle.message("markdown.table.inlay.kind.description")
 
+    @Suppress("UnstableApiUsage")
     override val key: SettingsKey<NoSettings>
         get() = settingsKey
 

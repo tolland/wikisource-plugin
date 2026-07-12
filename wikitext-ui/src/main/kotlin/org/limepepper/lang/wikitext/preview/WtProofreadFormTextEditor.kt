@@ -114,10 +114,6 @@ class WtProofreadFormTextEditor(
         Disposer.dispose(delegate)
     }
 
-    override fun isEditorLoaded(): Boolean {
-        return delegate.isEditorLoaded()
-    }
-
     private companion object {
         const val CARD_FORM = "form"
         const val CARD_RAW = "raw"
