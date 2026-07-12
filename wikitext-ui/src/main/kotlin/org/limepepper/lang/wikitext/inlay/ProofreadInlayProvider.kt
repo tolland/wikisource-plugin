@@ -23,7 +23,7 @@ class ProofreadInlayProvider : InlayHintsProvider<NoSettings> {
         editor: Editor,
         settings: NoSettings,
         sink: InlayHintsSink
-    ): InlayHintsCollector? {
+    ): InlayHintsCollector {
         return object : FactoryInlayHintsCollector(editor) {
             override fun collect(element: PsiElement, editor: Editor, sink: InlayHintsSink): Boolean {
                 if (element.node?.elementType == WtTypes.HTML_TAG_CLOSE) {
