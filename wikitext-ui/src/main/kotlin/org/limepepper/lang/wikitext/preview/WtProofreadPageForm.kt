@@ -2,7 +2,7 @@ package org.limepepper.lang.wikitext.preview
 
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.EditorFactory
@@ -80,7 +80,9 @@ class WtProofreadPageForm(
     private var quality: PageQuality? = null
 
     private val qualityCombo = ComboBox(PageQuality.LEVELS.toList().toTypedArray()).apply {
-        renderer = SimpleListCellRenderer.create("") { "$it — ${PageQuality.levelName(it)}" }
+        renderer = SimpleListCellRenderer.create { label, value, _ ->
+            label.text = if (value == null) "" else "$value — ${PageQuality.levelName(value)}"
+        }
         addActionListener { if (!syncing) qualityLevelPicked() }
     }
 
@@ -219,7 +221,7 @@ class WtProofreadPageForm(
      */
     private fun createSectionEditor(name: String): EditorEx {
         val file = LightVirtualFile(name, WtFileType, "")
-        val document = ReadAction.compute<Document?, RuntimeException> {
+        val document = runReadAction {
             FileDocumentManager.getInstance().getDocument(file)
         } ?: editorFactory.createDocument("")
         val editor = editorFactory.createEditor(document, project, file, false) as EditorEx
