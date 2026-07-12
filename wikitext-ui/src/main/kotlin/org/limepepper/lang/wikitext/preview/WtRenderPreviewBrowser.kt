@@ -1,7 +1,7 @@
 package org.limepepper.lang.wikitext.preview
 
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.application.runReadAction
+import com.intellij.openapi.application.runReadActionBlocking
 import com.intellij.openapi.editor.event.DocumentEvent
 import com.intellij.openapi.editor.event.DocumentListener
 import com.intellij.openapi.fileEditor.FileDocumentManager
@@ -91,7 +91,7 @@ class WtRenderPreviewBrowser(
         component.add(cardPanel, BorderLayout.CENTER)
         reloadPreview()
 
-        runReadAction {
+        runReadActionBlocking {
             FileDocumentManager.getInstance().getDocument(file)?.addDocumentListener(object : DocumentListener {
                 override fun documentChanged(event: DocumentEvent) {
                     renderPane.scheduleReload()

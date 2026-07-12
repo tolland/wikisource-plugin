@@ -2,7 +2,7 @@ package org.limepepper.lang.wikitext.preview
 
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.runReadAction
+import com.intellij.openapi.application.runReadActionBlocking
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.util.Disposer
@@ -119,7 +119,7 @@ class WtRenderPreviewPane(
      * modern platform — without the implicit read lock that IDE actions get.
      */
     private fun readWikitext(): String =
-        runReadAction {
+        runReadActionBlocking {
             val document = FileDocumentManager.getInstance().getDocument(file)
             document?.text ?: VfsUtilCore.loadText(file)
         }

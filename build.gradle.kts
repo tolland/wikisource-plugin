@@ -1,6 +1,8 @@
 import org.gradle.kotlin.dsl.withType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.intellij.platform.gradle.tasks.PrepareSandboxTask
+import org.jetbrains.kotlin.gradle.dsl.JvmDefaultMode
+import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 
 val intellijPlatformVersion = providers.gradleProperty("intellijPlatformVersion").get()
 
@@ -16,6 +18,20 @@ plugins {
 
 idea {
     module {
+    }
+}
+
+allprojects {
+    plugins.withId("org.jetbrains.kotlin.jvm") {
+        extensions.configure<KotlinJvmProjectExtension> {
+            compilerOptions {
+                // Compile interface default methods without DefaultImpls bridges;
+                // otherwise implementors of platform interfaces (ToolWindowFactory)
+                // get compiler-generated overrides of deprecated members, which the
+                // plugin verifier reports as deprecated-API usages.
+                jvmDefault.set(JvmDefaultMode.NO_COMPATIBILITY)
+            }
+        }
     }
 }
 
