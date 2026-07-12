@@ -8,7 +8,6 @@ plugins {
 
 dependencies {
     implementation(project(":wikitext-core"))
-    implementation("org.xerial:sqlite-jdbc:3.53.2.0")
     testImplementation(libs.junit)
     testImplementation("org.jetbrains.kotlin:kotlin-test")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit")

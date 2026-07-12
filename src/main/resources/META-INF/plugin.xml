@@ -8,6 +8,7 @@
         ]]></description>
 
     <depends>com.intellij.modules.lang</depends>
+    <depends>com.intellij.modules.jcef</depends>
 
     <content>
         <module name="wikisource.wikitext-core" loading="required"/>
