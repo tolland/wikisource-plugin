@@ -15,4 +15,11 @@
         <module name="wikisource.wikitext-vfs"/>
         <module name="wikisource.wikitext-ui"/>
     </content>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <projectConfigurable
+            id="org.limepepper.wikitext.wtbot.project"
+            displayName="WTBot (VFS backend)"
+            instance="org.limepepper.lang.wikitext.vfs.settings.WtbotProjectConfigurable"/>
+    </extensions>
 </idea-plugin>

@@ -7,6 +7,9 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
+import com.intellij.openapi.project.Project
+import org.limepepper.lang.wikitext.vfs.settings.WtbotProjectSettings
+import org.limepepper.lang.wikitext.vfs.settings.WtbotSettingsListener
 
 /**
  * Calls the wtbot FastAPI VFS endpoints over HTTP.
@@ -19,12 +22,43 @@ import java.time.Duration
  * @param timeout  per-request timeout
  */
 class HttpVfsBackend(
-    private val baseUrl: String = "http://127.0.0.1:8000",
-    private val timeout: Duration = Duration.ofSeconds(10),
-    private val client: HttpClient = HttpClient.newBuilder()
-        .connectTimeout(timeout)
-        .build(),
+    private var baseUrl: String,
+    private var timeout: Duration = Duration.ofSeconds(10),
+    private var client: HttpClient = buildClient(Duration.ofSeconds(10)),
 ) : VfsBackend {
+
+    constructor() : this(
+        baseUrl = "http://127.0.0.1:8000",
+        timeout = Duration.ofSeconds(10),
+        client = buildClient(Duration.ofSeconds(10))
+    )
+
+    constructor(project: Project) : this(
+        baseUrl = WtbotProjectSettings.getInstance(project).baseUrl,
+        timeout = Duration.ofSeconds(WtbotProjectSettings.getInstance(project).timeoutSeconds.toLong()),
+        client = buildClient(Duration.ofSeconds(WtbotProjectSettings.getInstance(project).timeoutSeconds.toLong()))
+    ) {
+        val settings = WtbotProjectSettings.getInstance(project)
+        project.messageBus.connect().subscribe(WtbotProjectSettings.TOPIC, WtbotSettingsListener { state ->
+            // update baseUrl and timeout on settings change
+            this.baseUrl = "http://${state.host}:${state.port}"
+            val newTimeout = Duration.ofSeconds(state.timeoutSeconds.toLong())
+            if (newTimeout != this.timeout) {
+                this.timeout = newTimeout
+                this.client = buildClient(newTimeout)
+            }
+        })
+    }
+
+    companion object {
+        private fun buildClient(timeout: Duration): HttpClient =
+            HttpClient.newBuilder()
+                .connectTimeout(timeout)
+                .build()
+    }
+
+    // Expose for tests
+    internal fun getBaseUrlForTesting(): String = baseUrl
 
     override fun stat(path: String): StatResult {
         val json = get("/vfs/stat", "path" to path)
@@ -182,7 +216,7 @@ class HttpVfsBackend(
             path?.let { "path" to it },
             title?.let { "title" to it },
         ).joinToString("&") { (k, v) ->
-            "${URLEncoder.encode(k, "UTF-8")}=${URLEncoder.encode(v, "UTF-8")}"
+            "${URLEncoder.encode(k, "UTF-8")}=${URLEncoder.encode(v, "UTF-8")}" 
         }
         return "$baseUrl/preview/page-image?$query"
     }
@@ -247,7 +281,7 @@ class HttpVfsBackend(
 
     private fun get(endpoint: String, vararg params: Pair<String, String>): String {
         val query = params.joinToString("&") { (k, v) ->
-            "${URLEncoder.encode(k, "UTF-8")}=${URLEncoder.encode(v, "UTF-8")}"
+            "${URLEncoder.encode(k, "UTF-8")}=${URLEncoder.encode(v, "UTF-8")}" 
         }
         val uri = URI.create("$baseUrl$endpoint?$query")
         val req = HttpRequest.newBuilder(uri)
