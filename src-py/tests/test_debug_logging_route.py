@@ -55,9 +55,6 @@ async def test_debug_logging_route_logs_body_at_trace(caplog):
         response = await client.post("/echo", json={"value": "visible"})
 
     assert response.status_code == 200
-    from rich import inspect
-
-    inspect(caplog)
     assert "POST /echo request body" in caplog.text
     assert '"value": "visible"' in caplog.text
     assert "POST /echo response 200 body" in caplog.text

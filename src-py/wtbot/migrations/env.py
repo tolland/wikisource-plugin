@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import Connection, engine_from_config, pool
@@ -10,9 +9,6 @@ from sqlmodel import SQLModel
 import wtbot.model  # noqa: F401
 
 config = context.config
-
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
 
 target_metadata = SQLModel.metadata
 
