@@ -13,5 +13,10 @@
             serviceImplementation="org.limepepper.lang.wikitext.vfs.backend.WtVfsService"
         />
 
+        <projectConfigurable
+            id="org.limepepper.wikitext.wtbot.project"
+            displayName="WTBot (VFS backend)"
+            instance="org.limepepper.lang.wikitext.vfs.settings.WtbotProjectConfigurable"/>
+
     </extensions>
 </idea-plugin>

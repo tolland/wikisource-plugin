@@ -7,13 +7,13 @@ import java.util.concurrent.atomic.AtomicReference
 class WtbotProjectSettingsTest : BasePlatformTestCase() {
 
     fun testSettingsAndListenerNotified() {
-        val project = myProject
-        val settings = WtbotProjectSettings.getInstance(project)
+        val proj = project
+        val settings = WtbotProjectSettings.getInstance(proj)
         val received = AtomicReference<WtbotProjectSettings.State?>(null)
-        val connection = project.messageBus.connect(testRootDisposable)
-        connection.subscribe(WtbotProjectSettings.TOPIC) { state ->
+        val connection = proj.messageBus.connect(testRootDisposable)
+        connection.subscribe(WtbotProjectSettings.TOPIC, WtbotSettingsListener { state ->
             received.set(state)
-        }
+        })
 
         settings.host = "example.org"
         settings.port = 9001
@@ -28,13 +28,13 @@ class WtbotProjectSettingsTest : BasePlatformTestCase() {
     }
 
     fun testHttpVfsBackendUsesProjectSettings() {
-        val project = myProject
-        val settings = WtbotProjectSettings.getInstance(project)
+        val proj = project
+        val settings = WtbotProjectSettings.getInstance(proj)
         settings.host = "127.0.0.2"
         settings.port = 12345
         settings.timeoutSeconds = 7
 
-        val backend = org.limepepper.lang.wikitext.vfs.backend.HttpVfsBackend(project)
+        val backend = org.limepepper.lang.wikitext.vfs.backend.HttpVfsBackend(proj)
         assertEquals("http://127.0.0.2:12345", backend.getBaseUrlForTesting())
     }
 }

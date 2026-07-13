@@ -2,10 +2,9 @@ package org.limepepper.lang.wikitext.vfs.settings
 
 import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.Service
+import com.intellij.openapi.components.Service.Level
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
-import com.intellij.openapi.components.Service
-import com.intellij.openapi.components.Service.Level
 import com.intellij.openapi.project.Project
 import com.intellij.util.messages.Topic
 
@@ -18,7 +17,7 @@ import com.intellij.util.messages.Topic
 class WtbotProjectSettings(private val project: Project) : PersistentStateComponent<WtbotProjectSettings.State> {
 
     data class State(
-        var host: String = "127.0.0.1",
+        var host: String = "127.0.100.1",
         var port: Int = 8000,
         var timeoutSeconds: Int = 10
     )
@@ -62,7 +61,8 @@ class WtbotProjectSettings(private val project: Project) : PersistentStateCompon
         get() = "http://${state.host}:${state.port}"
 
     companion object {
-        val TOPIC: Topic<WtbotSettingsListener> = Topic.create("WtbotProjectSettings", WtbotSettingsListener::class.java)
+        val TOPIC: Topic<WtbotSettingsListener> =
+            Topic.create("WtbotProjectSettings", WtbotSettingsListener::class.java)
 
         fun getInstance(project: Project): WtbotProjectSettings =
             project.getService(WtbotProjectSettings::class.java)
