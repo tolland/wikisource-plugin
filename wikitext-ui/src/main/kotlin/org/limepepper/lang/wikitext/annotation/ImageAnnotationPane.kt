@@ -41,4 +41,7 @@ class ImageAnnotationPane(
 
     /** "Reset" fits the whole image into the pane, the same as the initial view. */
     fun resetZoom() = canvas.fitToViewport()
+
+    /** Selects [boxId] and scrolls it into view. */
+    fun revealBox(boxId: String) = canvas.revealBox(boxId)
 }

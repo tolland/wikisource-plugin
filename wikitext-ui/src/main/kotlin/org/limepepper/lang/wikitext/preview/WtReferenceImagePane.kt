@@ -6,6 +6,7 @@ import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
 import org.limepepper.lang.wikitext.annotation.BoundingBox
+import org.limepepper.lang.wikitext.annotation.BoundingBoxModel
 import org.limepepper.lang.wikitext.annotation.ImageAnnotationPane
 import org.limepepper.lang.wikitext.vfs.WtVirtualFile
 import org.limepepper.lang.wikitext.vfs.backend.WtVfsService
@@ -46,6 +47,22 @@ class WtReferenceImagePane(
 
     val component: JComponent
         get() = annotationPane.component
+
+    /** The shared box set — the editor-side anchor chrome observes this. */
+    val model: BoundingBoxModel
+        get() = annotationPane.model
+
+    /** Revision the file's cached content is based on, for new anchors. */
+    val baseRevid: Long?
+        get() = (file as? WtVirtualFile)?.revid
+
+    /** Hands the right-click menu over to the host (see [ImageAnnotationCanvas.popupMenuFactory]). */
+    fun installPopupMenu(factory: (BoundingBox?) -> javax.swing.JPopupMenu?) {
+        annotationPane.canvas.popupMenuFactory = factory
+    }
+
+    /** Selects [boxId] and scrolls the canvas to it (gutter-icon click path). */
+    fun revealBox(boxId: String) = annotationPane.revealBox(boxId)
 
     @Volatile
     private var disposed = false
@@ -120,6 +137,9 @@ class WtReferenceImagePane(
                                     width = it.width,
                                     height = it.height,
                                     label = it.label,
+                                    textStart = it.textStart,
+                                    textEnd = it.textEnd,
+                                    anchorRevid = it.anchorRevid,
                                 )
                             },
                     )

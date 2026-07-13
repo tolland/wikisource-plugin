@@ -46,6 +46,10 @@ class WtRenderPreviewBrowser(
             null
         }
 
+    /** The scan pane, for profiles that have one — box↔text linking wires into it. */
+    val referenceImagePane: WtReferenceImagePane?
+        get() = imagePane
+
     private val cards = CardLayout()
     private val cardPanel = JBPanel<JBPanel<*>>(cards).apply {
         add(renderPane.component, CARD_RENDER)

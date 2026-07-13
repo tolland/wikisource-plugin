@@ -112,6 +112,14 @@ class WtProofreadPageForm(
     val preferredFocusComponent: JComponent
         get() = bodyEditor.contentComponent
 
+    /**
+     * The body (transcription) section editor — the anchor chrome of
+     * box↔text linking renders here, and anchor offsets are offsets into
+     * this document (for an unstructured buffer it holds the whole file).
+     */
+    val bodySectionEditor: EditorEx
+        get() = bodyEditor
+
     init {
         bodyFooterSplitter.firstComponent = section("Body", bodyEditor)
         bodyFooterSplitter.secondComponent = footerSection

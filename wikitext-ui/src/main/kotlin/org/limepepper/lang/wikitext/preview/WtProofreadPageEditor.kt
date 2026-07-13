@@ -35,4 +35,25 @@ class WtProofreadPageEditor private constructor(
 ) {
     constructor(project: Project, textEditor: TextEditor, previewEditor: WtRenderPreviewBrowser) :
         this(WtProofreadFormTextEditor(project, textEditor), previewEditor)
+
+    init {
+        // Box↔text linking: the anchor manager renders text anchors in the
+        // form's body editor and owns the canvas's right-click link actions;
+        // the scan (and its boxes) loads eagerly so anchors appear without
+        // first opening the reference-image card.
+        previewEditor.referenceImagePane?.let { pane ->
+            val anchorManager = WtAnnotationAnchorManager(
+                editorHalf.bodyEditor,
+                pane.model,
+                revidSupplier = { pane.baseRevid },
+                onRevealBox = { boxId ->
+                    previewEditor.showReferenceImage = true
+                    pane.revealBox(boxId)
+                },
+            )
+            Disposer.register(this, anchorManager)
+            pane.installPopupMenu(anchorManager::createPopupMenu)
+            pane.ensureLoaded()
+        }
+    }
 }

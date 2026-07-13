@@ -39,6 +39,10 @@ class WtProofreadFormTextEditor(
 ) : TextEditor by delegate {
     private val form = WtProofreadPageForm(project, delegate)
 
+    /** The form's body (transcription) editor — see [WtProofreadPageForm.bodySectionEditor]. */
+    val bodyEditor
+        get() = form.bodySectionEditor
+
     private val cards = CardLayout()
     private val cardPanel = JPanel(cards)
     private val wrapper = JPanel(BorderLayout())
