@@ -18,7 +18,7 @@ import org.limepepper.lang.wikitext.vfs.settings.WtbotSettingsListener
  * JSON is parsed with a minimal hand-rolled extractor ([JsonReader]) rather
  * than a full library so the wikitext-vfs module stays dep-light.
  *
- * @param baseUrl  e.g. "http://127.0.0.1:8000" — no trailing slash
+ * @param baseUrl  e.g. "http://127.0.100.1:8000" — no trailing slash
  * @param timeout  per-request timeout
  */
 class HttpVfsBackend(
@@ -28,7 +28,7 @@ class HttpVfsBackend(
 ) : VfsBackend {
 
     constructor() : this(
-        baseUrl = "http://127.0.0.1:8000",
+        baseUrl = "http://127.0.100.1:8000",
         timeout = Duration.ofSeconds(10),
         client = buildClient(Duration.ofSeconds(10))
     )
@@ -216,7 +216,7 @@ class HttpVfsBackend(
             path?.let { "path" to it },
             title?.let { "title" to it },
         ).joinToString("&") { (k, v) ->
-            "${URLEncoder.encode(k, "UTF-8")}=${URLEncoder.encode(v, "UTF-8")}" 
+            "${URLEncoder.encode(k, "UTF-8")}=${URLEncoder.encode(v, "UTF-8")}"
         }
         return "$baseUrl/preview/page-image?$query"
     }
@@ -281,7 +281,7 @@ class HttpVfsBackend(
 
     private fun get(endpoint: String, vararg params: Pair<String, String>): String {
         val query = params.joinToString("&") { (k, v) ->
-            "${URLEncoder.encode(k, "UTF-8")}=${URLEncoder.encode(v, "UTF-8")}" 
+            "${URLEncoder.encode(k, "UTF-8")}=${URLEncoder.encode(v, "UTF-8")}"
         }
         val uri = URI.create("$baseUrl$endpoint?$query")
         val req = HttpRequest.newBuilder(uri)
