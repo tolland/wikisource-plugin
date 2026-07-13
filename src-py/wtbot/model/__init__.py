@@ -6,6 +6,7 @@ These SQLModel classes define the SQLite schema shared by the IntelliJ plugin
 classes. See ``src-py/DESIGN.md`` for the rationale behind each table.
 """
 
+from wtbot.model.annotation_anchor import AnnotationAnchor
 from wtbot.model.commit import Commit, CommitStatus
 from wtbot.model.edit_journal import EditJournal
 from wtbot.model.fetch_request import FetchKind, FetchRequest, FetchStatus
@@ -23,6 +24,7 @@ from wtbot.model.site_credential import SiteCredential
 from wtbot.model.transclusion import Transclusion
 
 __all__ = [
+    "AnnotationAnchor",
     "Site",
     "Namespace",
     "NsRole",
