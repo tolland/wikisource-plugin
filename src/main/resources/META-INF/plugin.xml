@@ -15,7 +15,4 @@
         <module name="wikisource.wikitext-vfs" loading="required"/>
         <module name="wikisource.wikitext-ui"  loading="required"/>
     </content>
-
-    <extensions defaultExtensionNs="com.intellij">
-    </extensions>
 </idea-plugin>

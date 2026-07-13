@@ -1,4 +1,6 @@
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+import org.gradle.api.tasks.JavaExec
+import org.gradle.api.tasks.SourceSetContainer
 
 plugins {
     id("org.jetbrains.kotlin.jvm")
@@ -18,4 +20,16 @@ dependencies {
         // this is required in 2026.2 but seems to break 2026.1
         // bundledModule("intellij.platform.ui.jcef")
     }
+}
+
+val sourceSets = extensions.getByType<SourceSetContainer>()
+
+tasks.register<JavaExec>("runAnnotationDemo") {
+    group = "application"
+    description = "Runs the standalone ImageAnnotationPane manual harness."
+
+    dependsOn(tasks.named("testClasses"))
+
+    mainClass.set("org.limepepper.lang.wikitext.annotation.AnnotationDemo")
+    classpath = sourceSets.named("test").get().runtimeClasspath + configurations.named("intellijPlatformClasspath").get()
 }
