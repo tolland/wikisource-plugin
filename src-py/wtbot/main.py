@@ -8,9 +8,7 @@ from sqlalchemy.engine import Engine
 from sqlmodel import Session, select
 
 from wtbot.api import (
-    commit as commit_api,
-)
-from wtbot.api import (
+    annotations,
     edit_journal,
     fetch,
     file_blob,
@@ -24,6 +22,9 @@ from wtbot.api import (
     sites,
     vfs,
     viewer,
+)
+from wtbot.api import (
+    commit as commit_api,
 )
 from wtbot.db import create_db_engine, init_db
 from wtbot.logging_config import LOGGING_CONFIG, LoggingConfig, configure_logging
@@ -108,6 +109,7 @@ def create_app(
         else Path(os.environ.get("WTBOT_BLOB_ROOT", "./blobs"))
     )
 
+    app.include_router(annotations.router)
     app.include_router(commit_api.router)
     app.include_router(edit_journal.router)
     app.include_router(fetch.router)
