@@ -182,6 +182,70 @@ class HttpVfsBackendTest {
         )
     }
 
+    @Test fun `listAnnotations parses annotations and dangling anchors`() {
+        handle("/pages/annotations", """
+            {"annotations":[
+              {"id":"a1","shape":"rect","x":10.5,"y":20.0,"width":30.0,"height":40.25,
+               "label":"para 1","text_start":5,"text_end":9,"anchor_revid":42},
+              {"id":"e1","shape":"ellipse","x":450.0,"y":375.0,"width":100.0,"height":50.0,
+               "label":null,"text_start":null,"text_end":null,"anchor_revid":null}
+            ],"dangling_anchor_ids":["gone1","gone2"]}
+        """.trimIndent())
+
+        val r = backend.listAnnotations("/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1")
+        assertEquals(2, r.annotations.size)
+        val a1 = r.annotations[0]
+        assertEquals("a1", a1.id)
+        assertEquals("rect", a1.shape)
+        assertEquals(10.5, a1.x, 0.0)
+        assertEquals(40.25, a1.height, 0.0)
+        assertEquals("para 1", a1.label)
+        assertEquals(5, a1.textStart)
+        assertEquals(9, a1.textEnd)
+        assertEquals(42L, a1.anchorRevid)
+        assertEquals("ellipse", r.annotations[1].shape)
+        assertNull(r.annotations[1].textStart)
+        assertEquals(listOf("gone1", "gone2"), r.danglingAnchorIds)
+    }
+
+    @Test fun `saveAnnotation PUTs geometry and anchor and parses the echo`() {
+        var captured: String? = null
+        var requestPath: String? = null
+        server.createContext("/pages/annotations/") { ex ->
+            captured = ex.requestBody.readBytes().decodeToString()
+            requestPath = ex.requestURI.toString()
+            val body = """{"id":"a1","shape":"rect","x":1.0,"y":2.0,"width":3.0,"height":4.0,
+                           "label":"l","text_start":0,"text_end":7,"anchor_revid":42}""".toByteArray()
+            ex.sendResponseHeaders(200, body.size.toLong())
+            ex.responseBody.use { it.write(body) }
+        }
+
+        val saved = backend.saveAnnotation(
+            "/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1",
+            PageAnnotation(id = "a1", x = 1.0, y = 2.0, width = 3.0, height = 4.0,
+                label = "l", textStart = 0, textEnd = 7, anchorRevid = 42L),
+            imageWidth = 1000,
+            imageHeight = 800,
+        )
+        assertEquals(7, saved.textEnd)
+        assertTrue(requestPath!!.startsWith("/pages/annotations/a1?path="))
+        val body = captured!!
+        assertTrue(body.contains("\"x\":1.0"))
+        assertTrue(body.contains("\"text_start\":0"))
+        assertTrue(body.contains("\"image_width\":1000"))
+    }
+
+    @Test fun `deleteAnnotation throws on 404`() {
+        server.createContext("/pages/annotations/") { ex ->
+            val body = """{"detail":"no annotation a9"}""".toByteArray()
+            ex.sendResponseHeaders(404, body.size.toLong())
+            ex.responseBody.use { it.write(body) }
+        }
+        assertThrows(VfsBackendException::class.java) {
+            backend.deleteAnnotation("/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1", "a9")
+        }
+    }
+
     @Test fun `throws VfsBackendException on HTTP error`() {
         server.createContext("/vfs/stat") { ex ->
             val body = """{"detail":"not found"}""".toByteArray()

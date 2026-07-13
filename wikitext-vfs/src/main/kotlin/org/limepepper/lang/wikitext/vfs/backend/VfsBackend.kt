@@ -53,4 +53,24 @@ interface VfsBackend {
      * Currently the sidecar serves a placeholder (see /preview/page-image).
      */
     fun pageImageUrl(path: String?, title: String?): String
+
+    /** Scan annotations (bounding boxes + text anchors) for a Page: leaf. */
+    fun listAnnotations(path: String): AnnotationListResult
+
+    /**
+     * Upserts one rect annotation — geometry, label, and anchor together
+     * (null anchor offsets unlink). The scan raster size must accompany a
+     * page's first annotation: it becomes the annotation document's
+     * coordinate space, and only the caller's decoded image knows it.
+     * Sending it on every save is harmless.
+     */
+    fun saveAnnotation(
+        path: String,
+        annotation: PageAnnotation,
+        imageWidth: Int? = null,
+        imageHeight: Int? = null,
+    ): PageAnnotation
+
+    /** Deletes an annotation and its anchor. Unknown ids are an error. */
+    fun deleteAnnotation(path: String, annotationId: String)
 }

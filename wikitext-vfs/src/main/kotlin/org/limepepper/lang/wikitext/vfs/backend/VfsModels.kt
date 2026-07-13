@@ -111,3 +111,39 @@ data class WriteResult(
     val newRevid: Long? = null,
     val message: String? = null,
 )
+
+/**
+ * One scan annotation from /pages/annotations — a shape drawn over the
+ * reference image, optionally anchored to a range of the transcription.
+ * Geometry is the axis-aligned bounding box in scan-pixel coordinates.
+ * [shape] is the SVG element name; only "rect" is editable from the canvas
+ * (anything else was drawn out-of-band, e.g. in Inkscape) — the sidecar
+ * rejects geometry writes to non-rect shapes.
+ *
+ * Anchor semantics: both offsets null = unlinked; textStart == textEnd =
+ * insertion point; textStart < textEnd = replace range. [anchorRevid] is
+ * the revision the offsets were computed against — a mismatch with the
+ * page's current revid means the anchor is stale.
+ */
+data class PageAnnotation(
+    val id: String,
+    val shape: String = "rect",
+    val x: Double,
+    val y: Double,
+    val width: Double,
+    val height: Double,
+    val label: String? = null,
+    val textStart: Int? = null,
+    val textEnd: Int? = null,
+    val anchorRevid: Long? = null,
+)
+
+/**
+ * GET /pages/annotations response. [danglingAnchorIds] are text anchors
+ * whose SVG shape was deleted out-of-band — kept server-side, surfaced so
+ * the UI can offer cleanup rather than silently losing the link.
+ */
+data class AnnotationListResult(
+    val annotations: List<PageAnnotation>,
+    val danglingAnchorIds: List<String> = emptyList(),
+)

@@ -104,4 +104,43 @@ class FakeVfsBackendTest {
         )
         assertEquals(WriteStatus.error, result.status)
     }
+
+    @Test
+    fun `annotations round trip - save list delete`() {
+        val path = "/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1"
+        val annotation = PageAnnotation(
+            id = "a1", x = 10.0, y = 20.0, width = 30.0, height = 40.0,
+            label = "l", textStart = 5, textEnd = 9,
+        )
+        backend.saveAnnotation(path, annotation, imageWidth = 1000, imageHeight = 800)
+
+        val listed = backend.listAnnotations(path)
+        assertEquals(listOf(annotation), listed.annotations)
+        assertEquals(emptyList<String>(), listed.danglingAnchorIds)
+
+        // Upsert without image size once the page has a document.
+        backend.saveAnnotation(path, annotation.copy(x = 99.0))
+        assertEquals(99.0, backend.listAnnotations(path).annotations.single().x, 0.0)
+
+        backend.deleteAnnotation(path, "a1")
+        assertEquals(emptyList<PageAnnotation>(), backend.listAnnotations(path).annotations)
+    }
+
+    @Test
+    fun `first annotation of a page requires the image size`() {
+        val path = "/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1"
+        assertThrows(VfsBackendException::class.java) {
+            backend.saveAnnotation(
+                path,
+                PageAnnotation(id = "a1", x = 0.0, y = 0.0, width = 1.0, height = 1.0),
+            )
+        }
+    }
+
+    @Test
+    fun `deleting an unknown annotation throws`() {
+        assertThrows(VfsBackendException::class.java) {
+            backend.deleteAnnotation("/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1", "nope")
+        }
+    }
 }
