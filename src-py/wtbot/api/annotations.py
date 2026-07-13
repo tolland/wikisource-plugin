@@ -6,6 +6,7 @@ from pydantic import BaseModel, model_validator
 from sqlmodel import Session, select
 
 from wtbot.annotation_svg import SvgAnnotation, SvgAnnotationStore
+from wtbot.api.debug_loggig_route import DebugLoggingRoute
 from wtbot.api.page_image import _cache_path, _rendition_url
 from wtbot.deps import get_session
 from wtbot.model import Page
@@ -25,7 +26,9 @@ Two faces over one store (see wtbot.annotation_svg for the split):
   back. Import reports anchors left dangling by out-of-band deletions.
 """
 
-router = APIRouter(prefix="/pages", tags=["page-annotations"])
+router = APIRouter(
+    prefix="/pages", tags=["page-annotations"], route_class=DebugLoggingRoute
+)
 
 
 class AnnotationUpsert(BaseModel):
