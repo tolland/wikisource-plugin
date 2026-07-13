@@ -11,9 +11,11 @@ What SVG holds badly is the *relation to the transcription text*, so that
 half lives here: one row per linked annotation, joined by the SVG element's
 id. An annotation with no row is an unlinked box.
 
-Offsets are plain character offsets into Page.text as of ``anchor_revid``
-(plus local edits — the client re-anchors open documents with RangeMarkers
-and writes refreshed offsets back). A row whose anchor_revid no longer
+Offsets are character offsets into the transcription text as the client
+editor presents it as of ``anchor_revid`` — for ProofreadPage pages that is
+the *body* section (header/footer excluded); for unstructured buffers, the
+whole text. The client re-anchors open documents with RangeMarkers and
+writes refreshed offsets back. A row whose anchor_revid no longer
 matches the page is *stale*, which the client must surface rather than
 trust; a row whose annotation_id has no SVG element (e.g. the rect was
 deleted in Inkscape) is *dangling*, which the API reports on import.

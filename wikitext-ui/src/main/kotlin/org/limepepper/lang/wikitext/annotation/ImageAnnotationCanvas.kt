@@ -1,12 +1,14 @@
 package org.limepepper.lang.wikitext.annotation
 
 import com.intellij.ui.JBColor
+import org.limepepper.lang.wikitext.annotation.AnnotationPalette.withAlpha
 import java.awt.Color
 import java.awt.Cursor
 import java.awt.Dimension
 import java.awt.Graphics
 import java.awt.Graphics2D
 import java.awt.Point
+import java.awt.Rectangle
 import java.awt.RenderingHints
 import java.awt.event.KeyAdapter
 import java.awt.event.KeyEvent
@@ -17,6 +19,7 @@ import java.awt.geom.AffineTransform
 import java.awt.geom.Point2D
 import java.awt.image.BufferedImage
 import javax.swing.JComponent
+import javax.swing.JPopupMenu
 import javax.swing.JScrollPane
 import javax.swing.SwingUtilities
 import kotlin.math.max
@@ -52,6 +55,13 @@ class ImageAnnotationCanvas(
     var zoom: Double = 1.0
         private set
 
+    /**
+     * Host hook for the right-click menu: called with the box under the
+     * cursor (already selected) or null on empty space; a null return shows
+     * no menu. The canvas stays ignorant of what the actions mean.
+     */
+    var popupMenuFactory: ((BoundingBox?) -> JPopupMenu?)? = null
+
     /** The drag in progress, if any. All coordinates are image pixels. */
     private sealed interface Gesture {
         /** Rubber-banding a new box; becomes a model box on release. */
@@ -80,7 +90,9 @@ class ImageAnnotationCanvas(
         val mouse = object : MouseAdapter() {
             override fun mousePressed(e: MouseEvent) {
                 requestFocusInWindow()
-                if (SwingUtilities.isMiddleMouseButton(e)) {
+                if (e.isPopupTrigger) {
+                    showPopup(e)
+                } else if (SwingUtilities.isMiddleMouseButton(e)) {
                     panScreenOrigin = e.locationOnScreen
                     panViewOrigin = scrollPaneProvider().viewport.viewPosition
                     cursor = Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR)
@@ -104,7 +116,9 @@ class ImageAnnotationCanvas(
             }
 
             override fun mouseReleased(e: MouseEvent) {
-                if (SwingUtilities.isMiddleMouseButton(e)) {
+                if (e.isPopupTrigger) {
+                    showPopup(e)
+                } else if (SwingUtilities.isMiddleMouseButton(e)) {
                     panScreenOrigin = null
                     panViewOrigin = null
                     updateCursor(e.point)
@@ -211,6 +225,35 @@ class ImageAnnotationCanvas(
             null -> model.select(null)
         }
         gesture = null
+        repaint()
+    }
+
+    /** Selects the box under a popup click, then delegates to the host menu. */
+    private fun showPopup(e: MouseEvent) {
+        if (image == null) {
+            return
+        }
+        val p = toImagePoint(e.point)
+        val box = when (val hit = BoxGeometry.hitTest(model.boxes(), model.selectedId, p.x, p.y, HANDLE_HIT_RADIUS_PX / zoom)) {
+            is BoxGeometry.Hit.HandleHit -> model[hit.boxId]
+            is BoxGeometry.Hit.BodyHit -> model[hit.boxId]
+            BoxGeometry.Hit.Miss -> null
+        }
+        box?.let { model.select(it.id) }
+        popupMenuFactory?.invoke(box)?.show(this, e.x, e.y)
+    }
+
+    /** Selects [boxId] and scrolls it into view (e.g. from a gutter click). */
+    fun revealBox(boxId: String) {
+        val box = model[boxId] ?: return
+        model.select(boxId)
+        val margin = 40
+        scrollRectToVisible(Rectangle(
+            (box.x * zoom).roundToInt() - margin,
+            (box.y * zoom).roundToInt() - margin,
+            (box.width * zoom).roundToInt() + 2 * margin,
+            (box.height * zoom).roundToInt() + 2 * margin,
+        ))
         repaint()
     }
 
@@ -351,10 +394,10 @@ class ImageAnnotationCanvas(
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
         val boxes = model.boxes()
         for ((index, box) in boxes.withIndex()) {
-            paintBox(g2, box, colorFor(index), selected = box.id == model.selectedId)
+            paintBox(g2, box, AnnotationPalette.colorFor(index), selected = box.id == model.selectedId)
         }
         (gesture as? Gesture.DrawNew)?.let { draw ->
-            paintBox(g2, draw.box(), colorFor(boxes.size), selected = false)
+            paintBox(g2, draw.box(), AnnotationPalette.colorFor(boxes.size), selected = false)
         }
     }
 
@@ -372,6 +415,11 @@ class ImageAnnotationCanvas(
         box.label?.let { label ->
             val metrics = g2.fontMetrics
             g2.drawString(label, x, max(metrics.ascent, y - metrics.descent - 1))
+        }
+
+        // A filled corner dot marks a box linked to a text range.
+        if (box.linked) {
+            g2.fillOval(x + 3, y + 3, LINK_DOT_PX, LINK_DOT_PX)
         }
 
         if (selected) {
@@ -412,20 +460,9 @@ class ImageAnnotationCanvas(
             BoxGeometry.Handle.SE to Cursor.SE_RESIZE_CURSOR,
         )
 
+        /** Diameter of the linked-box corner dot, in screen pixels. */
+        const val LINK_DOT_PX = 8
+
         val HANDLE_FILL = JBColor(Color.WHITE, Color(0x3C3F41))
-
-        /** Per-box colors, cycled by box index, readable on light and dark. */
-        val PALETTE = listOf(
-            JBColor(Color(0x1E88E5), Color(0x64B5F6)),
-            JBColor(Color(0xE53935), Color(0xEF9A9A)),
-            JBColor(Color(0x43A047), Color(0xA5D6A7)),
-            JBColor(Color(0xFB8C00), Color(0xFFCC80)),
-            JBColor(Color(0x8E24AA), Color(0xCE93D8)),
-            JBColor(Color(0x00897B), Color(0x80CBC4)),
-        )
-
-        fun colorFor(index: Int): Color = PALETTE[index % PALETTE.size]
-
-        fun Color.withAlpha(alpha: Int) = Color(red, green, blue, alpha)
     }
 }

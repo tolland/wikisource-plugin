@@ -12,6 +12,12 @@ import kotlin.math.min
  * which keeps undo/persistence/diffing trivial. [id] is the stable identity
  * that outlives geometry changes — it is the join key to everything outside
  * the canvas (text anchors, persisted SVG rect ids).
+ *
+ * A box may carry a text anchor: character offsets into the transcription
+ * text the box's region corresponds to ([textStart] == [textEnd] marks an
+ * insertion point, < a replace range; both null = unlinked). The canvas
+ * never edits these — the editor-side anchor chrome owns them — but they
+ * live on the box so one model object is the whole annotation.
  */
 data class BoundingBox(
     val id: String = UUID.randomUUID().toString(),
@@ -20,7 +26,13 @@ data class BoundingBox(
     val width: Double,
     val height: Double,
     val label: String? = null,
+    val textStart: Int? = null,
+    val textEnd: Int? = null,
+    /** Revision the offsets were computed against; null = unknown/local. */
+    val anchorRevid: Long? = null,
 ) {
+    val linked: Boolean get() = textStart != null && textEnd != null
+
     val right: Double get() = x + width
     val bottom: Double get() = y + height
 
