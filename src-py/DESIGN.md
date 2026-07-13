@@ -220,11 +220,13 @@ Site identity is the pywikibot `family`/`code` pair (the request vocabulary
 key. The old standalone `Revision` model was folded into `pages` (inline remote
 state, matching the original schema design) and `upserts.py` was removed as stale.
 
-Two things deferred, not lost:
+One thing deferred, not lost:
 - **FTS5** (`pages_fts`) for "search/replace across the whole work" — was a
   virtual table in `schema.sql`; will return as a raw-DDL migration step, since
   SQLModel doesn't model virtual tables.
-- A real **migration tool**; `init_db()` is create-if-absent for now.
+
+Schema changes are managed by Alembic under `src-py/wtbot/migrations`.
+`init_db()` upgrades the database to the latest migration revision at startup.
 
 ### 6.2 New table — cache-fill requests (the explicit ask)
 

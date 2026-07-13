@@ -1,10 +1,13 @@
 from collections.abc import Iterator
+from pathlib import Path
 
+from alembic import command
+from alembic.config import Config
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session, create_engine
 
-# Importing the models registers them on SQLModel.metadata so create_all works.
+# Importing the models registers them on SQLModel.metadata for Alembic.
 import wtbot.model  # noqa: F401
 
 """SQLite engine wiring and pragma discipline.
@@ -23,6 +26,8 @@ eager write lock bought nothing for the read-heavy VFS traffic.
 """
 
 DEFAULT_SQLITE_URL = "sqlite:///database.db"
+PACKAGE_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = PACKAGE_ROOT.parents[1]
 
 
 def create_db_engine(
@@ -46,10 +51,40 @@ def create_db_engine(
     return engine
 
 
+def alembic_config(url: str | None = None) -> Config:
+    ini_path = PROJECT_ROOT / "alembic.ini"
+    cfg = Config(str(ini_path)) if ini_path.exists() else Config()
+    cfg.set_main_option("script_location", str(PACKAGE_ROOT / "migrations"))
+    src_path = PROJECT_ROOT / "src-py"
+    cfg.set_main_option(
+        "prepend_sys_path", str(src_path if src_path.exists() else PACKAGE_ROOT.parent)
+    )
+    if url is not None:
+        cfg.set_main_option("sqlalchemy.url", url)
+    return cfg
+
+
+def upgrade_db(engine: Engine | None = None, revision: str = "head") -> None:
+    cfg = alembic_config()
+    if engine is None:
+        command.upgrade(cfg, revision)
+        return
+
+    with engine.begin() as connection:
+        cfg.attributes["connection"] = connection
+        command.upgrade(cfg, revision)
+
+
 def init_db(engine: Engine) -> None:
-    """Create any missing tables. (A real migration tool comes later; for now the
-    models are the source of truth and this is create-if-absent.)"""
-    SQLModel.metadata.create_all(engine)
+    """Bring the database schema up to the latest Alembic revision."""
+    upgrade_db(engine)
+
+
+def stamp_db(engine: Engine, revision: str = "head") -> None:
+    cfg = alembic_config()
+    with engine.begin() as connection:
+        cfg.attributes["connection"] = connection
+        command.stamp(cfg, revision)
 
 
 def session_factory(engine: Engine) -> Iterator[Session]:
