@@ -187,6 +187,62 @@ class HttpVfsBackend(
         return "$baseUrl/preview/page-image?$query"
     }
 
+    override fun listAnnotations(path: String): AnnotationListResult {
+        val json = get("/pages/annotations", "path" to path)
+        return JsonReader(json).run {
+            AnnotationListResult(
+                annotations = array("annotations", ::readAnnotation),
+                danglingAnchorIds = stringArray("dangling_anchor_ids"),
+            )
+        }
+    }
+
+    override fun saveAnnotation(
+        path: String,
+        annotation: PageAnnotation,
+        imageWidth: Int?,
+        imageHeight: Int?,
+    ): PageAnnotation {
+        val body = buildJsonObject(
+            "x" to annotation.x,
+            "y" to annotation.y,
+            "width" to annotation.width,
+            "height" to annotation.height,
+            "label" to annotation.label,
+            "text_start" to annotation.textStart,
+            "text_end" to annotation.textEnd,
+            "anchor_revid" to annotation.anchorRevid,
+            "image_width" to imageWidth,
+            "image_height" to imageHeight,
+        )
+        val json = put(
+            "/pages/annotations/${URLEncoder.encode(annotation.id, "UTF-8")}",
+            body,
+            "path" to path,
+        )
+        return readAnnotation(JsonReader(json))
+    }
+
+    override fun deleteAnnotation(path: String, annotationId: String) {
+        delete(
+            "/pages/annotations/${URLEncoder.encode(annotationId, "UTF-8")}",
+            "path" to path,
+        )
+    }
+
+    private fun readAnnotation(r: JsonReader): PageAnnotation = PageAnnotation(
+        id = r.string("id"),
+        shape = r.string("shape"),
+        x = r.double("x"),
+        y = r.double("y"),
+        width = r.double("width"),
+        height = r.double("height"),
+        label = r.stringOrNull("label"),
+        textStart = r.longOrNull("text_start")?.toInt(),
+        textEnd = r.longOrNull("text_end")?.toInt(),
+        anchorRevid = r.longOrNull("anchor_revid"),
+    )
+
     // -------------------------------------------------------------------------
 
     private fun get(endpoint: String, vararg params: Pair<String, String>): String {
@@ -221,6 +277,40 @@ class HttpVfsBackend(
         return resp.body()
     }
 
+    private fun put(endpoint: String, jsonBody: String, vararg params: Pair<String, String>): String {
+        val query = params.joinToString("&") { (k, v) ->
+            "${URLEncoder.encode(k, "UTF-8")}=${URLEncoder.encode(v, "UTF-8")}"
+        }
+        val uri = URI.create("$baseUrl$endpoint?$query")
+        val req = HttpRequest.newBuilder(uri)
+            .timeout(timeout)
+            .version(HttpClient.Version.HTTP_1_1) // avoid upgrade requests
+            .header("Content-Type", "application/json")
+            .PUT(HttpRequest.BodyPublishers.ofString(jsonBody))
+            .build()
+        val resp = send(req)
+        if (resp.statusCode() !in 200..299) {
+            throw VfsBackendException("HTTP ${resp.statusCode()} from $uri: ${resp.body()}")
+        }
+        return resp.body()
+    }
+
+    private fun delete(endpoint: String, vararg params: Pair<String, String>) {
+        val query = params.joinToString("&") { (k, v) ->
+            "${URLEncoder.encode(k, "UTF-8")}=${URLEncoder.encode(v, "UTF-8")}"
+        }
+        val uri = URI.create("$baseUrl$endpoint?$query")
+        val req = HttpRequest.newBuilder(uri)
+            .timeout(timeout)
+            .version(HttpClient.Version.HTTP_1_1) // avoid upgrade requests
+            .DELETE()
+            .build()
+        val resp = send(req)
+        if (resp.statusCode() !in 200..299) {
+            throw VfsBackendException("HTTP ${resp.statusCode()} from $uri: ${resp.body()}")
+        }
+    }
+
     /**
      * Wraps [HttpClient.send] so a down/unreachable sidecar (the common case
      * right after IDE launch, before wtbot has started) surfaces as
@@ -248,7 +338,7 @@ class HttpVfsBackend(
     private fun jsonValue(v: Any?): String = when (v) {
         null -> "null"
         is String -> "\"${escapeJson(v)}\""
-        is Boolean, is Long, is Int -> v.toString()
+        is Boolean, is Long, is Int, is Double -> v.toString()
         else -> "\"${escapeJson(v.toString())}\""
     }
 

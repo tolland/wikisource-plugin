@@ -60,6 +60,29 @@ internal class JsonReader(private val json: String) {
         return m.groupValues[1].toLong()
     }
 
+    fun double(key: String): Double =
+        doubleOrNull(key) ?: error("missing number field '$key' in JSON")
+
+    fun doubleOrNull(key: String): Double? {
+        val m = Regex(""""$key"\s*:\s*(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)""").find(json)
+            ?: return null
+        return m.groupValues[1].toDouble()
+    }
+
+    /** Extracts a flat array of strings, e.g. `"ids":["a","b"]`. */
+    fun stringArray(key: String): List<String> {
+        val keyIdx = json.indexOf(""""$key"""")
+        if (keyIdx == -1) return emptyList()
+        val arrStart = json.indexOf('[', keyIdx + key.length + 2)
+        if (arrStart == -1) return emptyList()
+        val arrEnd = json.indexOf(']', arrStart)
+        if (arrEnd == -1) return emptyList()
+        return Regex(""""((?:[^"\\]|\\.)*)"""")
+            .findAll(json.substring(arrStart, arrEnd))
+            .map { it.groupValues[1] }
+            .toList()
+    }
+
     /**
      * Extracts a nested JSON object value for [key] as its own [JsonReader],
      * or null when the key is absent or its value is `null`. The returned
