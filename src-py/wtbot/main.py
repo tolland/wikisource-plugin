@@ -97,7 +97,11 @@ def create_app(
         init_db(engine)
         yield
 
-    app = FastAPI(title="wtbot", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(
+        title="wtbot",
+        version="0.1.0",
+        lifespan=lifespan,
+    )
 
     app.openapi = custom_openapi
 
@@ -109,12 +113,12 @@ def create_app(
         else Path(os.environ.get("WTBOT_BLOB_ROOT", "./blobs"))
     )
 
+    app.include_router(health.router)
     app.include_router(annotations.router)
     app.include_router(commit_api.router)
     app.include_router(edit_journal.router)
     app.include_router(fetch.router)
     app.include_router(file_blob.router)
-    app.include_router(health.router)
     app.include_router(namespace.router)
     app.include_router(page_image.router)
     app.include_router(page_meta.router)
