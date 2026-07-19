@@ -10,6 +10,12 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import org.limepepper.lang.wikitext.WtFileType
 
+/**
+ * Split editor/preview for plain wikitext and proofread-index files.
+ * Proofread-page content is not handled here: those files carry
+ * [org.limepepper.lang.wikitext.PrpFileType] and open in
+ * [org.limepepper.lang.wikitext.editor.prp.PrpFileEditorProvider] instead.
+ */
 class WtPreviewEditorProvider : FileEditorProvider, DumbAware {
 
     override fun accept(
@@ -21,11 +27,9 @@ class WtPreviewEditorProvider : FileEditorProvider, DumbAware {
 
     override fun createEditor(project: Project, file: VirtualFile): FileEditor {
         val textEditor = TextEditorProvider.getInstance().createEditor(project, file) as TextEditor
-        val profile = WtEditorProfile.forFile(file)
-        val previewEditor = WtRenderPreviewBrowser(file, profile)
+        val previewEditor = WtRenderPreviewBrowser(file)
 
-        return when (profile) {
-            WtEditorProfile.PROOFREAD_PAGE -> WtProofreadPageEditor(project, textEditor, previewEditor)
+        return when (WtEditorProfile.forFile(file)) {
             WtEditorProfile.PROOFREAD_INDEX -> WtProofreadIndexEditor(textEditor, previewEditor)
             WtEditorProfile.WIKITEXT -> WtWikitextEditor(textEditor, previewEditor)
         }

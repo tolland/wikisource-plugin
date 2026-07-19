@@ -81,7 +81,14 @@ class PrpPreviewBrowser(
     init {
         component.add(PrpPreviewToolbar(this).component, BorderLayout.NORTH)
         component.add(cardPanel, BorderLayout.CENTER)
-        reloadPreview()
+        // The reference image is the initial card (wikisource editor
+        // convention), but the showReferenceImage setter's no-change guard
+        // never fires for the field's initial value — apply that state here.
+        imagePane.ensureLoaded()
+        cards.show(cardPanel, CARD_IMAGE)
+        // The render pane starts hidden; scheduleReload() just marks it
+        // pending, so the first toggle to the render card triggers the reload.
+        renderPane.scheduleReload()
 
         runReadActionBlocking {
             FileDocumentManager.getInstance().getDocument(file)?.addDocumentListener(object : DocumentListener {

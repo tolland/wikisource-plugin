@@ -1,4 +1,4 @@
-package org.limepepper.lang.wikitext.preview
+package org.limepepper.lang.wikitext.editor.prp
 
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.AnAction

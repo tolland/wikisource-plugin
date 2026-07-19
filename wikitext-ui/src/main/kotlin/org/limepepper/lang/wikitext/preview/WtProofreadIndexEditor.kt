@@ -16,5 +16,4 @@ class WtProofreadIndexEditor(
     textEditor,
     wtPreviewEditor,
     "Proofread Index Editor",
-    WtEditorProfile.PROOFREAD_INDEX,
 )

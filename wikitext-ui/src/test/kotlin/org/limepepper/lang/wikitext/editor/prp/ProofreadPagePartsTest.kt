@@ -1,4 +1,4 @@
-package org.limepepper.lang.wikitext.preview
+package org.limepepper.lang.wikitext.editor.prp
 
 import kotlin.test.Test
 import kotlin.test.assertEquals

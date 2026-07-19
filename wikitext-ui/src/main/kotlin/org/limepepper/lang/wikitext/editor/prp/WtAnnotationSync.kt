@@ -19,7 +19,7 @@ private val SYNC_LOG = logger<WtAnnotationSync>()
  * loses nothing (short of closing the editor mid-outage).
  *
  * A [BoundingBox] carries the whole annotation — geometry from the canvas
- * plus the text-anchor fields owned by [org.limepepper.lang.wikitext.preview.WtAnnotationAnchorManager] — so the
+ * plus the text-anchor fields owned by [WtAnnotationAnchorManager] — so the
  * PUT body comes straight off the box.
  *
  * EDT discipline: the model is EDT-owned, so diffing happens on the EDT
