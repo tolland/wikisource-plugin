@@ -7,15 +7,19 @@ from wtbot.main import create_app
 from wtbot.model import EditJournal, FetchRequest, FetchStatus, IndexMeta, Page, Site
 from wtbot.model.page_meta import PageMeta
 from wtbot.wiki.client import FakeWikiClient
-from wtbot.wiki.wiki_types import IndexPageEntry, RemotePage
+from wtbot.wiki.wiki_types import IndexPageEntry, RemotePage, RemotePageImages
 from wtbot.worker import run_pending
 
 """Partially transcribed works: fan-out discovers the index pagination via
 list=proofreadpagesinindex, creates local placeholder stub rows for pages
 that do not exist on the wiki yet (pageid/revid None — the provisional-Page
-shape), and only enqueues fetches for pages that do. The VFS then lists,
-stats, opens (with a scaffold body) and edits placeholders like any other
-page; committing a placeholder's journal creates the page remotely."""
+shape), and only enqueues fetches for pages that do. Stubs are enriched up
+front with the scan reference image (imageforpage) and ProofreadPage's
+prepopulated OCR body (defaultcontentforpage) — both work for a redlink
+Page: because the Index's File: exists. The VFS then lists, stats, opens
+(with the OCR body, or the scaffold when the wiki offers none) and edits
+placeholders like any other page; committing a placeholder's journal
+creates the page remotely."""
 
 FAMILY = "mywikisource"
 CODE = "en"
@@ -35,6 +39,23 @@ _ENTRIES = [
 ] + [IndexPageEntry(page_offset=5, title=PAGE_5, pageid=11605)]
 
 
+def _images(n: int) -> RemotePageImages:
+    return RemotePageImages(
+        thumbnail_url=f"https://fake.wiki/thumb/page{n}-240px-Sparse.pdf.jpg",
+        fullsize_url=f"https://fake.wiki/thumb/page{n}-1280px-Sparse.pdf.jpg",
+        size=240,
+        filename="Sparse.pdf",
+    )
+
+
+def _ocr_body(n: int) -> str:
+    return (
+        '<noinclude><pagequality level="1" user="" /></noinclude>'
+        f"OCR text layer of page {n}.\n"
+        "<noinclude>\n</noinclude>"
+    )
+
+
 def _remote(
     title: str, cm: str, ns: str, key: int, text: str, revid: int
 ) -> RemotePage:
@@ -49,14 +70,18 @@ def _remote(
     )
 
 
-def _fake_wiki() -> FakeWikiClient:
-    return FakeWikiClient(
+def _fake_wiki(cls: type[FakeWikiClient] = FakeWikiClient) -> FakeWikiClient:
+    return cls(
         pages={
             INDEX: _remote(INDEX, "proofread-index", "Index", 252, _INDEX_BODY, 100),
             PAGE_5: _remote(PAGE_5, "proofread-page", "Page", 250, _PAGE_5_BODY, 105),
         },
         files={FILE: b"%PDF-fake"},
         index_pages={INDEX: _ENTRIES},
+        # The wiki knows a scan for every slot, but only offers OCR text for
+        # pages 2 and 3 — pages 1 and 4 exercise the scaffold fallback.
+        page_images={f"Page:Sparse.pdf/{n}": _images(n) for n in range(1, 5)},
+        default_contents={f"Page:Sparse.pdf/{n}": _ocr_body(n) for n in (2, 3)},
     )
 
 
@@ -131,6 +156,68 @@ def test_fanout_creates_stubs_and_fetches_only_existing(engine, tmp_path):
         assert index_meta.page_count == 5
 
 
+def test_fanout_enriches_placeholders_with_scan_and_ocr(engine, tmp_path):
+    _seed_and_fan_out(engine, tmp_path)
+    with Session(engine) as s:
+        metas = {
+            meta.page_number: meta
+            for meta in s.exec(
+                select(PageMeta)
+                .join(Page, Page.pk == PageMeta.page_pk)
+                .where(PageMeta.index_title == INDEX, Page.revid.is_(None))
+            ).all()
+        }
+        assert sorted(metas) == [1, 2, 3, 4]
+        for n, meta in metas.items():
+            assert meta.thumb_url == _images(n).thumbnail_url
+            assert meta.source_image_url == _images(n).fullsize_url
+            assert meta.thumb_width == 240
+        assert metas[2].default_body == _ocr_body(2)
+        assert metas[3].default_body == _ocr_body(3)
+        assert metas[1].default_body is None
+        assert metas[4].default_body is None
+
+
+class _CountingWiki(FakeWikiClient):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.image_calls: list[str] = []
+        self.default_calls: list[str] = []
+
+    def get_page_images(self, title):
+        self.image_calls.append(title)
+        return super().get_page_images(title)
+
+    def get_default_page_content(self, title):
+        self.default_calls.append(title)
+        return super().get_default_page_content(title)
+
+
+def test_refanout_skips_already_enriched_stubs(engine, tmp_path):
+    wiki = _fake_wiki(_CountingWiki)
+    with Session(engine) as s:
+        site = Site(family=FAMILY, code=CODE)
+        s.add(site)
+        s.commit()
+        s.refresh(site)
+        s.add(FetchRequest(site_pk=site.pk, title=INDEX, depth=1))
+        s.commit()
+        run_pending(s, lambda _: wiki, blob_root=tmp_path / "blobs")
+        first_defaults = list(wiki.default_calls)
+        assert set(first_defaults) >= {f"Page:Sparse.pdf/{n}" for n in range(1, 5)}
+
+        wiki.default_calls.clear()
+        s.add(FetchRequest(site_pk=site.pk, title=INDEX, depth=1))
+        s.commit()
+        run_pending(s, lambda _: wiki, blob_root=tmp_path / "blobs")
+
+        # Fully enriched stubs (image + OCR body) cost no second round trip;
+        # the ones the wiki offered no OCR for are asked again.
+        assert "Page:Sparse.pdf/2" not in wiki.default_calls
+        assert "Page:Sparse.pdf/3" not in wiki.default_calls
+        assert "Page:Sparse.pdf/1" in wiki.default_calls
+
+
 def test_refanout_does_not_clobber_edited_stub(engine, tmp_path):
     wiki = _seed_and_fan_out(engine, tmp_path)
     with Session(engine) as s:
@@ -172,6 +259,9 @@ def test_placeholders_listed_with_flag(engine, tmp_path):
         assert len(children) == 5
         assert by_number["Page:Sparse.pdf/1"]["placeholder"] is True
         assert by_number["Page:Sparse.pdf/1"]["writable"] is True
+        # The scan reference image is known even though the page isn't
+        # created yet — transcription can start from the placeholder.
+        assert by_number["Page:Sparse.pdf/1"]["has_page_image"] is True
         assert by_number[PAGE_5]["placeholder"] is False
 
         stat = c.get(
@@ -187,7 +277,18 @@ def test_placeholders_listed_with_flag(engine, tmp_path):
             assert result == c.get("/vfs/stat", params={"path": path}).json(), path
 
 
+def test_placeholder_opens_with_prepopulated_ocr_body(engine, tmp_path):
+    _seed_and_fan_out(engine, tmp_path)
+    path = f"{_PAGES_PATH}/Page:Sparse.pdf/3"
+    with _client(engine, tmp_path) as c:
+        r = c.get("/vfs/content", params={"path": path}).json()
+        assert _unb64(r["content_base64"]) == _ocr_body(3)
+        assert r["revid"] is None
+
+
 def test_placeholder_opens_with_scaffold_and_saves_as_edit(engine, tmp_path):
+    # Page 1 is the slot the wiki offered no OCR body for — the generic
+    # proofread-page scaffold is the fallback.
     _seed_and_fan_out(engine, tmp_path)
     path = f"{_PAGES_PATH}/Page:Sparse.pdf/1"
     with _client(engine, tmp_path) as c:

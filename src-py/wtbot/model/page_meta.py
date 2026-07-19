@@ -63,6 +63,12 @@ class PageMeta(SQLModel, table=True):
 
     # Remote (from the wiki's imageinfo / ProofreadPage APIs)
     source_image_url: str | None = None  # full-size page raster
+    # ProofreadPage's prepopulated body for a not-yet-created Page: (the
+    # pagequality header + the scan's OCR text layer + footer, from
+    # prop=defaultcontentforpage at Index fan-out time). Served as the
+    # opening body of a placeholder until the first local edit; never the
+    # remote body — that stays on Page.text.
+    default_body: str | None = None
     thumb_url: str | None = None
     thumb_width: int | None = None
     thumb_height: int | None = None

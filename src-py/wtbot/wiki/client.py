@@ -63,6 +63,13 @@ class WikiClient(Protocol):
         callers fall back to page_count interpolation."""
         ...
 
+    def get_default_page_content(self, title: str) -> str | None:
+        """The body ProofreadPage would prepopulate the editor with for a
+        not-yet-created Page: (pagequality header + the scan's OCR text
+        layer + footer, one serialized string), or None when the wiki has
+        none to offer -- enrichment, never a fetch-failing call."""
+        ...
+
     def download_file(self, title: str, dest: Path) -> Path: ...
 
     def get_namespaces(self): ...  # returns pwb NamespacesDict or None
@@ -289,6 +296,37 @@ class PywikibotClient:
             if "pageoffset" in e and "title" in e
         ] or None
 
+    def get_default_page_content(self, title: str) -> str | None:
+        # ProofreadPage serves the same prepopulated body its own web editor
+        # shows on a redlink Page: (pagequality header, the scan's OCR text
+        # layer, footer) via prop=defaultcontentforpage — the response value
+        # is one serialized string. Same plain-GET/fail-soft rationale as
+        # get_page_images: a miss just means the scaffold fallback.
+        try:
+            import requests
+
+            resp = requests.get(
+                self.site.base_url(self.site.apipath()),
+                params={
+                    "action": "query",
+                    "prop": "defaultcontentforpage",
+                    "titles": title,
+                    "format": "json",
+                },
+                headers={"User-Agent": "wtbot (wikisource-plugin)"},
+                timeout=(5, 30),
+            )
+            data = resp.json()
+        except Exception as exc:  # noqa: BLE001 - enrichment only, never fatal
+            logging.debug("defaultcontentforpage query failed for %s: %s", title, exc)
+            return None
+        pages = (data.get("query") or {}).get("pages") or {}
+        for pdata in pages.values():
+            content = pdata.get("defaultcontentforpage")
+            if isinstance(content, str) and content.strip():
+                return content
+        return None
+
     def download_file(self, title: str, dest: Path) -> Path:
         dest = Path(dest)
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -354,11 +392,13 @@ class FakeWikiClient:
         files: dict[str, bytes] | None = None,
         page_images: dict[str, RemotePageImages] | None = None,
         index_pages: dict[str, list[IndexPageEntry]] | None = None,
+        default_contents: dict[str, str] | None = None,
     ):
         self._pages = dict(pages or {})
         self._files = dict(files or {})
         self._page_images = dict(page_images or {})
         self._index_pages = dict(index_pages or {})
+        self._default_contents = dict(default_contents or {})
 
     def get_page(self, title: str) -> RemotePage:
         try:
@@ -398,6 +438,9 @@ class FakeWikiClient:
 
     def list_index_pages(self, title: str) -> list[IndexPageEntry] | None:
         return self._index_pages.get(title)
+
+    def get_default_page_content(self, title: str) -> str | None:
+        return self._default_contents.get(title)
 
     def download_file(self, title: str, dest: Path) -> Path:
         try:

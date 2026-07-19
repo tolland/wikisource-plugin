@@ -291,7 +291,9 @@ def _fan_out_index(
 ) -> int:
     """Download the File: blob, enumerate the index pagination, enqueue
     fetches for pages that exist remotely and create placeholder stub rows
-    for the ones that do not.
+    for the ones that do not. Placeholders are enriched from the wiki up
+    front (scan image URLs + prepopulated OCR body) so transcription can
+    start on them straight away.
 
     Pagination comes from list=proofreadpagesinindex when available:
     authoritative titles, and missing pages known up front — no fetch
@@ -337,13 +339,23 @@ def _fan_out_index(
         )
     child_specs.extend((title, FetchKind.single) for title in subpage_titles)
 
+    # Network calls, so before the fan-out transaction opens.
+    enrichments = _gather_placeholder_enrichment(
+        session, ctx.client, req.site_pk, stub_specs
+    )
+
     try:
         if index_meta is not None and page_count:
             store.set_index_page_count(index_meta, page_count)
 
         for title, page_number in stub_specs:
             _ensure_placeholder_page(
-                session, req.site_pk, req.title, title, page_number
+                session,
+                req.site_pk,
+                req.title,
+                title,
+                page_number,
+                enrichment=enrichments.get(title),
             )
 
         seen_titles: set[str] = set()
@@ -371,23 +383,101 @@ def _fan_out_index(
         session.rollback()
 
 
+@dataclass(frozen=True)
+class PlaceholderEnrichment:
+    """What the wiki offers for a Page: that does not exist yet: the scan
+    reference image (imageforpage works off the Index's File:, created page
+    or not) and the body ProofreadPage's own editor would prepopulate (the
+    OCR text layer, prop=defaultcontentforpage)."""
+
+    images: RemotePageImages | None = None
+    default_body: str | None = None
+
+
+def _gather_placeholder_enrichment(
+    session: Session,
+    client: WikiClient,
+    site_pk: int,
+    stub_specs: list[tuple[str, int]],
+) -> dict[str, PlaceholderEnrichment]:
+    """Fetch scan-image URLs + the prepopulated OCR body for each placeholder
+    slot. Skips stubs a previous fan-out already enriched, so a refresh of a
+    large index costs no per-stub round trips."""
+    titles = [title for title, _ in stub_specs]
+    if not titles:
+        return {}
+    try:
+        rows = session.exec(
+            select(Page, PageMeta)
+            .join(PageMeta, PageMeta.page_pk == Page.pk, isouter=True)
+            .where(Page.site_pk == site_pk, Page.title.in_(titles))
+        ).all()
+    finally:
+        session.rollback()
+    enriched = {
+        page.title
+        for page, meta in rows
+        if meta is not None
+        and meta.default_body is not None
+        and (meta.thumb_url is not None or meta.source_image_url is not None)
+    }
+    return {
+        title: PlaceholderEnrichment(
+            images=client.get_page_images(title),
+            default_body=client.get_default_page_content(title),
+        )
+        for title in titles
+        if title not in enriched
+    }
+
+
+def _apply_placeholder_enrichment(
+    meta: PageMeta, enrichment: PlaceholderEnrichment
+) -> None:
+    """Fill only fields still unset — the stub may carry values from an
+    earlier fan-out or a partial enrichment."""
+    images = enrichment.images
+    if images is not None:
+        if meta.thumb_url is None and images.thumbnail_url is not None:
+            meta.thumb_url = images.thumbnail_url
+            meta.thumb_width = images.size
+        if meta.source_image_url is None and images.fullsize_url is not None:
+            meta.source_image_url = images.fullsize_url
+    if meta.default_body is None and enrichment.default_body is not None:
+        meta.default_body = enrichment.default_body
+
+
 def _ensure_placeholder_page(
     session: Session,
     site_pk: int,
     index_title: str,
     title: str,
     page_number: int,
+    enrichment: PlaceholderEnrichment | None = None,
 ) -> None:
     """Create the local stub row for a proofread page that does not exist on
     the wiki yet — the same provisional-Page shape as a pasted upload:
     pageid/revid None means "exists locally only". Everything downstream
     (listing, stat, editing, commit-as-create) then works with no special
     cases. Never clobbers an existing row: the user may already have edits
-    journalled against a stub from an earlier fan-out."""
+    journalled against a stub from an earlier fan-out — an existing stub only
+    gains enrichment fields it is still missing."""
     existing = session.exec(
         select(Page).where(Page.site_pk == site_pk, Page.title == title)
     ).first()
     if existing is not None:
+        if existing.revid is None and enrichment is not None:
+            meta = session.exec(
+                select(PageMeta).where(PageMeta.page_pk == existing.pk)
+            ).first()
+            if meta is None:
+                meta = PageMeta(
+                    page_pk=existing.pk,
+                    index_title=index_title,
+                    page_number=page_number,
+                )
+            _apply_placeholder_enrichment(meta, enrichment)
+            session.add(meta)
         return
     page = Page(
         site_pk=site_pk,
@@ -399,9 +489,10 @@ def _ensure_placeholder_page(
     )
     session.add(page)
     session.flush()
-    session.add(
-        PageMeta(page_pk=page.pk, index_title=index_title, page_number=page_number)
-    )
+    meta = PageMeta(page_pk=page.pk, index_title=index_title, page_number=page_number)
+    if enrichment is not None:
+        _apply_placeholder_enrichment(meta, enrichment)
+    session.add(meta)
 
 
 # ---------------------------------------------------------------------------

@@ -325,12 +325,16 @@ class WikisourceVfs:
     def read(self, raw_path: str) -> ReadContentResponse:
         match resolve(self.store, raw_path):
             case PageLeaf(path, _, page) if page.revid is None:
-                # Placeholder stub: open with the content-model scaffold so a
-                # fresh transcription starts well-formed (local edits, once
-                # journalled, take precedence via effective_body).
-                return self.mw.read_page(
-                    path.raw, page, default_body=proofread_page_scaffold()
-                )
+                # Placeholder stub: open with the wiki's prepopulated body
+                # (the scan's OCR text layer, stored at Index fan-out time)
+                # when we have it, else the content-model scaffold — either
+                # way a fresh transcription starts well-formed (local edits,
+                # once journalled, take precedence via effective_body).
+                meta = self.store.page_meta(page)
+                default_body = (
+                    meta.default_body if meta is not None else None
+                ) or proofread_page_scaffold()
+                return self.mw.read_page(path.raw, page, default_body=default_body)
             case (
                 PageLeaf(path, _, page)
                 | IndexWikitext(path, _, page)
