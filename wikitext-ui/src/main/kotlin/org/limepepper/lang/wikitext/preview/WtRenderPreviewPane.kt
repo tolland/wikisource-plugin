@@ -49,6 +49,12 @@ class WtRenderPreviewPane(
 
     val component: JComponent = jcefBrowser?.component ?: JBScrollPane(fallbackPane)
 
+    init {
+        // Ctrl-wheel zoom, with the level held across reloads. The listener
+        // and load handler keep the helper reachable for the browser's life.
+        jcefBrowser?.let { JcefBrowserZoom(it) }
+    }
+
     // Debounce keystrokes: every reload is a network round trip through the
     // sidecar to the wiki, so wait for a typing pause rather than 250ms.
     private val reloadTimer = Timer(500) { reload() }.apply {

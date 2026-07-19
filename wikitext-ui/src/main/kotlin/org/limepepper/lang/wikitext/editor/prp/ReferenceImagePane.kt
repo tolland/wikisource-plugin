@@ -35,7 +35,8 @@ private val IMAGE_LOG = logger<ReferenceImagePane>()
  *
  * The drawing surface is the reusable [ImageAnnotationPane]: bounding boxes
  * drawn over the scan (left-drag draws, drag moves, handles resize,
- * Delete removes, wheel zooms, middle-drag pans). For wikisource:// pages
+ * Delete removes, wheel scrolls, Shift-wheel scrolls horizontally,
+ * Ctrl-wheel zooms, middle-drag pans). For wikisource:// pages
  * the boxes persist: they load from the sidecar with the image and every
  * change is written behind via [WtAnnotationSync] to the per-page SVG
  * annotation document. For non-VFS files the canvas still works, just

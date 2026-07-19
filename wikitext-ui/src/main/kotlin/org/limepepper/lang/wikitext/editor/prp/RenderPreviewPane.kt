@@ -11,6 +11,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.jcef.JBCefApp
 import com.intellij.ui.jcef.JBCefBrowser
+import org.limepepper.lang.wikitext.preview.JcefBrowserZoom
 import org.limepepper.lang.wikitext.vfs.WtVirtualFile
 import org.limepepper.lang.wikitext.vfs.backend.PreviewResult
 import org.limepepper.lang.wikitext.vfs.backend.WtVfsService
@@ -48,6 +49,12 @@ class RenderPreviewPane(
         }
 
     val component: JComponent = jcefBrowser?.component ?: JBScrollPane(fallbackPane)
+
+    init {
+        // Ctrl-wheel zoom, with the level held across reloads. The listener
+        // and load handler keep the helper reachable for the browser's life.
+        jcefBrowser?.let { JcefBrowserZoom(it) }
+    }
 
     // Debounce keystrokes: every reload is a network round trip through the
     // sidecar to the wiki, so wait for a typing pause rather than 250ms.

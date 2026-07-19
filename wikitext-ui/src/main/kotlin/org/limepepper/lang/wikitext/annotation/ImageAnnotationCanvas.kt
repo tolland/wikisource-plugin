@@ -14,7 +14,6 @@ import java.awt.event.KeyAdapter
 import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
-import java.awt.event.MouseWheelEvent
 import java.awt.geom.AffineTransform
 import java.awt.geom.Point2D
 import java.awt.image.BufferedImage
@@ -39,7 +38,13 @@ import kotlin.math.roundToInt
  *  - left-drag a handle of the selected box: resize (crossing over flips)
  *  - Delete/Backspace: delete the selected box; Escape: cancel the drag in
  *    progress (restoring the original geometry) or clear the selection
- *  - scroll wheel: zoom about the cursor; middle-drag: pan
+ *  - middle-drag: pan
+ *
+ * The wheel is deliberately not handled here: the canvas has no wheel
+ * listener, so AWT retargets wheel events to the enclosing
+ * [ImageAnnotationPane], which owns the conventional scroll/zoom scheme
+ * (wheel scrolls, Shift-wheel scrolls horizontally, Ctrl-wheel zooms via
+ * [wheelZoom]).
  *
  * The canvas reports its size as image-size x zoom, so it must live inside
  * a scroll pane, supplied via [scrollPaneProvider] (a provider because the
@@ -131,16 +136,9 @@ class ImageAnnotationCanvas(
             override fun mouseMoved(e: MouseEvent) {
                 updateCursor(e.point)
             }
-
-            override fun mouseWheelMoved(e: MouseWheelEvent) {
-                if (image != null && gesture == null) {
-                    zoomTo(zoom * WHEEL_ZOOM_STEP.pow(-e.preciseWheelRotation), e.point)
-                }
-            }
         }
         addMouseListener(mouse)
         addMouseMotionListener(mouse)
-        addMouseWheelListener(mouse)
 
         addKeyListener(object : KeyAdapter() {
             override fun keyPressed(e: KeyEvent) {
@@ -277,6 +275,16 @@ class ImageAnnotationCanvas(
      * put on screen: remember which image pixel and viewport position the
      * anchor is at, resize, then scroll that pixel back under it.
      */
+    /**
+     * Ctrl-wheel zoom entry point for the pane's wheel handler; ignored
+     * mid-gesture so the scale never shifts under a drag in progress.
+     */
+    fun wheelZoom(rotation: Double, anchor: Point) {
+        if (image != null && gesture == null) {
+            zoomTo(zoom * WHEEL_ZOOM_STEP.pow(-rotation), anchor)
+        }
+    }
+
     fun zoomTo(newZoom: Double, anchor: Point) {
         if (image == null) {
             return
