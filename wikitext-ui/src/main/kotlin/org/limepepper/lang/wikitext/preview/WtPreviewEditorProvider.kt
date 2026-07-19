@@ -11,7 +11,11 @@ import com.intellij.openapi.vfs.VirtualFile
 import org.limepepper.lang.wikitext.WtFileType
 
 class WtPreviewEditorProvider : FileEditorProvider, DumbAware {
-    override fun accept(project: Project, file: VirtualFile): Boolean {
+
+    override fun accept(
+        project: Project,
+        file: VirtualFile,
+    ): Boolean {
         return acceptsFile(file)
     }
 

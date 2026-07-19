@@ -41,7 +41,7 @@ dependencies {
         intellijIdea(intellijPlatformVersion) {
             useCache = true
         }
-        plugin("psiviewer", version = "2026.1")
+        // plugin("psiviewer", version = "2026.1")
         pluginModule(implementation(project(":wikitext-core")))
         pluginModule(implementation(project(":wikitext-vfs")))
         pluginModule(implementation(project(":wikitext-ui")))

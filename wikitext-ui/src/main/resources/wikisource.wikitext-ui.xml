@@ -42,6 +42,15 @@
             implementationClass="org.limepepper.lang.wikitext.structure.WtStructureViewFactory"
         />
 
+        <!-- pure Proofread-page editor, separate for dev purposes -->
+        <fileEditorProvider
+            implementation="org.limepepper.lang.wikitext.editor.prp.PrpFileEditorProvider"
+        />
+
+        <!--
+        this is the old editor that uses profiles to build
+        a Page, Index or generic wikitext specific editor/preview split
+        -->
         <fileEditorProvider
             implementation="org.limepepper.lang.wikitext.preview.WtPreviewEditorProvider"
         />

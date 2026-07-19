@@ -12,11 +12,9 @@ plugins {
     java
 }
 
-tasks.register<Exec>("javap") {
+tasks.register<Exec>("javap_old") {
     group = "help"
     description = "Print the public JVM API of -Pclass=<fully.qualified.ClassName>"
-
-    dependsOn("classes")
 
     val className = providers.gradleProperty("class")
 
@@ -25,12 +23,6 @@ tasks.register<Exec>("javap") {
         vendor.set(javaExtension.toolchain.vendor)
         implementation.set(javaExtension.toolchain.implementation)
     }
-
-    args(
-        "-public",
-        "-classpath",
-        sourceSets.named("main").get().runtimeClasspath.asPath,
-    )
 
     doFirst {
         require(className.isPresent) {
@@ -46,6 +38,42 @@ tasks.register<Exec>("javap") {
                 .absolutePath,
         )
 
-        args(className.get())
+        args(
+            "-public",
+            "-classpath",
+            sourceSets.main.get().compileClasspath.asPath,
+            className.get(),
+        )
     }
+}
+
+tasks.register("printCompileClasspath") {
+    val compileClasspath =
+        configurations.named("compileClasspath")
+
+    doLast {
+        compileClasspath.get().files
+            .sortedBy { it.absolutePath }
+            .forEach(::println)
+    }
+}
+
+val javapLauncher = javaToolchains.launcherFor {
+    languageVersion.set(javaExtension.toolchain.languageVersion)
+    vendor.set(javaExtension.toolchain.vendor)
+    implementation.set(javaExtension.toolchain.implementation)
+}
+
+tasks.register<JavapTask>("javap") {
+    group = "help"
+    description =
+        "Print the public JVM API of -Pclass=<fully.qualified.ClassName>"
+
+    className.set(providers.gradleProperty("class"))
+
+    classpath.from(
+        configurations.named("compileClasspath"),
+    )
+
+    launcher.set(javapLauncher)
 }

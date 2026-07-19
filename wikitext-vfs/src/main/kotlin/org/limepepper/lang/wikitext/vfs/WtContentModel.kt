@@ -2,8 +2,8 @@ package org.limepepper.lang.wikitext.vfs
 
 import com.intellij.openapi.fileTypes.FileType
 import com.intellij.openapi.fileTypes.FileTypeRegistry
-import com.intellij.openapi.fileTypes.PlainTextFileType
 import org.limepepper.lang.wikitext.WtFileType
+import org.limepepper.lang.wikitext.PrpFileType
 
 /**
  * MediaWiki contentmodel identifiers this plugin knows about, and the
@@ -21,7 +21,7 @@ import org.limepepper.lang.wikitext.WtFileType
  */
 enum class WtContentModel(val wikiId: String, val fileType: FileType) {
     PROOFREAD_INDEX("proofread-index", WtFileType),
-    PROOFREAD_PAGE("proofread-page", WtFileType),
+    PROOFREAD_PAGE("proofread-page", PrpFileType),
     WIKITEXT("wikitext", WtFileType),
     SANITIZED_CSS("sanitized-css", FileTypeRegistry.getInstance().getFileTypeByFileName("dummy.css")),
     JSON("json", FileTypeRegistry.getInstance().getFileTypeByFileName("dummy.json")),

@@ -16,7 +16,7 @@ import com.intellij.openapi.fileEditor.TextEditorWithPreview
  * [WtProofreadFormTextEditor]'s toolbar, above the header/body/footer form
  * and the raw-mode toggle it belongs with.
  */
-sealed class WtEditorWithPreview(
+open class WtEditorWithPreview(
     textEditor: TextEditor,
     wtPreviewEditor: WtRenderPreviewBrowser,
     name: String,

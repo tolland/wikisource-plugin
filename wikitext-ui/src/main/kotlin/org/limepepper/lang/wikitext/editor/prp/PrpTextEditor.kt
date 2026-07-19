@@ -1,4 +1,4 @@
-package org.limepepper.lang.wikitext.preview
+package org.limepepper.lang.wikitext.editor.prp
 
 import com.intellij.codeHighlighting.BackgroundEditorHighlighter
 import com.intellij.ide.structureView.StructureViewBuilder
@@ -16,30 +16,14 @@ import java.awt.CardLayout
 import javax.swing.JComponent
 import javax.swing.JPanel
 
-
-/**
- * A [TextEditor] that presents the proofread editing surface as its UI while
- * delegating everything else (document, file, state) to the real [delegate]
- * editor, so [WtProofreadPageEditor] can plug the form into
- * [com.intellij.openapi.fileEditor.TextEditorWithPreview]'s editor slot
- * without giving up the platform's text-editor plumbing.
- *
- * The surface is a card stack under one shared toolbar (page navigation +
- * the raw-mode toggle):
- *
- *  - **form card** (default): the three-field [WtProofreadPageForm];
- *  - **raw card**: the delegate's plain text editor over the serialized
- *    buffer, for when the structured view gets in the way (or the buffer is
- *    malformed and needs hand-repair). Both cards edit the same document, so
- *    switching is always in sync and never loses work.
- */
-class WtProofreadFormTextEditor(
+class PrpTextEditor(
     project: Project,
     private val delegate: TextEditor,
-) : TextEditor by delegate {
-    private val form = WtProofreadPageForm(project, delegate)
+) : TextEditor by delegate  {
 
-    /** The form's body (transcription) editor — see [WtProofreadPageForm.bodySectionEditor]. */
+    private val form = PrpPageForm(project, delegate)
+
+    /** The form's body (transcription) editor — see [PrpPageForm.bodySectionEditor]. */
     val bodyEditor
         get() = form.bodySectionEditor
 

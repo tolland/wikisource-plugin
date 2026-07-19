@@ -5,11 +5,20 @@
             implementationClass="org.limepepper.lang.wikitext.WtFileType"
             fieldName="INSTANCE"
             language="Wikitext"
-            extensions="wt;wiki"/>
+            extensions="wt;wiki"
+        />
+
+        <fileType
+            name="proofread-page"
+            implementationClass="org.limepepper.lang.wikitext.PrpFileType"
+            fieldName="INSTANCE"
+            language="Wikitext"
+            extensions="prp"
+        />
 
         <lang.parserDefinition
             language="Wikitext"
-            implementationClass="org.limepepper.lang.wikitext.parser.WtParserDefinition"/>
-
+            implementationClass="org.limepepper.lang.wikitext.parser.WtParserDefinition"
+        />
     </extensions>
 </idea-plugin>

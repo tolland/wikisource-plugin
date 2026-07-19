@@ -3,13 +3,17 @@ package org.limepepper.lang.wikitext.vfs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Test
+import org.limepepper.lang.wikitext.PrpFileType
 import org.limepepper.lang.wikitext.WtFileType
 
 class WtContentModelTest {
 
     @Test fun `wikitext-flavored content models map to WtFileType`() {
-        for (id in listOf("proofread-index", "proofread-page", "wikitext")) {
+        for (id in listOf("proofread-index", "wikitext")) {
             assertEquals(id, WtFileType, WtContentModel.fileTypeFor(id))
+        }
+        for (id in listOf("proofread-page" )) {
+            assertEquals(id, PrpFileType, WtContentModel.fileTypeFor(id))
         }
     }
 
