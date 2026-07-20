@@ -135,7 +135,9 @@ class PrpTextEditor(
         Disposer.dispose(delegate)
     }
 
+    // @TODO this is not working, verify is still failing
+    @Suppress("UnstableApiUsage", "Internal")
     override fun isEditorLoaded(): Boolean {
-        return delegate.isEditorLoaded()
+        return delegate.isEditorLoaded
     }
 }
