@@ -60,6 +60,14 @@ data class ProofreadPageHeader(
                 text = headerText.substring(match.range.last + 1),
             )
         }
+
+        /**
+         * Length of the leading `<pagequality …/>` tag in [headerText], or `0`
+         * when it doesn't start with one. Exposed so callers that only need
+         * to find the tag's extent (e.g. guarding it in an editor) don't have
+         * to re-run [parse] and reassemble the offset from its [ProofreadPageHeader.text].
+         */
+        fun qualityTagLength(headerText: String): Int = P_QUALITY.find(headerText)?.let { it.range.last + 1 } ?: 0
     }
 }
 
@@ -92,6 +100,18 @@ data class ProofreadPageParts(
      * text between them, carrying no tags of its own.
      */
     data class Boundaries(val header: IntRange, val body: IntRange, val footer: IntRange)
+
+    /**
+     * Character ranges of the *tag* substrings within a serialized page, as
+     * opposed to [Boundaries] which spans whole sections. `headerOpen` is
+     * `<noinclude>` plus a leading `<pagequality …/>` tag when present;
+     * `headerClose`/`footerOpen`/`footerClose` are bare `<noinclude>` /
+     * `</noinclude>` tags. Everything *outside* these four ranges but inside
+     * [Boundaries.header] / [Boundaries.footer] is free-text header/footer
+     * content (running headers, `{{nop}}`, etc.) — an editor guarding only
+     * [TagSpans] keeps that text editable while protecting the framing.
+     */
+    data class TagSpans(val headerOpen: IntRange, val headerClose: IntRange, val footerOpen: IntRange, val footerClose: IntRange)
 
     companion object {
         const val OPEN_TAG = "<noinclude>"
@@ -170,6 +190,20 @@ data class ProofreadPageParts(
             val body = text.substring(b.body.first, b.body.last + 1)
             val footer = text.substring(b.footer.first + OPEN_TAG.length, b.footer.last - CLOSE_TAG.length + 1)
             return ProofreadPageParts(ProofreadPageHeader.parse(header), body, footer)
+        }
+
+        /** Locate the tag substrings within a serialized page — see [TagSpans]. */
+        fun tagSpans(text: String): TagSpans? {
+            val b = boundaries(text) ?: return null
+            val headerTextStart = b.header.first + OPEN_TAG.length
+            val headerTextEnd = b.header.last - CLOSE_TAG.length + 1
+            val qualityLength = ProofreadPageHeader.qualityTagLength(text.substring(headerTextStart, headerTextEnd))
+            return TagSpans(
+                headerOpen = b.header.first until (headerTextStart + qualityLength),
+                headerClose = headerTextEnd..b.header.last,
+                footerOpen = b.footer.first until (b.footer.first + OPEN_TAG.length),
+                footerClose = (b.footer.last - CLOSE_TAG.length + 1)..b.footer.last,
+            )
         }
     }
 }

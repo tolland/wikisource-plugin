@@ -137,6 +137,30 @@ class ProofreadPagePartsTest {
     }
 
     @Test
+    fun tagSpansCoverOnlyTheTagsNotTheRunningHeaderOrFooterText() {
+        val spans = ProofreadPageParts.tagSpans(fullSample)!!
+        assertEquals(
+            "<noinclude><pagequality level=\"1\" user=\"Admin\" />",
+            fullSample.substring(spans.headerOpen.first, spans.headerOpen.last + 1),
+        )
+        assertEquals("</noinclude>", fullSample.substring(spans.headerClose.first, spans.headerClose.last + 1))
+        assertEquals("<noinclude>", fullSample.substring(spans.footerOpen.first, spans.footerOpen.last + 1))
+        assertEquals("</noinclude>", fullSample.substring(spans.footerClose.first, spans.footerClose.last + 1))
+
+        // The running header text between the two header tags is untouched.
+        val headerTextStart = spans.headerOpen.last + 1
+        val headerTextEnd = spans.headerClose.first
+        assertEquals("{{rh|xii||Preface||}}", fullSample.substring(headerTextStart, headerTextEnd))
+    }
+
+    @Test
+    fun tagSpansHeaderOpenIsJustTheTagWhenThereIsNoPagequality() {
+        val text = "<noinclude>{{rh|xii||Preface||}}</noinclude>body<noinclude></noinclude>"
+        val spans = ProofreadPageParts.tagSpans(text)!!
+        assertEquals("<noinclude>", text.substring(spans.headerOpen.first, spans.headerOpen.last + 1))
+    }
+
+    @Test
     fun rejectsEmptyText() {
         assertNull(ProofreadPageParts.decompose(""))
     }
