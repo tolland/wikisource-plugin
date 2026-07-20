@@ -135,7 +135,13 @@ class WikisourceVfs:
                     path=path.raw, exists=True, name="Pages", kind=NodeKind.directory
                 )
             case PageLeaf(path, _, page):
-                return self.mw.stat_page(path.raw, page, name=page.title)
+                meta = self.store.page_meta(page)
+                body = self.store.effective_body(page)
+                if not body:
+                    body = self._placeholder_default(page, meta)
+                return self.mw.stat_page(
+                    path.raw, page, name=page.title, body=body, meta=meta
+                )
             case StubDir(path, name):
                 return Stat(
                     path=path.raw, exists=True, name=name, kind=NodeKind.directory
@@ -216,6 +222,8 @@ class WikisourceVfs:
                     )
                 if body is None:
                     body = page.text or ""
+                if not body:
+                    body = self._placeholder_default(page, metas.get(page.pk))
                 results[i] = self.mw.stat_page(
                     raw,
                     page,
@@ -311,13 +319,16 @@ class WikisourceVfs:
             meta = metas.get(p.pk)
             return meta.page_number or 0 if meta is not None else 0
 
-        return ListChildrenResponse(
-            parent_path=parent,
-            children=[
-                self.mw.page_node(f"{parent}/{p.title}", p, meta=metas.get(p.pk))
-                for p in sorted(pages, key=page_number)
-            ],
-        )
+        children: list[Node] = []
+        for p in sorted(pages, key=page_number):
+            meta = metas.get(p.pk)
+            body = self.store.effective_body(p)
+            if not body:
+                body = self._placeholder_default(p, meta)
+            children.append(
+                self.mw.page_node(f"{parent}/{p.title}", p, meta=meta, body=body)
+            )
+        return ListChildrenResponse(parent_path=parent, children=children)
 
     def _file_dir_children(
         self, path: WikiPath, file_page: Page
@@ -331,6 +342,18 @@ class WikisourceVfs:
             ],
         )
 
+    def _placeholder_default(self, page: Page, meta) -> str:
+        """The opening body a placeholder serves when it has no body of its
+        own — the wiki's prepopulated OCR default (stored at Index fan-out)
+        or the content-model scaffold. Empty for real pages. Applied in
+        stat/list as well as read so length/timestamp always describe the
+        same content a read would return."""
+        if page.revid is not None:
+            return ""
+        return (
+            meta.default_body if meta is not None else None
+        ) or proofread_page_scaffold()
+
     # -- read / write ------------------------------------------------------------
 
     def read(self, raw_path: str) -> ReadContentResponse:
@@ -341,11 +364,13 @@ class WikisourceVfs:
                 # when we have it, else the content-model scaffold — either
                 # way a fresh transcription starts well-formed (local edits,
                 # once journalled, take precedence via effective_body).
-                meta = self.store.page_meta(page)
-                default_body = (
-                    meta.default_body if meta is not None else None
-                ) or proofread_page_scaffold()
-                return self.mw.read_page(path.raw, page, default_body=default_body)
+                return self.mw.read_page(
+                    path.raw,
+                    page,
+                    default_body=self._placeholder_default(
+                        page, self.store.page_meta(page)
+                    ),
+                )
             case (
                 PageLeaf(path, _, page)
                 | IndexWikitext(path, _, page)

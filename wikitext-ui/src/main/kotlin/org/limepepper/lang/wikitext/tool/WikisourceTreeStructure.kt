@@ -60,6 +60,8 @@ internal class WikisourceTreeStructure(
                     dirty = child.dirty,
                     hasPageImage = child.hasPageImage,
                     placeholder = child.placeholder,
+                    length = child.length,
+                    timestamp = child.timestamp,
                 ) as Any
             }.toTypedArray()
         } catch (e: VfsBackendException) {

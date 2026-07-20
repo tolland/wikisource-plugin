@@ -96,8 +96,10 @@ class MediaWikiVfs:
         page: Page,
         name: str | None = None,
         meta: PageMeta | None | object = _UNRESOLVED,
+        body: str | None = None,
     ) -> Node:
-        body = self.store.effective_body(page)
+        if body is None:
+            body = self.store.effective_body(page)
         resolved = self._resolve_meta(page, meta)
         return Node(
             path=path,

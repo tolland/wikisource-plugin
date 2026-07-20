@@ -285,6 +285,16 @@ def test_placeholder_opens_with_prepopulated_ocr_body(engine, tmp_path):
         assert _unb64(r["content_base64"]) == _ocr_body(3)
         assert r["revid"] is None
 
+        # stat and the children listing describe the same content the read
+        # serves — the plugin trusts length for its VirtualFile.
+        stat = c.get("/vfs/stat", params={"path": path}).json()
+        assert stat["length"] == len(_ocr_body(3).encode())
+        children = c.get("/vfs/children", params={"path": _PAGES_PATH}).json()[
+            "children"
+        ]
+        by_name = {c_["name"]: c_ for c_ in children}
+        assert by_name["Page:Sparse.pdf/3"]["length"] == len(_ocr_body(3).encode())
+
 
 def test_placeholder_opens_with_scaffold_and_saves_as_edit(engine, tmp_path):
     # Page 1 is the slot the wiki offered no OCR body for — the generic

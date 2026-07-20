@@ -44,12 +44,23 @@ class WtVirtualFile(
     dirty: Boolean = false,
     hasPageImage: Boolean = false,
     placeholder: Boolean = false,
+    length: Long? = null,
+    timestamp: String? = null,
 ) : VirtualFile() {
 
     // Populated either eagerly by the tool window (BG thread) or lazily on
     // first access. Protected by `@Synchronized` on each accessor.
     @Volatile var cachedChildren: Array<VirtualFile>? = null
     @Volatile var cachedContent: ByteArray? = null
+
+    // Backend-reported facts about the effective body — the same content a
+    // read of this path serves (server precedence: uncommitted journal >
+    // pushed-not-yet-refetched commit > remote snapshot > placeholder
+    // default). Length is superseded by cachedContent once loaded;
+    // timestamp is epoch millis of the page's last local save or remote
+    // revision, whichever backs the current body.
+    @Volatile private var statLength: Long? = length
+    @Volatile private var statTimestamp: Long? = timestamp?.toLongOrNull()
 
     // The revid this file's cached content is based on — the conflict token
     // sent back as base_revid on save. Updated on every successful write.
@@ -74,17 +85,23 @@ class WtVirtualFile(
 
     fun setParent(p: WtVirtualFile) { _parent = p }
 
-    /** Refresh decoration metadata from a fresh backend sighting. */
+    /** Refresh decoration metadata from a fresh backend sighting. Length and
+     * timestamp are only overwritten when the sighting carries them (stats
+     * and file listings do; directory rows don't). */
     fun updateMeta(
         qualityLevel: Int?,
         dirty: Boolean,
         hasPageImage: Boolean,
         placeholder: Boolean,
+        length: Long? = null,
+        timestamp: String? = null,
     ) {
         this.qualityLevel = qualityLevel
         this.dirty = dirty
         this.hasPageImage = hasPageImage
         this.placeholder = placeholder
+        length?.let { statLength = it }
+        timestamp?.toLongOrNull()?.let { statTimestamp = it }
     }
 
     /**
@@ -94,7 +111,10 @@ class WtVirtualFile(
      */
     @Synchronized
     fun invalidateIfStale(stat: StatResult) {
-        updateMeta(stat.qualityLevel, stat.dirty, stat.hasPageImage, stat.placeholder)
+        updateMeta(
+            stat.qualityLevel, stat.dirty, stat.hasPageImage, stat.placeholder,
+            stat.length, stat.timestamp,
+        )
         if (stat.revid != revid) {
             revid = stat.revid
             cachedContent = null
@@ -136,6 +156,8 @@ class WtVirtualFile(
                 dirty = child.dirty,
                 hasPageImage = child.hasPageImage,
                 placeholder = child.placeholder,
+                length = child.length,
+                timestamp = child.timestamp,
             )
         }.toTypedArray() as Array<VirtualFile>
         cachedChildren = children
@@ -171,6 +193,11 @@ class WtVirtualFile(
                 when (result.status) {
                     WriteStatus.ok -> {
                         cachedContent = bytes
+                        statLength = bytes.size.toLong()
+                        // The backend stamps local_modified_at at save time;
+                        // mirror it locally so length/stamps move with the
+                        // content without waiting for the next re-stat.
+                        statTimestamp = System.currentTimeMillis()
                         revid = result.newRevid
                         // A local save is journalled, not pushed — the page is
                         // now dirty relative to the wiki until committed.
@@ -187,10 +214,16 @@ class WtVirtualFile(
         }
     }
 
-    override fun getLength(): Long = cachedContent?.size?.toLong() ?: 0L
+    override fun getLength(): Long = cachedContent?.size?.toLong() ?: statLength ?: 0L
 
-    override fun getTimeStamp(): Long = 0L
-    override fun getModificationStamp(): Long = 0L
+    /** Last modification of the effective body (local save or remote
+     * revision), epoch millis as reported by the backend stat. */
+    override fun getTimeStamp(): Long = statTimestamp ?: 0L
+
+    // The platform compares modification stamps for staleness, not order, so
+    // the backend timestamp doubles as the stamp: it moves exactly when the
+    // effective body does (save, remote revision, post-commit refetch).
+    override fun getModificationStamp(): Long = statTimestamp ?: 0L
 
     override fun refresh(asynchronous: Boolean, recursive: Boolean, postRunnable: Runnable?) {
         cachedChildren = null
@@ -214,6 +247,8 @@ class WtVirtualFile(
                 dirty = stat.dirty,
                 hasPageImage = stat.hasPageImage,
                 placeholder = stat.placeholder,
+                length = stat.length,
+                timestamp = stat.timestamp,
             )
     }
 }
