@@ -19,6 +19,7 @@ import com.intellij.openapi.editor.markup.TextAttributes
 import com.intellij.openapi.util.Disposer
 import com.intellij.util.Alarm
 import com.intellij.util.ui.ColorIcon
+import org.limepepper.lang.wikitext.annotation.AnnotationCategory
 import org.limepepper.lang.wikitext.annotation.AnnotationPalette
 import org.limepepper.lang.wikitext.annotation.AnnotationPalette.withAlpha
 import org.limepepper.lang.wikitext.annotation.BoundingBox
@@ -28,9 +29,12 @@ import java.awt.Graphics
 import java.awt.Graphics2D
 import java.awt.Rectangle
 import java.awt.RenderingHints
+import javax.swing.ButtonGroup
 import javax.swing.Icon
+import javax.swing.JMenu
 import javax.swing.JMenuItem
 import javax.swing.JPopupMenu
+import javax.swing.JRadioButtonMenuItem
 
 /**
  * The editor half of box↔text linking: renders each linked box's text
@@ -314,9 +318,32 @@ class WtAnnotationAnchorManager(
             })
         }
         menu.addSeparator()
+        menu.add(categoryMenu(box))
+        menu.addSeparator()
         menu.add(JMenuItem("Delete Box").apply {
             addActionListener { boxModel.remove(box.id) }
         })
+        return menu
+    }
+
+    /** Region-category submenu — a radio group over [AnnotationCategory]. */
+    private fun categoryMenu(box: BoundingBox): JMenu {
+        val boxModel = model
+        fun setCategory(category: AnnotationCategory?) {
+            boxModel[box.id]?.let { boxModel.update(it.copy(category = category)) }
+        }
+        val menu = JMenu("Category")
+        val group = ButtonGroup()
+        menu.add(JRadioButtonMenuItem("None", box.category == null).apply {
+            group.add(this)
+            addActionListener { setCategory(null) }
+        })
+        for (category in AnnotationCategory.entries) {
+            menu.add(JRadioButtonMenuItem(category.displayName, box.category == category).apply {
+                group.add(this)
+                addActionListener { setCategory(category) }
+            })
+        }
         return menu
     }
 

@@ -221,33 +221,19 @@ class HttpVfsBackend(
         return "$baseUrl/preview/page-image?$query"
     }
 
-    override fun listAnnotations(path: String): AnnotationListResult {
+    override fun listAnnotations(path: String): List<PageAnnotation> {
         val json = get("/pages/annotations", "path" to path)
-        return JsonReader(json).run {
-            AnnotationListResult(
-                annotations = array("annotations", ::readAnnotation),
-                danglingAnchorIds = stringArray("dangling_anchor_ids"),
-            )
-        }
+        return JsonReader(json).array("annotations", ::readAnnotation)
     }
 
-    override fun saveAnnotation(
-        path: String,
-        annotation: PageAnnotation,
-        imageWidth: Int?,
-        imageHeight: Int?,
-    ): PageAnnotation {
+    override fun saveAnnotation(path: String, annotation: PageAnnotation): PageAnnotation {
         val body = buildJsonObject(
             "x" to annotation.x,
             "y" to annotation.y,
             "width" to annotation.width,
             "height" to annotation.height,
             "label" to annotation.label,
-            "text_start" to annotation.textStart,
-            "text_end" to annotation.textEnd,
-            "anchor_revid" to annotation.anchorRevid,
-            "image_width" to imageWidth,
-            "image_height" to imageHeight,
+            "category" to annotation.category,
         )
         val json = put(
             "/pages/annotations/${URLEncoder.encode(annotation.id, "UTF-8")}",
@@ -264,16 +250,46 @@ class HttpVfsBackend(
         )
     }
 
+    override fun listTextAnchors(path: String): List<PageTextAnchor> {
+        val json = get("/pages/text-anchors", "path" to path)
+        return JsonReader(json).array("anchors", ::readTextAnchor)
+    }
+
+    override fun saveTextAnchor(path: String, anchor: PageTextAnchor): PageTextAnchor {
+        val body = buildJsonObject(
+            "text_start" to anchor.textStart,
+            "text_end" to anchor.textEnd,
+            "anchor_revid" to anchor.anchorRevid,
+        )
+        val json = put(
+            "/pages/text-anchors/${URLEncoder.encode(anchor.annotationId, "UTF-8")}",
+            body,
+            "path" to path,
+        )
+        return readTextAnchor(JsonReader(json))
+    }
+
+    override fun deleteTextAnchor(path: String, annotationId: String) {
+        delete(
+            "/pages/text-anchors/${URLEncoder.encode(annotationId, "UTF-8")}",
+            "path" to path,
+        )
+    }
+
     private fun readAnnotation(r: JsonReader): PageAnnotation = PageAnnotation(
         id = r.string("id"),
-        shape = r.string("shape"),
         x = r.double("x"),
         y = r.double("y"),
         width = r.double("width"),
         height = r.double("height"),
         label = r.stringOrNull("label"),
-        textStart = r.longOrNull("text_start")?.toInt(),
-        textEnd = r.longOrNull("text_end")?.toInt(),
+        category = r.stringOrNull("category"),
+    )
+
+    private fun readTextAnchor(r: JsonReader): PageTextAnchor = PageTextAnchor(
+        annotationId = r.string("annotation_id"),
+        textStart = r.longOrNull("text_start")?.toInt() ?: 0,
+        textEnd = r.longOrNull("text_end")?.toInt() ?: 0,
         anchorRevid = r.longOrNull("anchor_revid"),
     )
 

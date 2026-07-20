@@ -27,6 +27,8 @@ class FakeVfsBackend : VfsBackend {
     private val childrenOf = mutableMapOf<String, MutableList<String>>()
     // page path → annotation id → annotation, in insertion order
     private val annotations = mutableMapOf<String, LinkedHashMap<String, PageAnnotation>>()
+    // page path → annotation id → text anchor, independent of the boxes
+    private val textAnchors = mutableMapOf<String, LinkedHashMap<String, PageTextAnchor>>()
 
     /**
      * Register a directory. The parent is the longest already-registered
@@ -158,31 +160,33 @@ class FakeVfsBackend : VfsBackend {
         )
     }
 
-    override fun listAnnotations(path: String): AnnotationListResult =
-        AnnotationListResult(annotations[path].orEmpty().values.toList())
+    override fun listAnnotations(path: String): List<PageAnnotation> =
+        annotations[path].orEmpty().values.toList()
 
-    override fun saveAnnotation(
-        path: String,
-        annotation: PageAnnotation,
-        imageWidth: Int?,
-        imageHeight: Int?,
-    ): PageAnnotation {
-        val forPage = annotations.getOrPut(path) { LinkedHashMap() }
-        val existing = forPage[annotation.id]
-        if (existing != null && existing.shape != "rect") {
-            throw VfsBackendException("annotation ${annotation.id} is a ${existing.shape}, not a rect")
-        }
-        if (forPage.isEmpty() && (imageWidth == null || imageHeight == null)) {
-            throw VfsBackendException("image_size is required for a page's first annotation")
-        }
-        val saved = annotation.copy(shape = "rect")
-        forPage[annotation.id] = saved
-        return saved
+    override fun saveAnnotation(path: String, annotation: PageAnnotation): PageAnnotation {
+        annotations.getOrPut(path) { LinkedHashMap() }[annotation.id] = annotation
+        return annotation
     }
 
     override fun deleteAnnotation(path: String, annotationId: String) {
-        if (annotations[path]?.remove(annotationId) == null) {
+        val boxRemoved = annotations[path]?.remove(annotationId) != null
+        val anchorRemoved = textAnchors[path]?.remove(annotationId) != null
+        if (!boxRemoved && !anchorRemoved) {
             throw VfsBackendException("no annotation $annotationId at $path")
+        }
+    }
+
+    override fun listTextAnchors(path: String): List<PageTextAnchor> =
+        textAnchors[path].orEmpty().values.toList()
+
+    override fun saveTextAnchor(path: String, anchor: PageTextAnchor): PageTextAnchor {
+        textAnchors.getOrPut(path) { LinkedHashMap() }[anchor.annotationId] = anchor
+        return anchor
+    }
+
+    override fun deleteTextAnchor(path: String, annotationId: String) {
+        if (textAnchors[path]?.remove(annotationId) == null) {
+            throw VfsBackendException("no text anchor $annotationId at $path")
         }
     }
 

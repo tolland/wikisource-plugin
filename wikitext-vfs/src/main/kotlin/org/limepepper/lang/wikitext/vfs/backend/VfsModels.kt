@@ -113,37 +113,36 @@ data class WriteResult(
 )
 
 /**
- * One scan annotation from /pages/annotations — a shape drawn over the
- * reference image, optionally anchored to a range of the transcription.
- * Geometry is the axis-aligned bounding box in scan-pixel coordinates.
- * [shape] is the SVG element name; only "rect" is editable from the canvas
- * (anything else was drawn out-of-band, e.g. in Inkscape) — the sidecar
- * rejects geometry writes to non-rect shapes.
- *
- * Anchor semantics: both offsets null = unlinked; textStart == textEnd =
- * insertion point; textStart < textEnd = replace range. [anchorRevid] is
- * the revision the offsets were computed against — a mismatch with the
- * page's current revid means the anchor is stale.
+ * One scan annotation from /pages/annotations — a bounding box drawn over
+ * the reference image, in scan-pixel coordinates. [category] classifies the
+ * region for the OCR pipeline (one of the sidecar's AnnotationCategory wire
+ * values: "header", "footer", "body", "paragraph", "section", "ignore");
+ * null = uncategorized. Text anchoring is a separate resource (see
+ * [PageTextAnchor]) joined by [id].
  */
 data class PageAnnotation(
     val id: String,
-    val shape: String = "rect",
     val x: Double,
     val y: Double,
     val width: Double,
     val height: Double,
     val label: String? = null,
-    val textStart: Int? = null,
-    val textEnd: Int? = null,
-    val anchorRevid: Long? = null,
+    val category: String? = null,
 )
 
 /**
- * GET /pages/annotations response. [danglingAnchorIds] are text anchors
- * whose SVG shape was deleted out-of-band — kept server-side, surfaced so
- * the UI can offer cleanup rather than silently losing the link.
+ * One text anchor from /pages/text-anchors — a range of the transcription
+ * text that is the target for OCR output or other processed text, joined to
+ * its bounding box (if any) by [annotationId]. Either side may exist
+ * without the other: mark the text first, or draw the box first.
+ *
+ * textStart == textEnd = insertion point; textStart < textEnd = replace
+ * range. [anchorRevid] is the revision the offsets were computed against —
+ * a mismatch with the page's current revid means the anchor is stale.
  */
-data class AnnotationListResult(
-    val annotations: List<PageAnnotation>,
-    val danglingAnchorIds: List<String> = emptyList(),
+data class PageTextAnchor(
+    val annotationId: String,
+    val textStart: Int,
+    val textEnd: Int,
+    val anchorRevid: Long? = null,
 )

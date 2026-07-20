@@ -182,40 +182,36 @@ class HttpVfsBackendTest {
         )
     }
 
-    @Test fun `listAnnotations parses annotations and dangling anchors`() {
+    @Test fun `listAnnotations parses boxes with categories`() {
         handle("/pages/annotations", """
             {"annotations":[
-              {"id":"a1","shape":"rect","x":10.5,"y":20.0,"width":30.0,"height":40.25,
-               "label":"para 1","text_start":5,"text_end":9,"anchor_revid":42},
-              {"id":"e1","shape":"ellipse","x":450.0,"y":375.0,"width":100.0,"height":50.0,
-               "label":null,"text_start":null,"text_end":null,"anchor_revid":null}
-            ],"dangling_anchor_ids":["gone1","gone2"]}
+              {"id":"a1","x":10.5,"y":20.0,"width":30.0,"height":40.25,
+               "label":"para 1","category":"paragraph"},
+              {"id":"a2","x":450.0,"y":375.0,"width":100.0,"height":50.0,
+               "label":null,"category":null}
+            ]}
         """.trimIndent())
 
         val r = backend.listAnnotations("/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1")
-        assertEquals(2, r.annotations.size)
-        val a1 = r.annotations[0]
+        assertEquals(2, r.size)
+        val a1 = r[0]
         assertEquals("a1", a1.id)
-        assertEquals("rect", a1.shape)
         assertEquals(10.5, a1.x, 0.0)
         assertEquals(40.25, a1.height, 0.0)
         assertEquals("para 1", a1.label)
-        assertEquals(5, a1.textStart)
-        assertEquals(9, a1.textEnd)
-        assertEquals(42L, a1.anchorRevid)
-        assertEquals("ellipse", r.annotations[1].shape)
-        assertNull(r.annotations[1].textStart)
-        assertEquals(listOf("gone1", "gone2"), r.danglingAnchorIds)
+        assertEquals("paragraph", a1.category)
+        assertNull(r[1].label)
+        assertNull(r[1].category)
     }
 
-    @Test fun `saveAnnotation PUTs geometry and anchor and parses the echo`() {
+    @Test fun `saveAnnotation PUTs geometry and category and parses the echo`() {
         var captured: String? = null
         var requestPath: String? = null
         server.createContext("/pages/annotations/") { ex ->
             captured = ex.requestBody.readBytes().decodeToString()
             requestPath = ex.requestURI.toString()
-            val body = """{"id":"a1","shape":"rect","x":1.0,"y":2.0,"width":3.0,"height":4.0,
-                           "label":"l","text_start":0,"text_end":7,"anchor_revid":42}""".toByteArray()
+            val body = """{"id":"a1","x":1.0,"y":2.0,"width":3.0,"height":4.0,
+                           "label":"l","category":"body"}""".toByteArray()
             ex.sendResponseHeaders(200, body.size.toLong())
             ex.responseBody.use { it.write(body) }
         }
@@ -223,16 +219,13 @@ class HttpVfsBackendTest {
         val saved = backend.saveAnnotation(
             "/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1",
             PageAnnotation(id = "a1", x = 1.0, y = 2.0, width = 3.0, height = 4.0,
-                label = "l", textStart = 0, textEnd = 7, anchorRevid = 42L),
-            imageWidth = 1000,
-            imageHeight = 800,
+                label = "l", category = "body"),
         )
-        assertEquals(7, saved.textEnd)
+        assertEquals("body", saved.category)
         assertTrue(requestPath!!.startsWith("/pages/annotations/a1?path="))
         val body = captured!!
         assertTrue(body.contains("\"x\":1.0"))
-        assertTrue(body.contains("\"text_start\":0"))
-        assertTrue(body.contains("\"image_width\":1000"))
+        assertTrue(body.contains("\"category\":\"body\""))
     }
 
     @Test fun `deleteAnnotation throws on 404`() {
@@ -243,6 +236,57 @@ class HttpVfsBackendTest {
         }
         assertThrows(VfsBackendException::class.java) {
             backend.deleteAnnotation("/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1", "a9")
+        }
+    }
+
+    @Test fun `listTextAnchors parses anchors`() {
+        handle("/pages/text-anchors", """
+            {"anchors":[
+              {"annotation_id":"a1","text_start":5,"text_end":9,"anchor_revid":42},
+              {"annotation_id":"a2","text_start":7,"text_end":7,"anchor_revid":null}
+            ]}
+        """.trimIndent())
+
+        val r = backend.listTextAnchors("/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1")
+        assertEquals(2, r.size)
+        assertEquals("a1", r[0].annotationId)
+        assertEquals(5, r[0].textStart)
+        assertEquals(9, r[0].textEnd)
+        assertEquals(42L, r[0].anchorRevid)
+        assertEquals(7, r[1].textStart)
+        assertNull(r[1].anchorRevid)
+    }
+
+    @Test fun `saveTextAnchor PUTs offsets and parses the echo`() {
+        var captured: String? = null
+        var requestPath: String? = null
+        server.createContext("/pages/text-anchors/") { ex ->
+            captured = ex.requestBody.readBytes().decodeToString()
+            requestPath = ex.requestURI.toString()
+            val body = """{"annotation_id":"a1","text_start":0,"text_end":7,"anchor_revid":42}""".toByteArray()
+            ex.sendResponseHeaders(200, body.size.toLong())
+            ex.responseBody.use { it.write(body) }
+        }
+
+        val saved = backend.saveTextAnchor(
+            "/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1",
+            PageTextAnchor(annotationId = "a1", textStart = 0, textEnd = 7, anchorRevid = 42L),
+        )
+        assertEquals(7, saved.textEnd)
+        assertTrue(requestPath!!.startsWith("/pages/text-anchors/a1?path="))
+        val body = captured!!
+        assertTrue(body.contains("\"text_start\":0"))
+        assertTrue(body.contains("\"anchor_revid\":42"))
+    }
+
+    @Test fun `deleteTextAnchor throws on 404`() {
+        server.createContext("/pages/text-anchors/") { ex ->
+            val body = """{"detail":"no text anchor a9"}""".toByteArray()
+            ex.sendResponseHeaders(404, body.size.toLong())
+            ex.responseBody.use { it.write(body) }
+        }
+        assertThrows(VfsBackendException::class.java) {
+            backend.deleteTextAnchor("/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1", "a9")
         }
     }
 

@@ -14,7 +14,6 @@ dependencies = [
     "rich>=15.0.0",
     "sqlalchemy>=2.0.51",
     "sqlmodel>=0.0.39",
-    "svgelements>=1.9",
     "typer>=0.26.8",
     "uvicorn[standard]>=0.49.0",
 ]

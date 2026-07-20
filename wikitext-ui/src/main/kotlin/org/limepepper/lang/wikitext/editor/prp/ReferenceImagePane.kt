@@ -5,6 +5,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
+import org.limepepper.lang.wikitext.annotation.AnnotationCategory
 import org.limepepper.lang.wikitext.annotation.BoundingBox
 import org.limepepper.lang.wikitext.annotation.BoundingBoxModel
 import org.limepepper.lang.wikitext.annotation.ImageAnnotationPane
@@ -37,10 +38,10 @@ private val IMAGE_LOG = logger<ReferenceImagePane>()
  * drawn over the scan (left-drag draws, drag moves, handles resize,
  * Delete removes, wheel scrolls, Shift-wheel scrolls horizontally,
  * Ctrl-wheel zooms, middle-drag pans). For wikisource:// pages
- * the boxes persist: they load from the sidecar with the image and every
- * change is written behind via [WtAnnotationSync] to the per-page SVG
- * annotation document. For non-VFS files the canvas still works, just
- * in-memory.
+ * the boxes persist: they load from the sidecar with the image (boxes and
+ * their text anchors are separate resources, merged here by annotation id)
+ * and every change is written behind via [WtAnnotationSync]. For non-VFS
+ * files the canvas still works, just in-memory.
  */
 class ReferenceImagePane(
     private val file: VirtualFile,
@@ -108,9 +109,24 @@ class ReferenceImagePane(
             }
             // Boxes ride along with the scan; a failure here degrades to a
             // bare image rather than blocking it.
-            val annotations = if (image != null && vfsPath != null) {
+            val boxes = if (image != null && vfsPath != null) {
                 try {
-                    backend.listAnnotations(vfsPath)
+                    val anchorsById = backend.listTextAnchors(vfsPath).associateBy { it.annotationId }
+                    backend.listAnnotations(vfsPath).map { annotation ->
+                        val anchor = anchorsById[annotation.id]
+                        BoundingBox(
+                            id = annotation.id,
+                            x = annotation.x,
+                            y = annotation.y,
+                            width = annotation.width,
+                            height = annotation.height,
+                            label = annotation.label,
+                            category = AnnotationCategory.fromWire(annotation.category),
+                            textStart = anchor?.textStart,
+                            textEnd = anchor?.textEnd,
+                            anchorRevid = anchor?.anchorRevid,
+                        )
+                    }
                 } catch (e: Exception) {
                     IMAGE_LOG.warn("annotation load failed for $vfsPath", e)
                     null
@@ -127,32 +143,11 @@ class ReferenceImagePane(
                     return@invokeLater
                 }
                 annotationPane.showImage(image)
-                if (annotations != null && vfsPath != null) {
-                    annotationPane.model.setAll(
-                        annotations.annotations
-                            .filter { it.shape == "rect" } // others are view-only, drawn out-of-band
-                            .map {
-                                BoundingBox(
-                                    id = it.id,
-                                    x = it.x,
-                                    y = it.y,
-                                    width = it.width,
-                                    height = it.height,
-                                    label = it.label,
-                                    textStart = it.textStart,
-                                    textEnd = it.textEnd,
-                                    anchorRevid = it.anchorRevid,
-                                )
-                            },
-                    )
-                    val sync = WtAnnotationSync(
-                        annotationPane.model,
-                        vfsPath,
-                        image.width,
-                        image.height,
-                    )
+                if (boxes != null && vfsPath != null) {
+                    annotationPane.model.setAll(boxes)
+                    val sync = WtAnnotationSync(annotationPane.model, vfsPath)
                     Disposer.register(this, sync)
-                    sync.seed(annotations.annotations)
+                    sync.seed(boxes)
                 }
             }
         }

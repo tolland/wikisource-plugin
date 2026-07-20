@@ -54,23 +54,21 @@ interface VfsBackend {
      */
     fun pageImageUrl(path: String?, title: String?): String
 
-    /** Scan annotations (bounding boxes + text anchors) for a Page: leaf. */
-    fun listAnnotations(path: String): AnnotationListResult
+    /** Scan annotations (bounding boxes) for a Page: leaf. */
+    fun listAnnotations(path: String): List<PageAnnotation>
 
-    /**
-     * Upserts one rect annotation — geometry, label, and anchor together
-     * (null anchor offsets unlink). The scan raster size must accompany a
-     * page's first annotation: it becomes the annotation document's
-     * coordinate space, and only the caller's decoded image knows it.
-     * Sending it on every save is harmless.
-     */
-    fun saveAnnotation(
-        path: String,
-        annotation: PageAnnotation,
-        imageWidth: Int? = null,
-        imageHeight: Int? = null,
-    ): PageAnnotation
+    /** Upserts one annotation's geometry, label, and category. */
+    fun saveAnnotation(path: String, annotation: PageAnnotation): PageAnnotation
 
-    /** Deletes an annotation and its anchor. Unknown ids are an error. */
+    /** Deletes an annotation and its text anchor. Unknown ids are an error. */
     fun deleteAnnotation(path: String, annotationId: String)
+
+    /** Text anchors for a Page: leaf — the other half of the annotations. */
+    fun listTextAnchors(path: String): List<PageTextAnchor>
+
+    /** Upserts the text anchor joined to [PageTextAnchor.annotationId]. */
+    fun saveTextAnchor(path: String, anchor: PageTextAnchor): PageTextAnchor
+
+    /** Deletes just the text anchor, leaving any box. Unknown ids are an error. */
+    fun deleteTextAnchor(path: String, annotationId: String)
 }
