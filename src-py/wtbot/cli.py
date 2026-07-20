@@ -11,6 +11,8 @@ app = typer.Typer(
     help="wtbot — Wikisource editor backend",
     add_completion=False,
     no_args_is_help=True,
+    pretty_exceptions_enable=False,
+    pretty_exceptions_short=False,
 )
 
 
