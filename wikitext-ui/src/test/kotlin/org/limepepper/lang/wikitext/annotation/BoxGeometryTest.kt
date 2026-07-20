@@ -7,7 +7,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 
 class BoxGeometryTest {
-    private val box = BoundingBox(id = "a", x = 100.0, y = 100.0, width = 50.0, height = 40.0)
+    private val box = BoundingBox(
+        id = "a",
+        x = 100.0,
+        y = 100.0,
+        width = 50.0,
+        height = 40.0,
+    )
 
     // ---- hit testing ----------------------------------------------------
 

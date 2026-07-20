@@ -7,7 +7,14 @@ import kotlin.test.assertNull
 
 class BoundingBoxModelTest {
     private val model = BoundingBoxModel()
-    private val box = BoundingBox(id = "a", x = 0.0, y = 0.0, width = 10.0, height = 10.0)
+
+    private val box = BoundingBox(
+        id = "a",
+        x = 0.0,
+        y = 0.0,
+        width = 10.0,
+        height = 10.0,
+    )
 
     private class RecordingListener : BoundingBoxModel.Listener {
         var boxEvents = 0
