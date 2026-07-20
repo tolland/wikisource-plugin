@@ -10,17 +10,30 @@ history, not separate wiki edits). The worker snapshots the journal rows it is
 about to push, releases the SQLite transaction while the wiki save happens, and
 then marks only that snapshotted batch committed on success. New saves that
 arrive during the remote call remain pending for a later run.
+
+A successful push never mutates the Page row: Page is strictly the *fetched*
+remote snapshot, written only by the fetch worker. The push's outcome lives on
+the Commit row (result_revid), a refetch of the page is enqueued to true the
+snapshot up (text, revid, pageid, contributor, ...), and until that lands
+reads bridge on the Commit body (see PageStore.effective_body).
 """
 
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
 from threading import Lock
 
 from sqlmodel import Session, select
 
-from wtbot.model import Commit, CommitStatus, EditJournal, Page, Site
+from wtbot.model import (
+    Commit,
+    CommitStatus,
+    EditJournal,
+    FetchKind,
+    FetchRequest,
+    Page,
+    Site,
+)
 from wtbot.wiki.client import WikiClient
 from wtbot.wiki.wiki_types import EditConflict
 
@@ -56,7 +69,6 @@ class _OrphanedPendingPage:
 class _CommitOutcome:
     status: CommitStatus
     result_revid: int | None = None
-    remote_timestamp: datetime | None = None
     error_message: str | None = None
 
 
@@ -210,6 +222,24 @@ def _load_pending_page_commit(
         # None stays None: a placeholder stub (never on the wiki) pushes as a
         # page *creation*, not an edit based on a fabricated revid 0.
         base_revid = latest.base_revid if latest.base_revid is not None else page.revid
+
+        # Saves made after our own successful push but before its refetch
+        # landed were based on the pushed body (effective_body serves it),
+        # even though the client's revid was still the stale snapshot — bump
+        # the base to our own result_revid so we don't conflict against our
+        # own edit. A genuinely newer remote revision (someone else's edit)
+        # is still ahead of it and still conflicts.
+        last_push = session.exec(
+            select(Commit)
+            .where(Commit.page_pk == page_pk, Commit.status == CommitStatus.success)
+            .order_by(Commit.created_at.desc(), Commit.pk.desc())
+        ).first()
+        if (
+            last_push is not None
+            and last_push.result_revid is not None
+            and (base_revid is None or last_push.result_revid > base_revid)
+        ):
+            base_revid = last_push.result_revid
         return _PendingPageCommit(
             page_pk=page_pk,
             title=page.title,
@@ -252,7 +282,6 @@ def _save_pending_page(
         return _CommitOutcome(
             status=CommitStatus.success,
             result_revid=result.revid,
-            remote_timestamp=result.timestamp,
         )
     except EditConflict as exc:
         return _CommitOutcome(status=CommitStatus.conflict, error_message=str(exc))
@@ -279,10 +308,20 @@ def _record_commit_outcome(
         if outcome.status == CommitStatus.success:
             page = session.get(Page, pending.page_pk)
             if page is not None:
-                page.revid = outcome.result_revid
-                page.remote_timestamp = outcome.remote_timestamp
+                # dirty is local bookkeeping; the remote-snapshot columns
+                # (text/revid/...) are deliberately left untouched — the
+                # enqueued refetch is the only writer of those.
                 page.dirty = _has_uncaptured_pending_edits(session, pending)
                 session.add(page)
+                session.add(
+                    FetchRequest(
+                        site_pk=page.site_pk,
+                        title=page.title,
+                        kind=FetchKind.single,
+                        depth=0,
+                        priority=10,  # snapshot refresh jumps bulk fan-outs
+                    )
+                )
 
             rows = session.exec(
                 select(EditJournal).where(EditJournal.pk.in_(pending.journal_pks))

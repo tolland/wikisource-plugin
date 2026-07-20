@@ -469,19 +469,27 @@ class FakeWikiClient:
         if not force and base_revid is not None and current_revid != base_revid:
             raise EditConflict(title, base_revid, current_revid)
         new_revid = (current_revid or 0) + 1
-        updated = (
-            replace(existing, text=text, revid=new_revid, comment=comment)
-            if existing is not None
-            else RemotePage(
+        if existing is not None:
+            updated = replace(existing, text=text, revid=new_revid, comment=comment)
+        else:
+            # Mimic what a ProofreadPage wiki reports for a page created by
+            # this push: namespace from the title prefix, content model from
+            # the namespace, and a real pageid — so refetching a committed
+            # placeholder upserts a sensible snapshot.
+            ns = title.partition(":")[0] if ":" in title else None
+            updated = RemotePage(
                 title=title,
                 namespace_key=0,
-                namespace_canonical=None,
-                content_model="wikitext",
+                namespace_canonical=ns,
+                content_model={
+                    "Page": "proofread-page",
+                    "Index": "proofread-index",
+                }.get(ns or "", "wikitext"),
                 text=text,
+                pageid=new_revid + 1000,
                 revid=new_revid,
                 comment=comment,
             )
-        )
         self._pages[title] = updated
         return SaveResult(revid=new_revid, timestamp=updated.timestamp)
 

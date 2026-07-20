@@ -85,11 +85,19 @@ def test_commit_endpoint_pushes_pending_edits(engine):
         assert resp.status_code == 200
         assert resp.json()["handled"] == 1
 
+        # The endpoint drains the post-push refetch inline, so a read
+        # straight after committing serves the new remote body — never the
+        # stale (or empty, for an ex-placeholder) snapshot.
+        read = c.get("/vfs/content", params={"path": PATH}).json()
+        assert base64.b64decode(read["content_base64"]).decode() == "edited"
+        assert read["revid"] == 101
+
     assert fake._pages[TITLE].text == "edited"
 
     with Session(engine) as s:
         updated = s.get(Page, page.pk)
         assert updated.revid == 101
+        assert updated.text == "edited"  # snapshot trued up by the refetch
         assert updated.dirty is False
 
         journal = s.exec(

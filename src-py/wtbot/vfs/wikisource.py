@@ -199,12 +199,23 @@ class WikisourceVfs:
             page_pks = [p.pk for p in pages if p.pk is not None]
             uncommitted = self.store.latest_uncommitted_bodies(page_pks)
             metas = self.store.page_metas_by_pks(page_pks)
+            pushed = self.store.latest_successful_commits(
+                [pk for pk in page_pks if pk not in uncommitted]
+            )
             for i, raw, page_title in entries:
                 page = pages_by_title.get(page_title)
                 if page is None:
                     results[i] = Stat(path=raw, exists=False)
                     continue
-                body = uncommitted.get(page.pk, page.text or "")
+                # Mirrors effective_body's three-level rule (uncommitted
+                # journal > pushed-not-yet-refetched commit > snapshot).
+                body = uncommitted.get(page.pk)
+                if body is None:
+                    body = self.store.pushed_body_ahead_of_snapshot(
+                        pushed.get(page.pk), page
+                    )
+                if body is None:
+                    body = page.text or ""
                 results[i] = self.mw.stat_page(
                     raw,
                     page,

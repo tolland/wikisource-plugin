@@ -3,7 +3,16 @@ from datetime import datetime, timezone
 from sqlalchemy import func
 from sqlmodel import Session, select
 
-from wtbot.model import EditJournal, FileBlob, FileMeta, IndexMeta, Page, Site
+from wtbot.model import (
+    Commit,
+    CommitStatus,
+    EditJournal,
+    FileBlob,
+    FileMeta,
+    IndexMeta,
+    Page,
+    Site,
+)
 from wtbot.model.namespace import Namespace, NsRole
 from wtbot.model.page_meta import PageMeta, default_short_name
 
@@ -249,9 +258,10 @@ class PageStore:
         worker on refresh from the wiki. Local IDE saves must never touch it,
         or it stops meaning "what's on the wiki" and a refresh silently loses
         the diff base. Instead, a save appends an EditJournal row; this reads
-        the most recent uncommitted one back, falling back to Page.text when
-        there's nothing uncommitted (never edited locally, or already pushed
-        and marked committed).
+        the most recent uncommitted one back. With nothing uncommitted, a
+        successful push whose refetch hasn't landed yet is bridged from the
+        Commit log (the pushed body *is* the remote body until the fetch
+        worker rewrites the snapshot); otherwise Page.text.
         """
         latest = self.session.exec(
             select(EditJournal)
@@ -262,7 +272,41 @@ class PageStore:
         ).first()
         if latest is not None:
             return latest.body
+        pushed = self.pushed_body_ahead_of_snapshot(
+            self.latest_successful_commits([page.pk]).get(page.pk), page
+        )
+        if pushed is not None:
+            return pushed
         return page.text or ""
+
+    def latest_successful_commits(self, page_pks: list[int]) -> dict[int, Commit]:
+        """Batched latest successful Commit per page, feeding the
+        pushed-but-not-refetched read bridge (see [effective_body] /
+        [pushed_body_ahead_of_snapshot])."""
+        if not page_pks:
+            return {}
+        rows = self.session.exec(
+            select(Commit)
+            .where(Commit.page_pk.in_(page_pks))
+            .where(Commit.status == CommitStatus.success)
+            .order_by(Commit.created_at, Commit.pk)
+        ).all()
+        # Rows are ascending, so the newest commit per page_pk wins.
+        return {row.page_pk: row for row in rows}
+
+    @staticmethod
+    def pushed_body_ahead_of_snapshot(commit: Commit | None, page: Page) -> str | None:
+        """The body of [commit] while it is ahead of the Page snapshot — the
+        push succeeded but the refetch that trues Page up hasn't landed yet
+        (still queued, or failed). In that window the Commit log is the best
+        witness of the remote body; once a fetch writes revid >= result_revid
+        this returns None and Page.text takes over, so a later remote edit is
+        never shadowed."""
+        if commit is None or commit.result_revid is None:
+            return None
+        if page.revid is not None and page.revid >= commit.result_revid:
+            return None
+        return commit.submitted_body
 
     def latest_uncommitted_bodies(self, page_pks: list[int]) -> dict[int, str]:
         """Batched form of [effective_body]'s EditJournal lookup, for call

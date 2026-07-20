@@ -328,14 +328,25 @@ def test_committing_placeholder_creates_remote_page(engine, tmp_path):
         resp = c.post("/commits/")
         assert resp.status_code == 200
 
+        # Reading straight back after the commit serves the pushed body —
+        # the regression case where an ex-placeholder read empty.
+        r = c.get("/vfs/content", params={"path": path}).json()
+        assert _unb64(r["content_base64"]) == "fresh transcription"
+        stat = c.get("/vfs/stat", params={"path": path}).json()
+        assert stat["placeholder"] is False
+        assert stat["dirty"] is False
+
     # The page now exists on the (fake) wiki...
     created = wiki.get_page("Page:Sparse.pdf/4")
     assert created.text == "fresh transcription"
 
-    # ...and the local row is no longer a placeholder.
+    # ...and the local row is no longer a placeholder: the post-commit
+    # refetch trued the snapshot up from the wiki.
     with Session(engine) as s:
         page = s.exec(select(Page).where(Page.title == "Page:Sparse.pdf/4")).one()
         assert page.revid is not None
+        assert page.pageid is not None
+        assert page.text == "fresh transcription"
         journal = s.exec(
             select(EditJournal).where(EditJournal.page_pk == page.pk)
         ).one()

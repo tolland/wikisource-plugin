@@ -351,6 +351,25 @@ Flow: VFS `write` → append `EditJournal` row + set `pages.dirty=1`. `commit` �
 read latest uncommitted journal rows, create `commits` rows, pywikibot pushes,
 mark `committed=True` on success.
 
+A successful push **never mutates the `Page` row**: `Page` is strictly the
+*fetched* remote snapshot, and the fetch worker is its only writer. The push's
+outcome is logged on the `Commit` row (`result_revid`), and the commit worker
+enqueues a high-priority refetch of the page (drained inline by the commit
+endpoints) to true the snapshot up — text, revid, pageid, contributor and all.
+Two consequences of the window between "journal committed" and "refetch
+landed":
+
+- **Reads bridge on the Commit log.** `effective_body` is a three-level rule:
+  latest *uncommitted* journal row → the latest successful commit's
+  `submitted_body` while `Page.revid` still lags its `result_revid` → `Page.text`.
+  The pushed body *is* the remote body during that window, and the revid guard
+  means a later remote edit (fetched normally) is never shadowed.
+- **A save landing in the window carries a stale `base_revid`** (the client's
+  revid is still the old snapshot, though its buffer came from the pushed
+  body). The commit worker bumps such a base to our own last `result_revid`
+  so it doesn't conflict with our own edit; a genuinely newer remote revision
+  is still ahead of that and still conflicts.
+
 ---
 
 ## 7. The fetch worker (pywikibot side)

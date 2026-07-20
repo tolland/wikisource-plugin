@@ -12,10 +12,13 @@ from wtbot.api.commit import (
     run_commit_for_page,
 )
 from wtbot.commit_worker import run_pending_commits
-from wtbot.model import Commit, CommitStatus, EditJournal, Page, Site
+from wtbot.model import Commit, CommitStatus, EditJournal, FetchRequest, Page, Site
+from wtbot.model.fetch_request import FetchKind, FetchStatus
 from wtbot.model.namespace import NsRole
+from wtbot.vfs.store import PageStore
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import RemotePage, SaveResult
+from wtbot.worker import run_pending
 
 TITLE = "Page:Foo.djvu/1"
 
@@ -88,12 +91,20 @@ def test_push_single_save_succeeds(engine):
         handled, _failed = run_pending_commits(s, _client_factory(fake))
         assert handled == 1
 
+        # The Page row is strictly the fetched remote snapshot: the push
+        # leaves it untouched (the Commit row logs result_revid 101) and
+        # enqueues a refetch to true it up.
         updated = s.get(Page, page.pk)
-        assert (
-            updated.text == "original"
-        )  # cache text untouched by push (read_content already had it)
-        assert updated.revid == 101
+        assert updated.text == "original"
+        assert updated.revid == 100
         assert updated.dirty is False
+
+        # Until the refetch lands, reads bridge on the pushed body.
+        assert PageStore(s).effective_body(updated) == "edited"
+
+        refetch = s.exec(select(FetchRequest).where(FetchRequest.title == TITLE)).one()
+        assert refetch.kind == FetchKind.single
+        assert refetch.status == FetchStatus.pending
 
         journal = s.exec(
             select(EditJournal)
@@ -105,6 +116,14 @@ def test_push_single_save_succeeds(engine):
         commit = s.exec(select(Commit).where(Commit.page_pk == page.pk)).first()
         assert commit.status == CommitStatus.success
         assert commit.result_revid == 101
+
+        # Draining the refetch makes the snapshot itself current, and the
+        # bridge yields to it.
+        run_pending(s, _client_factory(fake))
+        updated = s.get(Page, page.pk)
+        assert updated.revid == 101
+        assert updated.text == "edited"
+        assert PageStore(s).effective_body(updated) == "edited"
 
     assert fake._pages[TITLE].text == "edited"
 
@@ -182,7 +201,7 @@ def test_local_save_during_remote_push_remains_pending(engine):
     with Session(engine) as s:
         updated = s.get(Page, page.pk)
         assert updated.text == "second edit"
-        assert updated.revid == 101
+        assert updated.revid == 100  # snapshot untouched; Commit logs 101
         assert updated.dirty is True
 
         journal = s.exec(
@@ -197,6 +216,46 @@ def test_local_save_during_remote_push_remains_pending(engine):
         assert len(commits) == 1
         assert commits[0].status == CommitStatus.success
         assert commits[0].submitted_body == "first edit"
+
+
+def test_second_edit_before_refetch_does_not_conflict_with_own_push(engine):
+    """A save made after our own successful push but before its refetch
+    lands carries a stale base_revid (the client's revid is still the old
+    snapshot). It was based on the pushed body, so the worker bumps the base
+    to our own result_revid instead of conflicting with our own edit."""
+    site, page = _setup(engine)
+    fake = FakeWikiClient(
+        pages={
+            TITLE: RemotePage(
+                title=TITLE,
+                namespace_key=0,
+                namespace_canonical="Page",
+                content_model="proofread-page",
+                text="original",
+                revid=100,
+            )
+        }
+    )
+
+    with Session(engine) as s:
+        s.add(EditJournal(page_pk=page.pk, base_revid=100, body="first edit"))
+        s.commit()
+        handled, failed = run_pending_commits(s, _client_factory(fake))
+        assert (handled, failed) == (1, set())  # remote is now revid 101
+
+        # Refetch deliberately not drained; the next save still says base 100.
+        s.add(EditJournal(page_pk=page.pk, base_revid=100, body="second edit"))
+        s.commit()
+        handled, failed = run_pending_commits(s, _client_factory(fake))
+        assert (handled, failed) == (1, set())
+
+        commits = s.exec(
+            select(Commit).where(Commit.page_pk == page.pk).order_by(Commit.pk)
+        ).all()
+        assert [c.status for c in commits] == [CommitStatus.success] * 2
+        assert commits[1].base_revid == 101
+
+    assert fake._pages[TITLE].text == "second edit"
 
 
 def test_remote_conflict_recorded_not_raised(engine):
