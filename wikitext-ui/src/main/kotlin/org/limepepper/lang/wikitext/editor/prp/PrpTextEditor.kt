@@ -3,59 +3,91 @@ package org.limepepper.lang.wikitext.editor.prp
 import com.intellij.codeHighlighting.BackgroundEditorHighlighter
 import com.intellij.ide.structureView.StructureViewBuilder
 import com.intellij.openapi.actionSystem.ActionGroup
+import com.intellij.openapi.editor.Document
+import com.intellij.openapi.editor.RangeMarker
+import com.intellij.openapi.editor.event.DocumentEvent
+import com.intellij.openapi.editor.event.DocumentListener
 import com.intellij.openapi.fileEditor.FileEditorLocation
 import com.intellij.openapi.fileEditor.FileEditorState
 import com.intellij.openapi.fileEditor.FileEditorStateLevel
 import com.intellij.openapi.fileEditor.TextEditor
-import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
 import org.jetbrains.annotations.Unmodifiable
 import java.awt.BorderLayout
-import java.awt.CardLayout
 import javax.swing.JComponent
 import javax.swing.JPanel
 
+/**
+ * Text-editor half of the proofread-page split editor. The document stays
+ * the file's single serialized buffer
+ * (`<noinclude><pagequality …/>header</noinclude>body<noinclude>footer</noinclude>`)
+ * shown verbatim in a plain text editor — no header/body/footer field split.
+ * The header and footer `<noinclude>` sections (tags included) are protected
+ * with [Document.createGuardedBlock] so a proofreader's edits stay confined
+ * to the body without the framing being editable or removable by accident.
+ * See [ProofreadPageParts.boundaries] for the shape being guarded; a buffer
+ * that doesn't parse into that shape (empty, malformed, legacy V1) is left
+ * fully editable, matching that method's own fallback.
+ */
 class PrpTextEditor(
-    project: Project,
     private val delegate: TextEditor,
-) : TextEditor by delegate  {
+) : TextEditor by delegate {
 
-    private val form = PrpPageForm(project, delegate)
+    private val document: Document = delegate.editor.document
 
-    /** The form's body (transcription) editor — see [PrpPageForm.bodySectionEditor]. */
+    private var headerGuard: RangeMarker? = null
+    private var footerGuard: RangeMarker? = null
+
+    /**
+     * The editor whose text box↔text anchor offsets are relative to — see
+     * [bodyStartOffset] for how those offsets map onto this whole-buffer
+     * document.
+     */
     val bodyEditor
-        get() = form.bodySectionEditor
+        get() = delegate.editor
 
-    private val cards = CardLayout()
-    private val cardPanel = JPanel(cards)
+    /**
+     * Offset in [bodyEditor]'s document where the editable body begins — the
+     * end of the guarded header, or `0` when the buffer isn't structured
+     * into header/body/footer (the whole buffer is then "body").
+     */
+    val bodyStartOffset: Int
+        get() = headerGuard?.takeIf { it.isValid }?.endOffset ?: 0
+
     private val wrapper = JPanel(BorderLayout())
 
-    /** `true` shows the raw serialized buffer in the plain text editor. */
-    var rawMode: Boolean = false
-        set(value) {
-            if (field == value) return
-            field = value
-            cards.show(cardPanel, if (value) CARD_RAW else CARD_FORM)
-            preferredFocusedComponent.requestFocusInWindow()
-        }
-
     init {
-        cardPanel.add(form.component, CARD_FORM)
-        cardPanel.add(delegate.component, CARD_RAW)
-        val toolbar = WtPageNavToolbar(cardPanel, delegate.file, listOf(ToggleRawModeAction(this)))
+        val toolbar = WtPageNavToolbar(delegate.component, delegate.file)
         wrapper.add(toolbar.component, BorderLayout.NORTH)
-        wrapper.add(cardPanel, BorderLayout.CENTER)
+        wrapper.add(delegate.component, BorderLayout.CENTER)
+
+        updateGuards()
+        document.addDocumentListener(object : DocumentListener {
+            override fun documentChanged(event: DocumentEvent) = updateGuards()
+        }, this)
+    }
+
+    /** Re-derive the guarded header/footer ranges after any document change. */
+    private fun updateGuards() {
+        headerGuard?.let { if (it.isValid) document.removeGuardedBlock(it) }
+        footerGuard?.let { if (it.isValid) document.removeGuardedBlock(it) }
+        headerGuard = null
+        footerGuard = null
+
+        val bounds = ProofreadPageParts.boundaries(document.text) ?: return
+        headerGuard = document.createGuardedBlock(bounds.header.first, bounds.header.last + 1).apply {
+            isGreedyToRight = false
+        }
+        footerGuard = document.createGuardedBlock(bounds.footer.first, bounds.footer.last + 1).apply {
+            isGreedyToLeft = false
+        }
     }
 
     override fun getComponent(): JComponent = wrapper
 
     override fun getPreferredFocusedComponent(): JComponent =
-        if (rawMode) {
-            delegate.preferredFocusedComponent ?: delegate.editor.contentComponent
-        } else {
-            form.preferredFocusComponent
-        }
+        delegate.preferredFocusedComponent ?: delegate.editor.contentComponent
 
     override fun getState(level: FileEditorStateLevel): FileEditorState {
         return delegate.getState(level)
@@ -98,16 +130,12 @@ class PrpTextEditor(
     }
 
     override fun dispose() {
-        Disposer.dispose(form)
+        headerGuard?.let { if (it.isValid) document.removeGuardedBlock(it) }
+        footerGuard?.let { if (it.isValid) document.removeGuardedBlock(it) }
         Disposer.dispose(delegate)
     }
 
     override fun isEditorLoaded(): Boolean {
         return delegate.isEditorLoaded()
-    }
-
-    private companion object {
-        const val CARD_FORM = "form"
-        const val CARD_RAW = "raw"
     }
 }

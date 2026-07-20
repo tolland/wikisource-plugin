@@ -122,6 +122,21 @@ class ProofreadPagePartsTest {
     }
 
     @Test
+    fun boundariesSpanTheFullNoincludeTagPairs() {
+        val text = "<noinclude>hdr</noinclude>body<noinclude>ftr</noinclude>"
+        val bounds = ProofreadPageParts.boundaries(text)!!
+        assertEquals("<noinclude>hdr</noinclude>", text.substring(bounds.header.first, bounds.header.last + 1))
+        assertEquals("body", text.substring(bounds.body.first, bounds.body.last + 1))
+        assertEquals("<noinclude>ftr</noinclude>", text.substring(bounds.footer.first, bounds.footer.last + 1))
+    }
+
+    @Test
+    fun boundariesRejectTheSameShapesDecomposeRejects() {
+        assertNull(ProofreadPageParts.boundaries(""))
+        assertNull(ProofreadPageParts.boundaries("just some plain wikitext"))
+    }
+
+    @Test
     fun rejectsEmptyText() {
         assertNull(ProofreadPageParts.decompose(""))
     }

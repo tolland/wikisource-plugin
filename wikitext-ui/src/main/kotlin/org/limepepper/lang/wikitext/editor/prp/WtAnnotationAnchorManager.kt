@@ -50,9 +50,12 @@ import javax.swing.JPopupMenu
  *  - while the document is edited, the platform moves the [RangeMarker]s;
  *    a debounced pass writes the moved offsets back into the model, which
  *    [WtAnnotationSync] then persists. Offsets are therefore *body-text*
- *    offsets — the text the user actually edits (for an unstructured
- *    buffer the body field holds the whole buffer, so they degrade
- *    sanely).
+ *    offsets — [editor] shows the whole `<noinclude>`-framed buffer with the
+ *    header/footer guarded (see `PrpTextEditor`), so every offset exchanged
+ *    with [model] is translated through [bodyStartOffset] to stay
+ *    body-relative on the wire; only [editor]'s own marker/caret/selection
+ *    offsets are whole-buffer (for an unstructured buffer [bodyStartOffset]
+ *    is `0`, so they degrade sanely).
  *
  * Also owns the canvas's right-click menu ([createPopupMenu]) — the link/
  * unlink actions need the editor's caret and selection, which live here.
@@ -60,6 +63,7 @@ import javax.swing.JPopupMenu
 class WtAnnotationAnchorManager(
     private val editor: Editor,
     private val model: BoundingBoxModel,
+    private val bodyStartOffset: () -> Int,
     private val revidSupplier: () -> Long?,
     private val onRevealBox: (String) -> Unit,
 ) : Disposable {
@@ -133,9 +137,10 @@ class WtAnnotationAnchorManager(
     }
 
     private fun createChrome(box: BoundingBox, colorIndex: Int): AnchorChrome {
+        val bodyStart = bodyStartOffset()
         val length = editor.document.textLength
-        val start = requireNotNull(box.textStart).coerceIn(0, length)
-        val end = requireNotNull(box.textEnd).coerceIn(start, length)
+        val start = (requireNotNull(box.textStart) + bodyStart).coerceIn(bodyStart, length)
+        val end = (requireNotNull(box.textEnd) + bodyStart).coerceIn(start, length)
         val color = AnnotationPalette.colorFor(colorIndex)
 
         val marker = editor.document.createRangeMarker(start, end)
@@ -162,7 +167,7 @@ class WtAnnotationAnchorManager(
         } else {
             null
         }
-        return AnchorChrome(marker, highlighter, inlay, colorIndex, box.label, start, end)
+        return AnchorChrome(marker, highlighter, inlay, colorIndex, box.label, box.textStart!!, box.textEnd!!)
     }
 
     private fun removeChrome(id: String) {
@@ -194,8 +199,9 @@ class WtAnnotationAnchorManager(
                 invalidated = true
                 continue
             }
-            val start = chrome.marker.startOffset
-            val end = chrome.marker.endOffset
+            val bodyStart = bodyStartOffset()
+            val start = chrome.marker.startOffset - bodyStart
+            val end = chrome.marker.endOffset - bodyStart
             if (start != box.textStart || end != box.textEnd) {
                 chrome.modelStart = start
                 chrome.modelEnd = end
@@ -316,7 +322,10 @@ class WtAnnotationAnchorManager(
 
     private fun link(boxId: String, start: Int, end: Int) {
         val box = model[boxId] ?: return
-        model.update(box.copy(textStart = start, textEnd = end, anchorRevid = revidSupplier()))
+        val bodyStart = bodyStartOffset()
+        model.update(
+            box.copy(textStart = start - bodyStart, textEnd = end - bodyStart, anchorRevid = revidSupplier()),
+        )
         revealAnchorOf(boxId)
     }
 

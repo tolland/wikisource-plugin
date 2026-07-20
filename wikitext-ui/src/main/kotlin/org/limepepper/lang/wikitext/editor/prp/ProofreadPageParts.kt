@@ -85,6 +85,14 @@ data class ProofreadPageParts(
     fun compose(): String =
         OPEN_TAG + header.compose() + CLOSE_TAG + body + OPEN_TAG + footer + CLOSE_TAG
 
+    /**
+     * Character ranges of the three sections within a serialized page, as
+     * found by [boundaries]. [header] and [footer] each span their full
+     * `<noinclude>…</noinclude>` tag pair (inclusive); [body] is the bare
+     * text between them, carrying no tags of its own.
+     */
+    data class Boundaries(val header: IntRange, val body: IntRange, val footer: IntRange)
+
     companion object {
         const val OPEN_TAG = "<noinclude>"
         const val CLOSE_TAG = "</noinclude>"
@@ -110,14 +118,15 @@ data class ProofreadPageParts(
             )
 
         /**
-         * Split a serialized proofread-page body into header/body/footer, or
-         * return `null` when the text is not in a shape we can round-trip
+         * Locate the header/body/footer ranges within a serialized page, or
+         * return `null` when the text is not in a shape that round-trips
          * losslessly — empty pages, a malformed (unbalanced) tag structure, or
          * the legacy "V1" layout whose `<div class="pagetext">` wrapper the
-         * greedy close pattern would swallow. Callers fall back to editing the
-         * raw serialized text in those cases rather than risk corrupting it.
+         * greedy close pattern would swallow. Shared by [decompose] and by
+         * callers that only need offsets (e.g. guarding the header/footer
+         * regions in an editor).
          */
-        fun decompose(text: String): ProofreadPageParts? {
+        fun boundaries(text: String): Boundaries? {
             if (text.isEmpty()) return null
 
             val opens = P_OPEN.findAll(text).toList()
@@ -137,13 +146,29 @@ data class ProofreadPageParts(
             val closes = P_CLOSE.findAll(text).toList()
             if (closes.size != opens.size) return null
 
+            val firstOpen = opens.first()
             val firstClose = closes.first()
             val lastOpen = opens.last()
             val lastClose = closes.last()
 
-            val header = text.substring(opens.first().range.last + 1, firstClose.range.first)
-            val body = text.substring(firstClose.range.last + 1, lastOpen.range.first)
-            val footer = text.substring(lastOpen.range.last + 1, lastClose.range.first)
+            return Boundaries(
+                header = firstOpen.range.first..firstClose.range.last,
+                body = (firstClose.range.last + 1) until lastOpen.range.first,
+                footer = lastOpen.range.first..lastClose.range.last,
+            )
+        }
+
+        /**
+         * Split a serialized proofread-page body into header/body/footer, or
+         * `null` under the same conditions as [boundaries]. Callers fall back
+         * to editing the raw serialized text in those cases rather than risk
+         * corrupting it.
+         */
+        fun decompose(text: String): ProofreadPageParts? {
+            val b = boundaries(text) ?: return null
+            val header = text.substring(b.header.first + OPEN_TAG.length, b.header.last - CLOSE_TAG.length + 1)
+            val body = text.substring(b.body.first, b.body.last + 1)
+            val footer = text.substring(b.footer.first + OPEN_TAG.length, b.footer.last - CLOSE_TAG.length + 1)
             return ProofreadPageParts(ProofreadPageHeader.parse(header), body, footer)
         }
     }

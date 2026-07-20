@@ -14,19 +14,23 @@ class PrpFileEditor private constructor(
     private val previewHalf: PrpPreviewBrowser,
 ) : TextEditorWithPreview(editorHalf, previewHalf) {
     constructor(project: Project, editor: TextEditor, file: VirtualFile) :
-        this(PrpTextEditor(project, editor), PrpPreviewBrowser(file))
+        this(PrpTextEditor(editor), PrpPreviewBrowser(file))
 
     init {
         // Initialize TextEditorWithPreview's lazy UI before disposal-sensitive editor switching can occur.
         component
 
         // Box↔text linking: the anchor manager renders text anchors in the
-        // form's body editor and owns the canvas's right-click link actions
-        // (the scan itself loads eagerly in PrpPreviewBrowser's init).
+        // body editor and owns the canvas's right-click link actions (the
+        // scan itself loads eagerly in PrpPreviewBrowser's init). Anchor
+        // offsets are body-relative (see WtAnnotationAnchorManager), so they
+        // need translating against the guarded header's end offset in the
+        // editor's whole-buffer document.
         val pane = previewHalf.referenceImagePane
         val anchorManager = WtAnnotationAnchorManager(
             editorHalf.bodyEditor,
             pane.model,
+            bodyStartOffset = { editorHalf.bodyStartOffset },
             revidSupplier = { pane.baseRevid },
             onRevealBox = { boxId ->
                 previewHalf.showReferenceImage = true
