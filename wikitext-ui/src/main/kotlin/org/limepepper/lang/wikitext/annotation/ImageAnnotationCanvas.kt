@@ -39,6 +39,8 @@ import kotlin.math.roundToInt
  *  - Delete/Backspace: delete the selected box; Escape: cancel the drag in
  *    progress (restoring the original geometry) or clear the selection
  *  - middle-drag: pan
+ *  - dragging a box gesture past the viewport edge auto-pans toward the
+ *    cursor until the image extent (or the cursor returns inside)
  *
  * The wheel is deliberately not handled here: the canvas has no wheel
  * listener, so AWT retargets wheel events to the enclosing
@@ -116,6 +118,11 @@ class ImageAnnotationCanvas(
                         viewOrigin.y - (onScreen.y - screenOrigin.y),
                     ))
                 } else if (gesture != null) {
+                    // Keep the drag point visible: pans toward a cursor held
+                    // past the viewport edge (the autoscrolls timer re-fires
+                    // this handler while it stays outside), a no-op while the
+                    // cursor is inside. The viewport clamps at the extents.
+                    scrollRectToVisible(Rectangle(e.x, e.y, 1, 1))
                     dragGesture(toImagePoint(e.point))
                 }
             }
@@ -176,6 +183,13 @@ class ImageAnnotationCanvas(
                 gesture = Gesture.DrawNew(p.x, p.y)
             }
         }
+        // Swing's drag autoscroll: while the button is held outside the
+        // viewport, synthesized drag events keep coming and the view pans
+        // toward the cursor (clamped at the image extent) until the cursor
+        // comes back inside. Enabled only for the duration of a box gesture
+        // so it never fights the middle-button pan, which drives
+        // viewPosition itself.
+        autoscrolls = true
         repaint()
     }
 
@@ -202,6 +216,7 @@ class ImageAnnotationCanvas(
     private fun finishGesture() {
         val g = gesture
         gesture = null
+        autoscrolls = false
         if (g is Gesture.DrawNew) {
             val box = g.box()
             // A degenerate drag is a click on empty space: selection was
@@ -223,6 +238,9 @@ class ImageAnnotationCanvas(
             null -> model.select(null)
         }
         gesture = null
+        // setAutoscrolls(false) also stops the synthesized-drag timer, so an
+        // Escape mid-drag stops the panning immediately.
+        autoscrolls = false
         repaint()
     }
 
