@@ -23,6 +23,18 @@ export interface Site {
   created_at?: string | null;
 }
 
+export interface WikiNamespace {
+  pk: number;
+  site_pk: number;
+  key: number;
+  canonical_name: string;
+  local_name: string;
+  role: NamespaceRole;
+  subpages: boolean;
+  content: boolean;
+  case?: string | null;
+}
+
 export interface SitePayload {
   family: string;
   code: string;

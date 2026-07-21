@@ -12,6 +12,7 @@ import type {
   Site,
   SiteCredential,
   SitePayload,
+  WikiNamespace,
   CredentialPayload
 } from '$lib/types';
 
@@ -56,6 +57,10 @@ async function deleteRequest(path: string): Promise<void> {
 
 export function listSites(): Promise<Site[]> {
   return getJson<Site[]>('/sites/');
+}
+
+export function listNamespaces(sitePk: number): Promise<WikiNamespace[]> {
+  return getJson<WikiNamespace[]>(`/namespaces/?site_pk=${sitePk}`);
 }
 
 export function createSite(payload: SitePayload): Promise<Site> {
