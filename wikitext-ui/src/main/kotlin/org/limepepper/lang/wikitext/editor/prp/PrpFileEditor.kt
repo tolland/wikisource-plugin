@@ -27,7 +27,11 @@ class PrpFileEditor private constructor(
     private val file: VirtualFile,
 ) : TextEditorWithPreview(editorHalf, previewHalf) {
     constructor(project: Project, editor: TextEditor, file: VirtualFile) :
-        this(PrpTextEditor(editor), PrpPreviewBrowser(file), file)
+        this(
+            PrpTextEditor(editor),
+            PrpPreviewBrowser(file),
+            file,
+        )
 
     @Volatile
     private var disposed = false

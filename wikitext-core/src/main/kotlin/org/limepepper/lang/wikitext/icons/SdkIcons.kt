@@ -1,4 +1,4 @@
-package icons
+package org.limepepper.lang.wikitext.icons
 
 import com.intellij.openapi.util.IconLoader.getIcon
 import javax.swing.Icon

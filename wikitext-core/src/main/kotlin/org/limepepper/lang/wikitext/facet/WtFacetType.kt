@@ -7,7 +7,7 @@ import com.intellij.openapi.module.Module
 import com.intellij.openapi.module.ModuleType
 
 
-import icons.SdkIcons
+import org.limepepper.lang.wikitext.icons.SdkIcons
 import javax.swing.Icon
 
 /**

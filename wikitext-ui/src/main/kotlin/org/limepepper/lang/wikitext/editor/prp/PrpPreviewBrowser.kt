@@ -1,5 +1,14 @@
 package org.limepepper.lang.wikitext.editor.prp
 
+import com.intellij.ide.structureView.FileEditorPositionListener
+import com.intellij.ide.structureView.ModelListener
+import com.intellij.ide.structureView.StructureViewModel
+import com.intellij.ide.structureView.StructureViewTreeElement
+import com.intellij.ide.structureView.TreeBasedStructureViewBuilder
+import com.intellij.ide.util.treeView.smartTree.Filter
+import com.intellij.ide.util.treeView.smartTree.Grouper
+import com.intellij.ide.util.treeView.smartTree.Sorter
+import com.intellij.navigation.ItemPresentation
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.runReadActionBlocking
 import com.intellij.openapi.editor.event.DocumentEvent
@@ -11,10 +20,12 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.UserDataHolderBase
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.components.JBPanel
+import org.limepepper.lang.wikitext.structure.StaticStructureViewModel
 import java.awt.BorderLayout
 import java.awt.CardLayout
 import java.awt.Rectangle
 import java.beans.PropertyChangeListener
+import javax.swing.Icon
 import javax.swing.JComponent
 
 /**
@@ -26,6 +37,7 @@ import javax.swing.JComponent
 class PrpPreviewBrowser(
     private val file: VirtualFile,
 ) : UserDataHolderBase(), FileEditor, Disposable {
+
 
     private val component = JBPanel<JBPanel<*>>(BorderLayout())
 
@@ -140,4 +152,5 @@ class PrpPreviewBrowser(
         const val CARD_RENDER = "render"
         const val CARD_IMAGE = "reference-image"
     }
+
 }
