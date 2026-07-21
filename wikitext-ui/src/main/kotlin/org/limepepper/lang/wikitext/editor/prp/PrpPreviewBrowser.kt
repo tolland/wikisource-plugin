@@ -41,6 +41,13 @@ class PrpPreviewBrowser(
     val referenceImagePane: ReferenceImagePane
         get() = imagePane
 
+    /**
+     * Notified when the visible card flips between the reference scan and the
+     * rendered preview. The host ([PrpFileEditor]) uses this to refresh the
+     * structure view, whose content depends on which card is showing.
+     */
+    var onPaneChanged: (() -> Unit)? = null
+
     private val cards = CardLayout()
     private val cardPanel = JBPanel<JBPanel<*>>(cards).apply {
         add(imagePane.component, CARD_IMAGE)
@@ -64,6 +71,7 @@ class PrpPreviewBrowser(
                 }
                 renderPane.visible = !value
                 cards.show(cardPanel, if (value) CARD_IMAGE else CARD_RENDER)
+                onPaneChanged?.invoke()
             }
         }
 
