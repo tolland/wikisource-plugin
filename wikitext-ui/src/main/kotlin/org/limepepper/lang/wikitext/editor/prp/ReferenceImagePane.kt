@@ -108,12 +108,12 @@ class ReferenceImagePane(
                 null
             }
             // Boxes ride along with the scan; a failure here degrades to a
-            // bare image rather than blocking it.
+            // bare image rather than blocking it. Text ranges are a separate,
+            // editor-owned resource (see WtTextRangeManager) and are not loaded
+            // here.
             val boxes = if (image != null && vfsPath != null) {
                 try {
-                    val anchorsById = backend.listTextAnchors(vfsPath).associateBy { it.annotationId }
                     backend.listAnnotations(vfsPath).map { annotation ->
-                        val anchor = anchorsById[annotation.id]
                         BoundingBox(
                             id = annotation.id,
                             x = annotation.x,
@@ -122,9 +122,6 @@ class ReferenceImagePane(
                             height = annotation.height,
                             label = annotation.label,
                             category = AnnotationCategory.fromWire(annotation.category),
-                            textStart = anchor?.textStart,
-                            textEnd = anchor?.textEnd,
-                            anchorRevid = anchor?.anchorRevid,
                         )
                     }
                 } catch (e: Exception) {

@@ -77,6 +77,14 @@ class PrpTextEditor(
     var bodyStartOffset: Int = 0
         private set
 
+    /**
+     * Offset in [bodyEditor]'s document where the editable body ends — the
+     * start of the guarded footer open tag, or the document length when the
+     * buffer isn't structured into header/body/footer.
+     */
+    var bodyEndOffset: Int = 0
+        private set
+
     private val wrapper = JPanel(BorderLayout())
 
     init {
@@ -97,6 +105,7 @@ class PrpTextEditor(
         dividers.forEach { Disposer.dispose(it) }
         dividers = emptyList()
         bodyStartOffset = 0
+        bodyEndOffset = document.textLength
 
         val spans = ProofreadPageParts.tagSpans(document.text) ?: return
 
@@ -107,6 +116,7 @@ class PrpTextEditor(
             }
         }
         bodyStartOffset = spans.headerClose.last + 1
+        bodyEndOffset = spans.footerOpen.first
 
         val editor = delegate.editor
         dividers = listOfNotNull(

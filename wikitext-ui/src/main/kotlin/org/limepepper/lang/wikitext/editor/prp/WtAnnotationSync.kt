@@ -7,7 +7,6 @@ import com.intellij.util.Alarm
 import org.limepepper.lang.wikitext.annotation.BoundingBox
 import org.limepepper.lang.wikitext.annotation.BoundingBoxModel
 import org.limepepper.lang.wikitext.vfs.backend.PageAnnotation
-import org.limepepper.lang.wikitext.vfs.backend.PageTextAnchor
 import org.limepepper.lang.wikitext.vfs.backend.WtVfsService
 
 private val SYNC_LOG = logger<WtAnnotationSync>()
@@ -15,16 +14,15 @@ private val SYNC_LOG = logger<WtAnnotationSync>()
 /**
  * Write-behind persistence for the reference pane's [BoundingBoxModel]:
  * observes the model, debounces the change storm a drag produces, and
- * pushes the net difference to the sidecar. Failures keep the difference
- * dirty and retry, so a briefly-down sidecar loses nothing (short of
- * closing the editor mid-outage).
+ * pushes the net difference to the sidecar's `/pages/annotations`. Failures
+ * keep the difference dirty and retry, so a briefly-down sidecar loses
+ * nothing (short of closing the editor mid-outage).
  *
- * A [BoundingBox] carries the whole annotation, but server-side it is two
- * resources joined by the box id — the bounding box (geometry, label,
- * category → /pages/annotations) and the text anchor (offsets owned by
- * [WtAnnotationAnchorManager] → /pages/text-anchors) — so the diff is
- * split: each half is PUT/DELETEd only when that half changed. Deleting a
- * box deletes both halves server-side in one call.
+ * The box is scan geometry only (position, label, category); the
+ * transcription text ranges it may correspond to are a wholly independent
+ * resource persisted by [WtTextRangeSync]. Deleting a box still drops any
+ * text anchor that shares its id server-side, so a stale anchor never
+ * outlives its box.
  *
  * EDT discipline: the model is EDT-owned, so diffing happens on the EDT
  * (via [alarm]) and only the HTTP calls hop to a pooled thread.
@@ -62,30 +60,11 @@ class WtAnnotationSync(
         alarm.addRequest(::flush, delayMs)
     }
 
-    /** The per-box calls a flush must make; empty = in sync. */
-    private data class BoxDiff(
-        val box: BoundingBox,
-        val saveBox: Boolean,
-        val saveAnchor: Boolean,
-        val deleteAnchor: Boolean,
-    )
-
-    private fun diffOf(box: BoundingBox): BoxDiff {
-        val last = synced[box.id]
-        val geometryChanged = last == null ||
-            last.x != box.x || last.y != box.y ||
+    private fun changed(box: BoundingBox): Boolean {
+        val last = synced[box.id] ?: return true
+        return last.x != box.x || last.y != box.y ||
             last.width != box.width || last.height != box.height ||
             last.label != box.label || last.category != box.category
-        val anchorChanged = last == null ||
-            last.textStart != box.textStart ||
-            last.textEnd != box.textEnd ||
-            last.anchorRevid != box.anchorRevid
-        return BoxDiff(
-            box = box,
-            saveBox = geometryChanged,
-            saveAnchor = anchorChanged && box.linked,
-            deleteAnchor = anchorChanged && !box.linked && last?.linked == true,
-        )
     }
 
     private fun flush() {
@@ -94,10 +73,9 @@ class WtAnnotationSync(
             return
         }
         val current = model.boxes().associateBy { it.id }
-        val diffs = current.values.map(::diffOf)
-            .filter { it.saveBox || it.saveAnchor || it.deleteAnchor }
+        val saves = current.values.filter(::changed)
         val deletes = synced.keys.filter { it !in current }
-        if (diffs.isEmpty() && deletes.isEmpty()) {
+        if (saves.isEmpty() && deletes.isEmpty()) {
             return
         }
         flushInFlight = true
@@ -107,36 +85,19 @@ class WtAnnotationSync(
             val deleted = ArrayList<String>()
             var failure: Exception? = null
             try {
-                for (diff in diffs) {
-                    val box = diff.box
-                    if (diff.saveBox) {
-                        backend.saveAnnotation(
-                            path,
-                            PageAnnotation(
-                                id = box.id,
-                                x = box.x,
-                                y = box.y,
-                                width = box.width,
-                                height = box.height,
-                                label = box.label,
-                                category = box.category?.wire,
-                            ),
-                        )
-                    }
-                    if (diff.saveAnchor) {
-                        backend.saveTextAnchor(
-                            path,
-                            PageTextAnchor(
-                                annotationId = box.id,
-                                textStart = box.textStart!!,
-                                textEnd = box.textEnd!!,
-                                anchorRevid = box.anchorRevid,
-                            ),
-                        )
-                    }
-                    if (diff.deleteAnchor) {
-                        backend.deleteTextAnchor(path, box.id)
-                    }
+                for (box in saves) {
+                    backend.saveAnnotation(
+                        path,
+                        PageAnnotation(
+                            id = box.id,
+                            x = box.x,
+                            y = box.y,
+                            width = box.width,
+                            height = box.height,
+                            label = box.label,
+                            category = box.category?.wire,
+                        ),
+                    )
                     acked += box
                 }
                 for (id in deletes) {

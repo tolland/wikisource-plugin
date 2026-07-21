@@ -443,11 +443,6 @@ class ImageAnnotationCanvas(
             g2.drawString(label, x, max(metrics.ascent, y - metrics.descent - 1))
         }
 
-        // A filled corner dot marks a box linked to a text range.
-        if (box.linked) {
-            g2.fillOval(x + 3, y + 3, LINK_DOT_PX, LINK_DOT_PX)
-        }
-
         if (selected) {
             for (handle in BoxGeometry.Handle.entries) {
                 val c = BoxGeometry.handleCenter(box, handle)
@@ -485,9 +480,6 @@ class ImageAnnotationCanvas(
             BoxGeometry.Handle.S to Cursor.S_RESIZE_CURSOR,
             BoxGeometry.Handle.SE to Cursor.SE_RESIZE_CURSOR,
         )
-
-        /** Diameter of the linked-box corner dot, in screen pixels. */
-        const val LINK_DOT_PX = 8
 
         val HANDLE_FILL = JBColor(Color.WHITE, Color(0x3C3F41))
     }

@@ -62,15 +62,17 @@
 
     </extensions>
 
-    <!--    <actions>-->
-    <!--        <action-->
-    <!--            id="org.limepepper.lang.wikitext.actions.ProofreadAction"-->
-    <!--            class="org.limepepper.lang.wikitext.preview.ToggleRawModeAction"-->
-    <!--            text="Proofread"-->
-    <!--            description="Proofread the current document"-->
-    <!--            icon="AllIcons.Actions.Check"-->
-    <!--        />-->
-    <!--    </actions>-->
+    <actions>
+        <action
+            id="org.limepepper.lang.wikitext.editor.prp.CreateTextRangeAction"
+            class="org.limepepper.lang.wikitext.editor.prp.CreateTextRangeAction"
+            text="Save Text Range"
+            description="Save the selected text (or the caret position) as a persistable text range"
+            icon="AllIcons.General.Add">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="alt shift T"/>
+        </action>
+    </actions>
 
     <applicationListeners>
         <listener

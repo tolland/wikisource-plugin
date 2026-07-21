@@ -16,12 +16,11 @@ import kotlin.math.min
  * [category] classifies the region for the OCR pipeline (see
  * [AnnotationCategory]); null = uncategorized.
  *
- * A box may carry a text anchor: character offsets into the transcription
- * text the box's region corresponds to ([textStart] == [textEnd] marks an
- * insertion point, < a replace range; both null = unlinked). The canvas
- * never edits these — the editor-side anchor chrome owns them — but they
- * live on the box so one model object is the whole annotation. Server-side
- * the two halves are separate resources joined by [id].
+ * The box carries no text offsets: a transcription text range is an
+ * independent, editor-managed object (see
+ * [org.limepepper.lang.wikitext.editor.prp.TextRange]) that a box may later
+ * *refer to* by sharing its [id]. Server-side the two are separate resources
+ * (`/pages/annotations` and `/pages/text-anchors`) joined by [id].
  */
 data class BoundingBox(
     val id: String = UUID.randomUUID().toString(),
@@ -31,13 +30,7 @@ data class BoundingBox(
     val height: Double,
     val label: String? = null,
     val category: AnnotationCategory? = null,
-    val textStart: Int? = null,
-    val textEnd: Int? = null,
-    /** Revision the offsets were computed against; null = unknown/local. */
-    val anchorRevid: Long? = null,
 ) {
-    val linked: Boolean get() = textStart != null && textEnd != null
-
     val right: Double get() = x + width
     val bottom: Double get() = y + height
 

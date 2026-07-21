@@ -3,16 +3,20 @@ package org.limepepper.lang.wikitext.editor.prp
 import com.intellij.ide.impl.StructureViewWrapperImpl
 import com.intellij.ide.structureView.StructureViewBuilder
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.fileEditor.TextEditorWithPreview
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
-import org.limepepper.lang.wikitext.annotation.BoundingBox
+import org.limepepper.lang.wikitext.vfs.WtVirtualFile
+import org.limepepper.lang.wikitext.vfs.backend.WtVfsService
 import java.awt.Component
 import java.awt.KeyboardFocusManager
 import java.beans.PropertyChangeListener
 import javax.swing.SwingUtilities
+
+private val PRP_LOG = logger<PrpFileEditor>()
 
 /**
  * Provides an implementation of FileEditor, suitable for use by [PrpFileEditorProvider] via its' [com.intellij.openapi.fileEditor.FileEditorProvider.createEditor] method.
@@ -20,9 +24,13 @@ import javax.swing.SwingUtilities
 class PrpFileEditor private constructor(
     private val editorHalf: PrpTextEditor,
     private val previewHalf: PrpPreviewBrowser,
+    private val file: VirtualFile,
 ) : TextEditorWithPreview(editorHalf, previewHalf) {
     constructor(project: Project, editor: TextEditor, file: VirtualFile) :
-        this(PrpTextEditor(editor), PrpPreviewBrowser(file))
+        this(PrpTextEditor(editor), PrpPreviewBrowser(file), file)
+
+    @Volatile
+    private var disposed = false
 
     /** Which pane's structure the Structure tool window should reflect. */
     enum class ActivePane { EDITOR, PREVIEW_RENDER, PREVIEW_IMAGE }
@@ -54,15 +62,23 @@ class PrpFileEditor private constructor(
         // need translating against the guarded header's end offset in the
         // editor's whole-buffer document.
         val pane = previewHalf.referenceImagePane
-        val anchorManager = WtAnnotationAnchorManager(
+        pane.installPopupMenu(BoxCanvasPopup(pane.model)::menuFor)
+
+        // Independent transcription text ranges: rendered/edited in the body
+        // editor by the manager, loaded once from the sidecar, persisted
+        // write-behind. Offsets are body-relative (see WtTextRangeManager), so
+        // the manager translates them against the guarded header's end offset.
+        val rangeModel = TextRangeModel()
+        val anchorManager = WtTextRangeManager(
             editorHalf.bodyEditor,
-            pane.model,
+            rangeModel,
             bodyStartOffset = { editorHalf.bodyStartOffset },
+            bodyEndOffset = { editorHalf.bodyEndOffset },
             revidSupplier = { pane.baseRevid },
-            onRevealBox = { boxId ->
-                previewHalf.showReferenceImage = true
-                pane.revealBox(boxId)
-            },
+//            onRevealBox = { boxId ->
+//                previewHalf.showReferenceImage = true
+//                pane.revealBox(boxId)
+//            },
         )
         Disposer.register(this, anchorManager)
         pane.installPopupMenu(anchorManager::createPopupMenu)
@@ -76,6 +92,35 @@ class PrpFileEditor private constructor(
             KeyboardFocusManager.getCurrentKeyboardFocusManager()
                 .removePropertyChangeListener("focusOwner", focusListener)
         }
+    }
+
+    /** Loads persisted text ranges off the EDT, then seeds the model + sync. */
+    private fun loadTextRanges(model: TextRangeModel) {
+        val vfsPath = (file as? WtVirtualFile)?.path ?: return
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val loaded = try {
+                WtVfsService.instance.backend.listTextAnchors(vfsPath).map {
+                    TextRange(id = it.annotationId, start = it.textStart, end = it.textEnd, anchorRevid = it.anchorRevid)
+                }
+            } catch (e: Exception) {
+                PRP_LOG.warn("text-range load failed for $vfsPath", e)
+                null
+            }
+            ApplicationManager.getApplication().invokeLater {
+                if (disposed || loaded == null) {
+                    return@invokeLater
+                }
+                model.setAll(loaded)
+                val sync = WtTextRangeSync(model, vfsPath)
+                Disposer.register(this, sync)
+                sync.seed(loaded)
+            }
+        }
+    }
+
+    override fun dispose() {
+        disposed = true
+        super.dispose()
     }
 
     /** The pane whose structure the tool window should currently show. */
@@ -105,17 +150,17 @@ class PrpFileEditor private constructor(
      * transcription caret to the linked region — the same mapping the anchor
      * chrome uses (offsets are body-relative, see [PrpTextEditor.bodyStartOffset]).
      */
-    private fun navigateToBox(box: BoundingBox) {
-        previewHalf.showReferenceImage = true
-        previewHalf.referenceImagePane.revealBox(box.id)
-
-        val textStart = box.textStart ?: return
-        val editor = editorHalf.bodyEditor
-        val offset = (editorHalf.bodyStartOffset + textStart)
-            .coerceIn(0, editor.document.textLength)
-        editor.caretModel.moveToOffset(offset)
-        editor.scrollingModel.scrollToCaret(com.intellij.openapi.editor.ScrollType.MAKE_VISIBLE)
-    }
+//    private fun navigateToBox(box: BoundingBox) {
+//        previewHalf.showReferenceImage = true
+//        previewHalf.referenceImagePane.revealBox(box.id)
+//
+//        val textStart = box.textStart ?: return
+//        val editor = editorHalf.bodyEditor
+//        val offset = (editorHalf.bodyStartOffset + textStart)
+//            .coerceIn(0, editor.document.textLength)
+//        editor.caretModel.moveToOffset(offset)
+//        editor.scrollingModel.scrollToCaret(com.intellij.openapi.editor.ScrollType.MAKE_VISIBLE)
+//    }
 
     /**
      * Asks the Structure tool window to re-query [getStructureViewBuilder]. The
