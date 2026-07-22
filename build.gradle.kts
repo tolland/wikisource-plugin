@@ -46,6 +46,9 @@ dependencies {
         pluginModule(implementation(project(":wikitext-vfs")))
         pluginModule(implementation(project(":wikitext-ui")))
         testFramework(TestFrameworkType.Platform)
+        bundledModule("intellij.platform.structureView")
+        bundledModule("intellij.platform.ui.jcef")
+        bundledModule("intellij.libraries.jcef")
     }
 }
 

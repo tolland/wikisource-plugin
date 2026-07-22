@@ -18,7 +18,9 @@ dependencies {
     intellijPlatform {
         testFramework(TestFrameworkType.Platform)
         // this is required in 2026.2 but seems to break 2026.1
-        // bundledModule("intellij.platform.ui.jcef")
+        bundledModule("intellij.platform.ui.jcef")
+        bundledModule("intellij.libraries.jcef")
+        bundledModule("intellij.platform.structureView")
     }
 }
 

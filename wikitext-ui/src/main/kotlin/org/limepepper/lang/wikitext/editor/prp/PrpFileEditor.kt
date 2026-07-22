@@ -9,6 +9,7 @@ import com.intellij.openapi.fileEditor.TextEditorWithPreview
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
+import org.limepepper.lang.wikitext.annotation.BoundingBox
 import org.limepepper.lang.wikitext.vfs.WtVirtualFile
 import org.limepepper.lang.wikitext.vfs.backend.WtVfsService
 import java.awt.Component
@@ -79,13 +80,10 @@ class PrpFileEditor private constructor(
             bodyStartOffset = { editorHalf.bodyStartOffset },
             bodyEndOffset = { editorHalf.bodyEndOffset },
             revidSupplier = { pane.baseRevid },
-//            onRevealBox = { boxId ->
-//                previewHalf.showReferenceImage = true
-//                pane.revealBox(boxId)
-//            },
         )
         Disposer.register(this, anchorManager)
-        pane.installPopupMenu(anchorManager::createPopupMenu)
+        loadTextRanges(rangeModel)
+//        pane.installPopupMenu(anchorManager::createPopupMenu)
 
         // Toggling the preview card (scan ↔ rendered HTML) changes which
         // structure applies, as does moving focus between the panes.
@@ -154,17 +152,17 @@ class PrpFileEditor private constructor(
      * transcription caret to the linked region — the same mapping the anchor
      * chrome uses (offsets are body-relative, see [PrpTextEditor.bodyStartOffset]).
      */
-//    private fun navigateToBox(box: BoundingBox) {
-//        previewHalf.showReferenceImage = true
-//        previewHalf.referenceImagePane.revealBox(box.id)
-//
+    private fun navigateToBox(box: BoundingBox) {
+        previewHalf.showReferenceImage = true
+        previewHalf.referenceImagePane.revealBox(box.id)
+
 //        val textStart = box.textStart ?: return
 //        val editor = editorHalf.bodyEditor
 //        val offset = (editorHalf.bodyStartOffset + textStart)
 //            .coerceIn(0, editor.document.textLength)
 //        editor.caretModel.moveToOffset(offset)
 //        editor.scrollingModel.scrollToCaret(com.intellij.openapi.editor.ScrollType.MAKE_VISIBLE)
-//    }
+    }
 
     /**
      * Asks the Structure tool window to re-query [getStructureViewBuilder]. The

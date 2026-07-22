@@ -77,7 +77,7 @@ class PrpBoxStructureElement(
     override fun canNavigate(): Boolean = true
 
     /** Only a linked box has a transcription offset to jump the caret to. */
-    override fun canNavigateToSource(): Boolean = box.linked
+    override fun canNavigateToSource(): Boolean = false // box.linked
 
     private fun title(): String =
         box.label?.takeIf { it.isNotBlank() }
@@ -89,7 +89,8 @@ class PrpBoxStructureElement(
         val y = box.y.roundToInt()
         val w = box.width.roundToInt()
         val h = box.height.roundToInt()
-        val linkMark = if (box.linked) " • linked" else ""
+        //val linkMark = if (box.linked) " • linked" else ""
+        val linkMark = if (false) " • linked" else ""
         return "($x, $y) ${w}×$h$linkMark"
     }
 }

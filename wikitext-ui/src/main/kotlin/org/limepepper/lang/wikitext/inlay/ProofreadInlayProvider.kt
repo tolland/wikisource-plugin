@@ -30,8 +30,8 @@ class ProofreadInlayProvider : InlayHintsProvider<NoSettings> {
                     sink.addInlineElement(
                         element.textRange.endOffset,
                         true,
-                        factory.smallText(" dummy"),
-                        false
+                        factory.smallText("close tag"),
+                        true
                     )
                 }
 

@@ -120,14 +120,36 @@ class PrpTextEditor(
 
         val editor = delegate.editor
         dividers = listOfNotNull(
-            addDivider(editor, spans.headerOpen.first, "Header"),
-            addDivider(editor, bodyStartOffset, "Body"),
-            addDivider(editor, spans.footerOpen.first, "Footer"),
+            addDivider(
+                editor,
+                spans.headerOpen.first,
+                "Header",
+            ),
+            addDivider(
+                editor,
+                bodyStartOffset,
+                "Body",
+            ),
+            addDivider(
+                editor,
+                spans.footerOpen.first,
+                "Footer",
+            ),
         )
     }
 
-    private fun addDivider(editor: Editor, offset: Int, label: String): Inlay<*>? =
-        editor.inlayModel.addBlockElement(offset, false, true, 0, SectionDividerRenderer(label))
+    private fun addDivider(
+        editor: Editor,
+        offset: Int,
+        label: String,
+    ): Inlay<*>? =
+        editor.inlayModel.addBlockElement(
+            offset,
+            false,
+            true,
+            0,
+            SectionDividerRenderer(label),
+        )
 
     override fun getComponent(): JComponent = wrapper
 

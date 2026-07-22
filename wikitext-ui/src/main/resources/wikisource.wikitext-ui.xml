@@ -2,8 +2,9 @@
     <dependencies>
         <module name="wikisource.wikitext-core"/>
         <module name="wikisource.wikitext-vfs"/>
-        <!-- problems with jcef changes between 2026.1 and 2026.2-->
-        <!--         <module name="intellij.platform.ui.jcef"/>-->
+        <module name="intellij.platform.ui.jcef"/>
+        <module name="intellij.libraries.jcef"/>
+        <module name="intellij.platform.structureView"/>
     </dependencies>
 
     <extensions defaultExtensionNs="com.intellij">
@@ -74,10 +75,11 @@
         </action>
     </actions>
 
-    <applicationListeners>
-        <listener
-            class="org.limepepper.lang.wikitext.inlay.ProofreadEditorListener"
-            topic="com.intellij.openapi.editor.event.EditorFactoryListener"
-        />
-    </applicationListeners>
+    <!-- this is a stub for an InlayHints provider -->
+    <!--    <applicationListeners>-->
+    <!--        <listener-->
+    <!--            class="org.limepepper.lang.wikitext.inlay.ProofreadEditorListener"-->
+    <!--            topic="com.intellij.openapi.editor.event.EditorFactoryListener"-->
+    <!--        />-->
+    <!--    </applicationListeners>-->
 </idea-plugin>

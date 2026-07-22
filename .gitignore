@@ -64,3 +64,4 @@ __pycache__/
 /my_first_notebook.ipynb
 /Query.sql
 /idea-flex.skeleton
+/editorStateDump-*.txt
