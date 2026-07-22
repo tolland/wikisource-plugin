@@ -136,8 +136,16 @@ class WtTextRangeManager(
      */
     fun createFromSelection() {
         val (start, end) = currentBodyRange() ?: return
-        model.add(TextRange(start = start, end = end, anchorRevid = revidSupplier()))
+        val range = TextRange(start = start, end = end, anchorRevid = revidSupplier())
+        if (!model.canPlace(range)) return
+        model.add(range)
         editor.contentComponent.repaint()
+    }
+
+    /** Used by the editor action to disable creation for an invalid selection. */
+    fun canCreateFromSelection(): Boolean {
+        val (start, end) = currentBodyRange() ?: return false
+        return model.canPlace(TextRange(start = start, end = end))
     }
 
     /** The current selection/caret as body-relative offsets, or null if it lies wholly outside the body. */
@@ -254,9 +262,11 @@ class WtTextRangeManager(
             val start = (chrome.marker.startOffset - bodyStart).coerceAtLeast(0)
             val end = (chrome.marker.endOffset - bodyStart).coerceAtLeast(start)
             if (start != range.start || end != range.end) {
+                val updated = range.copy(start = start, end = end)
+                if (!model.canPlace(updated)) continue
                 chrome.modelStart = start
                 chrome.modelEnd = end
-                model.update(range.copy(start = start, end = end))
+                model.update(updated)
             }
         }
         if (invalidated) {
@@ -308,7 +318,7 @@ class WtTextRangeManager(
             Edge.POINT -> range.copy(start = offset, end = offset)
         }
         if (updated != range) {
-            model.update(updated)
+            if (model.canPlace(updated)) model.update(updated)
         }
     }
 
@@ -454,7 +464,8 @@ class WtTextRangeManager(
                 override fun actionPerformed(e: AnActionEvent) {
                     val range = model[rangeId] ?: return
                     val (start, end) = currentBodyRange() ?: return
-                    model.update(range.copy(start = start, end = end, anchorRevid = revidSupplier()))
+                    val updated = range.copy(start = start, end = end, anchorRevid = revidSupplier())
+                    if (model.canPlace(updated)) model.update(updated)
                 }
             })
             group.add(object : AnAction("Collapse to Insertion Point at Caret") {
@@ -462,7 +473,8 @@ class WtTextRangeManager(
                     val range = model[rangeId] ?: return
                     val bodyStart = bodyStartOffset()
                     val at = editor.caretModel.offset.coerceIn(bodyStart, bodyEndOffset()) - bodyStart
-                    model.update(range.copy(start = at, end = at, anchorRevid = revidSupplier()))
+                    val updated = range.copy(start = at, end = at, anchorRevid = revidSupplier())
+                    if (model.canPlace(updated)) model.update(updated)
                 }
             })
             group.addSeparator()

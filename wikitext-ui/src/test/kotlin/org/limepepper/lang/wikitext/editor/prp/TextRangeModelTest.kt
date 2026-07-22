@@ -60,4 +60,51 @@ class TextRangeModelTest {
         assertFailsWith<IllegalArgumentException> { model.add(TextRange(id = "x", start = 2, end = 3)) }
         assertFailsWith<IllegalArgumentException> { model.update(TextRange(id = "y", start = 0, end = 1)) }
     }
+
+    @Test
+    fun rejectsOverlappingAndNestedRanges() {
+        val model = TextRangeModel()
+        model.add(TextRange(id = "existing", start = 10, end = 20))
+
+        assertFalse(model.canPlace(TextRange(start = 5, end = 15)))
+        assertFalse(model.canPlace(TextRange(start = 12, end = 18)))
+        assertFalse(model.canPlace(TextRange(start = 5, end = 25)))
+        assertFalse(model.canPlace(TextRange(start = 15, end = 15)))
+        assertFailsWith<IllegalArgumentException> {
+            model.add(TextRange(start = 12, end = 18))
+        }
+    }
+
+    @Test
+    fun allowsAdjacentRangesAndPointsOnBoundaries() {
+        val model = TextRangeModel()
+        model.add(TextRange(id = "existing", start = 10, end = 20))
+
+        assertTrue(model.canPlace(TextRange(start = 5, end = 10)))
+        assertTrue(model.canPlace(TextRange(start = 20, end = 25)))
+        assertTrue(model.canPlace(TextRange(start = 10, end = 10)))
+        assertTrue(model.canPlace(TextRange(start = 20, end = 20)))
+    }
+
+    @Test
+    fun rejectsCoincidentPointsAndInvalidUpdatesOrBulkLoads() {
+        val model = TextRangeModel()
+        model.add(TextRange(id = "point", start = 7, end = 7))
+        model.add(TextRange(id = "extent", start = 10, end = 20))
+
+        assertFailsWith<IllegalArgumentException> {
+            model.add(TextRange(start = 7, end = 7))
+        }
+        assertFailsWith<IllegalArgumentException> {
+            model.update(model["extent"]!!.copy(start = 6))
+        }
+        assertFailsWith<IllegalArgumentException> {
+            model.setAll(
+                listOf(
+                    TextRange(start = 0, end = 10),
+                    TextRange(start = 5, end = 6),
+                ),
+            )
+        }
+    }
 }

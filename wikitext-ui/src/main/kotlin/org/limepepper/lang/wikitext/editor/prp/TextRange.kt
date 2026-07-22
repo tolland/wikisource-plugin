@@ -33,4 +33,16 @@ data class TextRange(
     val isPoint: Boolean get() = start == end
 
     val length: Int get() = end - start
+
+    /**
+     * True when two replacement extents intersect/nest, a point is inside an
+     * extent, or both points occupy the same offset. Adjacent ranges and a
+     * point on an extent boundary are safe and therefore do not conflict.
+     */
+    fun conflictsWith(other: TextRange): Boolean = when {
+        isPoint && other.isPoint -> start == other.start
+        isPoint -> start > other.start && start < other.end
+        other.isPoint -> other.start > start && other.start < end
+        else -> start < other.end && other.start < end
+    }
 }

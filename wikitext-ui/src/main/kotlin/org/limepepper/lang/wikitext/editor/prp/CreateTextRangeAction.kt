@@ -20,7 +20,9 @@ import com.intellij.openapi.util.Key
  */
 class CreateTextRangeAction : AnAction() {
     override fun update(event: AnActionEvent) {
-        event.presentation.isEnabledAndVisible = managerFor(event) != null
+        val manager = managerFor(event)
+        event.presentation.isVisible = manager != null
+        event.presentation.isEnabled = manager?.canCreateFromSelection() == true
     }
 
     override fun actionPerformed(event: AnActionEvent) {
