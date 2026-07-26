@@ -132,10 +132,12 @@ class PrpFileEditor private constructor(
             Layout.SHOW_EDITOR -> false
             else -> previewFocused
         }
-        return when {
-            !previewActive -> ActivePane.EDITOR
-            previewHalf.showReferenceImage -> ActivePane.PREVIEW_IMAGE
-            else -> ActivePane.PREVIEW_RENDER
+        if (!previewActive) {
+            return ActivePane.EDITOR
+        }
+        return when (previewHalf.activePreviewKind()) {
+            PrpPreviewBrowser.PaneKind.IMAGE -> ActivePane.PREVIEW_IMAGE
+            PrpPreviewBrowser.PaneKind.RENDER -> ActivePane.PREVIEW_RENDER
         }
     }
 
@@ -153,7 +155,7 @@ class PrpFileEditor private constructor(
      * chrome uses (offsets are body-relative, see [PrpTextEditor.bodyStartOffset]).
      */
     private fun navigateToBox(box: BoundingBox) {
-        previewHalf.showReferenceImage = true
+        previewHalf.revealImagePane()
         previewHalf.referenceImagePane.revealBox(box.id)
 
 //        val textStart = box.textStart ?: return

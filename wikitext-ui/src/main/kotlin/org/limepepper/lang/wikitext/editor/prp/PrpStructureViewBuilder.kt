@@ -20,9 +20,10 @@ import org.limepepper.lang.wikitext.annotation.BoundingBox
  * - preview showing the rendered HTML → a stub ([PrpInfoStructureElement]),
  *   since a parsed preview exposes no navigable structure yet
  *
- * [PrpFileEditor] re-queries this builder (by broadcasting the structure-changed
- * signal) whenever the active pane changes, so [activePane] is read afresh on
- * every [createStructureView].
+ * When both previews are tiled together the active one is decided by focus (see
+ * [PrpPreviewBrowser.activePreviewKind]). [PrpFileEditor] re-queries this
+ * builder (by broadcasting the structure-changed signal) whenever the active
+ * pane changes, so [activePane] is read afresh on every [createStructureView].
  */
 class PrpStructureViewBuilder(
     private val editorHalf: PrpTextEditor,

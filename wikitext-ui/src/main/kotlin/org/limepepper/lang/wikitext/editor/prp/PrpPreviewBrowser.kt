@@ -1,14 +1,5 @@
 package org.limepepper.lang.wikitext.editor.prp
 
-import com.intellij.ide.structureView.FileEditorPositionListener
-import com.intellij.ide.structureView.ModelListener
-import com.intellij.ide.structureView.StructureViewModel
-import com.intellij.ide.structureView.StructureViewTreeElement
-import com.intellij.ide.structureView.TreeBasedStructureViewBuilder
-import com.intellij.ide.util.treeView.smartTree.Filter
-import com.intellij.ide.util.treeView.smartTree.Grouper
-import com.intellij.ide.util.treeView.smartTree.Sorter
-import com.intellij.navigation.ItemPresentation
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.runReadActionBlocking
 import com.intellij.openapi.editor.event.DocumentEvent
@@ -19,25 +10,36 @@ import com.intellij.openapi.fileEditor.FileEditorState
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.UserDataHolderBase
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.ui.JBSplitter
 import com.intellij.ui.components.JBPanel
-import org.limepepper.lang.wikitext.structure.StaticStructureViewModel
 import java.awt.BorderLayout
-import java.awt.CardLayout
-import java.awt.Rectangle
+import java.awt.Component
+import java.awt.KeyboardFocusManager
 import java.beans.PropertyChangeListener
-import javax.swing.Icon
 import javax.swing.JComponent
+import javax.swing.SwingUtilities
 
 /**
  * this is provided to the right pane of TextEditorWithPreview
  * it is an implementation of FileEditor
- * we are using Panels to swap between the reference-image
- * and the preview render from the wiki backend
+ *
+ * It hosts the two proofread previews — the reference scan
+ * ([ReferenceImagePane]) and the server-rendered wikitext ([RenderPreviewPane])
+ * — and lets the user show either one alone or both tiled together for
+ * side-by-side comparison. A master toolbar ([PrpPreviewToolbar]) at the top
+ * picks the [mode] and, in the tiled [Mode.SPLIT] mode, the [splitStacked]
+ * orientation; each preview carries its own toolbar with the controls specific
+ * to it (zoom/OCR for the scan, reload for the render).
  */
 class PrpPreviewBrowser(
     private val file: VirtualFile,
 ) : UserDataHolderBase(), FileEditor, Disposable {
 
+    /** Which preview(s) the right side shows. */
+    enum class Mode { IMAGE_ONLY, RENDER_ONLY, SPLIT }
+
+    /** The two previews, for [activePreviewKind] / structure-view purposes. */
+    enum class PaneKind { IMAGE, RENDER }
 
     private val component = JBPanel<JBPanel<*>>(BorderLayout())
 
@@ -48,67 +50,95 @@ class PrpPreviewBrowser(
     private val imagePane =
         ReferenceImagePane(file).also { Disposer.register(this, it) }
 
-
     /** The scan pane, for profiles that have one — box↔text linking wires into it. */
     val referenceImagePane: ReferenceImagePane
         get() = imagePane
 
+    // Each preview is wrapped with its own toolbar so the pane-specific
+    // controls travel with it into the tiled layout.
+    private val imageHost = paneHost(
+        PrpImagePreviewToolbar(imagePane).component,
+        imagePane.component,
+    )
+    private val renderHost = paneHost(
+        PrpRenderPreviewToolbar(::reloadPreview, renderPane.component).component,
+        renderPane.component,
+    )
+
+    // Reused across mode changes; its orientation follows [splitStacked].
+    private val splitter = JBSplitter(false, 0.5f).apply {
+        setHonorComponentsMinimumSize(false)
+    }
+
+    private val centerPanel = JBPanel<JBPanel<*>>(BorderLayout())
+
     /**
-     * Notified when the visible card flips between the reference scan and the
-     * rendered preview. The host ([PrpFileEditor]) uses this to refresh the
-     * structure view, whose content depends on which card is showing.
+     * Notified when the visible/active preview changes — a mode switch, or (in
+     * the tiled mode) focus crossing between the two previews. The host
+     * ([PrpFileEditor]) uses this to refresh the structure view, whose content
+     * depends on which preview is active.
      */
     var onPaneChanged: (() -> Unit)? = null
-
-    private val cards = CardLayout()
-    private val cardPanel = JBPanel<JBPanel<*>>(cards).apply {
-        add(imagePane.component, CARD_IMAGE)
-        add(renderPane.component, CARD_RENDER)
-    }
 
     @Volatile
     private var disposed = false
 
     /**
-     * Proofread workflow: flips the pane between the rendered preview and the
-     * page's reference scan. Set from the toggle in [PrpPreviewToolbar]; only
-     * profiles with a reference image (proofread-page) can turn it on.
+     * Which preview(s) are shown. The reference scan is the initial view
+     * (wikisource editor convention). Changing it re-lays out the center and
+     * notifies [onPaneChanged].
      */
-    var showReferenceImage: Boolean = true
+    var mode: Mode = Mode.IMAGE_ONLY
         set(value) {
             if (field != value) {
                 field = value
-                if (value) {
-                    imagePane.ensureLoaded()
-                }
-                renderPane.visible = !value
-                cards.show(cardPanel, if (value) CARD_IMAGE else CARD_RENDER)
-                onPaneChanged?.invoke()
+                applyLayout()
             }
         }
 
-    fun zoomImage(factor: Double) {
-        imagePane.zoomBy(factor)
-    }
+    /**
+     * Tiling orientation for [Mode.SPLIT]: `true` stacks the previews top and
+     * bottom, `false` places them side by side. Ignored outside SPLIT.
+     */
+    var splitStacked: Boolean = false
+        set(value) {
+            if (field != value) {
+                field = value
+                if (mode == Mode.SPLIT) {
+                    applyLayout()
+                }
+            }
+        }
 
-    fun resetImageZoom() {
-        imagePane.resetZoom()
-    }
+    // In SPLIT both previews are visible, so which one is "active" (for the
+    // structure view) is decided by focus. Updated by [focusListener].
+    private var focusedKind: PaneKind = PaneKind.IMAGE
 
-    /** The drag-selected OCR region of the scan, in image pixel coordinates. */
-    fun referenceSelection(): Rectangle? = imagePane.selection
+    private val focusListener = PropertyChangeListener { event ->
+        val owner = event.newValue as? Component ?: return@PropertyChangeListener
+        val kind = when {
+            SwingUtilities.isDescendingFrom(owner, imageHost) -> PaneKind.IMAGE
+            SwingUtilities.isDescendingFrom(owner, renderHost) -> PaneKind.RENDER
+            else -> return@PropertyChangeListener
+        }
+        if (kind != focusedKind) {
+            focusedKind = kind
+            if (mode == Mode.SPLIT) {
+                onPaneChanged?.invoke()
+            }
+        }
+    }
 
     init {
         component.add(PrpPreviewToolbar(this).component, BorderLayout.NORTH)
-        component.add(cardPanel, BorderLayout.CENTER)
-        // The reference image is the initial card (wikisource editor
-        // convention), but the showReferenceImage setter's no-change guard
-        // never fires for the field's initial value — apply that state here.
-        imagePane.ensureLoaded()
-        cards.show(cardPanel, CARD_IMAGE)
-        // The render pane starts hidden; scheduleReload() just marks it
-        // pending, so the first toggle to the render card triggers the reload.
-        renderPane.scheduleReload()
+        component.add(centerPanel, BorderLayout.CENTER)
+
+        // Apply the initial mode (IMAGE_ONLY): the property initializer sets the
+        // backing field directly without firing the setter, so lay out here.
+        applyLayout()
+
+        KeyboardFocusManager.getCurrentKeyboardFocusManager()
+            .addPropertyChangeListener("focusOwner", focusListener)
 
         runReadActionBlocking {
             FileDocumentManager.getInstance().getDocument(file)?.addDocumentListener(object : DocumentListener {
@@ -119,6 +149,73 @@ class PrpPreviewBrowser(
         }
     }
 
+    /**
+     * Rebuilds the center to match [mode]/[splitStacked] and reconciles each
+     * pane's loaded/visible state:
+     * - the scan is loaded lazily the first time it becomes visible;
+     * - the render pane tracks visibility so edits arriving while it is hidden
+     *   are coalesced into one reload when it is next shown.
+     */
+    private fun applyLayout() {
+        centerPanel.removeAll()
+        when (mode) {
+            Mode.IMAGE_ONLY -> centerPanel.add(imageHost, BorderLayout.CENTER)
+            Mode.RENDER_ONLY -> centerPanel.add(renderHost, BorderLayout.CENTER)
+            Mode.SPLIT -> {
+                splitter.orientation = splitStacked
+                splitter.firstComponent = imageHost
+                splitter.secondComponent = renderHost
+                centerPanel.add(splitter, BorderLayout.CENTER)
+            }
+        }
+
+        val imageShown = mode != Mode.RENDER_ONLY
+        val renderShown = mode != Mode.IMAGE_ONLY
+        if (imageShown) {
+            imagePane.ensureLoaded()
+        }
+        // scheduleReload() marked the render pending while hidden; the setter
+        // flushes that pending reload when the pane becomes visible.
+        renderPane.visible = renderShown
+
+        centerPanel.revalidate()
+        centerPanel.repaint()
+        onPaneChanged?.invoke()
+    }
+
+    /**
+     * The preview the structure view should reflect: the sole visible pane, or
+     * — when both are tiled — whichever last held focus.
+     */
+    fun activePreviewKind(): PaneKind = when (mode) {
+        Mode.IMAGE_ONLY -> PaneKind.IMAGE
+        Mode.RENDER_ONLY -> PaneKind.RENDER
+        Mode.SPLIT -> focusedKind
+    }
+
+    /**
+     * Ensures the reference scan is visible and treated as active — used when
+     * navigating to a bounding box from the structure view or a gutter icon.
+     * If only the render is showing, switches to the scan; a tiled layout is
+     * left as-is (the scan is already visible).
+     */
+    fun revealImagePane() {
+        if (mode == Mode.RENDER_ONLY) {
+            mode = Mode.IMAGE_ONLY
+        }
+        imagePane.ensureLoaded()
+        if (focusedKind != PaneKind.IMAGE) {
+            focusedKind = PaneKind.IMAGE
+            onPaneChanged?.invoke()
+        }
+    }
+
+    private fun paneHost(toolbar: JComponent, content: JComponent): JComponent =
+        JBPanel<JBPanel<*>>(BorderLayout()).apply {
+            add(toolbar, BorderLayout.NORTH)
+            add(content, BorderLayout.CENTER)
+        }
+
     fun reloadPreview() {
         if (!disposed) {
             renderPane.reload()
@@ -128,7 +225,7 @@ class PrpPreviewBrowser(
     override fun getComponent(): JComponent = component
 
     override fun getPreferredFocusedComponent(): JComponent =
-        if (showReferenceImage) imagePane.component else renderPane.component
+        if (activePreviewKind() == PaneKind.IMAGE) imagePane.component else renderPane.component
 
     override fun getName(): String = "Wikitext Preview"
 
@@ -146,11 +243,7 @@ class PrpPreviewBrowser(
 
     override fun dispose() {
         disposed = true
+        KeyboardFocusManager.getCurrentKeyboardFocusManager()
+            .removePropertyChangeListener("focusOwner", focusListener)
     }
-
-    private companion object {
-        const val CARD_RENDER = "render"
-        const val CARD_IMAGE = "reference-image"
-    }
-
 }
