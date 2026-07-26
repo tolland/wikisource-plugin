@@ -193,6 +193,120 @@ Title-matched links have no honest `base_sha1`. Options, in order of preference:
 - [ ] Represent `base_unknown` explicitly rather than as `base_sha1 = None`
       overloading "never synced".
 
+### 4.5 Materializing the parallel tree
+
+Nothing above can be evaluated until there is a **parallel model of the target
+side in the database to compare against**. This is the real prerequisite, and it
+is where the tree-shape problem lives: full tree, partial tree with holes, or no
+tree at all on one side.
+
+**The good news: the fan-out already does this, and it already models absence.**
+`_fan_out_index` (`src-py/wtbot/page_processors.py`) drives off
+`list=proofreadpagesinindex`, which returns every slot in the index with
+`pageid=None` for the ones that do not exist. Slots that exist get a child
+`FetchRequest`; slots that don't get `_ensure_placeholder_page` — a `Page` row
+with `revid=None`, which the whole VFS already reads as
+`placeholder=True` (`vfs/mediawiki.py`). Running an `index` fetch against the
+**upstream** site therefore produces exactly the parallel tree we need, with no
+new machinery.
+
+**The critical distinction to preserve** — and it is currently implicit, which
+is a hazard:
+
+| | meaning | authorizes |
+|---|---|---|
+| `fetch_status=done`, `revid IS NULL` | **known absent** — the index enumerated this slot and the wiki said it does not exist | a create |
+| `fetch_status=unfetched` | **unknown** — we have never asked | nothing |
+| no row at all | **unknown** — we have never asked | nothing |
+
+The schema already encodes this (`_ensure_placeholder_page` sets
+`fetch_status=done` with the comment *"We know the remote state: absent. The
+fetch is complete."*). But it is a two-column convention with no name, and the
+promotion path is the first consumer for which conflating the rows is dangerous
+rather than merely untidy — because "absent" is the state that authorizes a
+*create*, and a create against a page that actually exists is an overwrite.
+
+- [ ] Give it a name: an `Existence` accessor / tri-state (`present`, `absent`,
+      `unknown`) derived from those columns, and use it everywhere the sync path
+      makes a decision. Do not invent a new column; do not let anything outside
+      the fan-out mint `revid=None` rows.
+- [ ] **Never fabricate placeholders on the target side to "fill in" the tree.**
+      A local placeholder is authoritative (we created the slot). An upstream
+      placeholder is a *cached negative*, and negative caching is precisely what
+      is unsafe here. Only the index enumeration may create them.
+- [ ] Add `remote_checked_at` so a known-absent answer can go stale. A
+      three-week-old "this page doesn't exist upstream" is not a fact.
+
+### 4.6 Probe, don't mirror
+
+Today the only way to learn anything about a remote page is a full fetch —
+content, scan-image enrichment, OCR default body, blob download. For a
+mostly-push target like en.wikisource that is far too heavy: we do not want a
+mirror of upstream, we want just enough state to compare a single work.
+
+Add a **probe**: metadata-only, bulk, no enrichment.
+
+- [ ] `WikiClient.probe_pages(titles) -> dict[str, PageProbe]` over
+      `action=query&prop=revisions&rvprop=ids|sha1|timestamp|user`, 50 titles
+      per request. Missing titles come back in `query.missing` — that is the
+      authoritative present/absent answer, in bulk.
+- [ ] For a ProofreadPage work, one `proofreadpagesinindex` call gives the
+      structure and `⌈N/50⌉` probe calls give revid + sha1 for every slot. A
+      400-page work costs ~9 API calls, not 400 fetches.
+- [ ] Full-fetch only the pages where the probe says the content actually
+      differs from what we hold. Where upstream is mostly redlinks — the common
+      case — that is near-zero fetches.
+- [ ] `sha1` gotcha: MediaWiki reports it **base-36 encoded**, not hex. Any
+      locally computed hash must match that encoding before it can be compared
+      to `Page.sha1`.
+- [ ] Second `sha1` gotcha: our promoted body is *transformed* (§5.2), so local
+      `sha1` ≠ upstream `sha1` even when the pages are semantically identical.
+      Hash equality is a sufficient but not necessary same-content test — use
+      the **transformed** body's hash for no-op detection.
+
+### 4.7 The pairing matrix
+
+With both trees materialized, pairing is an **outer join in both directions**
+on `(index link, page_offset)` — not on title, and not an inner join. The join
+must be able to represent a slot present on one side and unknown on the other,
+which is exactly what an inner join throws away.
+
+| local | upstream | case | action |
+|---|---|---|---|
+| present | present | the ordinary case | compare; §5.1 three-way state |
+| present | **absent** | upstream slot is a redlink | **create** — but see §5.6 |
+| present | **unknown** | *we have not looked* | **probe first, decide nothing** |
+| placeholder | present | never transcribed locally | candidate for *pull*, not push |
+| placeholder | absent | empty on both sides | skip |
+| absent/no row | present | upstream has pages we don't model | out of scope; surface only |
+| index present | **index absent** | whole work is new upstream | see below |
+
+Mapping this onto the cases as originally posed:
+
+- **Case 1 — Index and pages created entirely locally.** The instinct is that
+  this is the easy case because we are free to invent the whole target tree.
+  It is actually the *hardest* one, and the reason is not correspondence: it is
+  that `Page:Foo.pdf/101` cannot meaningfully exist upstream until
+  `File:Foo.pdf` exists upstream. That is a scan upload to Commons or
+  en.wikisource — a licensing and provenance decision, a large binary, and a
+  different permission grant. **Gate the whole case behind "does the backing
+  File: exist on the target?" and treat file upload as explicitly out of
+  scope** (§11.4). Until then, case 1 is *blocked*, not free.
+- **Case 2 — page exists upstream, not yet modelled locally.** This is the
+  `unknown` column, and the answer is just: probe it, then fetch it if it
+  differs. It is a cheap, ordinary case once probing exists. The failure the
+  question anticipates — "we fail on comparison of `base_revid`" — is real but
+  it is a *symptom of acting on `unknown`*. With the tri-state honoured, the
+  planner simply refuses to classify an unknown slot, and the probe resolves it.
+- **Case 3 — created or edited upstream in parallel.** Not solvable by better
+  bookkeeping. See §5.6; it is solved at push time, not at model time.
+
+- [ ] Build pairing as an explicit, persisted, inspectable artifact
+      (`PromotionItem`, §6.1), not a transient computation. "Show me the join"
+      is the first thing anyone will want when a sync looks wrong.
+- [ ] Pairing runs against a *snapshot* — record the probe timestamp on it, and
+      treat the whole pairing as stale after a TTL.
+
 ---
 
 ## 5. The promotion pipeline
@@ -320,6 +434,72 @@ Before any human sees an approve button for a batch:
       first-class option: run the whole batch against a target that isn't
       en.wikisource and inspect the result. Cheap to build once the target site
       is a parameter, and it's the highest-value safety feature here.
+
+### 5.6 Atomic preconditions — never push unconditionally
+
+This is the answer to "the remote may have been edited or created in parallel,
+and we have no way to track creation."
+
+**Don't track it. Make the push conditional and let the server enforce it.** The
+database model is a *plan*; the wiki is the authority on whether the plan is
+still valid at the moment it executes. Once the precondition rides along with
+the edit, the window between probe and push stops mattering — which is what
+makes the staleness problem in §4.5 tolerable rather than fatal.
+
+MediaWiki's `action=edit` has exactly the primitives needed, and **none of them
+are currently used** (`grep` for `createonly` in `src-py` returns nothing):
+
+- [ ] **`createonly=1` on every create.** The API refuses with `articleexists`
+      if the page now exists. Today `save_page` treats `base_revid=None` as
+      "creation" and calls `page.save()` with no such guard — so a page created
+      upstream since our probe is **silently overwritten**. That is case 3's
+      overwrite, and this one flag removes it.
+- [ ] **`nocreate=1` on every update.** The inverse guard: if we believed we
+      were editing an existing page and it has since been deleted, fail rather
+      than silently re-create a deleted page (which on en.wikisource is its own
+      species of embarrassment).
+- [ ] **`basetimestamp` + `starttimestamp` on every update**, matching the
+      revision we actually based on. `PywikibotClient.save_page` currently reads
+      `page.latest_revision.revid`, compares it to `base_revid` in Python, and
+      then saves — a TOCTOU window, and pywikibot's own conflict detection then
+      enforces "unchanged since I loaded it 200 ms ago" rather than "unchanged
+      since `base_revid`". Correct, atomic, and server-side is strictly better
+      than a client-side compare.
+- [ ] Verify how these thread through pywikibot's `Page.save()`; if they don't,
+      go through `site.editpage()` or a raw request. Do not settle for the
+      client-side check.
+- [ ] Map the resulting API error codes (`articleexists`, `missingtitle`,
+      `editconflict`, `protectedpage`, `abusefilter-*`, `spamblacklist`) onto
+      distinct outcomes on the `Commit` row. Right now everything that isn't
+      `EditConflict` collapses into `CommitStatus.error` with a stringified
+      exception, which is too coarse to drive a retry or a UI decision.
+- [ ] Treat `force=True` as strictly "drop the revid precondition" — it must
+      never imply dropping `createonly`/`nocreate`.
+
+### 5.7 Merging rather than overwriting
+
+With preconditions in place, a parallel edit produces a *failure*, and that
+failure is the trigger to merge. The rule: **a rejected push is re-entered as a
+`diverged` item, never retried harder.**
+
+- [ ] On `articleexists` from a create: fetch the now-existing upstream page and
+      reclassify as diverged with an **empty base**. A three-way merge against
+      an empty base is "both sides added content", i.e. an honest conflict —
+      correct, since two independent transcriptions of the same scan page
+      genuinely need a human.
+- [ ] On `editconflict` from an update: refetch and reclassify as diverged with
+      the real base (this is where §4.1's stored `base_body` earns its place).
+- [ ] Use a real three-way merge (`merge3`, or shell out to `git merge-file`)
+      rather than hand-rolling. Line-based merge works acceptably on wikitext.
+- [ ] **ProofreadPage-specific win:** a `Page:` body decomposes into
+      `<noinclude>` header / body / `<noinclude>` footer. Merge the three
+      segments *independently*. Most cross-wiki conflicts are header-only
+      (`pagequality` level and user), where the resolution is deterministic —
+      take the higher quality level, take the target wiki's user attribution —
+      so segmenting converts a large fraction of "conflict" into "clean merge"
+      and leaves genuine prose conflicts standing out.
+- [ ] Auto-merged results are still **never** pushed without human review. A
+      clean merge lowers review effort; it does not grant approval.
 
 ---
 
@@ -522,7 +702,21 @@ review-and-approve workflow with big diffs. Later, worth having in the plugin:
 
 ## 9. Phasing
 
-**Phase 1 — correspondence only, no pushing.**
+**Phase 0 — the parallel model (§4.5–4.7). Prerequisite for everything.**
+- [ ] Name the `Existence` tri-state over `(fetch_status, revid)`; audit every
+      existing `revid is None` read against it. Add `remote_checked_at`.
+- [ ] `WikiClient.probe_pages` bulk metadata probe + `FakeWikiClient` support.
+- [ ] Materialize an upstream work by running the existing `index` fan-out
+      against the upstream site; confirm it produces present rows + known-absent
+      placeholders and nothing else.
+- [ ] Pairing: outer join on `(index, page_offset)` producing the §4.7 matrix,
+      persisted and inspectable.
+
+No writes, no links, no UI. This is the piece the rest of the design assumes
+exists, and it is independently verifiable against the Hertz work — the output
+is just "here is the join, here is what we know and don't know".
+
+**Phase 1 — correspondence, no pushing.**
 - [ ] `RemoteLink` model + migration.
 - [ ] `POST /links`, `GET /links/{pk}`, refresh endpoint.
 - [ ] Title-match proposal + scan-file sha1 comparison.
@@ -533,6 +727,9 @@ Useful on its own — "which of my 400 local pages differ from upstream, and how
 is already worth having with no write path at all.
 
 **Phase 2 — single-page promotion.**
+- [ ] `createonly` / `nocreate` / `basetimestamp` on the push path, and the
+      error-code mapping (§5.6). Worth doing even independently of sync: the
+      silent-overwrite-on-create gap exists today for ordinary commits.
 - [ ] `EditSource` discriminator on `EditJournal` + `Commit.batch_pk`.
 - [ ] Check/transform framework with the §5.2 rules.
 - [ ] Single-page promote → manufactured journal row → existing commit path.
@@ -597,3 +794,14 @@ manage. (Building 4 before 3 is fine and arguably better.)
    ergonomic goal. Start strict; loosen with evidence.
 6. **Should promotion be available at all while the upstream page is
    protected/semi-protected?** Detect and surface it; probably block.
+7. **Is `Existence` derived or stored?** Deriving it from
+   `(fetch_status, revid)` avoids a migration and keeps one source of truth, but
+   leaves the invariant unenforced — anything that writes `revid=None` outside
+   the fan-out silently manufactures a "known absent" claim. A stored, explicitly
+   set column would be enforceable at the cost of denormalisation. Recommendation:
+   derive it, but make the fan-out the only writer by construction and cover it
+   with a test.
+8. **How stale may a probe be before a batch must re-run it?** Needs a real TTL,
+   and the answer differs by target: minutes for a busy en.wikisource work,
+   effectively unbounded for a quiet one. Probably "re-probe at approval time
+   regardless" is simpler than tuning a TTL — the preflight already re-polls.
