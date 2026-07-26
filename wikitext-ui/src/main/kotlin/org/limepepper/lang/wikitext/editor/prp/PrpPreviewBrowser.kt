@@ -61,7 +61,7 @@ class PrpPreviewBrowser(
         imagePane.component,
     )
     private val renderHost = paneHost(
-        PrpRenderPreviewToolbar(::reloadPreview, renderPane.component).component,
+        PrpRenderPreviewToolbar(renderPane).component,
         renderPane.component,
     )
 
@@ -101,6 +101,20 @@ class PrpPreviewBrowser(
      * bottom, `false` places them side by side. Ignored outside SPLIT.
      */
     var splitStacked: Boolean = false
+        set(value) {
+            if (field != value) {
+                field = value
+                if (mode == Mode.SPLIT) {
+                    applyLayout()
+                }
+            }
+        }
+
+    /**
+     * Whether the tiled previews are swapped from their default order (scan
+     * first, render second). Ignored outside [Mode.SPLIT].
+     */
+    var swapped: Boolean = false
         set(value) {
             if (field != value) {
                 field = value
@@ -169,8 +183,8 @@ class PrpPreviewBrowser(
             Mode.RENDER_ONLY -> centerPanel.add(renderHost, BorderLayout.CENTER)
             Mode.SPLIT -> {
                 splitter.orientation = splitStacked
-                splitter.firstComponent = imageHost
-                splitter.secondComponent = renderHost
+                splitter.firstComponent = if (swapped) renderHost else imageHost
+                splitter.secondComponent = if (swapped) imageHost else renderHost
                 centerPanel.add(splitter, BorderLayout.CENTER)
             }
         }

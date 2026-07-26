@@ -58,6 +58,18 @@ class JcefBrowserZoom(private val browser: JBCefBrowser) {
         }
     }
 
+    /** Toolbar zoom-in: one button step (a coarser notch than the wheel). */
+    fun zoomIn() = zoomBy(LEVEL_PER_BUTTON)
+
+    /** Toolbar zoom-out. */
+    fun zoomOut() = zoomBy(-LEVEL_PER_BUTTON)
+
+    /** Back to 100%. */
+    fun resetZoom() {
+        level = 0.0
+        browser.cefBrowser.zoomLevel = 0.0
+    }
+
     private fun zoomBy(deltaLevels: Double) {
         level = (level + deltaLevels).coerceIn(MIN_LEVEL, MAX_LEVEL)
         browser.cefBrowser.zoomLevel = level
@@ -66,6 +78,9 @@ class JcefBrowserZoom(private val browser: JBCefBrowser) {
     private companion object {
         /** Zoom levels per wheel notch: 0.5 ≈ ±9.5% per notch. */
         const val LEVEL_PER_NOTCH = 0.5
+
+        /** Zoom levels per toolbar button press: 1.0 = ±20%. */
+        const val LEVEL_PER_BUTTON = 1.0
 
         /** 1.2^-4 ≈ 48% and 1.2^8 ≈ 430%. */
         const val MIN_LEVEL = -4.0

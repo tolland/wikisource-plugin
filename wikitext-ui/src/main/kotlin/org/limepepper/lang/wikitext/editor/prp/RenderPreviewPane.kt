@@ -11,6 +11,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.jcef.JBCefApp
 import com.intellij.ui.jcef.JBCefBrowser
+import com.intellij.ui.jcef.JBCefJSQuery
 import org.limepepper.lang.wikitext.preview.JcefBrowserZoom
 import org.limepepper.lang.wikitext.vfs.WtVirtualFile
 import org.limepepper.lang.wikitext.vfs.backend.PreviewResult
@@ -50,10 +51,35 @@ class RenderPreviewPane(
 
     val component: JComponent = jcefBrowser?.component ?: JBScrollPane(fallbackPane)
 
-    init {
-        // Ctrl-wheel zoom, with the level held across reloads. The listener
-        // and load handler keep the helper reachable for the browser's life.
-        jcefBrowser?.let { JcefBrowserZoom(it) }
+    // Ctrl-wheel zoom, with the level held across reloads; also drives the
+    // toolbar zoom buttons so wheel and buttons share one zoom level.
+    private val zoom: JcefBrowserZoom? = jcefBrowser?.let { JcefBrowserZoom(it) }
+
+    /** True when zoom controls apply (JCEF present; the Swing fallback has none). */
+    val zoomSupported: Boolean
+        get() = zoom != null
+
+    fun zoomIn() = zoom?.zoomIn() ?: Unit
+
+    fun zoomOut() = zoom?.zoomOut() ?: Unit
+
+    fun resetZoom() = zoom?.resetZoom() ?: Unit
+
+    // Latest vertical scroll offset the page reported, so a reload (which goes
+    // through loadHTML and would otherwise jump back to the top) can restore
+    // roughly where the reader was. The page reports it via [scrollQuery]; the
+    // restore is injected into each rendered document (see [shellHtml]).
+    @Volatile
+    private var lastScrollY: Int = 0
+
+    private val scrollQuery: JBCefJSQuery? = jcefBrowser?.let { browser ->
+        JBCefJSQuery.create(browser as com.intellij.ui.jcef.JBCefBrowserBase).also { query ->
+            query.addHandler { value ->
+                value.toDoubleOrNull()?.let { lastScrollY = it.toInt() }
+                null
+            }
+            Disposer.register(this, query)
+        }
     }
 
     // Debounce keystrokes: every reload is a network round trip through the
@@ -155,11 +181,40 @@ class RenderPreviewPane(
               body { font-family: sans-serif; margin: 12px;
                      background: #fff; color: #202122; }
             </style>
+            $scrollScript
             </head>
             <body>${result.decodeHtml()}</body>
             </html>
         """.trimIndent()
     }
+
+    /**
+     * Script injected into every rendered document to (a) report the vertical
+     * scroll offset back to [scrollQuery] as the reader scrolls, and (b) restore
+     * the last reported offset once this reload finishes loading — the browser
+     * clamps an out-of-range offset to the new content height, so a preview that
+     * shrank simply lands at the bottom rather than off the end. Empty when JCEF
+     * (and thus the query) is unavailable.
+     */
+    private val scrollScript: String
+        get() {
+            val query = scrollQuery ?: return ""
+            val report = query.inject("String(window.scrollY)")
+            return """
+                <script>
+                  (function() {
+                    var pending;
+                    window.addEventListener('scroll', function() {
+                      clearTimeout(pending);
+                      pending = setTimeout(function() { $report }, 100);
+                    }, { passive: true });
+                    window.addEventListener('load', function() {
+                      window.scrollTo(0, $lastScrollY);
+                    });
+                  })();
+                </script>
+            """.trimIndent()
+        }
 
     private fun errorHtml(message: String): String {
         val escaped = message
