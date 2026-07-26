@@ -169,7 +169,7 @@ Link at the `Index:` level and derive the `Page:` children:
       (`list=proofreadpagesinindex`) on both sides — it returns
       `(page_offset, title, pageid)` and is authoritative.
 - [ ] **Critical check: the backing scan must be the same file.** Compare
-      `FileMeta.file_sha1` of the `File:` on both sides. If the local wiki has a
+      `FileBlob.file_sha1` of the `File:` on both sides. If the local wiki has a
       different upload of `The principles of mechanics….pdf` (re-derived DjVu,
       different page count, cropped cover), then local page 101 is **not**
       upstream page 101 and every promotion in the work is silently off by an
@@ -177,6 +177,12 @@ Link at the `Index:` level and derive the `Page:` children:
       be a hard block, not a warning. Where the files differ but page counts
       match, allow an explicit user-supplied constant offset with a spot-check
       confirmation UI (show local scan N and upstream scan N side by side).
+- [ ] **Where the target has no `File:` at all, this check cannot run.** That is
+      not itself a reason to block (see §4.7 case 1) — but it does mean
+      correspondence rests on title/offset assertion with *nothing* to validate
+      it against. Record the pairing as `correspondence_unverified` and carry
+      that flag through to the review UI; it is the one situation where the
+      offset failure mode is undetectable rather than merely unchecked.
 
 ### 4.4 When the merge base is unknown
 
@@ -283,15 +289,36 @@ which is exactly what an inner join throws away.
 
 Mapping this onto the cases as originally posed:
 
-- **Case 1 — Index and pages created entirely locally.** The instinct is that
-  this is the easy case because we are free to invent the whole target tree.
-  It is actually the *hardest* one, and the reason is not correspondence: it is
-  that `Page:Foo.pdf/101` cannot meaningfully exist upstream until
-  `File:Foo.pdf` exists upstream. That is a scan upload to Commons or
-  en.wikisource — a licensing and provenance decision, a large binary, and a
-  different permission grant. **Gate the whole case behind "does the backing
-  File: exist on the target?" and treat file upload as explicitly out of
-  scope** (§11.4). Until then, case 1 is *blocked*, not free.
+- **Case 1 — Index and pages created entirely locally.** Correspondence really
+  is free here: there is nothing on the target to reconcile against, so every
+  slot is a create and the pairing is trivial. The catch is the backing scan.
+
+  `Index:Foo.pdf` and `Page:Foo.pdf/101` **can** be created on a target that has
+  no `File:Foo.pdf` — MediaWiki and ProofreadPage permit it. So this is *not* a
+  technical block. What is lost is everything that hangs off the scan:
+
+  - the Index's file link and page-image column render as redlinks;
+  - no reference image in the ProofreadPage editor, so nobody upstream can
+    actually proofread or validate what we pushed;
+  - `prop=imageforpage` and `prop=defaultcontentforpage` return nothing, so our
+    own enrichment (`_gather_placeholder_enrichment`) degrades to `None` — it
+    already handles this gracefully, no code change needed;
+  - the §4.3 scan-sha1 check has nothing to compare, so the page-offset failure
+    mode becomes undetectable.
+
+  The last one is the real cost, and it is a correspondence cost rather than a
+  rendering one. Beyond that it is a *judgement* call, not an engineering one:
+  pushing a few hundred scanless `Page:` transcriptions to en.wikisource is
+  unusual content that no one else can verify, which sits badly with the
+  transparency posture in §3.
+
+  - [ ] Treat "target has no backing File:" as a **prominent batch-level
+        warning with an explicit override**, not a hard block. Show it on the
+        review screen next to the target banner.
+  - [ ] Support the sensible sequencing — upload the scan by hand (or via
+        Commons' own tooling), then promote the wikitext — by re-running the
+        pairing after the file appears. File upload stays out of scope (§11.4);
+        being blocked on it does not.
 - **Case 2 — page exists upstream, not yet modelled locally.** This is the
   `unknown` column, and the answer is just: probe it, then fetch it if it
   differs. It is a cheap, ordinary case once probing exists. The failure the
@@ -359,8 +386,11 @@ transform step with a visible before/after in the review UI:
       every promoted page. Hard block on missing templates.
 - [ ] **Local-only File: references.** `IndexMeta.short_name` generates names
       like `File:{short_name}_page_101_image_1.jpg` for extracted illustrations.
-      Those files exist locally and do not exist upstream. Either block, or
-      (later) make image upload part of the promotion batch.
+      Those files exist locally and do not exist upstream. As with the backing
+      scan, this renders as a redlink rather than failing the save — so block by
+      default (a redlinked illustration in the middle of a transcription is
+      visible breakage) but allow an override, and later consider making image
+      upload part of the promotion batch.
 - [ ] **Interwiki / absolute links to the staging host.** Any
       `wikisource-debian-13.lan` URL in the body is a hard block — leaking a LAN
       hostname into en.wikisource is both broken and mildly disclosive.
