@@ -2,7 +2,9 @@
   import { onMount } from 'svelte';
   import { page } from '$app/state';
   import { getIndexPage, listIndexPages } from '$lib/api';
-  import WikitextViewer from '$lib/components/WikitextViewer.svelte';
+  import Notice from '$lib/components/Notice.svelte';
+  import PageHeading from '$lib/components/PageHeading.svelte';
+  import WikitextArticle from '$lib/components/WikitextArticle.svelte';
   import type { IndexPageDetail, IndexPageSummary } from '$lib/types';
 
   let indexes: IndexPageSummary[] = $state([]);
@@ -44,9 +46,7 @@
 <section class="index-workspace">
   <aside class="sidebar" aria-label="Index pages">
     <div class="brand">
-      <p class="eyebrow">Working tree</p>
-      <h1>Index pages</h1>
-      <p class="count">{indexes.length} cached</p>
+      <PageHeading eyebrow="Working tree" title="Index pages" count={`${indexes.length} cached`} />
     </div>
 
     {#if loadingList}
@@ -76,26 +76,21 @@
 
   <section class="content" aria-live="polite">
     {#if error}
-      <div class="notice">{error}</div>
+      <Notice>{error}</Notice>
     {/if}
 
     {#if loadingPage}
       <div class="empty">Loading wikitext...</div>
     {:else if selected}
-      <article>
-        <header>
-          <p class="eyebrow">Index wikitext</p>
-          <h2>{selected.title}</h2>
-          <div class="meta">
-            <span>PK {selected.pk}</span>
-            {#if selected.revid}
-              <span>Revision {selected.revid}</span>
-            {/if}
-            <span>{selected.body_length.toLocaleString()} characters</span>
-          </div>
-        </header>
-        <WikitextViewer content={selected.body} />
-      </article>
+      <WikitextArticle eyebrow="Index wikitext" title={selected.title} content={selected.body}>
+        {#snippet meta()}
+          <span>PK {selected?.pk}</span>
+          {#if selected?.revid}
+            <span>Revision {selected.revid}</span>
+          {/if}
+          <span>{selected?.body_length.toLocaleString()} characters</span>
+        {/snippet}
+      </WikitextArticle>
     {:else}
       <div class="empty">Select an Index page to inspect its cached body.</div>
     {/if}
@@ -161,14 +156,6 @@
 
   .content {
     min-width: 0;
-  }
-
-  article {
-    animation: enter 260ms ease both;
-  }
-
-  header {
-    margin-bottom: 1.5rem;
   }
 
   @media (max-width: 860px) {

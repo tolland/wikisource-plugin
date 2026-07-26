@@ -1,6 +1,14 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { createFetch, listSites } from '$lib/api';
+  import ActionButton from '$lib/components/ActionButton.svelte';
+  import FormRow from '$lib/components/FormRow.svelte';
+  import Notice from '$lib/components/Notice.svelte';
+  import PageHeading from '$lib/components/PageHeading.svelte';
+  import SelectField from '$lib/components/SelectField.svelte';
+  import SiteSelect from '$lib/components/SiteSelect.svelte';
+  import TextField from '$lib/components/TextField.svelte';
+  import { siteLabel } from '$lib/format';
   import type { FetchKind, FetchResponse, Site } from '$lib/types';
 
   let title = $state('Index:');
@@ -15,10 +23,6 @@
   let loading = $state(false);
   let error = $state('');
   let result: FetchResponse | null = $state(null);
-
-  function siteLabel(site: Site): string {
-    return site.label || `${site.family}:${site.code}`;
-  }
 
   function selectedSite(): Site | null {
     return sites.find((site) => site.pk === selectedSitePk) ?? null;
@@ -70,37 +74,20 @@
   onMount(loadSites);
 </script>
 
-<section class="page-heading">
-  <p class="eyebrow">Checkout</p>
-  <h1>Fetch wikitext into the local cache.</h1>
-  <p>
+<PageHeading eyebrow="Checkout" title="Fetch wikitext into the local cache.">
+  <p class="description">
     This creates a `FetchRequest`, drains the Python worker inline, and writes
     the fetched page snapshot into SQLite.
   </p>
-</section>
+</PageHeading>
 
 <form class="fetch-form" onsubmit={(event) => { event.preventDefault(); void submitFetch(); }}>
-  <label>
-    <span>Title</span>
-    <input bind:value={title} required placeholder="Index:Example.djvu" />
-  </label>
+  <TextField label="Title" bind:value={title} required placeholder="Index:Example.djvu" />
 
   {#if loadingSites}
     <p class="state">Loading sites...</p>
   {:else if sites.length > 1}
-    <label>
-      <span>Site</span>
-      <select
-        bind:value={selectedSitePk}
-        onchange={() => {
-          applySelectedSite();
-        }}
-      >
-        {#each sites as site}
-          <option value={site.pk}>{siteLabel(site)}</option>
-        {/each}
-      </select>
-    </label>
+    <SiteSelect {sites} bind:value={selectedSitePk} onchange={applySelectedSite} />
   {:else if sites.length === 1}
     <div class="site-summary">
       <span>Site</span>
@@ -108,42 +95,35 @@
       <small>{sites[0].api_url ?? sites[0].host ?? `${sites[0].family}:${sites[0].code}`}</small>
     </div>
   {:else}
-    <div class="form-row">
-      <label>
-        <span>Family</span>
-        <input bind:value={family} required />
-      </label>
-      <label>
-        <span>Code</span>
-        <input bind:value={code} required />
-      </label>
-    </div>
+    <FormRow>
+      <TextField label="Family" bind:value={family} required />
+      <TextField label="Code" bind:value={code} required />
+    </FormRow>
 
-    <label>
-      <span>API URL</span>
-      <input bind:value={apiUrl} placeholder="https://en.wikisource.org/w/api.php" />
-    </label>
+    <TextField
+      label="API URL"
+      bind:value={apiUrl}
+      placeholder="https://en.wikisource.org/w/api.php"
+    />
   {/if}
 
-  <div class="form-row">
-    <label>
-      <span>Kind</span>
-      <select bind:value={kind}>
-        <option value="single">single</option>
-        <option value="index">index</option>
-      </select>
-    </label>
-    <label>
-      <span>Depth</span>
-      <input type="number" min="0" max="3" bind:value={depth} />
-    </label>
-  </div>
+  <FormRow>
+    <SelectField label="Kind" bind:value={kind}>
+      <option value="single">single</option>
+      <option value="index">index</option>
+    </SelectField>
+    <TextField label="Depth" type="number" min="0" max="3" bind:value={depth} />
+  </FormRow>
 
-  <button type="submit" disabled={loading}>{loading ? 'Fetching...' : 'Fetch into cache'}</button>
+  <div class="submit-row">
+    <ActionButton type="submit" disabled={loading}>
+      {loading ? 'Fetching...' : 'Fetch into cache'}
+    </ActionButton>
+  </div>
 </form>
 
 {#if error}
-  <div class="notice">{error}</div>
+  <Notice>{error}</Notice>
 {/if}
 
 {#if result}
@@ -165,22 +145,13 @@
       </div>
     </dl>
     {#if result.request.error_message}
-      <div class="notice">{result.request.error_message}</div>
+      <Notice>{result.request.error_message}</Notice>
     {/if}
   </section>
 {/if}
 
 <style>
-  .page-heading {
-    max-width: 56rem;
-  }
-
-  .page-heading h1 {
-    font-size: clamp(2.5rem, 6vw, 5.8rem);
-    letter-spacing: -0.05em;
-  }
-
-  .page-heading p {
+  .description {
     color: #594430;
     font-size: 1.1rem;
     line-height: 1.55;
@@ -199,12 +170,6 @@
 
   .fetch-form {
     display: grid;
-    gap: 1rem;
-  }
-
-  .form-row {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1rem;
   }
 
@@ -228,12 +193,6 @@
     font-size: 0.82rem;
   }
 
-  label {
-    display: grid;
-    gap: 0.4rem;
-  }
-
-  label span,
   .site-summary span,
   dt {
     color: #73583d;
@@ -244,33 +203,8 @@
     text-transform: uppercase;
   }
 
-  input,
-  select {
-    border: 1px solid rgba(72, 49, 31, 0.24);
-    border-radius: 12px;
-    background: #fffdf5;
-    color: #241b13;
-    font: inherit;
-    padding: 0.8rem 0.9rem;
-  }
-
-  button {
+  .submit-row {
     justify-self: start;
-    border: 0;
-    border-radius: 999px;
-    background: #9c5632;
-    color: #fff8e6;
-    cursor: pointer;
-    font-family: "Avenir Next", "Gill Sans", sans-serif;
-    font-weight: 800;
-    letter-spacing: 0.06em;
-    padding: 0.85rem 1.2rem;
-    text-transform: uppercase;
-  }
-
-  button:disabled {
-    cursor: wait;
-    opacity: 0.62;
   }
 
   dl {
@@ -286,11 +220,5 @@
 
   dd {
     margin: 0.2rem 0 0;
-  }
-
-  @media (max-width: 680px) {
-    .form-row {
-      grid-template-columns: 1fr;
-    }
   }
 </style>

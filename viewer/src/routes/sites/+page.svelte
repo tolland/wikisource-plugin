@@ -8,6 +8,12 @@
     saveSiteCredential,
     updateSite
   } from '$lib/api';
+  import ActionButton from '$lib/components/ActionButton.svelte';
+  import FormRow from '$lib/components/FormRow.svelte';
+  import Notice from '$lib/components/Notice.svelte';
+  import PageHeading from '$lib/components/PageHeading.svelte';
+  import TextField from '$lib/components/TextField.svelte';
+  import { siteLabel } from '$lib/format';
   import type { CredentialPayload, Site, SiteCredential, SitePayload } from '$lib/types';
 
   let sites: Site[] = $state([]);
@@ -41,15 +47,6 @@
       password: '',
       bot_name: ''
     };
-  }
-
-  function siteLabel(site: Site): string {
-    return site.label || `${site.family}:${site.code}`;
-  }
-
-  function selectedSite(): Site | null {
-    if (selectedSitePk === 'new') return null;
-    return sites.find((site) => site.pk === selectedSitePk) ?? null;
   }
 
   function payloadFromForm(): SitePayload {
@@ -191,13 +188,15 @@
 
 <section class="sites-workspace">
   <aside class="site-browser" aria-label="Configured sites">
-    <header>
-      <p class="eyebrow">Configuration</p>
-      <h1>Sites</h1>
-      <p class="count">{loading ? 'Loading' : `${sites.length} configured`}</p>
-    </header>
+    <PageHeading
+      eyebrow="Configuration"
+      title="Sites"
+      count={loading ? 'Loading' : `${sites.length} configured`}
+    />
 
-    <button class="new-site" type="button" onclick={selectNew}>New site</button>
+    <div class="new-site">
+      <ActionButton onclick={selectNew}>New site</ActionButton>
+    </div>
 
     {#if loading}
       <p class="state">Loading sites...</p>
@@ -221,10 +220,10 @@
 
   <section class="editor-pane">
     {#if error}
-      <div class="notice">{error}</div>
+      <Notice>{error}</Notice>
     {/if}
     {#if message}
-      <div class="success">{message}</div>
+      <Notice kind="success">{message}</Notice>
     {/if}
 
     <form
@@ -239,41 +238,34 @@
         <h2>{selectedSitePk === 'new' ? 'Add a wiki.' : siteForm.label || `${siteForm.family}:${siteForm.code}`}</h2>
       </header>
 
-      <div class="form-row">
-        <label>
-          <span>Family</span>
-          <input bind:value={siteForm.family} required placeholder="wikisource" />
-        </label>
-        <label>
-          <span>Code</span>
-          <input bind:value={siteForm.code} required placeholder="en" />
-        </label>
+      <FormRow>
+        <TextField label="Family" bind:value={siteForm.family} required placeholder="wikisource" />
+        <TextField label="Code" bind:value={siteForm.code} required placeholder="en" />
+      </FormRow>
+
+      <TextField label="Label" bind:value={siteForm.label} placeholder="Local Wikisource" />
+
+      <TextField
+        label="API URL"
+        bind:value={siteForm.api_url}
+        placeholder="https://en.wikisource.org/w/api.php"
+      />
+
+      <FormRow>
+        <TextField label="Host" bind:value={siteForm.host} placeholder="en.wikisource.org" />
+        <TextField
+          label="Article path"
+          bind:value={siteForm.articlepath}
+          required
+          placeholder="/wiki/$1"
+        />
+      </FormRow>
+
+      <div class="actions">
+        <ActionButton type="submit" disabled={savingSite}>
+          {savingSite ? 'Saving...' : selectedSitePk === 'new' ? 'Add site' : 'Save site'}
+        </ActionButton>
       </div>
-
-      <label>
-        <span>Label</span>
-        <input bind:value={siteForm.label} placeholder="Local Wikisource" />
-      </label>
-
-      <label>
-        <span>API URL</span>
-        <input bind:value={siteForm.api_url} placeholder="https://en.wikisource.org/w/api.php" />
-      </label>
-
-      <div class="form-row">
-        <label>
-          <span>Host</span>
-          <input bind:value={siteForm.host} placeholder="en.wikisource.org" />
-        </label>
-        <label>
-          <span>Article path</span>
-          <input bind:value={siteForm.articlepath} required placeholder="/wiki/$1" />
-        </label>
-      </div>
-
-      <button type="submit" disabled={savingSite}>
-        {savingSite ? 'Saving...' : selectedSitePk === 'new' ? 'Add site' : 'Save site'}
-      </button>
     </form>
 
     {#if selectedSitePk !== 'new'}
@@ -296,40 +288,40 @@
           </p>
         </header>
 
-        <label>
-          <span>Username</span>
-          <input bind:value={credentialForm.username} required autocomplete="username" />
-        </label>
+        <TextField
+          label="Username"
+          bind:value={credentialForm.username}
+          required
+          autocomplete="username"
+        />
 
-        <div class="form-row">
-          <label>
-            <span>Password</span>
-            <input
-              bind:value={credentialForm.password}
-              required
-              type="password"
-              autocomplete="current-password"
-            />
-          </label>
-          <label>
-            <span>Bot password suffix</span>
-            <input bind:value={credentialForm.bot_name} placeholder="wtbot" />
-          </label>
-        </div>
+        <FormRow>
+          <TextField
+            label="Password"
+            bind:value={credentialForm.password}
+            required
+            type="password"
+            autocomplete="current-password"
+          />
+          <TextField
+            label="Bot password suffix"
+            bind:value={credentialForm.bot_name}
+            placeholder="wtbot"
+          />
+        </FormRow>
 
         <div class="actions">
-          <button type="submit" disabled={savingCredential || loadingCredential}>
+          <ActionButton type="submit" disabled={savingCredential || loadingCredential}>
             {savingCredential ? 'Saving...' : 'Save credential'}
-          </button>
+          </ActionButton>
           {#if credential}
-            <button
-              class="secondary"
-              type="button"
-              onclick={() => removeCredential()}
+            <ActionButton
+              variant="secondary"
+              onclick={() => void removeCredential()}
               disabled={deletingCredential}
             >
               {deletingCredential ? 'Removing...' : 'Remove credential'}
-            </button>
+            </ActionButton>
           {/if}
         </div>
       </form>
@@ -357,33 +349,9 @@
     padding: 1.2rem;
   }
 
-  .site-browser h1 {
-    font-size: clamp(2.1rem, 4vw, 3.4rem);
-  }
-
-  .new-site,
-  .panel button {
-    cursor: pointer;
-    border: 0;
-    border-radius: 12px;
-    background: #9c5632;
-    color: #fff8e6;
-    font-family: "Avenir Next", "Gill Sans", sans-serif;
-    font-size: 0.78rem;
-    font-weight: 800;
-    letter-spacing: 0.06em;
-    padding: 0.8rem 0.95rem;
-    text-transform: uppercase;
-  }
-
   .new-site {
-    width: 100%;
+    display: grid;
     margin: 1rem 0;
-  }
-
-  button:disabled {
-    cursor: progress;
-    opacity: 0.62;
   }
 
   .site-list {
@@ -438,58 +406,14 @@
     overflow-wrap: anywhere;
   }
 
-  .form-row {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 1rem;
-  }
-
-  label {
-    display: grid;
-    gap: 0.4rem;
-  }
-
-  label span {
-    color: #73583d;
-    font-family: "Avenir Next", "Gill Sans", sans-serif;
-    font-size: 0.74rem;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  input {
-    width: 100%;
-    border: 1px solid rgba(72, 49, 31, 0.24);
-    border-radius: 12px;
-    background: #fffdf5;
-    color: #241b13;
-    font: inherit;
-    padding: 0.8rem 0.9rem;
-  }
-
   .actions {
     display: flex;
     flex-wrap: wrap;
     gap: 0.75rem;
   }
 
-  .panel button.secondary {
-    background: rgba(156, 86, 50, 0.12);
-    color: #7d4428;
-  }
-
-  .success {
-    border: 1px solid rgba(40, 107, 76, 0.34);
-    border-radius: 16px;
-    background: rgba(229, 246, 235, 0.72);
-    color: #24543f;
-    padding: 1rem;
-  }
-
   @media (max-width: 900px) {
-    .sites-workspace,
-    .form-row {
+    .sites-workspace {
       grid-template-columns: 1fr;
     }
   }

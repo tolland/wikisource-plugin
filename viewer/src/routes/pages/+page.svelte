@@ -2,7 +2,11 @@
   import { onMount } from 'svelte';
   import { page as routePage } from '$app/state';
   import { getPage, listNamespaces, listPages, listSites } from '$lib/api';
-  import WikitextViewer from '$lib/components/WikitextViewer.svelte';
+  import Notice from '$lib/components/Notice.svelte';
+  import PageHeading from '$lib/components/PageHeading.svelte';
+  import SiteSelect from '$lib/components/SiteSelect.svelte';
+  import WikitextArticle from '$lib/components/WikitextArticle.svelte';
+  import { siteLabel } from '$lib/format';
   import type { CachedPage, Site, WikiNamespace } from '$lib/types';
 
   let sites: Site[] = $state([]);
@@ -17,10 +21,6 @@
   let error = $state('');
   let searchTimer: ReturnType<typeof setTimeout> | undefined;
   let searchSequence = 0;
-
-  function siteLabel(site: Site): string {
-    return site.label || `${site.family}:${site.code}`;
-  }
 
   function selectedSite(): Site | undefined {
     return sites.find((site) => site.pk === selectedSitePk);
@@ -164,15 +164,15 @@
 <section class="page-workspace">
   <section class="search-pane" aria-label="Page search">
     <div class="brand">
-      <p class="eyebrow">Cache object</p>
-      <h1>Pages</h1>
-      {#if selectedSite()}
-        <p class="count">{siteLabel(selectedSite() as Site)}</p>
-      {/if}
+      <PageHeading
+        eyebrow="Cache object"
+        title="Pages"
+        count={selectedSite() ? siteLabel(selectedSite() as Site) : ''}
+      />
     </div>
 
     {#if error}
-      <div class="notice">{error}</div>
+      <Notice>{error}</Notice>
     {/if}
 
     <form
@@ -187,14 +187,7 @@
       {:else if sites.length === 0}
         <p class="state">No sites have been fetched yet.</p>
       {:else}
-        <label>
-          <span>Site</span>
-          <select bind:value={selectedSitePk} onchange={changeSite}>
-            {#each sites as site}
-              <option value={site.pk}>{siteLabel(site)}</option>
-            {/each}
-          </select>
-        </label>
+        <SiteSelect {sites} bind:value={selectedSitePk} onchange={() => void changeSite()} />
       {/if}
 
       <label class="title-field">
@@ -243,6 +236,7 @@
       </label>
 
       <button
+        class="submit"
         type="submit"
         disabled={selectedSitePk == null || titleFragment() == null || searching}
       >
@@ -255,25 +249,24 @@
     {#if loadingPage}
       <div class="empty">Loading page...</div>
     {:else if selectedPage}
-      <article>
-        <header>
-          <p class="eyebrow">{selectedPage.namespace_role}</p>
-          <h2>{selectedPage.title}</h2>
-          <div class="meta">
-            <span>PK {selectedPage.pk}</span>
-            {#if selectedPage.content_model}
-              <span>{selectedPage.content_model}</span>
-            {/if}
-            {#if selectedPage.revid}
-              <span>Revision {selectedPage.revid}</span>
-            {/if}
-            {#if selectedPage.text}
-              <span>{selectedPage.text.length.toLocaleString()} characters</span>
-            {/if}
-          </div>
-        </header>
-        <WikitextViewer content={selectedPage.text} />
-      </article>
+      <WikitextArticle
+        eyebrow={selectedPage.namespace_role}
+        title={selectedPage.title}
+        content={selectedPage.text}
+      >
+        {#snippet meta()}
+          <span>PK {selectedPage?.pk}</span>
+          {#if selectedPage?.content_model}
+            <span>{selectedPage.content_model}</span>
+          {/if}
+          {#if selectedPage?.revid}
+            <span>Revision {selectedPage.revid}</span>
+          {/if}
+          {#if selectedPage?.text}
+            <span>{selectedPage.text.length.toLocaleString()} characters</span>
+          {/if}
+        {/snippet}
+      </WikitextArticle>
     {:else}
       <div class="empty">Complete a title above to view a cached page.</div>
     {/if}
@@ -294,17 +287,14 @@
     padding: 1.4rem;
   }
 
-  .search-form {
-    grid-template-columns: minmax(12rem, 18rem) minmax(18rem, 1fr) auto;
-    align-items: end;
-  }
-
   .brand {
     margin-bottom: 1.4rem;
   }
 
   .search-form {
     display: grid;
+    grid-template-columns: minmax(12rem, 18rem) minmax(18rem, 1fr) auto;
+    align-items: end;
     gap: 0.9rem;
   }
 
@@ -322,8 +312,7 @@
     text-transform: uppercase;
   }
 
-  input,
-  select {
+  input {
     width: 100%;
     border: 1px solid rgba(87, 58, 37, 0.22);
     border-radius: 12px;
@@ -337,7 +326,7 @@
     cursor: pointer;
   }
 
-  .search-form button {
+  .submit {
     border: 0;
     border-radius: 12px;
     background: #9c5632;
@@ -350,7 +339,7 @@
     text-transform: uppercase;
   }
 
-  .search-form button:disabled {
+  .submit:disabled {
     cursor: default;
     opacity: 0.55;
   }
@@ -400,18 +389,6 @@
 
   .page-content {
     min-width: 0;
-  }
-
-  article {
-    animation: enter 260ms ease both;
-  }
-
-  header {
-    margin-bottom: 1.5rem;
-  }
-
-  h2 {
-    word-break: break-word;
   }
 
   @media (max-width: 920px) {

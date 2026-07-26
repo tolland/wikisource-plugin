@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { listIndexPages, listPendingCommits, listSites } from '$lib/api';
+  import LinkCard from '$lib/components/LinkCard.svelte';
+  import Notice from '$lib/components/Notice.svelte';
   import type { IndexPageSummary, Site } from '$lib/types';
 
   let sites: Site[] = $state([]);
@@ -42,40 +44,46 @@
 </section>
 
 {#if error}
-  <div class="notice">{error}</div>
+  <Notice>{error}</Notice>
 {/if}
 
 <section class="cards" aria-label="Cache overview">
-  <a class="card" href="/fetch">
-    <span class="card-kicker">Checkout</span>
-    <strong>Fetch pages</strong>
-    <small>Pull Index: and Page: records into SQLite.</small>
-  </a>
-  <a class="card" href="/sites">
-    <span class="card-kicker">Configuration</span>
-    <strong>{loading ? '...' : sites.length} Sites</strong>
-    <small>Add wikis, edit API URLs, and configure login credentials.</small>
-  </a>
-  <a class="card" href="/indexes">
-    <span class="card-kicker">Working tree</span>
-    <strong>{loading ? '...' : indexes.length} Index pages</strong>
-    <small>Open cached proofread indexes and inspect their source.</small>
-  </a>
-  <a class="card" href="/pages">
-    <span class="card-kicker">Objects</span>
-    <strong>Cached pages</strong>
-    <small>Find any Page, Template, Book, or other cached title.</small>
-  </a>
-  <a class="card" href="/commits">
-    <span class="card-kicker">Review</span>
-    <strong>{loading ? '...' : pendingCommitCount} staged pages</strong>
-    <small>Inspect pending local edits and push them one page at a time.</small>
-  </a>
-  <a class="card" href="/vfs">
-    <span class="card-kicker">Editor view</span>
-    <strong>Virtual files</strong>
-    <small>Browse the VFS projection exposed to the IntelliJ plugin.</small>
-  </a>
+  <LinkCard
+    href="/fetch"
+    kicker="Checkout"
+    title="Fetch pages"
+    description="Pull Index: and Page: records into SQLite."
+  />
+  <LinkCard
+    href="/sites"
+    kicker="Configuration"
+    title={`${loading ? '...' : sites.length} Sites`}
+    description="Add wikis, edit API URLs, and configure login credentials."
+  />
+  <LinkCard
+    href="/indexes"
+    kicker="Working tree"
+    title={`${loading ? '...' : indexes.length} Index pages`}
+    description="Open cached proofread indexes and inspect their source."
+  />
+  <LinkCard
+    href="/pages"
+    kicker="Objects"
+    title="Cached pages"
+    description="Find any Page, Template, Book, or other cached title."
+  />
+  <LinkCard
+    href="/commits"
+    kicker="Review"
+    title={`${loading ? '...' : pendingCommitCount} staged pages`}
+    description="Inspect pending local edits and push them one page at a time."
+  />
+  <LinkCard
+    href="/vfs"
+    kicker="Editor view"
+    title="Virtual files"
+    description="Browse the VFS projection exposed to the IntelliJ plugin."
+  />
 </section>
 
 <section class="panel-grid">
@@ -147,61 +155,18 @@
     margin: 2rem 0;
   }
 
-  .card,
   .panel {
     border: 1px solid rgba(72, 49, 31, 0.18);
     border-radius: 24px;
     background: rgba(255, 252, 240, 0.68);
     box-shadow: 0 20px 60px rgba(62, 44, 30, 0.12);
-  }
-
-  .card {
-    color: inherit;
-    min-height: 10rem;
     padding: 1.3rem;
-    text-decoration: none;
-    transition: transform 160ms ease, border-color 160ms ease;
-  }
-
-  .card:hover {
-    transform: translateY(-2px);
-    border-color: #9c5632;
-  }
-
-  .card strong,
-  .card small,
-  .card-kicker {
-    display: block;
-  }
-
-  .card strong {
-    margin-top: 0.5rem;
-    font-size: 1.45rem;
-  }
-
-  .card small {
-    margin-top: 0.7rem;
-    color: #73583d;
-    line-height: 1.4;
-  }
-
-  .card-kicker {
-    color: #9c5632;
-    font-family: "Avenir Next", "Gill Sans", sans-serif;
-    font-size: 0.72rem;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
   }
 
   .panel-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 1rem;
-  }
-
-  .panel {
-    padding: 1.3rem;
   }
 
   .panel h2 {
