@@ -579,6 +579,10 @@ POST /link/{page}/pull       # ff if clean; else return diff for merge
   the core `pages`/journal model is required to get there — `RemoteLink` is purely
   additive.
 
+The *push* direction of this — promoting locally proofread pages back up to
+en.wikisource.org, with preflight checks, batching and rollback — is worked out
+in `docs/upstream-sync-TODO.md`.
+
 ---
 
 ## 10. Testing
