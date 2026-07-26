@@ -6,7 +6,7 @@ license = { text = "MIT" }
 dependencies = [
     "alembic>=1.18.5",
     "bs4>=0.0.2",
-    "fastapi[standard]>=0.138.1",
+    "fastapi[standard]==0.140.0",
     "pydantic>=2.13.4",
     "python-dotenv>=1.2.1",
     "pywikibot>=11.4.2",
