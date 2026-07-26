@@ -58,6 +58,7 @@ internal class PrpPreviewToolbar(
                 "Tile Stacked", "Place the two previews top and bottom",
                 AllIcons.Actions.SplitHorizontally,
             ),
+            SwapPanesAction(previewBrowser),
         )
         val toolbar = ActionManager.getInstance()
             .createActionToolbar("WikitextPreviewToolbar", group, true)
@@ -112,6 +113,24 @@ private class OrientationAction(
 
     override fun update(event: AnActionEvent) {
         super.update(event)
+        event.presentation.isEnabledAndVisible = previewBrowser.mode == PrpPreviewBrowser.Mode.SPLIT
+    }
+
+    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
+}
+
+/**
+ * Swaps the two previews' positions in the tiled layout. Only relevant — and
+ * only shown — when both previews are visible ([PrpPreviewBrowser.Mode.SPLIT]).
+ */
+private class SwapPanesAction(
+    private val previewBrowser: PrpPreviewBrowser,
+) : AnAction("Swap Panes", "Swap the positions of the two previews", AllIcons.Actions.SwapPanels) {
+    override fun actionPerformed(event: AnActionEvent) {
+        previewBrowser.swapped = !previewBrowser.swapped
+    }
+
+    override fun update(event: AnActionEvent) {
         event.presentation.isEnabledAndVisible = previewBrowser.mode == PrpPreviewBrowser.Mode.SPLIT
     }
 
@@ -182,31 +201,67 @@ private class SendToOcrAction(
 }
 
 /**
- * The render pane's own toolbar: reload, which only makes sense for the
+ * The render pane's own toolbar: reload and zoom, which only make sense for the
  * server-rendered preview. Lives inside the render pane so it travels with it
- * in the tiled layout.
+ * in the tiled layout. The zoom buttons drive the same zoom level as Ctrl-wheel.
  */
 internal class PrpRenderPreviewToolbar(
-    private val reload: () -> Unit,
-    targetComponent: JComponent,
+    private val renderPane: RenderPreviewPane,
 ) {
     val component: JComponent
 
     init {
-        val group = DefaultActionGroup(ReloadPreviewAction(reload))
+        val group = DefaultActionGroup(
+            RenderReloadAction(renderPane),
+            RenderZoomInAction(renderPane),
+            RenderZoomOutAction(renderPane),
+            RenderResetZoomAction(renderPane),
+        )
         val toolbar = ActionManager.getInstance()
             .createActionToolbar("WikitextRenderPreviewToolbar", group, true)
-        toolbar.targetComponent = targetComponent
+        toolbar.targetComponent = renderPane.component
         component = toolbar.component.apply {
             border = JBUI.Borders.customLineBottom(JBColor.border())
         }
     }
 }
 
-private class ReloadPreviewAction(
-    private val reload: () -> Unit,
+private class RenderReloadAction(
+    private val renderPane: RenderPreviewPane,
 ) : AnAction("Reload Preview", "Reload Wikitext preview", AllIcons.Actions.Refresh) {
-    override fun actionPerformed(event: AnActionEvent) = reload()
+    override fun actionPerformed(event: AnActionEvent) = renderPane.reload()
 
     override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
+}
+
+/** Base for the render-preview zoom buttons: hidden when zoom isn't supported. */
+private abstract class RenderZoomAction(
+    private val renderPane: RenderPreviewPane,
+    text: String,
+    description: String,
+    icon: Icon,
+) : AnAction(text, description, icon) {
+    override fun update(event: AnActionEvent) {
+        event.presentation.isEnabledAndVisible = renderPane.zoomSupported
+    }
+
+    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
+}
+
+private class RenderZoomInAction(
+    private val renderPane: RenderPreviewPane,
+) : RenderZoomAction(renderPane, "Zoom In", "Zoom into the rendered preview", AllIcons.General.ZoomIn) {
+    override fun actionPerformed(event: AnActionEvent) = renderPane.zoomIn()
+}
+
+private class RenderZoomOutAction(
+    private val renderPane: RenderPreviewPane,
+) : RenderZoomAction(renderPane, "Zoom Out", "Zoom out of the rendered preview", AllIcons.General.ZoomOut) {
+    override fun actionPerformed(event: AnActionEvent) = renderPane.zoomOut()
+}
+
+private class RenderResetZoomAction(
+    private val renderPane: RenderPreviewPane,
+) : RenderZoomAction(renderPane, "Reset Zoom", "Reset the rendered preview to 100%", AllIcons.General.ActualZoom) {
+    override fun actionPerformed(event: AnActionEvent) = renderPane.resetZoom()
 }
