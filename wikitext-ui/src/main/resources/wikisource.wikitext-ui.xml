@@ -13,10 +13,14 @@
             implementationClass="org.limepepper.lang.wikitext.highlighting.WtSyntaxHighlighterFactory"
         />
 
+<!--        <annotator-->
+<!--            language="Wikitext"-->
+<!--            implementationClass="org.limepepper.lang.wikitext.highlighting.WtAnnotator"-->
+<!--        />-->
+
         <annotator
             language="Wikitext"
-            implementationClass="org.limepepper.lang.wikitext.highlighting.WtAnnotator"
-        />
+            implementationClass="org.limepepper.lang.wikitext.annotator.WtSentenceBandAnnotator"/>
 
         <defaultLiveTemplates
             file="/liveTemplates/Wikitext.xml"
@@ -56,10 +60,13 @@
             implementation="org.limepepper.lang.wikitext.preview.WtPreviewEditorProvider"
         />
 
-        <codeInsight.inlayProvider
-            language="Wikitext"
-            implementationClass="org.limepepper.lang.wikitext.inlay.ProofreadInlayProvider"
-        />
+        <!-- this is a stub to provide inlay hints around specific wikisource
+        related psi elements, however, it is disabled because it is messing up
+        the inlay hints in the proofread-page text editor -->
+        <!--        <codeInsight.inlayProvider-->
+        <!--            language="Wikitext"-->
+        <!--            implementationClass="org.limepepper.lang.wikitext.inlay.ProofreadInlayProvider"-->
+        <!--        />-->
 
     </extensions>
 
@@ -75,8 +82,8 @@
         </action>
     </actions>
 
-    <!-- this is a stub for an InlayHints provider -->
     <!--    <applicationListeners>-->
+    <!-- this is a stub for listing to EditorFactory events -->
     <!--        <listener-->
     <!--            class="org.limepepper.lang.wikitext.inlay.ProofreadEditorListener"-->
     <!--            topic="com.intellij.openapi.editor.event.EditorFactoryListener"-->

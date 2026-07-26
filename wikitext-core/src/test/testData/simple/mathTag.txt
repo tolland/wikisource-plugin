@@ -1,0 +1,4 @@
+WtTokenType.HTML_TAG_OPEN ('<math>')
+WtTokenType.VERBATIM_CONTENT ('e=mc^2')
+WtTokenType.HTML_TAG_CLOSE ('</math>')
+WtTokenType.NEWLINE ('\n')

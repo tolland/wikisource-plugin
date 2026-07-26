@@ -6,9 +6,13 @@ import com.intellij.openapi.actionSystem.ActionGroup
 import com.intellij.openapi.editor.CustomWrap
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.editor.EditorCustomElementRenderer
+import com.intellij.openapi.editor.Inlay
 import com.intellij.openapi.editor.RangeMarker
+import com.intellij.openapi.editor.colors.EditorFontType
 import com.intellij.openapi.editor.event.DocumentEvent
 import com.intellij.openapi.editor.event.DocumentListener
+import com.intellij.openapi.editor.markup.TextAttributes
 import com.intellij.openapi.fileEditor.FileEditorLocation
 import com.intellij.openapi.fileEditor.FileEditorState
 import com.intellij.openapi.fileEditor.FileEditorStateLevel
@@ -17,8 +21,14 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.UserDataHolderBase
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.pom.Navigatable
+import com.intellij.ui.JBColor
 import org.jetbrains.annotations.Unmodifiable
 import java.awt.BorderLayout
+import java.awt.Font
+import java.awt.Graphics
+import java.awt.Graphics2D
+import java.awt.Rectangle
+import java.awt.RenderingHints
 import java.beans.PropertyChangeListener
 import javax.swing.JComponent
 import javax.swing.JPanel
@@ -52,6 +62,7 @@ class PrpTextEditor(
 
     private var guards: List<RangeMarker> = emptyList()
     private var wraps: List<CustomWrap> = emptyList()
+    private var dividers: List<Inlay<*>> = emptyList()
 
     /**
      * The editor whose text box↔text anchor offsets are relative to — see
@@ -94,6 +105,8 @@ class PrpTextEditor(
     private fun updateDecorations() {
         guards.forEach { if (it.isValid) document.removeGuardedBlock(it) }
         guards = emptyList()
+        dividers.forEach { Disposer.dispose(it) }
+        dividers = emptyList()
         bodyStartOffset = 0
         bodyEndOffset = document.textLength
 
@@ -106,9 +119,13 @@ class PrpTextEditor(
                 emptyList()
             } else {
                 listOf(spans.headerOpen, spans.headerClose, spans.footerOpen, spans.footerClose)
-                    .mapNotNull { span -> addWrap(span.last + 1) }
+                    .mapNotNull { span ->
+                        addWrap(span.first)
+                        addWrap(span.last + 1)
+                    }
             }
         }
+
         if (spans == null) {
             return
         }
@@ -121,7 +138,39 @@ class PrpTextEditor(
         }
         bodyStartOffset = spans.headerClose.last + 1
         bodyEndOffset = spans.footerOpen.first
+
+        val editor = delegate.editor
+        dividers = listOfNotNull(
+            addDivider(
+                editor,
+                spans.headerOpen.first,
+                "Header",
+            ),
+            addDivider(
+                editor,
+                bodyStartOffset,
+                "Body",
+            ),
+            addDivider(
+                editor,
+                spans.footerOpen.first,
+                "Footer",
+            ),
+        )
     }
+
+    private fun addDivider(
+        editor: Editor,
+        offset: Int,
+        label: String,
+    ): Inlay<*>? =
+        editor.inlayModel.addBlockElement(
+            offset,
+            false,
+            true,
+            0,
+            SectionDividerRenderer(label),
+        )
 
     override fun getComponent(): JComponent = wrapper
 
@@ -195,6 +244,7 @@ class PrpTextEditor(
 
     override fun dispose() {
         guards.forEach { if (it.isValid) document.removeGuardedBlock(it) }
+        dividers.forEach { Disposer.dispose(it) }
         if (wraps.isNotEmpty()) {
             val staleWraps = wraps
             delegate.editor.customWrapModel.runBatchMutation {
@@ -208,4 +258,44 @@ class PrpTextEditor(
     // default method — deliberately not overridden (the plugin verifier
     // flags both overriding it and invoking it as internal-API usage). The
     // interface's own default (`true`) applies here instead.
+
+
+    /** A thin labeled rule marking a header/body/footer seam — see the class doc. */
+    private class SectionDividerRenderer(private val label: String) : EditorCustomElementRenderer {
+        override fun calcWidthInPixels(inlay: Inlay<*>): Int = 0
+
+        override fun calcHeightInPixels(inlay: Inlay<*>): Int {
+            val metrics = inlay.editor.contentComponent.getFontMetrics(labelFont(inlay))
+            return metrics.height + 2 * PADDING_PX
+        }
+
+        override fun paint(inlay: Inlay<*>, g: Graphics, targetRegion: Rectangle, textAttributes: TextAttributes) {
+            val g2 = g as Graphics2D
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+            val font = labelFont(inlay)
+            val metrics = inlay.editor.contentComponent.getFontMetrics(font)
+            val midY = targetRegion.y + targetRegion.height / 2
+            g2.color = JBColor.border()
+            g2.drawLine(targetRegion.x, midY, targetRegion.x + targetRegion.width, midY)
+
+            val labelX = targetRegion.x + LABEL_INSET_PX
+            val labelWidth = metrics.stringWidth(label)
+            g2.color = inlay.editor.contentComponent.background
+            g2.fillRect(labelX - 2, targetRegion.y, labelWidth + 4, targetRegion.height)
+
+            g2.color = JBColor.GRAY
+            g2.font = font
+            g2.drawString(label, labelX, targetRegion.y + metrics.ascent + (targetRegion.height - metrics.height) / 2)
+        }
+
+        private fun labelFont(inlay: Inlay<*>): Font {
+            val editorFont = inlay.editor.colorsScheme.getFont(EditorFontType.PLAIN)
+            return editorFont.deriveFont(Font.BOLD, editorFont.size2D - 2f)
+        }
+
+        private companion object {
+            const val PADDING_PX = 4
+            const val LABEL_INSET_PX = 8
+        }
+    }
 }

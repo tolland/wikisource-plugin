@@ -1,8 +1,17 @@
-import org.gradle.kotlin.dsl.withType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.intellij.platform.gradle.tasks.PrepareSandboxTask
 import org.jetbrains.kotlin.gradle.dsl.JvmDefaultMode
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
+
+val sandboxPluginIds = listOf(
+    "PsiViewer",
+)
+
+// Directory names created underneath <sandbox>/plugins.
+// They are usually, but not necessarily, the same as the plugin ID.
+val sandboxPluginDirectories = listOf(
+    "PsiViewer",
+)
 
 val intellijPlatformVersion = providers.gradleProperty("intellijPlatformVersion").get()
 
@@ -41,7 +50,12 @@ dependencies {
         intellijIdea(intellijPlatformVersion) {
             useCache = true
         }
+        // @TODO put this back if new version comes out
         // plugin("psiviewer", version = "2026.1")
+        plugin("org.jetbrains.plugins.kotlin.jupyter", version = "262.8665.176")
+        plugin("com.intellij.notebooks.core", version = "262.8665.270")
+        plugin("intellij.jupyter", version = "262.8665.339")
+        plugin("nl.rubensten.texifyidea", version = "1.0.0")
         pluginModule(implementation(project(":wikitext-core")))
         pluginModule(implementation(project(":wikitext-vfs")))
         pluginModule(implementation(project(":wikitext-ui")))
@@ -64,11 +78,20 @@ intellijPlatform {
     }
 }
 
+
+
 tasks {
 
     withType<PrepareSandboxTask> {
-        sandboxDirectory = project.layout.buildDirectory.dir("custom-sandbox")
+        sandboxDirectory =
+            rootProject.layout.projectDirectory.dir(".intellijPlatform/custom-sandbox")
         sandboxSuffix = ""
+
+        preserve {
+            sandboxPluginDirectories.forEach {
+                include("$it/**")
+            }
+        }
 
         // Declare sandbox config files as inputs for configuration cache compatibility
         inputs.files(

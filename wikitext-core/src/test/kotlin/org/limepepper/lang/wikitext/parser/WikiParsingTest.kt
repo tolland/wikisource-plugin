@@ -6,6 +6,11 @@ import java.io.IOException
 import java.io.FileNotFoundException
 
 class WikiParsingTest : WtParsingTextCase() {
+
+    // math tag tests
+    fun testMathTag() = doTest()
+
+    // simple
     fun testHelloWorld() = doTest()
     fun testNestedTemplates() = doTest()
     fun testWikiLinksSimple() = doTest()

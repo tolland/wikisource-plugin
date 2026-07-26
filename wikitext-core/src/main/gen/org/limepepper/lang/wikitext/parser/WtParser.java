@@ -420,12 +420,18 @@ public class WtParser implements PsiParser, LightPsiParser {
 
   /* ********************************************************** */
   // VERBATIM_CONTENT
-  static boolean verbatim_run(PsiBuilder b, int l) {
-    return consumeToken(b, VERBATIM_CONTENT);
+  public static boolean verbatim_body(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "verbatim_body")) return false;
+    if (!nextTokenIs(b, VERBATIM_CONTENT)) return false;
+    boolean r;
+    Marker m = enter_section_(b);
+    r = consumeToken(b, VERBATIM_CONTENT);
+    exit_section_(b, m, VERBATIM_BODY, r);
+    return r;
   }
 
   /* ********************************************************** */
-  // HTML_TAG_OPEN verbatim_run* HTML_TAG_CLOSE
+  // HTML_TAG_OPEN verbatim_body? HTML_TAG_CLOSE
   public static boolean verbatim_tag(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "verbatim_tag")) return false;
     if (!nextTokenIs(b, HTML_TAG_OPEN)) return false;
@@ -439,14 +445,10 @@ public class WtParser implements PsiParser, LightPsiParser {
     return r || p;
   }
 
-  // verbatim_run*
+  // verbatim_body?
   private static boolean verbatim_tag_1(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "verbatim_tag_1")) return false;
-    while (true) {
-      int c = current_position_(b);
-      if (!verbatim_run(b, l + 1)) break;
-      if (!empty_element_parsed_guard_(b, "verbatim_tag_1", c)) break;
-    }
+    verbatim_body(b, l + 1);
     return true;
   }
 

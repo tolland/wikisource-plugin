@@ -11,14 +11,14 @@ import static org.limepepper.lang.wikitext.psi.WtTypes.*;
 import org.limepepper.lang.wikitext.psi.*;
 import org.limepepper.lang.wikitext.parser.WtPsiImplUtil;
 
-public class WtVerbatimTagImpl extends WtVerbatimTagMixinImpl implements WtVerbatimTag {
+public class WtVerbatimBodyImpl extends WtVerbatimBodyMixin implements WtVerbatimBody {
 
-  public WtVerbatimTagImpl(@NotNull ASTNode node) {
+  public WtVerbatimBodyImpl(@NotNull ASTNode node) {
     super(node);
   }
 
   public void accept(@NotNull WtVisitor visitor) {
-    visitor.visitVerbatimTag(this);
+    visitor.visitVerbatimBody(this);
   }
 
   @Override
@@ -28,21 +28,9 @@ public class WtVerbatimTagImpl extends WtVerbatimTagMixinImpl implements WtVerba
   }
 
   @Override
-  @Nullable
-  public WtVerbatimBody getVerbatimBody() {
-    return findChildByClass(WtVerbatimBody.class);
-  }
-
-  @Override
-  @Nullable
-  public PsiElement getHtmlTagClose() {
-    return findChildByType(HTML_TAG_CLOSE);
-  }
-
-  @Override
   @NotNull
-  public PsiElement getHtmlTagOpen() {
-    return findNotNullChildByType(HTML_TAG_OPEN);
+  public PsiElement getVerbatimContent() {
+    return findNotNullChildByType(VERBATIM_CONTENT);
   }
 
 }

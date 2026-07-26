@@ -204,8 +204,16 @@ private html_tag_content ::= content_element*
 // opaque VERBATIM_CONTENT runs, never re-parsed as wikitext, matching the
 // lexer's <VERBATIM_TAG> state which never pushes a recursive frame for
 // what's inside.
-verbatim_tag ::= HTML_TAG_OPEN verbatim_run* HTML_TAG_CLOSE {pin=1}
-private verbatim_run ::= VERBATIM_CONTENT
+verbatim_tag ::= HTML_TAG_OPEN verbatim_body? HTML_TAG_CLOSE {
+    pin=1
+    mixin="org.limepepper.lang.wikitext.psi.impl.WtVerbatimTagMixinImpl"
+    implements="org.limepepper.lang.wikitext.psi.WtVerbatimTagMixin"
+}
+
+verbatim_body ::= VERBATIM_CONTENT {
+    mixin="org.limepepper.lang.wikitext.psi.impl.WtVerbatimBodyMixin"
+    implements="com.intellij.psi.PsiLanguageInjectionHost"
+}
 
 // =========================================================================
 // --- Comments ---

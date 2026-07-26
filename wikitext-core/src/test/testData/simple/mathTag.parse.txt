@@ -1,0 +1,6 @@
+Wikitext File(0,19)
+  WtVerbatimTagImpl(WtElementType.VERBATIM_TAG)(0,19)
+    PsiElement(WtTokenType.HTML_TAG_OPEN)('<math>')(0,6)
+    WtVerbatimBodyImpl(WtElementType.VERBATIM_BODY)(6,12)
+      PsiElement(WtTokenType.VERBATIM_CONTENT)('e=mc^2')(6,12)
+    PsiElement(WtTokenType.HTML_TAG_CLOSE)('</math>')(12,19)

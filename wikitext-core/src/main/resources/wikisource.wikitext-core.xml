@@ -20,5 +20,20 @@
             language="Wikitext"
             implementationClass="org.limepepper.lang.wikitext.parser.WtParserDefinition"
         />
+
+        <lang.elementManipulator
+            forClass="org.limepepper.lang.wikitext.psi.WtVerbatimBody"
+            implementationClass="org.limepepper.lang.wikitext.psi.impl.WtVerbatimBodyManipulator"
+        />
+
+        <multiHostInjector
+            implementation="org.limepepper.lang.wikitext.injection.WtVerbatimLanguageInjector"
+        />
     </extensions>
+
+<!--    <extensions defaultExtensionNs="org.intellij.intelliLang">-->
+<!--        <injectionConfig-->
+<!--            config="path/to/your/injections.xml"-->
+<!--        />-->
+<!--    </extensions>-->
 </idea-plugin>

@@ -5,6 +5,10 @@ import org.limepepper.lang.wikitext.utils.WtLexerTestCase
 
 class WtLexerTest : WtLexerTestCase() {
 
+    // math tag tests
+    fun testMathTag() = doTest()
+
+    // simple
     fun testHeaderOneWithNewline() = doTest()
     fun testHelloWorld() = doTest()
     fun testNestedTemplates() = doTest()

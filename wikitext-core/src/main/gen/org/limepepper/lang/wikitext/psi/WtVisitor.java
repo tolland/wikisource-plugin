@@ -4,6 +4,7 @@ package org.limepepper.lang.wikitext.psi;
 import org.jetbrains.annotations.*;
 import com.intellij.psi.PsiElementVisitor;
 import com.intellij.psi.NavigatablePsiElement;
+import com.intellij.psi.PsiLanguageInjectionHost;
 
 public class WtVisitor extends PsiElementVisitor {
 
@@ -39,7 +40,19 @@ public class WtVisitor extends PsiElementVisitor {
     visitNavigatablePsiElement(o);
   }
 
+  public void visitVerbatimBody(@NotNull WtVerbatimBody o) {
+    visitPsiLanguageInjectionHost(o);
+  }
+
   public void visitVerbatimTag(@NotNull WtVerbatimTag o) {
+    visitVerbatimTagMixin(o);
+  }
+
+  public void visitPsiLanguageInjectionHost(@NotNull PsiLanguageInjectionHost o) {
+    visitElement(o);
+  }
+
+  public void visitVerbatimTagMixin(@NotNull WtVerbatimTagMixin o) {
     visitNavigatablePsiElement(o);
   }
 

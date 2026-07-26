@@ -16,6 +16,7 @@ public interface WtTypes {
   IElementType LIST_ITEM = new WtElementType("LIST_ITEM");
   IElementType TABLE = new WtElementType("TABLE");
   IElementType TEMPLATE = new WtElementType("TEMPLATE");
+  IElementType VERBATIM_BODY = new WtElementType("VERBATIM_BODY");
   IElementType VERBATIM_TAG = new WtElementType("VERBATIM_TAG");
 
   IElementType BULLET = new WtTokenType("*");
@@ -86,6 +87,9 @@ public interface WtTypes {
       }
       else if (type == TEMPLATE) {
         return new WtTemplateImpl(node);
+      }
+      else if (type == VERBATIM_BODY) {
+        return new WtVerbatimBodyImpl(node);
       }
       else if (type == VERBATIM_TAG) {
         return new WtVerbatimTagImpl(node);

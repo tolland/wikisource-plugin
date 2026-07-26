@@ -4,16 +4,11 @@ package org.limepepper.lang.wikitext.psi;
 import java.util.List;
 import org.jetbrains.annotations.*;
 import com.intellij.psi.PsiElement;
+import com.intellij.psi.PsiLanguageInjectionHost;
 
-public interface WtVerbatimTag extends WtVerbatimTagMixin {
-
-  @Nullable
-  WtVerbatimBody getVerbatimBody();
-
-  @Nullable
-  PsiElement getHtmlTagClose();
+public interface WtVerbatimBody extends PsiLanguageInjectionHost {
 
   @NotNull
-  PsiElement getHtmlTagOpen();
+  PsiElement getVerbatimContent();
 
 }
