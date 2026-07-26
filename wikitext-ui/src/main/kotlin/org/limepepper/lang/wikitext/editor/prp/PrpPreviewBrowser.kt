@@ -133,6 +133,12 @@ class PrpPreviewBrowser(
         component.add(PrpPreviewToolbar(this).component, BorderLayout.NORTH)
         component.add(centerPanel, BorderLayout.CENTER)
 
+        // Arm the render pane's first load before laying out: scheduleReload()
+        // only marks it pending while the pane is hidden, so the render is
+        // populated the moment it first becomes visible (a mode switch to
+        // SPLIT/RENDER_ONLY) rather than staying blank until the first edit.
+        renderPane.scheduleReload()
+
         // Apply the initial mode (IMAGE_ONLY): the property initializer sets the
         // backing field directly without firing the setter, so lay out here.
         applyLayout()
