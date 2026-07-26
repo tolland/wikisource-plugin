@@ -183,6 +183,12 @@ class PrpPreviewBrowser(
             Mode.RENDER_ONLY -> centerPanel.add(renderHost, BorderLayout.CENTER)
             Mode.SPLIT -> {
                 splitter.orientation = splitStacked
+                // Clear both slots before reassigning: Splitter.setSecondComponent
+                // removes whatever currently occupies the second slot, so setting
+                // first := old-second and then second := other would evict the
+                // component we just moved into the first slot (leaving it blank).
+                splitter.firstComponent = null
+                splitter.secondComponent = null
                 splitter.firstComponent = if (swapped) renderHost else imageHost
                 splitter.secondComponent = if (swapped) imageHost else renderHost
                 centerPanel.add(splitter, BorderLayout.CENTER)
