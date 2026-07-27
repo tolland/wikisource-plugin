@@ -150,6 +150,47 @@ class FakeVfsBackendTest {
     }
 
     @Test
+    fun `box links round trip and require an existing range`() {
+        val path = "/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1"
+        backend.saveAnnotation(path, PageAnnotation(id = "b1", x = 0.0, y = 0.0, width = 1.0, height = 1.0))
+        assertThrows(VfsBackendException::class.java) {
+            backend.saveBoxLink(path, PageBoxLink(boxId = "b1", rangeId = "missing"))
+        }
+
+        backend.saveTextAnchor(path, PageTextAnchor(annotationId = "r1", textStart = 0, textEnd = 3))
+        backend.saveTextAnchor(path, PageTextAnchor(annotationId = "r2", textStart = 5, textEnd = 9))
+        val link = PageBoxLink(boxId = "b1", rangeId = "r1")
+        backend.saveBoxLink(path, link)
+        assertEquals(listOf(link), backend.listBoxLinks(path))
+
+        // Re-linking repoints the box's single link.
+        backend.saveBoxLink(path, link.copy(rangeId = "r2"))
+        assertEquals("r2", backend.listBoxLinks(path).single().rangeId)
+
+        backend.deleteBoxLink(path, "b1")
+        assertEquals(emptyList<PageBoxLink>(), backend.listBoxLinks(path))
+        assertThrows(VfsBackendException::class.java) {
+            backend.deleteBoxLink(path, "b1")
+        }
+    }
+
+    @Test
+    fun `deleting either endpoint drops the link`() {
+        val path = "/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1"
+        backend.saveAnnotation(path, PageAnnotation(id = "b1", x = 0.0, y = 0.0, width = 1.0, height = 1.0))
+        backend.saveTextAnchor(path, PageTextAnchor(annotationId = "r1", textStart = 0, textEnd = 3))
+        backend.saveBoxLink(path, PageBoxLink(boxId = "b1", rangeId = "r1"))
+
+        backend.deleteTextAnchor(path, "r1")
+        assertEquals(emptyList<PageBoxLink>(), backend.listBoxLinks(path))
+
+        backend.saveTextAnchor(path, PageTextAnchor(annotationId = "r1", textStart = 0, textEnd = 3))
+        backend.saveBoxLink(path, PageBoxLink(boxId = "b1", rangeId = "r1"))
+        backend.deleteAnnotation(path, "b1")
+        assertEquals(emptyList<PageBoxLink>(), backend.listBoxLinks(path))
+    }
+
+    @Test
     fun `deleting an unknown annotation throws`() {
         assertThrows(VfsBackendException::class.java) {
             backend.deleteAnnotation("/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1", "nope")

@@ -276,6 +276,33 @@ class HttpVfsBackend(
         )
     }
 
+    override fun listBoxLinks(path: String): List<PageBoxLink> {
+        val json = get("/pages/box-links", "path" to path)
+        return JsonReader(json).array("links", ::readBoxLink)
+    }
+
+    override fun saveBoxLink(path: String, link: PageBoxLink): PageBoxLink {
+        val body = buildJsonObject("range_annotation_id" to link.rangeId)
+        val json = put(
+            "/pages/box-links/${URLEncoder.encode(link.boxId, "UTF-8")}",
+            body,
+            "path" to path,
+        )
+        return readBoxLink(JsonReader(json))
+    }
+
+    override fun deleteBoxLink(path: String, boxId: String) {
+        delete(
+            "/pages/box-links/${URLEncoder.encode(boxId, "UTF-8")}",
+            "path" to path,
+        )
+    }
+
+    private fun readBoxLink(r: JsonReader): PageBoxLink = PageBoxLink(
+        boxId = r.string("box_annotation_id"),
+        rangeId = r.string("range_annotation_id"),
+    )
+
     private fun readAnnotation(r: JsonReader): PageAnnotation = PageAnnotation(
         id = r.string("id"),
         x = r.double("x"),
@@ -307,7 +334,7 @@ class HttpVfsBackend(
             .build()
         val resp = send(req)
         if (resp.statusCode() !in 200..299) {
-            throw VfsBackendException("HTTP ${resp.statusCode()} from $uri: ${resp.body()}")
+            throw VfsBackendException("HTTP ${resp.statusCode()} from $uri: ${resp.body()}", statusCode = resp.statusCode())
         }
         return resp.body()
     }
@@ -322,7 +349,7 @@ class HttpVfsBackend(
             .build()
         val resp = send(req)
         if (resp.statusCode() !in 200..299) {
-            throw VfsBackendException("HTTP ${resp.statusCode()} from $uri: ${resp.body()}")
+            throw VfsBackendException("HTTP ${resp.statusCode()} from $uri: ${resp.body()}", statusCode = resp.statusCode())
         }
         return resp.body()
     }
@@ -340,7 +367,7 @@ class HttpVfsBackend(
             .build()
         val resp = send(req)
         if (resp.statusCode() !in 200..299) {
-            throw VfsBackendException("HTTP ${resp.statusCode()} from $uri: ${resp.body()}")
+            throw VfsBackendException("HTTP ${resp.statusCode()} from $uri: ${resp.body()}", statusCode = resp.statusCode())
         }
         return resp.body()
     }
@@ -357,7 +384,7 @@ class HttpVfsBackend(
             .build()
         val resp = send(req)
         if (resp.statusCode() !in 200..299) {
-            throw VfsBackendException("HTTP ${resp.statusCode()} from $uri: ${resp.body()}")
+            throw VfsBackendException("HTTP ${resp.statusCode()} from $uri: ${resp.body()}", statusCode = resp.statusCode())
         }
     }
 
@@ -416,5 +443,9 @@ class HttpVfsBackend(
  * down/unreachable sidecar degrades the same way there as everywhere else
  * that already explicitly catches [VfsBackendException].
  */
-class VfsBackendException(message: String, cause: Throwable? = null) :
-    IOException(message, cause)
+class VfsBackendException(
+    message: String,
+    cause: Throwable? = null,
+    /** HTTP status when the failure was an HTTP error response; null for transport failures. */
+    val statusCode: Int? = null,
+) : IOException(message, cause)

@@ -6,6 +6,7 @@ These SQLModel classes define the SQLite schema shared by the IntelliJ plugin
 classes. See ``src-py/DESIGN.md`` for the rationale behind each table.
 """
 
+from wtbot.model.box_range_link import BoxRangeLink
 from wtbot.model.commit import Commit, CommitStatus
 from wtbot.model.edit_journal import EditJournal
 from wtbot.model.fetch_request import FetchKind, FetchRequest, FetchStatus
@@ -28,6 +29,7 @@ __all__ = [
     "AnnotationCategory",
     "ScanAnnotation",
     "TextTargetAnchor",
+    "BoxRangeLink",
     "Site",
     "Namespace",
     "NsRole",

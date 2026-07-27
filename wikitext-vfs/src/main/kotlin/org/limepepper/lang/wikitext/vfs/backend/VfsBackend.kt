@@ -71,4 +71,16 @@ interface VfsBackend {
 
     /** Deletes just the text anchor, leaving any box. Unknown ids are an error. */
     fun deleteTextAnchor(path: String, annotationId: String)
+
+    /** Box→range links for a Page: leaf (see [PageBoxLink]). */
+    fun listBoxLinks(path: String): List<PageBoxLink>
+
+    /**
+     * Upserts the link for [PageBoxLink.boxId], repointing an existing one.
+     * The target range must exist server-side; a missing range is an error.
+     */
+    fun saveBoxLink(path: String, link: PageBoxLink): PageBoxLink
+
+    /** Deletes the box's link, leaving box and range. Unknown ids are an error. */
+    fun deleteBoxLink(path: String, boxId: String)
 }

@@ -146,3 +146,15 @@ data class PageTextAnchor(
     val textEnd: Int,
     val anchorRevid: Long? = null,
 )
+
+/**
+ * One box→range link from /pages/box-links: the bounding box [boxId]'s
+ * content is destined for the text range [rangeId]. Explicit rows replace
+ * the old implicit shared-id convention — a box links to at most one range,
+ * several boxes may target one range, and the link dies with either
+ * endpoint (deleting the box or the range deletes it server-side).
+ */
+data class PageBoxLink(
+    val boxId: String,
+    val rangeId: String,
+)

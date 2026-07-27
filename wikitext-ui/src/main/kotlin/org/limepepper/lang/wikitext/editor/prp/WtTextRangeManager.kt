@@ -322,7 +322,79 @@ class WtTextRangeManager(
         }
     }
 
+    // ---- drop target for the canvas's drag-to-link handle ------------------
+
+    /**
+     * Resolves a drag-to-link drop at [screenPoint] (from
+     * [org.limepepper.lang.wikitext.annotation.ImageAnnotationCanvas]'s link
+     * handle) to the range under it. A drop on the editor body maps through
+     * the text offset — inside a range's extent, on its edge handles, or
+     * within a couple of characters of an insertion point all match. A drop
+     * on the gutter matches any range covering that line, so the per-range
+     * gutter icon works as a drop target too. Null when nothing is hit.
+     */
+    fun rangeIdAtScreenPoint(screenPoint: java.awt.Point): String? {
+        if (editor.isDisposed) {
+            return null
+        }
+        val content = editor.contentComponent
+        val inContent = java.awt.Point(screenPoint)
+        javax.swing.SwingUtilities.convertPointFromScreen(inContent, content)
+        if (content.contains(inContent.x, inContent.y)) {
+            val offset = editor.logicalPositionToOffset(editor.xyToLogicalPosition(inContent))
+            return rangeIdAtOffset(offset)
+        }
+        val gutter = (editor as? com.intellij.openapi.editor.ex.EditorEx)?.gutterComponentEx
+        if (gutter != null) {
+            val inGutter = java.awt.Point(screenPoint)
+            javax.swing.SwingUtilities.convertPointFromScreen(inGutter, gutter)
+            if (gutter.contains(inGutter.x, inGutter.y)) {
+                // The gutter shares the content's vertical geometry.
+                val line = editor.xyToLogicalPosition(java.awt.Point(0, inGutter.y)).line
+                return rangeIdAtLine(line)
+            }
+        }
+        return null
+    }
+
+    /** The range at an editor-absolute [offset], within a small tolerance. */
+    private fun rangeIdAtOffset(offset: Int): String? {
+        val off = offset - bodyStartOffset()
+        var best: String? = null
+        var bestDist = Int.MAX_VALUE
+        for (range in model.ranges()) {
+            val dist = when {
+                off in range.start..range.end -> 0
+                off < range.start -> range.start - off
+                else -> off - range.end
+            }
+            if (dist <= DROP_TOLERANCE_CHARS && dist < bestDist) {
+                best = range.id
+                bestDist = dist
+            }
+        }
+        return best
+    }
+
+    private fun rangeIdAtLine(line: Int): String? {
+        val doc = editor.document
+        for ((id, chrome) in chromes) {
+            if (!chrome.marker.isValid) {
+                continue
+            }
+            val startLine = doc.getLineNumber(chrome.marker.startOffset)
+            val endLine = doc.getLineNumber(chrome.marker.endOffset)
+            if (line in startLine..endLine) {
+                return id
+            }
+        }
+        return null
+    }
+
     // ---- selection / reveal ------------------------------------------------
+
+    /** Scroll to a range and flash it — the linking UI's "show me" path. */
+    fun reveal(rangeId: String) = revealRange(rangeId)
 
     /** Scroll to a range and flash it (e.g. a box referring to it was selected). */
     private fun revealRange(rangeId: String?) {
@@ -516,5 +588,8 @@ class WtTextRangeManager(
         const val ARC = 6
         const val SEG_PAD = 2
         const val MIN_SEG_PX = 3
+
+        /** How far (chars) a link drop may land from a range and still hit it. */
+        const val DROP_TOLERANCE_CHARS = 2
     }
 }

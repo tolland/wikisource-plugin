@@ -64,6 +64,31 @@ class ReferenceImagePane(
         annotationPane.canvas.popupMenuFactory = factory
     }
 
+    /**
+     * Wires the drag-to-link handle (see
+     * [org.limepepper.lang.wikitext.annotation.ImageAnnotationCanvas.linkDropHandler]):
+     * [linked] paints a box's handle filled once a link exists, [drop] gets
+     * the box id and the release point in screen coordinates.
+     */
+    fun installLinkDrag(
+        linked: (boxId: String) -> Boolean,
+        drop: (boxId: String, screenPoint: java.awt.Point) -> Unit,
+    ) {
+        annotationPane.canvas.linkedBoxProvider = linked
+        annotationPane.canvas.linkDropHandler = drop
+    }
+
+    /** Repaint hook for link-state changes the canvas can't observe itself. */
+    fun repaintCanvas() = annotationPane.canvas.repaint()
+
+    /**
+     * True once persisted boxes have been merged into [model] — before that,
+     * an empty model just means "not loaded yet", which link invalidation
+     * must not mistake for "all boxes deleted".
+     */
+    var boxesLoaded = false
+        private set
+
     /** Selects [boxId] and scrolls the canvas to it (gutter-icon click path). */
     fun revealBox(boxId: String) = annotationPane.revealBox(boxId)
 
@@ -141,6 +166,7 @@ class ReferenceImagePane(
                 }
                 annotationPane.showImage(image)
                 if (boxes != null && vfsPath != null) {
+                    boxesLoaded = true // before setAll: the seed event may prune links
                     annotationPane.model.setAll(boxes)
                     val sync = WtAnnotationSync(annotationPane.model, vfsPath)
                     Disposer.register(this, sync)

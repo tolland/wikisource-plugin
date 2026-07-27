@@ -29,6 +29,8 @@ class FakeVfsBackend : VfsBackend {
     private val annotations = mutableMapOf<String, LinkedHashMap<String, PageAnnotation>>()
     // page path → annotation id → text anchor, independent of the boxes
     private val textAnchors = mutableMapOf<String, LinkedHashMap<String, PageTextAnchor>>()
+    // page path → box id → link, one per box; dies with either endpoint
+    private val boxLinks = mutableMapOf<String, LinkedHashMap<String, PageBoxLink>>()
 
     /**
      * Register a directory. The parent is the longest already-registered
@@ -171,6 +173,10 @@ class FakeVfsBackend : VfsBackend {
     override fun deleteAnnotation(path: String, annotationId: String) {
         val boxRemoved = annotations[path]?.remove(annotationId) != null
         val anchorRemoved = textAnchors[path]?.remove(annotationId) != null
+        boxLinks[path]?.remove(annotationId)
+        if (anchorRemoved) {
+            boxLinks[path]?.values?.removeIf { it.rangeId == annotationId }
+        }
         if (!boxRemoved && !anchorRemoved) {
             throw VfsBackendException("no annotation $annotationId at $path")
         }
@@ -187,6 +193,24 @@ class FakeVfsBackend : VfsBackend {
     override fun deleteTextAnchor(path: String, annotationId: String) {
         if (textAnchors[path]?.remove(annotationId) == null) {
             throw VfsBackendException("no text anchor $annotationId at $path")
+        }
+        boxLinks[path]?.values?.removeIf { it.rangeId == annotationId }
+    }
+
+    override fun listBoxLinks(path: String): List<PageBoxLink> =
+        boxLinks[path].orEmpty().values.toList()
+
+    override fun saveBoxLink(path: String, link: PageBoxLink): PageBoxLink {
+        if (textAnchors[path]?.containsKey(link.rangeId) != true) {
+            throw VfsBackendException("no text anchor ${link.rangeId} at $path to link to")
+        }
+        boxLinks.getOrPut(path) { LinkedHashMap() }[link.boxId] = link
+        return link
+    }
+
+    override fun deleteBoxLink(path: String, boxId: String) {
+        if (boxLinks[path]?.remove(boxId) == null) {
+            throw VfsBackendException("no box link $boxId at $path")
         }
     }
 

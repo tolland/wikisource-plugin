@@ -37,6 +37,11 @@ class PrpFileEditor private constructor(
     @Volatile
     private var disposed = false
 
+    // Wired in init; fields so navigation can follow a box's link.
+    private lateinit var rangeModel: TextRangeModel
+    private lateinit var linkModel: BoxLinkModel
+    private lateinit var anchorManager: WtTextRangeManager
+
     /** Which pane's structure the Structure tool window should reflect. */
     enum class ActivePane { EDITOR, PREVIEW_RENDER, PREVIEW_IMAGE }
 
@@ -60,20 +65,13 @@ class PrpFileEditor private constructor(
         // Initialize TextEditorWithPreview's lazy UI before disposal-sensitive editor switching can occur.
         component
 
-        // Box↔text linking: the anchor manager renders text anchors in the
-        // body editor and owns the canvas's right-click link actions (the
-        // scan itself loads eagerly in PrpPreviewBrowser's init). Anchor
-        // offsets are body-relative (see WtAnnotationAnchorManager), so they
-        // need translating against the guarded header's end offset in the
-        // editor's whole-buffer document.
-        val pane = previewHalf.referenceImagePane
-        pane.installPopupMenu(BoxCanvasPopup(pane.model)::menuFor)
-
         // Independent transcription text ranges: rendered/edited in the body
         // editor by the manager, loaded once from the sidecar, persisted
         // write-behind. Offsets are body-relative (see WtTextRangeManager), so
         // the manager translates them against the guarded header's end offset.
+        val pane = previewHalf.referenceImagePane
         val rangeModel = TextRangeModel()
+        val linkModel = BoxLinkModel()
         val anchorManager = WtTextRangeManager(
             editorHalf.bodyEditor,
             rangeModel,
@@ -82,8 +80,57 @@ class PrpFileEditor private constructor(
             revidSupplier = { pane.baseRevid },
         )
         Disposer.register(this, anchorManager)
-        loadTextRanges(rangeModel)
-//        pane.installPopupMenu(anchorManager::createPopupMenu)
+        this.linkModel = linkModel
+        this.rangeModel = rangeModel
+        this.anchorManager = anchorManager
+        loadTextRanges(rangeModel, linkModel)
+
+        // Box↔range linking. The box menu carries the simple path (a dropdown
+        // of the page's ranges); the link handle on each box carries the
+        // drag path — drag it across to a range's extent/handles or its
+        // gutter icon and release.
+        val revealRange: (String) -> Unit = { rangeId ->
+            rangeModel.select(rangeId)
+            anchorManager.reveal(rangeId)
+        }
+        pane.installPopupMenu(
+            BoxCanvasPopup(
+                pane.model,
+                rangeModel,
+                linkModel,
+                rangeLabel = ::rangeMenuLabel,
+                onRevealRange = revealRange,
+            )::menuFor,
+        )
+        pane.installLinkDrag(
+            linked = linkModel::isLinked,
+            drop = { boxId, screenPoint ->
+                anchorManager.rangeIdAtScreenPoint(screenPoint)?.let { rangeId ->
+                    linkModel.link(boxId, rangeId)
+                    revealRange(rangeId)
+                }
+            },
+        )
+
+        // A link is only meaningful while both endpoints exist: deleting a
+        // range (or replacing the set) or deleting a box invalidates it. The
+        // box side is gated on boxesLoaded so the pre-load empty model isn't
+        // mistaken for "all boxes deleted".
+        rangeModel.addListener(object : TextRangeModel.Listener {
+            override fun rangesChanged() {
+                linkModel.retainRanges(rangeModel.ranges().mapTo(HashSet()) { it.id })
+            }
+        })
+        pane.model.addListener(object : org.limepepper.lang.wikitext.annotation.BoundingBoxModel.Listener {
+            override fun boxesChanged() {
+                if (pane.boxesLoaded) {
+                    linkModel.retainBoxes(pane.model.boxes().mapTo(HashSet()) { it.id })
+                }
+            }
+        })
+        linkModel.addListener(object : BoxLinkModel.Listener {
+            override fun linksChanged() = pane.repaintCanvas()
+        })
 
         // Toggling the preview card (scan ↔ rendered HTML) changes which
         // structure applies, as does moving focus between the panes.
@@ -96,17 +143,50 @@ class PrpFileEditor private constructor(
         }
     }
 
-    /** Loads persisted text ranges off the EDT, then seeds the model + sync. */
-    private fun loadTextRanges(model: TextRangeModel) {
+    /**
+     * A range's label in the box menu: a whitespace-collapsed snippet of its
+     * text (or its offsets, for an insertion point), so picking a target
+     * doesn't require memorizing offsets.
+     */
+    private fun rangeMenuLabel(range: TextRange): String {
+        if (range.isPoint) {
+            return "Insertion point @ ${range.start}"
+        }
+        val doc = editorHalf.bodyEditor.document
+        val bodyStart = editorHalf.bodyStartOffset
+        val start = (range.start + bodyStart).coerceIn(0, doc.textLength)
+        val end = (range.end + bodyStart).coerceIn(start, doc.textLength)
+        val snippet = doc.getText(com.intellij.openapi.util.TextRange(start, end))
+            .replace(Regex("\\s+"), " ").trim()
+        if (snippet.isEmpty()) {
+            return "Range ${range.start}–${range.end} (${range.length} chars)"
+        }
+        val clipped = if (snippet.length > SNIPPET_MAX_CHARS) snippet.take(SNIPPET_MAX_CHARS) + "…" else snippet
+        return "“$clipped”"
+    }
+
+    /** Loads persisted text ranges + box links off the EDT, then seeds models + syncs. */
+    private fun loadTextRanges(model: TextRangeModel, linkModel: BoxLinkModel) {
         val vfsPath = (file as? WtVirtualFile)?.path ?: return
         ApplicationManager.getApplication().executeOnPooledThread {
+            val backend = WtVfsService.instance.backend
             val loaded = try {
-                WtVfsService.instance.backend.listTextAnchors(vfsPath).map {
+                backend.listTextAnchors(vfsPath).map {
                     TextRange(id = it.annotationId, start = it.textStart, end = it.textEnd, anchorRevid = it.anchorRevid)
                 }
             } catch (e: Exception) {
                 PRP_LOG.warn("text-range load failed for $vfsPath", e)
                 null
+            }
+            val links = if (loaded == null) {
+                null
+            } else {
+                try {
+                    backend.listBoxLinks(vfsPath).associate { it.boxId to it.rangeId }
+                } catch (e: Exception) {
+                    PRP_LOG.warn("box-link load failed for $vfsPath", e)
+                    null
+                }
             }
             ApplicationManager.getApplication().invokeLater {
                 if (disposed || loaded == null) {
@@ -116,6 +196,16 @@ class PrpFileEditor private constructor(
                 val sync = WtTextRangeSync(model, vfsPath)
                 Disposer.register(this, sync)
                 sync.seed(loaded)
+                if (links != null) {
+                    // Defensive prune: a persisted link whose range didn't
+                    // load is already invalid. Seeding the sync with the raw
+                    // server state makes its first flush delete those rows.
+                    val valid = loaded.mapTo(HashSet()) { it.id }
+                    linkModel.setAll(links.filterValues { it in valid })
+                    val linkSync = WtBoxLinkSync(linkModel, vfsPath)
+                    Disposer.register(this, linkSync)
+                    linkSync.seed(links)
+                }
             }
         }
     }
@@ -157,13 +247,12 @@ class PrpFileEditor private constructor(
     private fun navigateToBox(box: BoundingBox) {
         previewHalf.revealImagePane()
         previewHalf.referenceImagePane.revealBox(box.id)
-
-//        val textStart = box.textStart ?: return
-//        val editor = editorHalf.bodyEditor
-//        val offset = (editorHalf.bodyStartOffset + textStart)
-//            .coerceIn(0, editor.document.textLength)
-//        editor.caretModel.moveToOffset(offset)
-//        editor.scrollingModel.scrollToCaret(com.intellij.openapi.editor.ScrollType.MAKE_VISIBLE)
+        linkModel.rangeFor(box.id)?.let { rangeId ->
+            if (rangeModel[rangeId] != null) {
+                rangeModel.select(rangeId)
+                anchorManager.reveal(rangeId)
+            }
+        }
     }
 
     /**
@@ -176,5 +265,9 @@ class PrpFileEditor private constructor(
         ApplicationManager.getApplication().messageBus
             .syncPublisher(StructureViewWrapperImpl.STRUCTURE_CHANGED)
             .run()
+    }
+
+    private companion object {
+        const val SNIPPET_MAX_CHARS = 40
     }
 }

@@ -2,6 +2,7 @@ package org.limepepper.lang.wikitext.annotation
 
 import com.intellij.ui.JBColor
 import org.limepepper.lang.wikitext.annotation.AnnotationPalette.withAlpha
+import java.awt.BasicStroke
 import java.awt.Color
 import java.awt.Cursor
 import java.awt.Dimension
@@ -69,6 +70,20 @@ class ImageAnnotationCanvas(
      */
     var popupMenuFactory: ((BoundingBox?) -> JPopupMenu?)? = null
 
+    /**
+     * Enables the drag-to-link affordance: when non-null every box grows a
+     * small circular link handle in its top-right corner; press it and drag
+     * anywhere — typically across to the transcription editor — and on
+     * release this is called with the box id and the release point in
+     * *screen* coordinates, so the host can hit-test its own components
+     * (text-range extents, gutter icons) and create the link. The canvas
+     * stays ignorant of what a link means.
+     */
+    var linkDropHandler: ((boxId: String, screenPoint: Point) -> Unit)? = null
+
+    /** Whether a box is currently linked — drives the handle glyph fill. */
+    var linkedBoxProvider: (String) -> Boolean = { false }
+
     /** The drag in progress, if any. All coordinates are image pixels. */
     private sealed interface Gesture {
         /** Rubber-banding a new box; becomes a model box on release. */
@@ -83,6 +98,9 @@ class ImageAnnotationCanvas(
         class Move(val original: BoundingBox, val grabDx: Double, val grabDy: Double) : Gesture
 
         class Resize(val original: BoundingBox, val handle: BoxGeometry.Handle) : Gesture
+
+        /** Dragging the link handle of [boxId]; current* are canvas coords. */
+        class LinkDrag(val boxId: String, var currentX: Int, var currentY: Int) : Gesture
     }
 
     private var gesture: Gesture? = null
@@ -104,14 +122,28 @@ class ImageAnnotationCanvas(
                     panViewOrigin = scrollPaneProvider().viewport.viewPosition
                     cursor = Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR)
                 } else if (SwingUtilities.isLeftMouseButton(e) && image != null) {
-                    startGesture(toImagePoint(e.point))
+                    val linkBox = linkHandleAt(e.point)
+                    if (linkBox != null) {
+                        model.select(linkBox)
+                        gesture = Gesture.LinkDrag(linkBox, e.x, e.y)
+                        repaint()
+                    } else {
+                        startGesture(toImagePoint(e.point))
+                    }
                 }
             }
 
             override fun mouseDragged(e: MouseEvent) {
                 val screenOrigin = panScreenOrigin
                 val viewOrigin = panViewOrigin
-                if (screenOrigin != null && viewOrigin != null) {
+                val link = gesture as? Gesture.LinkDrag
+                if (link != null) {
+                    // No autopan: the whole point is dragging out of the
+                    // canvas, over to the text editor.
+                    link.currentX = e.x
+                    link.currentY = e.y
+                    repaint()
+                } else if (screenOrigin != null && viewOrigin != null) {
                     val onScreen = e.locationOnScreen
                     scrollPaneProvider().viewport.viewPosition = clampViewPosition(Point(
                         viewOrigin.x - (onScreen.x - screenOrigin.x),
@@ -135,7 +167,14 @@ class ImageAnnotationCanvas(
                     panViewOrigin = null
                     updateCursor(e.point)
                 } else if (SwingUtilities.isLeftMouseButton(e)) {
-                    finishGesture()
+                    val link = gesture as? Gesture.LinkDrag
+                    if (link != null) {
+                        gesture = null
+                        linkDropHandler?.invoke(link.boxId, e.locationOnScreen)
+                        repaint()
+                    } else {
+                        finishGesture()
+                    }
                     updateCursor(e.point)
                 }
             }
@@ -209,6 +248,7 @@ class ImageAnnotationCanvas(
                 BoxGeometry.resize(g.original, g.handle, p.x, p.y),
                 img.width.toDouble(), img.height.toDouble(),
             ))
+            is Gesture.LinkDrag -> {} // handled in mouseDragged, canvas coords
             null -> {}
         }
     }
@@ -235,6 +275,7 @@ class ImageAnnotationCanvas(
             is Gesture.Move -> model.update(g.original)
             is Gesture.Resize -> model.update(g.original)
             is Gesture.DrawNew -> {}
+            is Gesture.LinkDrag -> {} // nothing to restore; just abandon
             null -> model.select(null)
         }
         gesture = null
@@ -357,6 +398,10 @@ class ImageAnnotationCanvas(
             cursor = Cursor.getDefaultCursor()
             return
         }
+        if (canvasPoint != null && linkHandleAt(canvasPoint) != null) {
+            cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+            return
+        }
         val hit = canvasPoint?.let {
             val p = toImagePoint(it)
             BoxGeometry.hitTest(model.boxes(), model.selectedId, p.x, p.y, HANDLE_HIT_RADIUS_PX / zoom)
@@ -367,6 +412,26 @@ class ImageAnnotationCanvas(
             else -> Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR)
         }
     }
+
+    /** The box whose link handle is under [p] (topmost first), if any. */
+    private fun linkHandleAt(p: Point): String? {
+        if (linkDropHandler == null || image == null) {
+            return null
+        }
+        for (box in model.boxes().asReversed()) {
+            val c = linkHandleCenter(box)
+            if (p.distance(c.x.toDouble(), c.y.toDouble()) <= LINK_HANDLE_HIT_PX) {
+                return box.id
+            }
+        }
+        return null
+    }
+
+    /** Handle center in canvas coordinates: just inside the top-right corner. */
+    private fun linkHandleCenter(box: BoundingBox): Point = Point(
+        (box.right * zoom).roundToInt() - LINK_HANDLE_INSET_PX,
+        (box.y * zoom).roundToInt() + LINK_HANDLE_INSET_PX,
+    )
 
     private fun toImagePoint(canvasPoint: Point): Point2D.Double {
         val img = image ?: return Point2D.Double(0.0, 0.0)
@@ -425,6 +490,42 @@ class ImageAnnotationCanvas(
         (gesture as? Gesture.DrawNew)?.let { draw ->
             paintBox(g2, draw.box(), AnnotationPalette.colorFor(boxes.size), selected = false)
         }
+        if (linkDropHandler != null) {
+            for ((index, box) in boxes.withIndex()) {
+                paintLinkHandle(g2, box, AnnotationPalette.colorFor(index))
+            }
+            (gesture as? Gesture.LinkDrag)?.let { drag ->
+                model[drag.boxId]?.let { box ->
+                    val from = linkHandleCenter(box)
+                    g2.color = JBColor.foreground()
+                    g2.stroke = BasicStroke(
+                        1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND,
+                        1f, floatArrayOf(4f, 4f), 0f,
+                    )
+                    g2.drawLine(from.x, from.y, drag.currentX, drag.currentY)
+                }
+            }
+        }
+    }
+
+    /**
+     * The drag-to-link grip: a circle just inside the box's top-right corner
+     * with a small ring glyph — filled with the box colour once linked,
+     * hollow while not.
+     */
+    private fun paintLinkHandle(g2: Graphics2D, box: BoundingBox, color: Color) {
+        val c = linkHandleCenter(box)
+        val d = LINK_HANDLE_PX
+        val x = c.x - d / 2
+        val y = c.y - d / 2
+        val linked = linkedBoxProvider(box.id)
+        g2.stroke = BasicStroke(1.5f)
+        g2.color = if (linked) color else HANDLE_FILL
+        g2.fillOval(x, y, d, d)
+        g2.color = if (linked) HANDLE_FILL else color
+        g2.drawOval(x + d / 4, y + d / 4, d / 2, d / 2)
+        g2.color = color
+        g2.drawOval(x, y, d, d)
     }
 
     private fun paintBox(g2: Graphics2D, box: BoundingBox, color: Color, selected: Boolean) {
@@ -469,6 +570,11 @@ class ImageAnnotationCanvas(
         /** Handle grab tolerance and drawn size, in screen pixels. */
         const val HANDLE_HIT_RADIUS_PX = 6.0
         const val HANDLE_SIZE_PX = 7
+
+        /** Link-handle drawn size, grab tolerance, and corner inset, in screen pixels. */
+        const val LINK_HANDLE_PX = 12
+        const val LINK_HANDLE_HIT_PX = 8.0
+        const val LINK_HANDLE_INSET_PX = 9
 
         val RESIZE_CURSORS = mapOf(
             BoxGeometry.Handle.NW to Cursor.NW_RESIZE_CURSOR,

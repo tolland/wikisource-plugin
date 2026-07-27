@@ -290,6 +290,52 @@ class HttpVfsBackendTest {
         }
     }
 
+    @Test fun `listBoxLinks parses links`() {
+        handle("/pages/box-links", """
+            {"links":[
+              {"box_annotation_id":"b1","range_annotation_id":"r1"},
+              {"box_annotation_id":"b2","range_annotation_id":"r1"}
+            ]}
+        """.trimIndent())
+
+        val r = backend.listBoxLinks("/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1")
+        assertEquals(2, r.size)
+        assertEquals("b1", r[0].boxId)
+        assertEquals("r1", r[0].rangeId)
+        assertEquals("b2", r[1].boxId)
+    }
+
+    @Test fun `saveBoxLink PUTs the range id and parses the echo`() {
+        var captured: String? = null
+        var requestPath: String? = null
+        server.createContext("/pages/box-links/") { ex ->
+            captured = ex.requestBody.readBytes().decodeToString()
+            requestPath = ex.requestURI.toString()
+            val body = """{"box_annotation_id":"b1","range_annotation_id":"r1"}""".toByteArray()
+            ex.sendResponseHeaders(200, body.size.toLong())
+            ex.responseBody.use { it.write(body) }
+        }
+
+        val saved = backend.saveBoxLink(
+            "/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1",
+            PageBoxLink(boxId = "b1", rangeId = "r1"),
+        )
+        assertEquals("r1", saved.rangeId)
+        assertTrue(requestPath!!.startsWith("/pages/box-links/b1?path="))
+        assertTrue(captured!!.contains("\"range_annotation_id\":\"r1\""))
+    }
+
+    @Test fun `deleteBoxLink throws on 404`() {
+        server.createContext("/pages/box-links/") { ex ->
+            val body = """{"detail":"no box link b9"}""".toByteArray()
+            ex.sendResponseHeaders(404, body.size.toLong())
+            ex.responseBody.use { it.write(body) }
+        }
+        assertThrows(VfsBackendException::class.java) {
+            backend.deleteBoxLink("/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1", "b9")
+        }
+    }
+
     @Test fun `throws VfsBackendException on HTTP error`() {
         server.createContext("/vfs/stat") { ex ->
             val body = """{"detail":"not found"}""".toByteArray()
