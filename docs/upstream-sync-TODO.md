@@ -101,7 +101,15 @@ we don't want to mirror.
       `prop=revisions&rvprop=ids|sha1|timestamp|user`, 50 titles per request;
       missing titles come back in `query.missing`. One `proofreadpagesinindex`
       call plus `⌈N/50⌉` probes covers a 400-page work in ~9 calls.
-- [ ] Full-fetch only where the probe says content actually differs.
+- [ ] **The probe answers "did the revision change?", not "did the content
+      change?"** — see §4.2. Against en.wikisource, for `proofread-page`, both
+      `sha1` *and* `size` are unreliable: measured on
+      `Page:Canadian patent 29537.djvu/2`, `rev_len` disagrees with the served
+      content length on **4 of 4** revisions and `rev_sha1` on 3 of 4. So the
+      probe is a cheap way to detect *presence* and *new revids*, and content
+      equality must come from a hash we compute. Use it to narrow, never to
+      conclude "unchanged".
+- [ ] Full-fetch where the probe shows a revid we have not seen.
 - [ ] **`sha1` encoding gotcha — verified, and it bites.** MediaWiki reports the
       same digest in two encodings depending on the surface: the action API
       (hence pywikibot's `Revision.sha1`, hence `Page.sha1` here) gives 40-char
@@ -215,6 +223,42 @@ Both are verified, the second against live en.wikisource.
       to `proofread-page`, which is exactly the content model this project
       cares about most. `content_sha1_base36` is the token to use; pinned by
       `test_proofread_serialization.py`.
+
+**Is a different export/API surface the answer? No — measured, all five agree.**
+For r1193309 (declared `ti1n0sdo…`), every read surface returns byte-identical
+content hashing to `ber7rim…`:
+
+| surface | bytes | sha1(content) matches stored |
+|---|---|---|
+| `action=query&prop=revisions&rvslots=main` | 1608 | no |
+| same, legacy (no `rvslots`) | 1608 | no |
+| `index.php?action=raw&oldid=` | 1608 | no |
+| REST v1 `/w/rest.php/v1/revision/{id}` | 1608 | no |
+| `action=parse&prop=wikitext` | 1608 | no |
+| `Special:Export` (the checked-in dumps) | 1608 | no |
+
+There is no surface that recovers the bytes the stored hash was taken over, so
+this cannot be worked around by changing how fixtures are extracted.
+
+**MediaWiki's own diff engine agrees with the content, not the hashes.**
+`action=compare` reports an **empty diff** for r1193309→r2650547 and
+r2650547→r7673287 — it considers those revisions identical, exactly as the
+content hashes do, while their stored `rev_sha1` values differ. The stored
+metadata is the stale party, and `rev_len` is staler still: it disagrees with
+the served length on all four revisions (1617/1624/1639/1513 stored versus
+1601/1608/1608/1608 served), including the one whose `sha1` *does* match. Treat
+`rev_len` as unusable for `proofread-page`.
+
+- [ ] **This is an artefact of long-lived upstream history, not of the model in
+      general.** A freshly installed wiki computes `rev_sha1` from the text it
+      is given, so our local staging wiki's hashes *are* content-consistent —
+      `test_import_recomputes_sha1_from_content` asserts exactly that. The
+      hazard is confined to reading old revisions from en.wikisource, which is
+      precisely what rung 2 does.
+- [ ] Mechanism not established. The stored length and hash appear to describe a
+      different serialization of the content than any API serves, and the two
+      fields are independently stale. Worth a note to the ProofreadPage
+      maintainers, but the workaround does not depend on the explanation.
 
 This also corrects an earlier note here claiming ProofreadPage rewrites `user=`
 on every save. It does not — the attribute tracks whoever last *changed the

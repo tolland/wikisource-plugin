@@ -19,10 +19,25 @@ Scope, measured against en.wikisource:
 so this is specific to ``proofread-page``, and to revisions predating the 2018
 ``Wikisource-bot`` "Pywikibot touch edit" pass.
 
+Changing how the fixture is extracted does not help: ``rvslots=main``, the
+legacy no-``rvslots`` form, ``index.php?action=raw``, REST v1
+``/w/rest.php/v1/revision/{id}``, ``action=parse&prop=wikitext`` and
+``Special:Export`` all return *byte-identical* content for r1193309. No surface
+recovers the bytes the stored hash was taken over.
+
+MediaWiki's own diff engine sides with the content: ``action=compare`` reports
+an empty diff for r1193309->r2650547 and r2650547->r7673287. The stored metadata
+is the stale party -- and ``rev_len`` more so than ``rev_sha1``, disagreeing
+with the served length on all four revisions.
+
+This is an artefact of long-lived upstream history, not of the content model:
+a freshly installed wiki hashes the text it is given, which is what
+``test_import_recomputes_sha1_from_content`` asserts against the harness.
+
 Consequence for docs/upstream-sync-TODO.md section 4.2: cross-wiki base
 discovery must intersect on a hash computed from the returned content, never on
-the server-provided ``rev_sha1``. These tests pin the behaviour so the
-conclusion is not quietly re-derived the hard way.
+the server-provided ``rev_sha1`` or ``rev_len``. These tests pin the behaviour
+so the conclusion is not quietly re-derived the hard way.
 """
 
 PAGE_2 = "Page:Canadian patent 29537.djvu/2"
