@@ -128,6 +128,19 @@ def local_api(wiki_pair: WikiStack) -> WikiApi:
 
 
 @pytest.fixture(scope="session")
+def local_other_api(wiki_pair: WikiStack) -> WikiApi:
+    """An unauthenticated client against the local wiki -- i.e. *somebody else*.
+
+    Needed because MediaWiki deliberately suppresses edit conflicts when the
+    same user made the intervening edit (``EditPage::isConflict``,
+    "Suppress edit conflict with self"). Any test of `basetimestamp` conflict
+    detection that uses one account for both sides silently passes the edit
+    through.
+    """
+    return WikiApi(wiki_pair.endpoint("local"))
+
+
+@pytest.fixture(scope="session")
 def seeded_upstream(wiki_pair: WikiStack, upstream_api: WikiApi) -> WikiApi:
     """Upstream loaded with the real Canadian patent work: the backing DjVu, the
     Index:, its 24 Page: subpages with full revision history, and the template

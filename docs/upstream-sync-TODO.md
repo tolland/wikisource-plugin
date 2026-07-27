@@ -463,6 +463,17 @@ None of these are currently used — `grep createonly src-py` returns nothing:
       `page.latest_revision.revid`, compares in Python, then saves — a TOCTOU
       window, after which pywikibot enforces "unchanged since I loaded it 200 ms
       ago" rather than "unchanged since `base_revid`".
+- [ ] **`basetimestamp` does not protect you from yourself — verified.**
+      `EditPage` (REL1_43, ~line 2338) calls `userWasLastToEdit` and, when the
+      requesting user made every intervening revision, sets `isConflict = false`
+      with the comment *"Suppress edit conflict with self"*. A stale
+      `basetimestamp` therefore sails through whenever the intervening editor is
+      our own bot account — precisely the "a previous batch already touched this
+      page" case. Only our own bookkeeping catches that, which argues for
+      keeping `Commit.result_revid` authoritative (as
+      `commit_worker._load_pending_page_commit` already does when it bumps the
+      base past our own last push) rather than trusting the server guard alone.
+      Pinned by `test_basetimestamp_is_suppressed_against_your_own_edit`.
 - [ ] Verify these thread through `Page.save()`; if not, use `site.editpage()` or
       a raw request. Do not settle for the client-side check.
 - [ ] Map API error codes (`articleexists`, `missingtitle`, `editconflict`,

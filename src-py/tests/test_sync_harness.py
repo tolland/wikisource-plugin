@@ -89,14 +89,20 @@ def test_createonly_rejects_a_parallel_creation(local_api: WikiApi) -> None:
     assert excinfo.value.code == "articleexists"
 
 
-def test_basetimestamp_rejects_an_intervening_edit(local_api: WikiApi) -> None:
+def test_basetimestamp_rejects_an_intervening_edit(
+    local_api: WikiApi, local_other_api: WikiApi
+) -> None:
     """Server-side conflict detection against the revision we actually based
-    on -- not against whatever the client loaded moments ago."""
+    on -- not against whatever the client loaded moments ago.
+
+    The intervening edit must come from a *different* user; see
+    test_basetimestamp_is_suppressed_against_your_own_edit.
+    """
     title = "Project:Basetimestamp probe"
     local_api.edit(title, "original", summary="first")
     original = local_api.revisions(title, limit=1)[0]
 
-    local_api.edit(title, "someone else's edit", summary="intervening")
+    local_other_api.edit(title, "someone else's edit", summary="intervening")
 
     with pytest.raises(WikiApiError) as excinfo:
         local_api.edit(
@@ -105,3 +111,34 @@ def test_basetimestamp_rejects_an_intervening_edit(local_api: WikiApi) -> None:
             basetimestamp=original.timestamp,
         )
     assert excinfo.value.code == "editconflict"
+
+
+def test_basetimestamp_is_suppressed_against_your_own_edit(
+    local_api: WikiApi,
+) -> None:
+    """MediaWiki deliberately suppresses edit conflicts with yourself.
+
+    ``EditPage`` (REL1_43, ~line 2338) calls ``userWasLastToEdit`` and, when the
+    requesting user made every intervening revision, sets ``isConflict = false``
+    with the comment "Suppress edit conflict with self".
+
+    So `basetimestamp` is **not** an unconditional guard: it protects against
+    other editors, not against our own account. That matters for §5.6 of
+    docs/upstream-sync-TODO.md -- if a previous promotion batch (same bot
+    account) already touched the page, a stale `basetimestamp` will sail
+    through rather than conflict, and only our own bookkeeping catches it.
+    """
+    title = "Project:Self-conflict probe"
+    local_api.edit(title, "original", summary="first")
+    original = local_api.revisions(title, limit=1)[0]
+
+    local_api.edit(title, "our own intervening edit", summary="intervening")
+
+    # Same account throughout: no conflict is raised, the edit lands.
+    result = local_api.edit(
+        title,
+        "our edit based on a now-stale revision",
+        basetimestamp=original.timestamp,
+    )
+    assert result.revid is not None
+    assert local_api.page_text(title) == "our edit based on a now-stale revision"
