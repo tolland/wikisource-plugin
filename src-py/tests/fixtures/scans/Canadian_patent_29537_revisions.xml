@@ -1,0 +1,418 @@
+<mediawiki xmlns="http://www.mediawiki.org/xml/export-0.11/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mediawiki.org/xml/export-0.11/ http://www.mediawiki.org/xml/export-0.11.xsd" version="0.11" xml:lang="en">
+  <siteinfo>
+    <sitename>Wikisource</sitename>
+    <dbname>enwikisource</dbname>
+    <base>https://en.wikisource.org/wiki/Main_Page</base>
+    <generator>MediaWiki 1.47.0-wmf.12</generator>
+    <case>first-letter</case>
+    <namespaces>
+      <namespace key="-2" case="first-letter">Media</namespace>
+      <namespace key="-1" case="first-letter">Special</namespace>
+      <namespace key="0" case="first-letter" />
+      <namespace key="1" case="first-letter">Talk</namespace>
+      <namespace key="2" case="first-letter">User</namespace>
+      <namespace key="3" case="first-letter">User talk</namespace>
+      <namespace key="4" case="first-letter">Wikisource</namespace>
+      <namespace key="5" case="first-letter">Wikisource talk</namespace>
+      <namespace key="6" case="first-letter">File</namespace>
+      <namespace key="7" case="first-letter">File talk</namespace>
+      <namespace key="8" case="first-letter">MediaWiki</namespace>
+      <namespace key="9" case="first-letter">MediaWiki talk</namespace>
+      <namespace key="10" case="first-letter">Template</namespace>
+      <namespace key="11" case="first-letter">Template talk</namespace>
+      <namespace key="12" case="first-letter">Help</namespace>
+      <namespace key="13" case="first-letter">Help talk</namespace>
+      <namespace key="14" case="first-letter">Category</namespace>
+      <namespace key="15" case="first-letter">Category talk</namespace>
+      <namespace key="100" case="first-letter">Portal</namespace>
+      <namespace key="101" case="first-letter">Portal talk</namespace>
+      <namespace key="102" case="first-letter">Author</namespace>
+      <namespace key="103" case="first-letter">Author talk</namespace>
+      <namespace key="104" case="first-letter">Page</namespace>
+      <namespace key="105" case="first-letter">Page talk</namespace>
+      <namespace key="106" case="first-letter">Index</namespace>
+      <namespace key="107" case="first-letter">Index talk</namespace>
+      <namespace key="114" case="first-letter">Translation</namespace>
+      <namespace key="115" case="first-letter">Translation talk</namespace>
+      <namespace key="710" case="first-letter">TimedText</namespace>
+      <namespace key="711" case="first-letter">TimedText talk</namespace>
+      <namespace key="828" case="first-letter">Module</namespace>
+      <namespace key="829" case="first-letter">Module talk</namespace>
+      <namespace key="1728" case="first-letter">Event</namespace>
+      <namespace key="1729" case="first-letter">Event talk</namespace>
+    </namespaces>
+  </siteinfo>
+  <page>
+    <title>Index:Canadian patent 29537.djvu</title>
+    <ns>106</ns>
+    <id>337466</id>
+    <revision>
+      <id>900091</id>
+      <timestamp>2008-11-30T20:26:28Z</timestamp>
+      <contributor>
+        <username>T. Mazzei</username>
+        <id>6201</id>
+      </contributor>
+      <comment>New page: {{:MediaWiki:Proofreadpage_index_template |Author=Nikola Tesla |Title=Canadian patent 29537 |Year=1888 |Publisher= |Key= |Source=Created from GIFs @ [http://www.tesla.hu/ Pepe's Tesla Page...</comment>
+      <origin>900091</origin>
+      <model>proofread-index</model>
+      <format>text/x-wiki</format>
+      <text bytes="272" sha1="lny7gq950nm8v6q0028nexk665b4y8c" xml:space="preserve">{{:MediaWiki:Proofreadpage_index_template
+|Author=Nikola Tesla
+|Title=Canadian patent 29537
+|Year=1888
+|Publisher=
+|Key=
+|Source=Created from GIFs @ [http://www.tesla.hu/ Pepe's Tesla Pages]
+|Image=[[Image:Canadian patent 29537.djvu|500px]]
+|Pages=&lt;pagelist/&gt;
+|Remarks=
+}}</text>
+      <sha1>lny7gq950nm8v6q0028nexk665b4y8c</sha1>
+    </revision>
+    <revision>
+      <id>900092</id>
+      <parentid>900091</parentid>
+      <timestamp>2008-11-30T20:28:05Z</timestamp>
+      <contributor>
+        <username>T. Mazzei</username>
+        <id>6201</id>
+      </contributor>
+      <minor/>
+      <origin>900092</origin>
+      <model>proofread-index</model>
+      <format>text/x-wiki</format>
+      <text bytes="331" sha1="gpd44jnyv3zt99w16imnlt96zwtukhx" xml:space="preserve">{{:MediaWiki:Proofreadpage_index_template
+|Author=Nikola Tesla
+|Title=Canadian patent 29537 — Method &amp; App. for the Electrical Transmission of Power
+|Year=1888
+|Publisher=
+|Key=
+|Source=Created from GIFs @ [http://www.tesla.hu/ Pepe's Tesla Pages]
+|Image=[[Image:Canadian patent 29537.djvu|500px]]
+|Pages=&lt;pagelist/&gt;
+|Remarks=
+}}</text>
+      <sha1>gpd44jnyv3zt99w16imnlt96zwtukhx</sha1>
+    </revision>
+    <revision>
+      <id>1193349</id>
+      <parentid>900092</parentid>
+      <timestamp>2009-08-14T01:34:04Z</timestamp>
+      <contributor>
+        <username>Kathleen.wright5</username>
+        <id>18404</id>
+      </contributor>
+      <comment>link to author page</comment>
+      <origin>1193349</origin>
+      <model>proofread-index</model>
+      <format>text/x-wiki</format>
+      <text bytes="355" sha1="f0ak0na2i7n7wn5evigtnk9v4wpyibe" xml:space="preserve">{{:MediaWiki:Proofreadpage_index_template
+|Author=[[Author:Nikola Tesla|Nikola Tesla]]
+|Title=Canadian patent 29537 — Method &amp; App. for the Electrical Transmission of Power
+|Year=1888
+|Publisher=
+|Key=
+|Source=Created from GIFs @ [http://www.tesla.hu/ Pepe's Tesla Pages]
+|Image=[[Image:Canadian patent 29537.djvu|500px]]
+|Pages=&lt;pagelist/&gt;
+|Remarks=
+}}</text>
+      <sha1>f0ak0na2i7n7wn5evigtnk9v4wpyibe</sha1>
+    </revision>
+    <revision>
+      <id>1684746</id>
+      <parentid>1193349</parentid>
+      <timestamp>2009-12-11T04:26:39Z</timestamp>
+      <contributor>
+        <username>Xxagile</username>
+        <id>20532</id>
+      </contributor>
+      <minor/>
+      <comment>+cat</comment>
+      <origin>1684746</origin>
+      <model>proofread-index</model>
+      <format>text/x-wiki</format>
+      <text bytes="384" sha1="dysecbedw06pkqv488hlus3y9zkxi8b" xml:space="preserve">{{:MediaWiki:Proofreadpage_index_template
+|Author=[[Author:Nikola Tesla|Nikola Tesla]]
+|Title=Canadian patent 29537 — Method &amp; App. for the Electrical Transmission of Power
+|Year=1888
+|Publisher=
+|Key=
+|Source=Created from GIFs @ [http://www.tesla.hu/ Pepe's Tesla Pages]
+|Image=[[Image:Canadian patent 29537.djvu|500px]]
+|Pages=&lt;pagelist/&gt;
+[[Category:Index Proofread]]
+|Remarks=
+}}</text>
+      <sha1>dysecbedw06pkqv488hlus3y9zkxi8b</sha1>
+    </revision>
+    <revision>
+      <id>1758449</id>
+      <parentid>1684746</parentid>
+      <timestamp>2010-01-30T11:54:13Z</timestamp>
+      <contributor>
+        <username>Billinghurst</username>
+        <id>19801</id>
+      </contributor>
+      <comment>update index</comment>
+      <origin>1758449</origin>
+      <model>proofread-index</model>
+      <format>text/x-wiki</format>
+      <text bytes="432" sha1="d4kuv8ohpmgjacdc25kcjbmf0ray05i" xml:space="preserve">{{:MediaWiki:Proofreadpage_index_template
+|Type=phdthesis
+|Title=[[Canadian patent 29537]] — Method &amp; App. for the Electrical Transmission of Power
+|Volume=
+|Author=[[Author:Nikola Tesla|Nikola Tesla]]
+|Translator=
+|Editor=
+|School=
+|Publisher=
+|Address=
+|Year=1888
+|Key=Method &amp; App. for the Electrical Transmission of Power
+|Source=djvu
+|Image=1
+|Progress=T
+|Pages=&lt;pagelist/&gt;
+[[Category:Index Proofread]]
+|Volumes=
+|Remarks=
+}}</text>
+      <sha1>d4kuv8ohpmgjacdc25kcjbmf0ray05i</sha1>
+    </revision>
+    <revision>
+      <id>2193445</id>
+      <parentid>1758449</parentid>
+      <timestamp>2010-11-12T11:04:05Z</timestamp>
+      <contributor>
+        <username>Kathleen.wright5</username>
+        <id>18404</id>
+      </contributor>
+      <comment>Category:Index Validated</comment>
+      <origin>2193445</origin>
+      <model>proofread-index</model>
+      <format>text/x-wiki</format>
+      <text bytes="432" sha1="7x085g91gb9ltmnve6d9q5dzut9uch9" xml:space="preserve">{{:MediaWiki:Proofreadpage_index_template
+|Type=phdthesis
+|Title=[[Canadian patent 29537]] — Method &amp; App. for the Electrical Transmission of Power
+|Volume=
+|Author=[[Author:Nikola Tesla|Nikola Tesla]]
+|Translator=
+|Editor=
+|School=
+|Publisher=
+|Address=
+|Year=1888
+|Key=Method &amp; App. for the Electrical Transmission of Power
+|Source=djvu
+|Image=1
+|Progress=T
+|Pages=&lt;pagelist/&gt;
+[[Category:Index Validated]]
+|Volumes=
+|Remarks=
+}}</text>
+      <sha1>7x085g91gb9ltmnve6d9q5dzut9uch9</sha1>
+    </revision>
+    <revision>
+      <id>2255862</id>
+      <parentid>2193445</parentid>
+      <timestamp>2010-12-21T00:22:47Z</timestamp>
+      <contributor>
+        <username>Hesperian</username>
+        <id>21</id>
+      </contributor>
+      <comment>to be validated: still two problematic pages</comment>
+      <origin>2255862</origin>
+      <model>proofread-index</model>
+      <format>text/x-wiki</format>
+      <text bytes="432" sha1="4nlt45ar7x30ibp7d5p83rdnak5fdi9" xml:space="preserve">{{:MediaWiki:Proofreadpage_index_template
+|Type=phdthesis
+|Title=[[Canadian patent 29537]] — Method &amp; App. for the Electrical Transmission of Power
+|Volume=
+|Author=[[Author:Nikola Tesla|Nikola Tesla]]
+|Translator=
+|Editor=
+|School=
+|Publisher=
+|Address=
+|Year=1888
+|Key=Method &amp; App. for the Electrical Transmission of Power
+|Source=djvu
+|Image=1
+|Progress=V
+|Pages=&lt;pagelist/&gt;
+[[Category:Index Validated]]
+|Volumes=
+|Remarks=
+}}</text>
+      <sha1>4nlt45ar7x30ibp7d5p83rdnak5fdi9</sha1>
+    </revision>
+    <revision>
+      <id>2827430</id>
+      <parentid>2255862</parentid>
+      <timestamp>2011-05-04T08:55:27Z</timestamp>
+      <contributor>
+        <username>Beeswaxcandle</username>
+        <id>80078</id>
+      </contributor>
+      <comment>Removed category that is automatically assigned</comment>
+      <origin>2827430</origin>
+      <model>proofread-index</model>
+      <format>text/x-wiki</format>
+      <text bytes="448" sha1="rabyyq2f1dewe3pirvidirvjroy1aox" xml:space="preserve">{{:MediaWiki:Proofreadpage_index_template
+|Type=phdthesis
+|Title=[[Canadian patent 29537]] — Method &amp; App. for the Electrical Transmission of Power
+|Volume=
+|Author=[[Author:Nikola Tesla|Nikola Tesla]]
+|Translator=
+|Editor=
+|School=
+|Publisher=
+|Address=
+|Year=1888
+|Key=Method &amp; App. for the Electrical Transmission of Power
+|Source=djvu
+|Image=1
+|Progress=V
+|Pages=&lt;pagelist/&gt;
+|Volumes=
+|Remarks=
+|Width=
+|Css=
+|Header=
+|Footer=&lt;references/&gt;
+}}</text>
+      <sha1>rabyyq2f1dewe3pirvidirvjroy1aox</sha1>
+    </revision>
+    <revision>
+      <id>6165175</id>
+      <parentid>2827430</parentid>
+      <timestamp>2016-03-26T15:03:52Z</timestamp>
+      <contributor>
+        <username>MpaaBot</username>
+        <id>350769</id>
+      </contributor>
+      <minor/>
+      <comment>Page transclusion checked</comment>
+      <origin>6165175</origin>
+      <model>proofread-index</model>
+      <format>text/x-wiki</format>
+      <text bytes="484" sha1="6ejqwstgohmk9x1gnjhy80jnsnv75co" xml:space="preserve">{{:MediaWiki:Proofreadpage_index_template
+|Type=phdthesis
+|Title=[[Canadian patent 29537]] — Method &amp; App. for the Electrical Transmission of Power
+|Volume=
+|Author=[[Author:Nikola Tesla|Nikola Tesla]]
+|Translator=
+|Editor=
+|School=
+|Publisher=
+|Address=
+|Year=1888
+|Key=Method &amp; App. for the Electrical Transmission of Power
+|Source=djvu
+|Image=1
+|Progress=V
+|Pages=&lt;pagelist/&gt;
+|Volumes=
+|Remarks={{index transcluded|transcluded=no}}
+|Width=
+|Css=
+|Header=
+|Footer=&lt;references/&gt;
+}}</text>
+      <sha1>6ejqwstgohmk9x1gnjhy80jnsnv75co</sha1>
+    </revision>
+    <revision>
+      <id>6293619</id>
+      <parentid>6165175</parentid>
+      <timestamp>2016-06-23T03:14:49Z</timestamp>
+      <contributor>
+        <username>Kathleen.wright5</username>
+        <id>18404</id>
+      </contributor>
+      <comment>transcluded=yes</comment>
+      <origin>6293619</origin>
+      <model>proofread-index</model>
+      <format>text/x-wiki</format>
+      <text bytes="549" sha1="rqgmxpitub0r38zgd9qu4wziybgrscd" xml:space="preserve">{{:MediaWiki:Proofreadpage_index_template
+|Type=phdthesis
+|Title=[[Canadian patent 29537]] — Method &amp; App. for the Electrical Transmission of Power
+|Language=en
+|Volume=
+|Author=[[Author:Nikola Tesla|Nikola Tesla]]
+|Translator=
+|Editor=
+|Illustrator=
+|School=
+|Publisher=
+|Address=
+|Year=1888
+|Key=Method &amp; App. for the Electrical Transmission of Power
+|ISBN=
+|OCLC=
+|LCCN=
+|BNF_ARK=
+|ARC=
+|Source=djvu
+|Image=1
+|Progress=V
+|Pages=&lt;pagelist/&gt;
+|Volumes=
+|Remarks={{index transcluded|transcluded=yes}}
+|Width=
+|Css=
+|Header=
+|Footer=&lt;references/&gt;
+}}</text>
+      <sha1>rqgmxpitub0r38zgd9qu4wziybgrscd</sha1>
+    </revision>
+    <revision>
+      <id>11207953</id>
+      <parentid>6293619</parentid>
+      <timestamp>2021-04-21T00:45:00Z</timestamp>
+      <contributor>
+        <username>InductiveBot</username>
+        <id>204982</id>
+      </contributor>
+      <minor/>
+      <comment>Transfer {{[[Template:Index transcluded|Index transcluded]]}} to :Mediawiki:Proofreadpage_index_template template</comment>
+      <origin>11207953</origin>
+      <model>proofread-index</model>
+      <format>text/x-wiki</format>
+      <text bytes="530" sha1="1mosdelt4q2i5z547b4g3fsymbaevzh" xml:space="preserve">{{:MediaWiki:Proofreadpage_index_template
+|Type=phdthesis
+|Title=[[Canadian patent 29537]] — Method &amp; App. for the Electrical Transmission of Power
+|Language=en
+|Volume=
+|Author=[[Author:Nikola Tesla|Nikola Tesla]]
+|Translator=
+|Editor=
+|Illustrator=
+|School=
+|Publisher=
+|Address=
+|Year=1888
+|Key=Method &amp; App. for the Electrical Transmission of Power
+|ISBN=
+|OCLC=
+|LCCN=
+|BNF_ARK=
+|ARC=
+|Source=djvu
+|Image=1
+|Progress=V
+|Pages=&lt;pagelist/&gt;
+|Volumes=
+|Remarks=
+|Width=
+|Css=
+|Header=
+|Footer=&lt;references/&gt;
+|Transclusion=yes
+}}</text>
+      <sha1>1mosdelt4q2i5z547b4g3fsymbaevzh</sha1>
+    </revision>
+  </page>
+</mediawiki>
