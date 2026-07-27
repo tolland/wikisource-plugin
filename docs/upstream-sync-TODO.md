@@ -458,22 +458,40 @@ None of these are currently used — `grep createonly src-py` returns nothing:
       Requires §5.3's explicit intent to set correctly.
 - [ ] **`nocreate=1` on every update** — don't silently resurrect a page deleted
       since we looked.
-- [ ] **`basetimestamp` + `starttimestamp`** matching the revision we actually
-      based on. `PywikibotClient.save_page` currently reads
-      `page.latest_revision.revid`, compares in Python, then saves — a TOCTOU
-      window, after which pywikibot enforces "unchanged since I loaded it 200 ms
-      ago" rather than "unchanged since `base_revid`".
-- [ ] **`basetimestamp` does not protect you from yourself — verified.**
-      `EditPage` (REL1_43, ~line 2338) calls `userWasLastToEdit` and, when the
-      requesting user made every intervening revision, sets `isConflict = false`
-      with the comment *"Suppress edit conflict with self"*. A stale
-      `basetimestamp` therefore sails through whenever the intervening editor is
-      our own bot account — precisely the "a previous batch already touched this
-      page" case. Only our own bookkeeping catches that, which argues for
-      keeping `Commit.result_revid` authoritative (as
+- [ ] **`baserevid` — not `basetimestamp` — on every update.** This matters more
+      than it looks; both alternatives were measured against a real wiki and
+      both fail open:
+      - **`basetimestamp` has one-second resolution.** `EditPage` (REL1_43,
+        ~line 2310) detects conflicts with `$this->edittime != $timestamp`, and
+        MediaWiki timestamps are accurate only to the second. Two edits landing
+        in the same second are indistinguishable, so the guard passes and the
+        push **overwrites**. A bot pushing quickly is exactly the workload that
+        trips this. Pinned by
+        `test_basetimestamp_cannot_see_a_same_second_edit`.
+      - **`basetimestamp` is also suppressed against your own account.**
+        `EditPage` (~line 2329) calls `userWasLastToEdit` and sets
+        `isConflict = false` — *"Suppress edit conflict with self"*. So a stale
+        base sails through whenever the intervening editor is our own bot,
+        precisely the "a previous batch already touched this page" case.
+      - **`baserevid` escapes both.** It compares revision ids exactly, and
+        `ApiEditPage` only forwards `wpEdittime` when `baserevid` is unset
+        (~line 405), so the self-suppression branch — guarded on
+        `$this->edittime` — never fires. Pinned by
+        `test_baserevid_rejects_an_intervening_edit`.
+- [ ] `PywikibotClient.save_page` currently reads `page.latest_revision.revid`,
+      compares in Python, then saves — a TOCTOU window, after which pywikibot
+      enforces "unchanged since I loaded it 200 ms ago" rather than "unchanged
+      since `base_revid`". Replace with `baserevid` on the request.
+- [ ] Even with `baserevid`, MediaWiki may **auto-merge** rather than conflict:
+      on a detected conflict `EditPage` (~line 2388) tries
+      `mergeChangesIntoContent` and, if the three-way merge succeeds, clears the
+      conflict and saves the merged text. That is a silent content change we did
+      not review. Decide deliberately whether to accept it; if not, the push must
+      verify the resulting revision's content against what we submitted.
+- [ ] Keep `Commit.result_revid` authoritative regardless — as
       `commit_worker._load_pending_page_commit` already does when it bumps the
-      base past our own last push) rather than trusting the server guard alone.
-      Pinned by `test_basetimestamp_is_suppressed_against_your_own_edit`.
+      base past our own last push. The server guard narrows the window; it does
+      not replace our own bookkeeping.
 - [ ] Verify these thread through `Page.save()`; if not, use `site.editpage()` or
       a raw request. Do not settle for the client-side check.
 - [ ] Map API error codes (`articleexists`, `missingtitle`, `editconflict`,

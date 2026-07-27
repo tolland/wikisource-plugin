@@ -101,6 +101,35 @@ class WikiApi:
             raise WikiApiError("loginfailed", str(message))
         self._csrf = None
 
+    def create_account(self, username: str, password: str) -> bool:
+        """Create an ordinary (non-sysop) account. Returns False if it existed.
+
+        Harness edits should not run as the admin: sysops carry rights that
+        change what MediaWiki permits, so testing as admin can hide rejections
+        a normal bot account would hit.
+        """
+        try:
+            payload = self._request(
+                "POST",
+                action="createaccount",
+                createtoken=self._token("createaccount"),
+                username=username,
+                password=password,
+                retype=password,
+                createreturnurl=self.endpoint.base_url,
+            )
+        except WikiApiError as exc:
+            if exc.code in {"userexists", "acct_creation_throttle_hit"}:
+                return False
+            raise
+        result = payload.get("createaccount", {})
+        if result.get("status") != "PASS":
+            message = result.get("message") or result.get("messagecode") or result
+            if "exists" in str(message):
+                return False
+            raise WikiApiError("createaccountfailed", str(message))
+        return True
+
     @property
     def csrf_token(self) -> str:
         if self._csrf is None:
@@ -181,12 +210,20 @@ class WikiApi:
         summary: str = "harness edit",
         createonly: bool = False,
         nocreate: bool = False,
+        baserevid: int | None = None,
         basetimestamp: str | None = None,
         starttimestamp: str | None = None,
     ) -> EditResult:
         """Save a page. The conditional flags are the point of this method --
         they are what section 5.6 of the sync design says every push must carry
-        and what the current pywikibot path does not send."""
+        and what the current pywikibot path does not send.
+
+        Prefer ``baserevid`` over ``basetimestamp``: it compares revision ids
+        exactly, while ``basetimestamp`` has one-second resolution and cannot
+        see an intervening edit made in the same second. ApiEditPage also only
+        forwards ``wpEdittime`` when ``baserevid`` is unset, so ``baserevid``
+        additionally escapes EditPage's suppress-conflict-with-self branch.
+        """
         params: dict[str, Any] = {
             "action": "edit",
             "title": title,
@@ -198,6 +235,8 @@ class WikiApi:
             params["createonly"] = "1"
         if nocreate:
             params["nocreate"] = "1"
+        if baserevid is not None:
+            params["baserevid"] = str(baserevid)
         if basetimestamp:
             params["basetimestamp"] = basetimestamp
         if starttimestamp:

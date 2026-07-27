@@ -1,3 +1,5 @@
+import time
+
 import pytest
 from conftest import CANADIAN_PATENT_INDEX, CANADIAN_PATENT_SCAN
 from wiki_harness import WikiApi, WikiApiError, WikiStack, scan_dump
@@ -78,67 +80,110 @@ def test_import_recomputes_sha1_from_content(seeded_upstream: WikiApi) -> None:
     assert dump_page.latest.declared_sha1 in {rev.sha1_base36 for rev in revisions}
 
 
-def test_createonly_rejects_a_parallel_creation(local_api: WikiApi) -> None:
+def test_createonly_rejects_a_parallel_creation(
+    local_promoter: WikiApi, local_bystander: WikiApi
+) -> None:
     """The guard the current push path is missing: once the page exists,
     a create must fail rather than overwrite."""
     title = "Project:Parallel create probe"
-    local_api.edit(title, "created by someone else", summary="first")
+    local_bystander.edit(title, "created by someone else", summary="first")
 
     with pytest.raises(WikiApiError) as excinfo:
-        local_api.edit(title, "our body", createonly=True)
+        local_promoter.edit(title, "our body", createonly=True)
     assert excinfo.value.code == "articleexists"
 
 
-def test_basetimestamp_rejects_an_intervening_edit(
-    local_api: WikiApi, local_other_api: WikiApi
+def test_baserevid_rejects_an_intervening_edit(
+    local_promoter: WikiApi, local_bystander: WikiApi
 ) -> None:
-    """Server-side conflict detection against the revision we actually based
-    on -- not against whatever the client loaded moments ago.
+    """``baserevid`` is the conflict token to push with.
 
-    The intervening edit must come from a *different* user; see
-    test_basetimestamp_is_suppressed_against_your_own_edit.
+    It compares revision ids exactly, so unlike ``basetimestamp`` it is immune
+    to the one-second timestamp resolution that
+    test_basetimestamp_cannot_see_a_same_second_edit demonstrates.
     """
-    title = "Project:Basetimestamp probe"
-    local_api.edit(title, "original", summary="first")
-    original = local_api.revisions(title, limit=1)[0]
+    title = "Project:Baserevid probe"
+    local_promoter.edit(title, "original\ncontent\nhere\n", summary="first")
+    original = local_promoter.revisions(title, limit=1)[0]
 
-    local_other_api.edit(title, "someone else's edit", summary="intervening")
+    local_bystander.edit(title, "totally different\nbystander text\n", summary="theirs")
 
     with pytest.raises(WikiApiError) as excinfo:
-        local_api.edit(
+        local_promoter.edit(
             title,
-            "our edit based on the original",
-            basetimestamp=original.timestamp,
+            "our rewrite\nof everything\n",
+            baserevid=original.revid,
         )
     assert excinfo.value.code == "editconflict"
 
 
+def test_basetimestamp_cannot_see_a_same_second_edit(
+    local_promoter: WikiApi, local_bystander: WikiApi
+) -> None:
+    """``basetimestamp`` has one-second resolution, and silently misses an
+    intervening edit made within the same second.
+
+    ``EditPage`` (REL1_43, ~line 2310) detects a conflict via
+    ``$this->edittime != $timestamp``, comparing MediaWiki timestamps, which are
+    only accurate to the second. Two edits over localhost land well inside one
+    second, so the guard sees nothing -- while ``baserevid`` catches it.
+
+    This is why section 5.6 of docs/upstream-sync-TODO.md specifies
+    ``baserevid``: a bot pushing quickly is exactly the workload that trips the
+    resolution limit.
+    """
+    title = "Project:Basetimestamp resolution probe"
+    local_promoter.edit(title, "original", summary="first")
+    original = local_promoter.revisions(title, limit=1)[0]
+
+    local_bystander.edit(title, "bystander edit", summary="theirs")
+    intervening = local_bystander.revisions(title, limit=1)[0]
+
+    if intervening.timestamp != original.timestamp:
+        pytest.skip("edits landed in different seconds; resolution limit not exercised")
+
+    # Same second: basetimestamp sees no change and the overwrite goes through.
+    assert (
+        local_promoter.edit(title, "ours", basetimestamp=original.timestamp).revid
+        is not None
+    )
+    assert local_promoter.page_text(title) == "ours"
+
+    # baserevid catches what basetimestamp missed.
+    local_bystander.edit(title, "bystander again", summary="theirs again")
+    stale = original.revid
+    with pytest.raises(WikiApiError) as excinfo:
+        local_promoter.edit(title, "ours again", baserevid=stale)
+    assert excinfo.value.code == "editconflict"
+
+
 def test_basetimestamp_is_suppressed_against_your_own_edit(
-    local_api: WikiApi,
+    local_promoter: WikiApi,
 ) -> None:
     """MediaWiki deliberately suppresses edit conflicts with yourself.
 
-    ``EditPage`` (REL1_43, ~line 2338) calls ``userWasLastToEdit`` and, when the
+    ``EditPage`` (REL1_43, ~line 2329) calls ``userWasLastToEdit`` and, when the
     requesting user made every intervening revision, sets ``isConflict = false``
     with the comment "Suppress edit conflict with self".
 
-    So `basetimestamp` is **not** an unconditional guard: it protects against
-    other editors, not against our own account. That matters for §5.6 of
-    docs/upstream-sync-TODO.md -- if a previous promotion batch (same bot
-    account) already touched the page, a stale `basetimestamp` will sail
-    through rather than conflict, and only our own bookkeeping catches it.
+    The branch is guarded on ``$this->edittime``, and ApiEditPage only forwards
+    ``wpEdittime`` when ``baserevid`` is unset -- so this suppression applies to
+    the ``basetimestamp`` path only, and is a second reason to push with
+    ``baserevid``.
     """
     title = "Project:Self-conflict probe"
-    local_api.edit(title, "original", summary="first")
-    original = local_api.revisions(title, limit=1)[0]
+    local_promoter.edit(title, "original", summary="first")
+    original = local_promoter.revisions(title, limit=1)[0]
 
-    local_api.edit(title, "our own intervening edit", summary="intervening")
+    # Wait out the one-second resolution so this test isolates the *self*
+    # suppression rather than re-testing the timestamp granularity above.
+    time.sleep(1.1)
+    local_promoter.edit(title, "our own intervening edit", summary="intervening")
 
-    # Same account throughout: no conflict is raised, the edit lands.
-    result = local_api.edit(
+    result = local_promoter.edit(
         title,
         "our edit based on a now-stale revision",
         basetimestamp=original.timestamp,
     )
     assert result.revid is not None
-    assert local_api.page_text(title) == "our edit based on a now-stale revision"
+    assert local_promoter.page_text(title) == "our edit based on a now-stale revision"

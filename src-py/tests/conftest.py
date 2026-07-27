@@ -2,7 +2,7 @@ import os
 import subprocess
 import time
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import pytest
@@ -127,17 +127,40 @@ def local_api(wiki_pair: WikiStack) -> WikiApi:
     return api
 
 
-@pytest.fixture(scope="session")
-def local_other_api(wiki_pair: WikiStack) -> WikiApi:
-    """An unauthenticated client against the local wiki -- i.e. *somebody else*.
+# Ordinary accounts for edit tests. The admin is a sysop and carries rights
+# that change what MediaWiki permits, so running edit tests as admin can hide
+# rejections a normal bot account would hit. `Promoter` stands in for the
+# account a promotion batch would push as; `Bystander` for anyone else editing
+# the same page.
+HARNESS_PASSWORD = "HarnessAccountPassword123!"
 
-    Needed because MediaWiki deliberately suppresses edit conflicts when the
-    same user made the intervening edit (``EditPage::isConflict``,
-    "Suppress edit conflict with self"). Any test of `basetimestamp` conflict
-    detection that uses one account for both sides silently passes the edit
-    through.
+
+def _editor(wiki_pair: WikiStack, role: str, username: str) -> WikiApi:
+    admin = WikiApi(wiki_pair.endpoint(role))
+    admin.login()
+    admin.create_account(username, HARNESS_PASSWORD)
+
+    api = WikiApi(
+        replace(wiki_pair.endpoint(role), username=username, password=HARNESS_PASSWORD)
+    )
+    api.login()
+    return api
+
+
+@pytest.fixture(scope="session")
+def local_promoter(wiki_pair: WikiStack) -> WikiApi:
+    """Ordinary account standing in for the promotion bot."""
+    return _editor(wiki_pair, "local", "Promoter")
+
+
+@pytest.fixture(scope="session")
+def local_bystander(wiki_pair: WikiStack) -> WikiApi:
+    """A *different* ordinary account.
+
+    Conflict tests need two distinct users: EditPage suppresses conflicts when
+    the requesting user made every intervening revision.
     """
-    return WikiApi(wiki_pair.endpoint("local"))
+    return _editor(wiki_pair, "local", "Bystander")
 
 
 @pytest.fixture(scope="session")
