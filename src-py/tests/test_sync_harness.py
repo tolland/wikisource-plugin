@@ -50,10 +50,10 @@ def test_import_preserves_revision_history(seeded_upstream: WikiApi) -> None:
     assert len(revisions) == 4
     assert all(rev.sha1 for rev in revisions), "revisions imported without sha1"
     assert {rev.user for rev in revisions} == {
-        "T. Mazzei",
-        "Kathleen.wright5",
-        "ThomasBot",
-        "Wikisource-bot",
+        "imported>T. Mazzei",
+        "imported>Kathleen.wright5",
+        "imported>ThomasBot",
+        "imported>Wikisource-bot",
     }
 
 

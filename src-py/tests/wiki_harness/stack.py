@@ -173,8 +173,6 @@ class WikiStack:
             role,
             "importDump",
             "--no-updates",
-            "--username-prefix",
-            "False",
             f"{FIXTURES_MOUNT}/scans/{dump_name}",
         )
 
