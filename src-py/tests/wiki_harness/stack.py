@@ -136,15 +136,30 @@ class WikiStack:
             script,
             *args,
         )
-        completed = subprocess.run(
-            command,
-            cwd=REPO_ROOT,
-            env=self._env,
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
+        try:
+            completed = subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                env=self._env,
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+            )
+        except subprocess.CalledProcessError as exc:
+            print("\n--- command failed ---")
+            print("command:", exc.cmd)
+            print("exit code:", exc.returncode)
+
+            if exc.stdout:
+                print("\n--- stdout ---")
+                print(exc.stdout)
+
+            if exc.stderr:
+                print("\n--- stderr ---")
+                print(exc.stderr)
+
+            raise
         return completed.stdout
 
     def import_dump(self, role: str, dump_name: str) -> str:

@@ -7,6 +7,7 @@ dependencies = [
     "alembic>=1.18.5",
     "bs4>=0.0.2",
     "fastapi[standard]==0.140.0",
+    "httpx2>=2.9.1",
     "pydantic>=2.13.4",
     "python-dotenv>=1.2.1",
     "pywikibot>=11.4.2",

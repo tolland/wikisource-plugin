@@ -71,7 +71,7 @@ services:
       - "${WIKISOURCE_PORT:-8080}:80"
     volumes:
       - mediawiki-images:/var/www/html/images
-      - ./src-py/tests/fixtures:/fixtures:ro
+      - ./src-py/tests/fixtures:/fixtures:ro,z
 
   db-local:
     <<: *db-common
@@ -101,7 +101,7 @@ services:
       - "${WIKISOURCE_LOCAL_PORT:-18582}:80"
     volumes:
       - mediawiki-local-images:/var/www/html/images
-      - ./src-py/tests/fixtures:/fixtures:ro
+      - ./src-py/tests/fixtures:/fixtures:ro,z
 
 volumes:
   mediawiki-db:
