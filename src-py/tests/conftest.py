@@ -1,5 +1,4 @@
 import os
-import shutil
 import subprocess
 import time
 from collections.abc import Iterator
@@ -11,12 +10,16 @@ import requests
 from fastapi.testclient import TestClient
 from sqlalchemy.engine import Engine
 from sqlmodel import Session
+from wiki_harness import StackConfig, WikiApi, WikiStack, docker_available
 
 from wtbot.db import create_db_engine, init_db
 from wtbot.main import create_app
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 COMPOSE_FILE = REPO_ROOT / "docker-compose.yml"
+
+CANADIAN_PATENT_INDEX = "Index:Canadian patent 29537.djvu"
+CANADIAN_PATENT_SCAN = "File:Canadian patent 29537.djvu"
 
 
 @dataclass(frozen=True)
@@ -58,11 +61,97 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 
+# --------------------------------------------------------------------------
+# Two-wiki harness (upstream + local) for cross-wiki sync tests.
+#
+# Separate compose project and ports from the single-instance `wikisource`
+# fixture above: MW_SERVER is baked into LocalSettings.php at install time, so a
+# volume installed for one port must never be reused on another.
+# --------------------------------------------------------------------------
+
+WIKI_PAIR_PROJECT = "wtbot-sync-pair"
+WIKI_PAIR_UPSTREAM_PORT = 18581
+WIKI_PAIR_LOCAL_PORT = 18582
+
+
+@pytest.fixture(scope="session")
+def wiki_pair(pytestconfig: pytest.Config) -> Iterator[WikiStack]:
+    """Two independent MediaWiki+ProofreadPage instances, empty.
+
+    `upstream` stands in for en.wikisource.org, `local` for the staging wiki.
+    """
+    if not docker_available():
+        pytest.skip("A running Docker daemon is required for the two-wiki harness")
+
+    stack = WikiStack(
+        StackConfig(
+            # Distinct env names from the single-instance fixture's
+            # WIKISOURCE_PORT: overriding that one must not silently move the
+            # pair onto a colliding port.
+            project_name=os.environ.get("SYNC_COMPOSE_PROJECT_NAME", WIKI_PAIR_PROJECT),
+            upstream_port=int(
+                os.environ.get("SYNC_UPSTREAM_PORT", WIKI_PAIR_UPSTREAM_PORT)
+            ),
+            local_port=int(os.environ.get("SYNC_LOCAL_PORT", WIKI_PAIR_LOCAL_PORT)),
+            username=os.environ.get("MW_ADMIN_USER", "Admin"),
+            password=os.environ.get("MW_ADMIN_PASSWORD", "AdminPassword123!"),
+            with_pair=True,
+        )
+    )
+    reuse = pytestconfig.getoption("--reuse-wikisource")
+
+    if not reuse:
+        stack.down()
+    try:
+        stack.up()
+    except (OSError, subprocess.CalledProcessError) as exc:
+        pytest.fail(f"failed to start the two-wiki harness: {exc}")
+
+    yield stack
+
+    if not reuse:
+        stack.down()
+
+
+@pytest.fixture(scope="session")
+def upstream_api(wiki_pair: WikiStack) -> WikiApi:
+    api = WikiApi(wiki_pair.endpoint("upstream"))
+    api.login()
+    return api
+
+
+@pytest.fixture(scope="session")
+def local_api(wiki_pair: WikiStack) -> WikiApi:
+    api = WikiApi(wiki_pair.endpoint("local"))
+    api.login()
+    return api
+
+
+@pytest.fixture(scope="session")
+def seeded_upstream(wiki_pair: WikiStack, upstream_api: WikiApi) -> WikiApi:
+    """Upstream loaded with the real Canadian patent work: the backing DjVu, the
+    Index:, its 24 Page: subpages with full revision history, and the template
+    and Module: closure needed for them to render.
+
+    Imported rather than API-written on purpose -- importDump preserves each
+    revision's text, timestamp, contributor and therefore sha1, which is what
+    the cross-wiki base discovery in docs/upstream-sync-TODO.md section 4.2
+    intersects on. An API copy would flatten history to a single revision.
+    """
+    if upstream_api.exists(CANADIAN_PATENT_INDEX):
+        return upstream_api
+    wiki_pair.import_scans("upstream", extension="djvu")
+    wiki_pair.import_dump("upstream", "Canadian_patent_29537_all.xml")
+    wiki_pair.import_dump("upstream", "Canadian_patent_29537_revisions.xml")
+    wiki_pair.rebuild_links("upstream")
+    return upstream_api
+
+
 @pytest.fixture(scope="session")
 def wikisource(pytestconfig: pytest.Config) -> Iterator[WikisourceInstance]:
     """Start a minimal MediaWiki/Wikisource stack for e2e tests."""
-    if shutil.which("docker") is None:
-        pytest.skip("Docker is required for Wikisource e2e tests")
+    if not docker_available():
+        pytest.skip("A running Docker daemon is required for Wikisource e2e tests")
 
     port = os.environ.get("WIKISOURCE_PORT", "8080")
     project_name = os.environ.get("COMPOSE_PROJECT_NAME", "wikibot-e2e")

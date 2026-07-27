@@ -59,6 +59,18 @@ $wgGroupPermissions['*']['edit'] = true;
 $wgGroupPermissions['*']['createpage'] = true;
 $wgGroupPermissions['*']['createtalk'] = true;
 
+// DjVu scans: required for Index: pagination and page-image reference scans.
+$wgFileExtensions[] = 'djvu';
+$wgDjvuDump = 'djvutoxml';
+$wgDjvuRenderer = 'ddjvu';
+$wgDjvuTxt = 'djvutxt';
+$wgDjvuOutputExtension = 'ppm';
+
+// Imports (Special:Import / importDump.php) are how test fixtures are seeded
+// with real revision history.
+$wgGroupPermissions['sysop']['import'] = true;
+$wgGroupPermissions['sysop']['importupload'] = true;
+
 wfLoadExtension( 'ProofreadPage' );
 PHP
 fi

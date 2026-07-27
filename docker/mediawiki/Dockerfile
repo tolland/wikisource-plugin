@@ -3,9 +3,13 @@ FROM mediawiki:${MEDIAWIKI_VERSION}
 
 ARG PROOFREADPAGE_BRANCH=REL1_43
 
+# djvulibre-bin + ghostscript give MediaWiki real DjVu handling (page count,
+# per-page rendering, embedded text layer) -- without them an imported .djvu
+# scan uploads but ProofreadPage cannot paginate an Index: from it.
 RUN set -eux; \
     apt-get update; \
-    apt-get install -y --no-install-recommends default-mysql-client git; \
+    apt-get install -y --no-install-recommends \
+      default-mysql-client git djvulibre-bin ghostscript; \
     rm -rf /var/lib/apt/lists/*; \
     git clone --depth 1 --branch "$PROOFREADPAGE_BRANCH" \
       https://gerrit.wikimedia.org/r/mediawiki/extensions/ProofreadPage \
