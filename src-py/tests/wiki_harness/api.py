@@ -4,6 +4,7 @@ from typing import Any
 import requests
 
 from wiki_harness.endpoint import WikiEndpoint
+from wtbot.wiki.sha1 import normalize_sha1
 
 """Thin MediaWiki action-API client for the test harness.
 
@@ -28,8 +29,17 @@ class RevisionInfo:
     timestamp: str
     user: str | None
     comment: str | None
-    sha1: str | None
+    sha1: str | None  # as the API gives it: 40-char hex
     content: str | None = None
+
+    @property
+    def sha1_base36(self) -> str | None:
+        """The same digest in the encoding the XML dumps and ``rev_sha1`` use.
+
+        Comparing an API hash straight against a dump hash silently never
+        matches -- see wtbot.wiki.sha1.
+        """
+        return normalize_sha1(self.sha1)
 
 
 @dataclass(frozen=True)

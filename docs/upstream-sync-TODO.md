@@ -102,10 +102,16 @@ we don't want to mirror.
       missing titles come back in `query.missing`. One `proofreadpagesinindex`
       call plus `⌈N/50⌉` probes covers a 400-page work in ~9 calls.
 - [ ] Full-fetch only where the probe says content actually differs.
-- [ ] `sha1` gotchas: MediaWiki reports it **base-36 encoded**, not hex; and our
-      promoted body is transformed (§5.2), so hash equality is a sufficient but
-      not necessary same-content test. Use the *transformed* body's hash for
-      no-op detection.
+- [ ] **`sha1` encoding gotcha — verified, and it bites.** MediaWiki reports the
+      same digest in two encodings depending on the surface: the action API
+      (hence pywikibot's `Revision.sha1`, hence `Page.sha1` here) gives 40-char
+      **hex**, while the XML export and the `rev_sha1` column give 31-char
+      **base-36**. Intersecting one against the other matches nothing, so
+      identical pages read as "unrelated histories". `wtbot.wiki.sha1`
+      normalises; everything comparing hashes must go through it.
+- [ ] Second `sha1` gotcha: our promoted body is transformed (§5.2), so hash
+      equality is a sufficient but not necessary same-content test. Use the
+      *transformed* body's hash for no-op detection.
 
 ### 3.4 The pairing matrix
 
@@ -191,16 +197,22 @@ base = argmax_timestamp { r in upstream_history : norm(r.sha1) in local_norm_sha
       body" idea — a set intersection handles the `Special:Import` case (whole
       upstream history imported locally, so many revisions match) and the
       copy-paste case (exactly one match) with the same code.
-- [ ] **The catch that will bite on Hertz: raw `sha1` will very likely not match
-      even at the true fork point.** Whatever created the local copy re-saved the
-      text, and ProofreadPage rewrites `user=` in the `<pagequality>` header on
-      save. One attribute differs → different sha1 → empty intersection → we
-      wrongly conclude "unrelated histories".
-- [ ] So intersect on a **normalized** hash: neutralise the `pagequality`
-      `user=` and `level=` attributes, normalise line endings, strip trailing
-      whitespace. Compute and cache `norm_sha1` per revision while walking. This
-      is what makes rung 2 actually work in practice, and it should be built and
-      tested before anything depends on it.
+- [ ] **First, get the encoding right** — this is the failure that actually
+      occurred in testing, not a hypothetical: intersecting the API's hex
+      against a dump's base-36 matches nothing. Normalise via
+      `wtbot.wiki.sha1` before comparing.
+- [ ] **ProofreadPage does *not* rewrite `user=` on every save**, contrary to an
+      earlier assumption here. The dump shows `Wikisource-bot` re-saving
+      `Page:…/1` with the header still reading `user="Hesperian"`: the attribute
+      tracks whoever last *changed the level*, and is preserved by saves that
+      don't. Since `transwikiimport` (Special:Import) and `transferbot` both
+      copy text verbatim, **raw sha1 should survive the normal staging-copy
+      path**, and rung 2 is stronger than first assumed.
+- [ ] A *content*-normalised hash (neutralise `pagequality` `user=`/`level=`,
+      line endings, trailing whitespace) is still worth having as a fallback for
+      copies that did perturb the text, and it is the same normalisation the
+      comparison protocol in §5.2 needs. But it is no longer the thing rung 2
+      depends on.
 - [ ] Cost is one history call per page per side. Restrict the walk to pages the
       cheap probe (§3.3) already says differ — for a mostly-clean work that is a
       handful of pages, not 400.
@@ -617,9 +629,8 @@ exactly what this feature needs and what `FakeWikiClient` cannot simulate
 - [ ] Stand up a second instance as the "upstream" and build a real diverged
       fixture: create a page, copy it across, edit both sides, then assert the
       §4.2 intersection finds the right base.
-- [ ] Specifically test that raw-sha1 matching **fails** and normalized matching
-      **succeeds** on a copy whose `pagequality user=` was rewritten — that is
-      the whole reason rung 2 needs normalization, and it should be pinned.
+- [ ] Pin the sha1 encoding trap in both directions (done —
+      `test_wiki_sha1.py`, and the import assertion in `test_sync_harness.py`).
 - [ ] `FakeWikiClient` for the fast unit-level pipeline tests (states, checks,
       transforms, batch bookkeeping).
 - [ ] Two sites with differing `File:` sha1s must refuse to link children.

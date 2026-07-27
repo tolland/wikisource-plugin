@@ -42,23 +42,30 @@ def test_seeded_upstream_has_the_work_and_its_scan(seeded_upstream: WikiApi) -> 
 def test_import_preserves_revision_history_and_sha1(
     seeded_upstream: WikiApi,
 ) -> None:
-    """The dump for Page/2 carries four revisions whose quality level rises
-    3 -> 4. Both the depth of history and the per-revision sha1 must survive,
-    or rung 2 of the base ladder has nothing to intersect on.
+    """The dump for Page/2 carries exactly four revisions whose quality level
+    rises 3 -> 4. Both the depth of history and the per-revision sha1 must
+    survive, or rung 2 of the base ladder has nothing to intersect on.
     """
     revisions = seeded_upstream.revisions(PAGE_2, limit=50)
-    assert len(revisions) >= 4
+    # Exactly four: more means a dump was imported twice, which silently
+    # inflates every history-walk test built on this fixture.
+    assert len(revisions) == 4
 
-    sha1s = [rev.sha1 for rev in revisions]
-    assert all(sha1s), "revisions imported without sha1"
-    # Real content hashes from the en.wikisource dump; these are stable across
-    # wikis precisely because sha1 is over the raw revision text.
-    assert "ber7rim00nw9gknuje381xd89o14ne7" in sha1s
-    assert "7qzy4bystlkoytnzaivpq46nv4bbd1d" in sha1s
+    assert all(rev.sha1 for rev in revisions), "revisions imported without sha1"
+
+    # The dump records base-36 hashes; the API reports hex. Comparing the two
+    # encodings directly silently never matches -- see wtbot.wiki.sha1.
+    dump_sha1s = {
+        "7qzy4bystlkoytnzaivpq46nv4bbd1d",  # r900114, level 3, T. Mazzei
+        "ti1n0sdo5tixoaccq10j25r8cwn0lqn",  # r1193309, level 4
+        "d8royu8iytefd8uu41iir20wxrp7rym",  # r2650547, ThomasBot maintenance
+        "ber7rim00nw9gknuje381xd89o14ne7",  # r7673287, pywikibot touch
+    }
+    assert {rev.sha1_base36 for rev in revisions} == dump_sha1s
 
     # Contributors come across too -- attribution is part of what an import
     # preserves and an API copy destroys.
-    assert {rev.user for rev in revisions} & {"T. Mazzei", "Kathleen.wright5"}
+    assert {rev.user for rev in revisions} >= {"T. Mazzei", "Kathleen.wright5"}
 
 
 def test_createonly_rejects_a_parallel_creation(local_api: WikiApi) -> None:

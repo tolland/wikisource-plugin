@@ -137,12 +137,16 @@ def seeded_upstream(wiki_pair: WikiStack, upstream_api: WikiApi) -> WikiApi:
     revision's text, timestamp, contributor and therefore sha1, which is what
     the cross-wiki base discovery in docs/upstream-sync-TODO.md section 4.2
     intersects on. An API copy would flatten history to a single revision.
+
+    Only ``_all.xml`` is imported: it is a strict superset of
+    ``_revisions.xml`` (same 25 work pages, same per-page revision counts, plus
+    the template/Module closure). Importing both duplicates every revision of
+    the work.
     """
     if upstream_api.exists(CANADIAN_PATENT_INDEX):
         return upstream_api
     wiki_pair.import_scans("upstream", extension="djvu")
     wiki_pair.import_dump("upstream", "Canadian_patent_29537_all.xml")
-    wiki_pair.import_dump("upstream", "Canadian_patent_29537_revisions.xml")
     wiki_pair.rebuild_links("upstream")
     return upstream_api
 
