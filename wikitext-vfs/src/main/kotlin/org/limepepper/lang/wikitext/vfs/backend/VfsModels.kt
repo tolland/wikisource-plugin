@@ -158,3 +158,58 @@ data class PageBoxLink(
     val boxId: String,
     val rangeId: String,
 )
+
+/**
+ * One OCR backend a page's site offers, from GET /ocr/backends — the
+ * sidecar's wrapper over per-site OCR services (a Wikimedia OCR instance,
+ * a token-guarded vision API, …). [supportsSegment] backends receive the
+ * cropped bounding-box bytes; URL-driven backends have the sidecar pass
+ * the wiki-side image URL instead. [supportsPrompt] backends accept a
+ * custom prompt (e.g. LaTeX instructions for idiosyncratic typesetting),
+ * with [defaultPrompt] as the server-side fallback.
+ */
+data class OcrBackendInfo(
+    val name: String,
+    val kind: String,
+    val defaultEngine: String? = null,
+    val defaultLangs: List<String> = emptyList(),
+    val defaultPrompt: String? = null,
+    val supportsPrompt: Boolean = false,
+    val supportsSegment: Boolean = false,
+)
+
+/**
+ * One recognition request for POST /ocr/run. Everything is optional: the
+ * sidecar fills engine/langs/prompt from the backend's configured defaults
+ * and resolves the backend-reachable image URL from the page itself — the
+ * client never sends its localhost rendition URL. [imageBase64] is the
+ * cropped bounding-box segment (PNG) for byte-capable backends;
+ * [annotationId]/geometry ride along as provenance.
+ */
+data class OcrRunRequest(
+    val backend: String? = null,
+    val annotationId: String? = null,
+    val boxX: Double? = null,
+    val boxY: Double? = null,
+    val boxWidth: Double? = null,
+    val boxHeight: Double? = null,
+    val imageBase64: String? = null,
+    val engine: String? = null,
+    val langs: List<String>? = null,
+    val prompt: String? = null,
+)
+
+/**
+ * The recognized text from POST /ocr/run. Text travels base64-encoded
+ * (multi-line; [JsonReader] does not unescape JSON strings — same
+ * convention as [PreviewResult]).
+ */
+data class OcrRunResult(
+    val backend: String,
+    val kind: String,
+    val engine: String? = null,
+    val textBase64: String,
+) {
+    fun decodeText(): String =
+        String(java.util.Base64.getDecoder().decode(textBase64), Charsets.UTF_8)
+}

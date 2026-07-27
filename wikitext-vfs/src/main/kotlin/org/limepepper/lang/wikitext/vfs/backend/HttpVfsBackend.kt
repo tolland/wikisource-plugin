@@ -298,6 +298,52 @@ class HttpVfsBackend(
         )
     }
 
+    override fun listOcrBackends(path: String): List<OcrBackendInfo> {
+        val json = get("/ocr/backends", "path" to path)
+        return JsonReader(json).array("backends") { r ->
+            OcrBackendInfo(
+                name = r.string("name"),
+                kind = r.string("kind"),
+                defaultEngine = r.stringOrNull("default_engine"),
+                defaultLangs = r.stringArray("default_langs"),
+                defaultPrompt = r.stringOrNull("default_prompt"),
+                supportsPrompt = r.boolOrDefault("supports_prompt", false),
+                supportsSegment = r.boolOrDefault("supports_segment", false),
+            )
+        }
+    }
+
+    override fun runOcr(path: String, request: OcrRunRequest): OcrRunResult {
+        // Hand-assembled because the body nests a box object and a string
+        // array, which the flat buildJsonObject helper doesn't cover.
+        val fields = mutableListOf(
+            "\"path\":${jsonValue(path)}",
+            "\"backend\":${jsonValue(request.backend)}",
+            "\"annotation_id\":${jsonValue(request.annotationId)}",
+            "\"image_base64\":${jsonValue(request.imageBase64)}",
+            "\"engine\":${jsonValue(request.engine)}",
+            "\"prompt\":${jsonValue(request.prompt)}",
+        )
+        request.langs?.let { langs ->
+            fields += "\"langs\":[" + langs.joinToString(",") { jsonValue(it) } + "]"
+        }
+        if (request.boxX != null && request.boxY != null &&
+            request.boxWidth != null && request.boxHeight != null
+        ) {
+            fields += "\"box\":{\"x\":${request.boxX},\"y\":${request.boxY}," +
+                "\"width\":${request.boxWidth},\"height\":${request.boxHeight}}"
+        }
+        val json = post("/ocr/run", fields.joinToString(",", "{", "}"))
+        return JsonReader(json).run {
+            OcrRunResult(
+                backend = string("backend"),
+                kind = string("kind"),
+                engine = stringOrNull("engine"),
+                textBase64 = string("text_base64"),
+            )
+        }
+    }
+
     private fun readBoxLink(r: JsonReader): PageBoxLink = PageBoxLink(
         boxId = r.string("box_annotation_id"),
         rangeId = r.string("range_annotation_id"),

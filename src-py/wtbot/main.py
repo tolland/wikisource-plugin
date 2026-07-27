@@ -14,6 +14,7 @@ from wtbot.api import (
     file_blob,
     health,
     namespace,
+    ocr,
     page_image,
     page_meta,
     page_nav,
@@ -120,6 +121,7 @@ def create_app(
     app.include_router(fetch.router)
     app.include_router(file_blob.router)
     app.include_router(namespace.router)
+    app.include_router(ocr.router)
     app.include_router(page_image.router)
     app.include_router(page_meta.router)
     app.include_router(page_nav.router)

@@ -42,6 +42,16 @@
             anchor="right"
         />
 
+        <!-- OCR review surface: responses land here for preview before any
+        text is applied (see OcrReviewController for the boundary). -->
+        <toolWindow
+            id="Wikisource OCR"
+            icon="AllIcons.Actions.Preview"
+            factoryClass="org.limepepper.lang.wikitext.ocr.OcrToolWindowFactory"
+            anchor="bottom"
+            canCloseContents="true"
+        />
+
         <lang.psiStructureViewFactory
             language="Wikitext"
             implementationClass="org.limepepper.lang.wikitext.structure.WtStructureViewFactory"

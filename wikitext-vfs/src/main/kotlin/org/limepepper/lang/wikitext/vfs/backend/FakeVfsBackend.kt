@@ -214,6 +214,32 @@ class FakeVfsBackend : VfsBackend {
         }
     }
 
+    /** Backends advertised by [listOcrBackends]; tests/demos seed this. */
+    val ocrBackends = mutableListOf(
+        OcrBackendInfo(name = "fake-ocr", kind = "wikimedia", defaultEngine = "tesseract"),
+    )
+
+    /** Requests [runOcr] received, newest last — for asserting in tests. */
+    val ocrRequests = mutableListOf<Pair<String, OcrRunRequest>>()
+
+    override fun listOcrBackends(path: String): List<OcrBackendInfo> = ocrBackends.toList()
+
+    override fun runOcr(path: String, request: OcrRunRequest): OcrRunResult {
+        val backend = request.backend?.let { name ->
+            ocrBackends.find { it.name == name }
+                ?: throw VfsBackendException("no OCR backend $name")
+        } ?: ocrBackends.firstOrNull()
+        ?: throw VfsBackendException("no OCR backend configured")
+        ocrRequests += path to request
+        val text = "OCR of ${request.annotationId ?: path}"
+        return OcrRunResult(
+            backend = backend.name,
+            kind = backend.kind,
+            engine = request.engine ?: backend.defaultEngine,
+            textBase64 = java.util.Base64.getEncoder().encodeToString(text.toByteArray()),
+        )
+    }
+
     override fun pageImageUrl(path: String?, title: String?): String {
         // PNG rather than SVG: the scan viewer decodes with ImageIO, which
         // has no SVG support.

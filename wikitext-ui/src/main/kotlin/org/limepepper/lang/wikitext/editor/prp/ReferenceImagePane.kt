@@ -81,6 +81,9 @@ class ReferenceImagePane(
     /** Repaint hook for link-state changes the canvas can't observe itself. */
     fun repaintCanvas() = annotationPane.canvas.repaint()
 
+    /** The scan pixels under [box] (see [org.limepepper.lang.wikitext.annotation.ImageAnnotationCanvas.cropImage]). */
+    fun cropBoxImage(box: BoundingBox): BufferedImage? = annotationPane.canvas.cropImage(box)
+
     /**
      * True once persisted boxes have been merged into [model] — before that,
      * an empty model just means "not loaded yet", which link invalidation

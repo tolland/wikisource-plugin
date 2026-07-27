@@ -83,4 +83,16 @@ interface VfsBackend {
 
     /** Deletes the box's link, leaving box and range. Unknown ids are an error. */
     fun deleteBoxLink(path: String, boxId: String)
+
+    /** The enabled OCR backends configured for a Page: leaf's site. */
+    fun listOcrBackends(path: String): List<OcrBackendInfo>
+
+    /**
+     * Runs one OCR recognition for [path] through the sidecar's wrapper —
+     * the sidecar picks the backend (named in [request] or the site's
+     * first), translates the image reference to a backend-reachable URL,
+     * and forwards the cropped segment/prompt for backends that take them.
+     * Blocking; call off the EDT.
+     */
+    fun runOcr(path: String, request: OcrRunRequest): OcrRunResult
 }

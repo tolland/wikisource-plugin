@@ -323,6 +323,28 @@ class ImageAnnotationCanvas(
         fitToViewport()
     }
 
+    /**
+     * The pixels under [box], clamped to the image — the segment OCR
+     * actions send. A copy, not a subimage view, so callers may hold it
+     * past the next [showImage]. Null while no image is loaded or the box
+     * lies wholly outside it.
+     */
+    fun cropImage(box: BoundingBox): BufferedImage? {
+        val img = image ?: return null
+        val x = box.x.roundToInt().coerceIn(0, img.width - 1)
+        val y = box.y.roundToInt().coerceIn(0, img.height - 1)
+        val w = (box.right.roundToInt().coerceIn(x + 1, img.width)) - x
+        val h = (box.bottom.roundToInt().coerceIn(y + 1, img.height)) - y
+        if (w <= 0 || h <= 0) {
+            return null
+        }
+        val copy = BufferedImage(w, h, BufferedImage.TYPE_INT_RGB)
+        val g = copy.createGraphics()
+        g.drawImage(img.getSubimage(x, y, w, h), 0, 0, null)
+        g.dispose()
+        return copy
+    }
+
     fun showStatus(text: String) {
         statusText = text
         revalidate()

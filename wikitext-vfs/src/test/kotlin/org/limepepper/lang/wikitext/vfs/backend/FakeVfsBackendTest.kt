@@ -191,6 +191,19 @@ class FakeVfsBackendTest {
     }
 
     @Test
+    fun `ocr run resolves the backend and echoes decodable text`() {
+        val path = "/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1"
+        val result = backend.runOcr(path, OcrRunRequest(annotationId = "b1"))
+        assertEquals("fake-ocr", result.backend)
+        assertEquals("OCR of b1", result.decodeText())
+        assertEquals("b1", backend.ocrRequests.single().second.annotationId)
+
+        assertThrows(VfsBackendException::class.java) {
+            backend.runOcr(path, OcrRunRequest(backend = "nope"))
+        }
+    }
+
+    @Test
     fun `deleting an unknown annotation throws`() {
         assertThrows(VfsBackendException::class.java) {
             backend.deleteAnnotation("/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1", "nope")

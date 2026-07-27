@@ -23,12 +23,14 @@ private val PRP_LOG = logger<PrpFileEditor>()
  * Provides an implementation of FileEditor, suitable for use by [PrpFileEditorProvider] via its' [com.intellij.openapi.fileEditor.FileEditorProvider.createEditor] method.
  */
 class PrpFileEditor private constructor(
+    private val project: Project,
     private val editorHalf: PrpTextEditor,
     private val previewHalf: PrpPreviewBrowser,
     private val file: VirtualFile,
 ) : TextEditorWithPreview(editorHalf, previewHalf) {
     constructor(project: Project, editor: TextEditor, file: VirtualFile) :
         this(
+            project,
             PrpTextEditor(editor),
             PrpPreviewBrowser(file),
             file,
@@ -41,6 +43,10 @@ class PrpFileEditor private constructor(
     private lateinit var rangeModel: TextRangeModel
     private lateinit var linkModel: BoxLinkModel
     private lateinit var anchorManager: WtTextRangeManager
+
+    /** The site's OCR backends, loaded async in init; empty until then. */
+    @Volatile
+    private var ocrBackends: List<org.limepepper.lang.wikitext.vfs.backend.OcrBackendInfo> = emptyList()
 
     /** Which pane's structure the Structure tool window should reflect. */
     enum class ActivePane { EDITOR, PREVIEW_RENDER, PREVIEW_IMAGE }
@@ -100,8 +106,11 @@ class PrpFileEditor private constructor(
                 linkModel,
                 rangeLabel = ::rangeMenuLabel,
                 onRevealRange = revealRange,
+                ocrBackends = { ocrBackends },
+                onRunOcr = ::runOcr,
             )::menuFor,
         )
+        loadOcrBackends()
         pane.installLinkDrag(
             linked = linkModel::isLinked,
             drop = { boxId, screenPoint ->
@@ -163,6 +172,113 @@ class PrpFileEditor private constructor(
         }
         val clipped = if (snippet.length > SNIPPET_MAX_CHARS) snippet.take(SNIPPET_MAX_CHARS) + "…" else snippet
         return "“$clipped”"
+    }
+
+    // ---- OCR ---------------------------------------------------------------
+
+    /** Fetches the site's OCR backends once, off the EDT; no backends = no menu items. */
+    private fun loadOcrBackends() {
+        val vfsPath = (file as? WtVirtualFile)?.path ?: return
+        ApplicationManager.getApplication().executeOnPooledThread {
+            try {
+                ocrBackends = WtVfsService.instance.backend.listOcrBackends(vfsPath)
+            } catch (e: Exception) {
+                PRP_LOG.warn("OCR backend discovery failed for $vfsPath", e)
+            }
+        }
+    }
+
+    /**
+     * Sends [box] to [backendInfo] through the sidecar wrapper and presents
+     * the response for review. The cropped segment is captured on the EDT
+     * (the canvas owns the decoded scan), encoded and sent on a pooled
+     * thread, and the resulting [org.limepepper.lang.wikitext.ocr.OcrProposal]
+     * lands in the OCR tool window — nothing touches the transcription until
+     * the user applies it there.
+     */
+    private fun runOcr(
+        box: org.limepepper.lang.wikitext.annotation.BoundingBox,
+        backendInfo: org.limepepper.lang.wikitext.vfs.backend.OcrBackendInfo,
+    ) {
+        val vfsPath = (file as? WtVirtualFile)?.path ?: return
+        val segment = if (backendInfo.supportsSegment) {
+            previewHalf.referenceImagePane.cropBoxImage(box)
+        } else {
+            null
+        }
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val proposal = try {
+                val imageBase64 = segment?.let { img ->
+                    val bytes = java.io.ByteArrayOutputStream()
+                    javax.imageio.ImageIO.write(img, "png", bytes)
+                    java.util.Base64.getEncoder().encodeToString(bytes.toByteArray())
+                }
+                val result = WtVfsService.instance.backend.runOcr(
+                    vfsPath,
+                    org.limepepper.lang.wikitext.vfs.backend.OcrRunRequest(
+                        backend = backendInfo.name,
+                        annotationId = box.id,
+                        boxX = box.x,
+                        boxY = box.y,
+                        boxWidth = box.width,
+                        boxHeight = box.height,
+                        imageBase64 = imageBase64,
+                    ),
+                )
+                org.limepepper.lang.wikitext.ocr.OcrProposal(
+                    title = "${file.name} · ${box.label ?: box.id.take(8)}",
+                    pagePath = vfsPath,
+                    boxId = box.id,
+                    backend = result.backend,
+                    engine = result.engine,
+                    text = result.decodeText(),
+                    applyToTarget = { text -> applyOcrText(box.id, text) },
+                )
+            } catch (e: Exception) {
+                PRP_LOG.warn("OCR run failed for $vfsPath box ${box.id}", e)
+                org.limepepper.lang.wikitext.ocr.OcrProposal(
+                    title = "OCR failed · ${file.name}",
+                    pagePath = vfsPath,
+                    boxId = box.id,
+                    backend = backendInfo.name,
+                    text = "OCR request failed: ${e.message ?: e.javaClass.simpleName}",
+                )
+            }
+            ApplicationManager.getApplication().invokeLater {
+                if (!disposed) {
+                    org.limepepper.lang.wikitext.ocr.OcrReviewController
+                        .getInstance(project)
+                        .present(proposal)
+                }
+            }
+        }
+    }
+
+    /**
+     * The accept path: replaces the content of the box's linked text range
+     * with [text] (an insertion point receives it as an insert). Offsets go
+     * through the live range model, so edits made since the OCR ran are
+     * respected. Returns a user-facing error, or null on success.
+     */
+    private fun applyOcrText(boxId: String, text: String): String? {
+        val rangeId = linkModel.rangeFor(boxId)
+            ?: return "This box has no linked text range — link one first."
+        val range = rangeModel[rangeId]
+            ?: return "The linked text range no longer exists."
+        val editor = editorHalf.bodyEditor
+        if (editor.isDisposed) {
+            return "The editor for this page is closed."
+        }
+        val doc = editor.document
+        val bodyStart = editorHalf.bodyStartOffset
+        val start = (range.start + bodyStart).coerceIn(0, doc.textLength)
+        val end = (range.end + bodyStart).coerceIn(start, doc.textLength)
+        com.intellij.openapi.command.WriteCommandAction.runWriteCommandAction(project) {
+            doc.replaceString(start, end, text)
+        }
+        rangeModel.select(rangeId)
+        anchorManager.reveal(rangeId)
+        return null
     }
 
     /** Loads persisted text ranges + box links off the EDT, then seeds models + syncs. */

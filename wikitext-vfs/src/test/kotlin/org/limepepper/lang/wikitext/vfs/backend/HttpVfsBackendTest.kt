@@ -336,6 +336,59 @@ class HttpVfsBackendTest {
         }
     }
 
+    @Test fun `listOcrBackends parses capabilities`() {
+        handle("/ocr/backends", """
+            {"backends":[
+              {"name":"wmocr","kind":"wikimedia","base_url":"https://ocr.wiki.lan",
+               "default_engine":"tesseract","default_langs":["en","de"],
+               "default_prompt":null,"enabled":true,
+               "supports_prompt":false,"supports_segment":false},
+              {"name":"gemini","kind":"token_api","base_url":"https://api.example",
+               "default_engine":null,"default_langs":[],
+               "default_prompt":"latex please","enabled":true,
+               "supports_prompt":true,"supports_segment":true}
+            ]}
+        """.trimIndent())
+
+        val r = backend.listOcrBackends("/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1")
+        assertEquals(2, r.size)
+        assertEquals("wmocr", r[0].name)
+        assertEquals(listOf("en", "de"), r[0].defaultLangs)
+        assertTrue(r[1].supportsPrompt)
+        assertEquals("latex please", r[1].defaultPrompt)
+    }
+
+    @Test fun `runOcr POSTs the request and decodes the text`() {
+        var captured: String? = null
+        server.createContext("/ocr/run") { ex ->
+            captured = ex.requestBody.readBytes().decodeToString()
+            // "line one\nline two" base64-encoded
+            val body = """{"backend":"gemini","kind":"token_api","engine":null,
+                           "text":"ignored","text_base64":"bGluZSBvbmUKbGluZSB0d28="}""".toByteArray()
+            ex.sendResponseHeaders(200, body.size.toLong())
+            ex.responseBody.use { it.write(body) }
+        }
+
+        val result = backend.runOcr(
+            "/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1",
+            OcrRunRequest(
+                backend = "gemini",
+                annotationId = "b1",
+                boxX = 1.0, boxY = 2.0, boxWidth = 3.0, boxHeight = 4.0,
+                imageBase64 = "aGVsbG8=",
+                langs = listOf("en"),
+                prompt = "latex",
+            ),
+        )
+        assertEquals("line one\nline two", result.decodeText())
+        val body = captured!!
+        assertTrue(body.contains("\"backend\":\"gemini\""))
+        assertTrue(body.contains("\"image_base64\":\"aGVsbG8=\""))
+        assertTrue(body.contains("\"prompt\":\"latex\""))
+        assertTrue(body.contains("\"langs\":[\"en\"]"))
+        assertTrue(body.contains("\"box\":{\"x\":1.0,\"y\":2.0,\"width\":3.0,\"height\":4.0}"))
+    }
+
     @Test fun `throws VfsBackendException on HTTP error`() {
         server.createContext("/vfs/stat") { ex ->
             val body = """{"detail":"not found"}""".toByteArray()

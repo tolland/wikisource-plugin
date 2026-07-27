@@ -3,6 +3,7 @@ package org.limepepper.lang.wikitext.editor.prp
 import org.limepepper.lang.wikitext.annotation.AnnotationCategory
 import org.limepepper.lang.wikitext.annotation.BoundingBox
 import org.limepepper.lang.wikitext.annotation.BoundingBoxModel
+import org.limepepper.lang.wikitext.vfs.backend.OcrBackendInfo
 import javax.swing.ButtonGroup
 import javax.swing.JMenu
 import javax.swing.JMenuItem
@@ -28,6 +29,10 @@ class BoxCanvasPopup(
     private val rangeLabel: ((TextRange) -> String)? = null,
     /** Called after linking (and by "Go to Linked Range") to reveal the range. */
     private val onRevealRange: ((rangeId: String) -> Unit)? = null,
+    /** The site's OCR backends (loaded async by the host; empty = none yet). */
+    private val ocrBackends: (() -> List<OcrBackendInfo>)? = null,
+    /** Sends the box to a backend; the host owns cropping and the review UI. */
+    private val onRunOcr: ((box: BoundingBox, backend: OcrBackendInfo) -> Unit)? = null,
 ) {
     fun menuFor(box: BoundingBox?): JPopupMenu? {
         if (box == null) {
@@ -46,6 +51,21 @@ class BoxCanvasPopup(
                 isEnabled = linkedRange != null && onRevealRange != null
                 addActionListener { linkedRange?.let { onRevealRange?.invoke(it) } }
             })
+        }
+        if (ocrBackends != null && onRunOcr != null) {
+            menu.addSeparator()
+            val backends = ocrBackends.invoke()
+            if (backends.isEmpty()) {
+                menu.add(JMenuItem("Run OCR (no backends configured)").apply {
+                    isEnabled = false
+                })
+            } else {
+                for (info in backends) {
+                    menu.add(JMenuItem("Run OCR via ${info.name}").apply {
+                        addActionListener { onRunOcr.invoke(box, info) }
+                    })
+                }
+            }
         }
         menu.addSeparator()
         menu.add(JMenuItem("Delete Box").apply {
