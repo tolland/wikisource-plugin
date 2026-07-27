@@ -144,7 +144,7 @@ Against the three tree-shape cases:
   redlinked file/page-image column, no reference image so nobody upstream can
   proofread or validate it, and `imageforpage` / `defaultcontentforpage` return
   nothing (our enrichment already degrades to `None` gracefully). The one real
-  cost is that the §3.5 scan-sha1 check has nothing to compare, making the
+  cost is that the §3.6 scan-sha1 check has nothing to compare, making the
   page-offset failure mode *undetectable*. Prominent batch-level warning with an
   override, not a block.
 - **Page exists on the target, not yet modelled locally.** The `unknown` column.
@@ -158,7 +158,32 @@ Against the three tree-shape cases:
       not a transient computation. "Show me the join" is the first thing anyone
       wants when a sync looks wrong.
 
-### 3.5 The scan-offset check
+### 3.5 Target page state — the cases that must fail, not merge
+
+Pairing (§3.4) asks "is there a page there?". That is not enough: a title can be
+occupied by something that is not a transcription, and pushing onto it is worse
+than pushing onto a redlink.
+
+- [ ] Classify the target title before any promotion: `normal`, `redirect`,
+      `deleted`, `moved`, `protected`, `missing`. Anything but `normal` (or
+      `missing` for a create) **fails the item and surfaces it for manual
+      handling**. None of these are automatable and guessing is how you get an
+      embarrassing edit.
+- [ ] **`deleted` is not the same as `missing`, and `prop=revisions` cannot tell
+      them apart** — both come back as missing. Distinguishing them needs
+      `list=logevents&letype=delete&letitle=…`. This matters more than it looks:
+      creating a page that was *deliberately* deleted (copyright problem,
+      out-of-scope work, a community decision) is a far worse mistake than
+      creating a genuinely new one, and it is the kind that draws exactly the
+      attention §2 is about. Treat "deleted at some point" as a hard block
+      pending human review.
+- [ ] A `redirect` at the target may be a legitimate merge target or a trap.
+      Never follow it automatically — `redirects=1` on the query would silently
+      retarget the push.
+- [ ] Check `prop=info&inprop=protection` and record it; a protected target
+      fails the item rather than erroring at push time.
+
+### 3.6 The scan-offset check
 
 - [ ] Compare `FileBlob.file_sha1` of the backing `File:` on both sides. A
       different upload (re-derived DjVu, cropped cover, different page count)
@@ -333,6 +358,101 @@ page genuinely need a human.
 - [ ] Represent "no base" explicitly. Do not let it be indistinguishable from
       "never synced" or from a fabricated base.
 
+### 4.5 The revision store (schema rework)
+
+**`Page` holds a single current snapshot** — `text`, `revid`, `sha1`. Every rung
+above needs history, and there is nowhere to put it. This is the schema change
+the rest of §4 implies.
+
+Upstream is going the same way: **T389026 "Rethink rev_sha1 field"** is resolved
+as *"Proposal 0: Drop rev_sha1 and compute it on the fly from content_sha1"* —
+Wikimedia themselves treat the stored revision hash as redundant and are moving
+to deriving it from content. Our measurements say the same thing from the
+outside. So make it a standing rule:
+
+> **Identity and comparison use hashes we compute over content we have seen.
+> `rev_sha1`, `rev_len` and anything else the wiki reports about its own
+> revisions is informational only, never a key and never a comparison token.**
+
+#### Content-addressed, sparse — not a MediaWiki clone
+
+Mirroring MediaWiki's actual schema (`revision`/`slots`/`content`/`text`, actor
+and comment normalisation) would import a lot of MCR machinery for no benefit,
+and §3.3 already says we don't want a mirror of upstream. Two tables carry it:
+
+```python
+class RevisionContent(SQLModel, table=True):
+    """Body store keyed by OUR hash of the bytes we actually received."""
+    content_sha1: str = Field(primary_key=True)   # base-36, computed locally
+    text: str
+    byte_length: int
+
+
+class Revision(SQLModel, table=True):
+    """One revision of one page on one site, as observed.
+
+    Deliberately SPARSE: rows exist for revisions we fetched, and their absence
+    never means the revision does not exist.
+    """
+    __table_args__ = (UniqueConstraint("page_pk", "revid", name="uq_rev"),)
+    pk: int | None = Field(default=None, primary_key=True)
+    page_pk: int = Field(foreign_key="page.pk", index=True)
+
+    revid: int                       # site-local, not comparable across wikis
+    parent_revid: int | None
+    content_sha1: str = Field(foreign_key="revisioncontent.content_sha1", index=True)
+
+    remote_sha1: str | None = None   # what the wiki claimed -- informational
+    remote_byte_length: int | None = None  # ditto; both are unreliable (§4.2)
+
+    timestamp: datetime
+    contributor: str | None = None
+    comment: str | None = None
+    observed_at: datetime = Field(default_factory=utcnow)
+```
+
+Content addressing is what makes correspondence *checkable rather than
+asserted*: two revisions on two different wikis that share a `content_sha1` are
+provably the same text, with no trust in either wiki's metadata and no
+normalisation guesswork. That is exactly the happy case — we copied the page, so
+the contents match — and it now falls out of the schema instead of needing a
+claim.
+
+- [ ] **The sparse/complete distinction is the §3.2 hazard again, one level
+      down.** "We hold revisions 900114, 2650547" must be distinguishable from
+      "the page has exactly those two revisions", or a history walk will find a
+      fork point that is merely the oldest row we happen to have. Record what
+      range of history is known — e.g. `oldest_known_revid` plus a
+      `history_complete_from` marker on `Page` — and have the base search refuse
+      to conclude "no common ancestor" while the walk is incomplete.
+- [ ] Store the *transformed* body's hash alongside, so §5.5 no-op detection and
+      §5.2's comparison protocol share one token.
+- [ ] `RevisionContent` dedupes across sites for free, which is the storage
+      answer to holding partial upstream history for a work.
+
+#### What this does to `RemoteLink`
+
+`RemoteLink` (§4.1) currently records `base_revid` / `base_sha1` / `base_body`
+inline. With a revision store it instead points at two `Revision` rows:
+
+```python
+    base_local_revision_pk: int | None
+    base_remote_revision_pk: int | None
+```
+
+and the invariant that makes the link trustworthy becomes checkable at any time:
+both rows resolve to the **same `content_sha1`**. A clone asserts the link *and*
+can prove it; a title-matched link can be verified or refuted rather than
+believed. `base_body` disappears — it is `RevisionContent.text`.
+
+- [ ] Migration: `Page.text`/`revid`/`sha1` stay as the convenient current-head
+      denormalisation (a great deal of existing code reads them), but become a
+      cache of the head `Revision` rather than the only record.
+- [ ] This is a substantial change to a core model. Worth doing before the
+      promotion pipeline is built on the current shape, not after — but it wants
+      its own review pass, so it is called out as Phase 1 work rather than folded
+      into a promotion commit.
+
 ---
 
 ## 5. The promotion pipeline
@@ -486,8 +606,12 @@ None of these are currently used — `grep createonly src-py` returns nothing:
       on a detected conflict `EditPage` (~line 2388) tries
       `mergeChangesIntoContent` and, if the three-way merge succeeds, clears the
       conflict and saves the merged text. That is a silent content change we did
-      not review. Decide deliberately whether to accept it; if not, the push must
-      verify the resulting revision's content against what we submitted.
+      not review, and it is the last place the wiki can substitute its judgement
+      for ours. **Close the loop the same way §4.5 closes every other one:**
+      after each push, fetch the resulting revision and compare *our* hash of
+      its content against the hash of what we submitted. Equal → the push landed
+      as reviewed. Not equal → MediaWiki merged, and the item goes back to
+      review rather than being recorded as a clean success.
 - [ ] Keep `Commit.result_revid` authoritative regardless — as
       `commit_worker._load_pending_page_commit` already does when it bumps the
       base past our own last push. The server guard narrows the window; it does
@@ -685,11 +809,14 @@ it. Split by task rather than by feature:
 persisted outer join. No writes, no UI. Independently verifiable against Hertz:
 the output is just "here is the join, here is what we know and don't know".
 
-**Phase 1 — base discovery (§4).** `RemoteLink` + `find-base`; the normalized-hash
-history intersection; local-side base extraction for patch mode. **Prototype
-rung 2 against Hertz before building anything on top of it** — if normalized
-matching finds the fork point there, title-matched links become nearly as good
-as cloned ones, and that determines how much of §4.3 carries the load.
+**Phase 1 — the revision store, then base discovery (§4.5, §4).** `Revision` +
+`RevisionContent` first: history has nowhere to live until they exist, and the
+change is much cheaper before the promotion pipeline is built on the current
+shape. Then `RemoteLink` pointing at revision rows, `find-base`, the
+content-hash history intersection, and local-side base extraction for patch
+mode. **Prototype rung 2 against Hertz before building anything on top of it** —
+whether it finds the fork point there determines how much of §4.3 carries the
+load.
 
 **Phase 2 — single-page promotion.** Explicit journal intent + `createonly` /
 `nocreate` / `basetimestamp` + error-code mapping (§5.6, §5.3) — worth doing
