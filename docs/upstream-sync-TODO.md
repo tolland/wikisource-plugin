@@ -197,22 +197,41 @@ base = argmax_timestamp { r in upstream_history : norm(r.sha1) in local_norm_sha
       body" idea — a set intersection handles the `Special:Import` case (whole
       upstream history imported locally, so many revisions match) and the
       copy-paste case (exactly one match) with the same code.
-- [ ] **First, get the encoding right** — this is the failure that actually
-      occurred in testing, not a hypothetical: intersecting the API's hex
-      against a dump's base-36 matches nothing. Normalise via
-      `wtbot.wiki.sha1` before comparing.
-- [ ] **ProofreadPage does *not* rewrite `user=` on every save**, contrary to an
-      earlier assumption here. The dump shows `Wikisource-bot` re-saving
-      `Page:…/1` with the header still reading `user="Hesperian"`: the attribute
-      tracks whoever last *changed the level*, and is preserved by saves that
-      don't. Since `transwikiimport` (Special:Import) and `transferbot` both
-      copy text verbatim, **raw sha1 should survive the normal staging-copy
-      path**, and rung 2 is stronger than first assumed.
+Two findings from building the harness change how this must be implemented.
+Both are verified, the second against live en.wikisource.
+
+- [ ] **Get the sha1 encoding right.** The action API (hence pywikibot, hence
+      `Page.sha1`) returns 40-char hex; the XML export and `rev_sha1` return
+      31-char base-36. Intersecting one against the other matches nothing.
+      Normalise via `wtbot.wiki.sha1`.
+- [ ] **Never intersect on the server's `rev_sha1` — intersect on a hash you
+      compute from the returned content.** For `proofread-page` revisions
+      predating ProofreadPage's 2018 reserialization pass, the stored
+      `rev_sha1` is *not* the hash of the content the API serves for that
+      revision. `Page:Canadian patent 29537.djvu/2` serves three consecutive
+      revisions with **byte-identical text under three different declared
+      hashes**. Measured on en.wikisource: proofread-page 3 of 4 mismatch,
+      proofread-index 11 of 11 match, wikitext 2 of 2 match — so it is specific
+      to `proofread-page`, which is exactly the content model this project
+      cares about most. `content_sha1_base36` is the token to use; pinned by
+      `test_proofread_serialization.py`.
+
+This also corrects an earlier note here claiming ProofreadPage rewrites `user=`
+on every save. It does not — the attribute tracks whoever last *changed the
+level* and survives saves that don't (`Wikisource-bot` re-saves `Page:…/1` with
+the header still crediting `Hesperian`). The real obstacle to rung 2 was never
+the header; it is the stored-hash discrepancy above.
+
 - [ ] A *content*-normalised hash (neutralise `pagequality` `user=`/`level=`,
-      line endings, trailing whitespace) is still worth having as a fallback for
-      copies that did perturb the text, and it is the same normalisation the
-      comparison protocol in §5.2 needs. But it is no longer the thing rung 2
-      depends on.
+      line endings, trailing whitespace) remains worth having for copies that
+      did perturb the text, and it is the same normalisation the comparison
+      protocol in §5.2 needs.
+- [ ] **Consequence for cost:** intersecting on content hashes means the history
+      walk must fetch revision *content*, not just metadata. `rvprop=content`
+      with `rvslots=main` still returns up to 50 revisions per request, so it is
+      one request per page rather than per revision — but it is no longer the
+      cheap metadata-only walk §3.3 describes. Restrict it to pages the probe
+      already says differ.
 - [ ] Cost is one history call per page per side. Restrict the walk to pages the
       cheap probe (§3.3) already says differ — for a mostly-clean work that is a
       handful of pages, not 400.
@@ -629,8 +648,9 @@ exactly what this feature needs and what `FakeWikiClient` cannot simulate
 - [ ] Stand up a second instance as the "upstream" and build a real diverged
       fixture: create a page, copy it across, edit both sides, then assert the
       §4.2 intersection finds the right base.
-- [ ] Pin the sha1 encoding trap in both directions (done —
-      `test_wiki_sha1.py`, and the import assertion in `test_sync_harness.py`).
+- [ ] Pin the sha1 encoding trap in both directions (done — `test_wiki_sha1.py`)
+      and the proofread-page stored-hash discrepancy (done —
+      `test_proofread_serialization.py`, which runs without Docker).
 - [ ] `FakeWikiClient` for the fast unit-level pipeline tests (states, checks,
       transforms, batch bookkeeping).
 - [ ] Two sites with differing `File:` sha1s must refuse to link children.

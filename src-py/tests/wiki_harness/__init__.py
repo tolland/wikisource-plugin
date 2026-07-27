@@ -1,4 +1,11 @@
 from wiki_harness.api import EditResult, RevisionInfo, WikiApi, WikiApiError
+from wiki_harness.dumps import (
+    SCANS_DIR,
+    DumpPage,
+    DumpRevision,
+    read_dump,
+    scan_dump,
+)
 from wiki_harness.endpoint import WikiEndpoint
 from wiki_harness.stack import (
     StackConfig,
@@ -15,6 +22,9 @@ cannot model: revision history, MediaWiki's sha1 semantics, conditional edits
 """
 
 __all__ = [
+    "SCANS_DIR",
+    "DumpPage",
+    "DumpRevision",
     "EditResult",
     "RevisionInfo",
     "StackConfig",
@@ -23,5 +33,7 @@ __all__ = [
     "WikiEndpoint",
     "WikiStack",
     "docker_available",
+    "read_dump",
+    "scan_dump",
     "wait_for_mediawiki",
 ]

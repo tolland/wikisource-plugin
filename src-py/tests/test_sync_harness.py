@@ -1,17 +1,19 @@
 import pytest
 from conftest import CANADIAN_PATENT_INDEX, CANADIAN_PATENT_SCAN
-from wiki_harness import WikiApi, WikiApiError, WikiStack
+from wiki_harness import WikiApi, WikiApiError, WikiStack, scan_dump
 
 """Harness-level checks for the two-wiki sync fixture.
 
 These assert the *fixture* is sound before anything is built on it, and they
-pin two empirical claims the sync design in docs/upstream-sync-TODO.md rests on:
+pin the empirical claims the sync design in docs/upstream-sync-TODO.md rests on:
 
-- importDump preserves per-revision sha1, so a work copied by import shares a
-  revision lineage with its source and the base discovery of section 4.2 can
-  intersect on the server-provided hash;
-- `createonly` turns a parallel creation into an error instead of the silent
-  overwrite the current push path performs (section 5.6).
+- an import preserves revision depth and attribution, which an API-level copy
+  would flatten;
+- an importing wiki recomputes sha1 from the text it is given, so *content*
+  hashes are the token comparable across wikis -- stored ``rev_sha1`` is not
+  (see test_proofread_serialization for why);
+- `createonly` and `basetimestamp` turn a parallel write into an error instead
+  of the silent overwrite the current push path performs (section 5.6).
 """
 
 PAGE_2 = "Page:Canadian patent 29537.djvu/2"
@@ -39,33 +41,41 @@ def test_seeded_upstream_has_the_work_and_its_scan(seeded_upstream: WikiApi) -> 
     assert slots, "ProofreadPage could not paginate the Index (DjVu support?)"
 
 
-def test_import_preserves_revision_history_and_sha1(
-    seeded_upstream: WikiApi,
-) -> None:
-    """The dump for Page/2 carries exactly four revisions whose quality level
-    rises 3 -> 4. Both the depth of history and the per-revision sha1 must
-    survive, or rung 2 of the base ladder has nothing to intersect on.
-    """
+def test_import_preserves_revision_history(seeded_upstream: WikiApi) -> None:
+    """Depth of history and attribution must survive the import -- an API-level
+    copy would flatten both."""
     revisions = seeded_upstream.revisions(PAGE_2, limit=50)
     # Exactly four: more means a dump was imported twice, which silently
     # inflates every history-walk test built on this fixture.
     assert len(revisions) == 4
-
     assert all(rev.sha1 for rev in revisions), "revisions imported without sha1"
-
-    # The dump records base-36 hashes; the API reports hex. Comparing the two
-    # encodings directly silently never matches -- see wtbot.wiki.sha1.
-    dump_sha1s = {
-        "7qzy4bystlkoytnzaivpq46nv4bbd1d",  # r900114, level 3, T. Mazzei
-        "ti1n0sdo5tixoaccq10j25r8cwn0lqn",  # r1193309, level 4
-        "d8royu8iytefd8uu41iir20wxrp7rym",  # r2650547, ThomasBot maintenance
-        "ber7rim00nw9gknuje381xd89o14ne7",  # r7673287, pywikibot touch
+    assert {rev.user for rev in revisions} == {
+        "T. Mazzei",
+        "Kathleen.wright5",
+        "ThomasBot",
+        "Wikisource-bot",
     }
-    assert {rev.sha1_base36 for rev in revisions} == dump_sha1s
 
-    # Contributors come across too -- attribution is part of what an import
-    # preserves and an API copy destroys.
-    assert {rev.user for rev in revisions} >= {"T. Mazzei", "Kathleen.wright5"}
+
+def test_import_recomputes_sha1_from_content(seeded_upstream: WikiApi) -> None:
+    """An importing wiki hashes the text it is given, so every imported
+    revision's sha1 is the *content* hash -- not the ``rev_sha1`` the source
+    wiki had frozen for it (see test_proofread_serialization).
+
+    This is the invariant rung 2 of the base ladder has to build on: content
+    hashes are comparable across wikis, stored rev_sha1 is not.
+    """
+    dump_page = scan_dump("Canadian_patent_29537_all.xml")[PAGE_2]
+    expected = {rev.content_sha1 for rev in dump_page.revisions}
+
+    revisions = seeded_upstream.revisions(PAGE_2, limit=50)
+    assert {rev.sha1_base36 for rev in revisions} == expected
+
+    # The latest revision is the one whose stored and content hashes agree on
+    # the source wiki too, so it round-trips end to end.
+    assert dump_page.latest.declared_sha1 == "ber7rim00nw9gknuje381xd89o14ne7"
+    assert dump_page.latest.content_sha1 == dump_page.latest.declared_sha1
+    assert dump_page.latest.declared_sha1 in {rev.sha1_base36 for rev in revisions}
 
 
 def test_createonly_rejects_a_parallel_creation(local_api: WikiApi) -> None:
