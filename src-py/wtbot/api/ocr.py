@@ -66,7 +66,9 @@ class OcrBackendUpsert(BaseModel):
     kind: OcrBackendKind
     base_url: str
     api_token: str | None = None
-    default_engine: str | None = None
+    # "tesseract" is Wikimedia OCR's free/local engine, so a config that
+    # doesn't say otherwise defaults there rather than to a paid engine.
+    default_engine: str | None = "tesseract"
     default_langs: list[str] = []
     default_prompt: str | None = None
     enabled: bool = True

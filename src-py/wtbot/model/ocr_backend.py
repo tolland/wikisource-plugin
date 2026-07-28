@@ -47,7 +47,10 @@ class OcrBackendConfig(SQLModel, table=True):
     base_url: str  # e.g. "https://ocr.wikisource-debian-13.lan"
 
     api_token: str | None = None
-    default_engine: str | None = None  # wikimedia: "tesseract"/"google"/...
+    # "tesseract" is Wikimedia OCR's free/local engine — "google" costs
+    # money, so a config that doesn't say otherwise should not silently
+    # incur charges.
+    default_engine: str | None = "tesseract"
     default_langs: str | None = None  # comma-separated, e.g. "en,de"
     default_prompt: str | None = None  # prompt-driven backends only
 

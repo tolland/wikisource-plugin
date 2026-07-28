@@ -282,6 +282,27 @@ def test_wikimedia_client_builds_the_documented_request(monkeypatch):
     assert ("crop[height]", "168") in captured["params"]
 
 
+def test_wikimedia_client_defaults_to_tesseract_when_engine_unset(monkeypatch):
+    captured = {}
+
+    class Resp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"text": "recognized"}
+
+    def fake_get(url, params=None, **kwargs):
+        captured["params"] = params
+        return Resp()
+
+    monkeypatch.setattr("wtbot.ocr.requests.get", fake_get)
+    WikimediaOcrClient("https://ocr.wiki.lan").recognize(
+        OcrRequest(image_url="https://img.example/p.jpg")
+    )
+    assert ("engine", "tesseract") in captured["params"]
+
+
 def test_wikimedia_client_requires_an_image_url():
     client = WikimediaOcrClient("https://ocr.wiki.lan")
     with pytest.raises(OcrError):

@@ -91,8 +91,10 @@ class WikimediaOcrClient:
                 "and none is known for this page"
             )
         params: list[tuple[str, str]] = [("image", request.image_url)]
-        if request.engine:
-            params.append(("engine", request.engine))
+        # Tesseract is free/local; Wikimedia OCR's other engines (e.g.
+        # Google) bill per call, so an unset engine must never default to
+        # one of those silently.
+        params.append(("engine", request.engine or "tesseract"))
         for lang in request.langs:
             params.append(("langs[]", lang))
         if request.crop is not None:
