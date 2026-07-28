@@ -13,7 +13,10 @@ import type {
   SiteCredential,
   SitePayload,
   WikiNamespace,
-  CredentialPayload
+  CredentialPayload,
+  OcrBackend,
+  OcrBackendList,
+  OcrBackendPayload
 } from '$lib/types';
 
 async function getJson<T>(path: string): Promise<T> {
@@ -89,6 +92,35 @@ export function saveSiteCredential(
 
 export function deleteSiteCredential(sitePk: number): Promise<void> {
   return deleteRequest(`/sites/${sitePk}/credential`);
+}
+
+function siteQuery(site: Pick<Site, 'family' | 'code'>): string {
+  return new URLSearchParams({ family: site.family, code: site.code }).toString();
+}
+
+export async function listOcrBackends(
+  site: Pick<Site, 'family' | 'code'>
+): Promise<OcrBackend[]> {
+  const result = await getJson<OcrBackendList>(`/ocr/config?${siteQuery(site)}`);
+  return result.backends;
+}
+
+export function saveOcrBackend(
+  site: Pick<Site, 'family' | 'code'>,
+  name: string,
+  payload: OcrBackendPayload
+): Promise<OcrBackend> {
+  return putJson<OcrBackend>(
+    `/ocr/config/${encodeURIComponent(name)}?${siteQuery(site)}`,
+    payload
+  );
+}
+
+export function deleteOcrBackend(
+  site: Pick<Site, 'family' | 'code'>,
+  name: string
+): Promise<void> {
+  return deleteRequest(`/ocr/config/${encodeURIComponent(name)}?${siteQuery(site)}`);
 }
 
 export function listIndexPages(): Promise<IndexPageSummary[]> {

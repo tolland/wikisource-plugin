@@ -53,6 +53,7 @@ class OcrBackendOut(BaseModel):
     default_langs: list[str]
     default_prompt: str | None
     enabled: bool
+    has_api_token: bool
     # Capability flags so the UI can shape its menu without knowing kinds.
     supports_prompt: bool
     supports_segment: bool
@@ -116,6 +117,7 @@ def _backend_out(row: OcrBackendConfig) -> OcrBackendOut:
         default_langs=row.langs_list(),
         default_prompt=row.default_prompt,
         enabled=row.enabled,
+        has_api_token=bool(row.api_token),
         supports_prompt=segment,
         supports_segment=segment,
     )
@@ -195,7 +197,10 @@ def upsert_config(
         )
     row.kind = body.kind
     row.base_url = body.base_url
-    row.api_token = body.api_token
+    # An omitted token means "keep the stored secret"; explicit null clears it.
+    # This lets an edit form safely leave its write-only token field blank.
+    if "api_token" in body.model_fields_set:
+        row.api_token = body.api_token
     row.default_engine = body.default_engine
     row.default_langs = ",".join(body.default_langs) or None
     row.default_prompt = body.default_prompt

@@ -100,6 +100,7 @@ def test_config_upsert_and_list(client, page_pk):
     assert out["kind"] == "wikimedia"
     assert out["default_langs"] == ["en", "de"]
     assert out["supports_prompt"] is False
+    assert out["has_api_token"] is False
     assert "api_token" not in out  # tokens are never echoed
 
     listing = client.get("/ocr/config", params={"family": FAMILY, "code": CODE}).json()
@@ -122,6 +123,15 @@ def test_config_delete(client, page_pk):
         ).status_code
         == 404
     )
+
+
+def test_config_update_preserves_omitted_write_only_token(client, page_pk):
+    _put_config(client, "gemini", kind="token_api", api_token="s3cret")
+    response = _put_config(client, "gemini", kind="token_api")
+    assert response.json()["has_api_token"] is True
+
+    response = _put_config(client, "gemini", kind="token_api", api_token=None)
+    assert response.json()["has_api_token"] is False
 
 
 def test_config_unknown_site_is_404(client):

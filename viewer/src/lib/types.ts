@@ -58,6 +58,35 @@ export interface CredentialPayload {
   bot_name?: string | null;
 }
 
+export type OcrBackendKind = 'wikimedia' | 'token_api';
+
+export interface OcrBackend {
+  name: string;
+  kind: OcrBackendKind;
+  base_url: string;
+  default_engine?: string | null;
+  default_langs: string[];
+  default_prompt?: string | null;
+  enabled: boolean;
+  has_api_token: boolean;
+  supports_prompt: boolean;
+  supports_segment: boolean;
+}
+
+export interface OcrBackendPayload {
+  kind: OcrBackendKind;
+  base_url: string;
+  api_token?: string | null;
+  default_engine?: string | null;
+  default_langs: string[];
+  default_prompt?: string | null;
+  enabled: boolean;
+}
+
+export interface OcrBackendList {
+  backends: OcrBackend[];
+}
+
 export interface IndexPageSummary {
   pk: number;
   title: string;
