@@ -7,6 +7,7 @@ from wiki_harness.dumps import (
     scan_dump,
 )
 from wiki_harness.endpoint import WikiEndpoint
+from wiki_harness.pwb import PwbHarness, pywikibot_harness
 from wiki_harness.stack import (
     StackConfig,
     WikiStack,
@@ -26,6 +27,7 @@ __all__ = [
     "DumpPage",
     "DumpRevision",
     "EditResult",
+    "PwbHarness",
     "RevisionInfo",
     "StackConfig",
     "WikiApi",
@@ -33,6 +35,7 @@ __all__ = [
     "WikiEndpoint",
     "WikiStack",
     "docker_available",
+    "pywikibot_harness",
     "read_dump",
     "scan_dump",
     "wait_for_mediawiki",

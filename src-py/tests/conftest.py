@@ -10,7 +10,14 @@ import requests
 from fastapi.testclient import TestClient
 from sqlalchemy.engine import Engine
 from sqlmodel import Session
-from wiki_harness import StackConfig, WikiApi, WikiStack, docker_available
+from wiki_harness import (
+    PwbHarness,
+    StackConfig,
+    WikiApi,
+    WikiStack,
+    docker_available,
+    pywikibot_harness,
+)
 
 from wtbot.db import create_db_engine, init_db
 from wtbot.main import create_app
@@ -161,6 +168,21 @@ def local_bystander(wiki_pair: WikiStack) -> WikiApi:
     the requesting user made every intervening revision.
     """
     return _editor(wiki_pair, "local", "Bystander")
+
+
+@pytest.fixture(scope="session")
+def upstream_pwb(wiki_pair: WikiStack) -> PwbHarness:
+    """pywikibot bound to the upstream harness wiki.
+
+    The production fetch path is pywikibot, so revision claims should be
+    assertable through the same library the worker uses.
+    """
+    return pywikibot_harness(wiki_pair.endpoint("upstream"))
+
+
+@pytest.fixture(scope="session")
+def local_pwb(wiki_pair: WikiStack) -> PwbHarness:
+    return pywikibot_harness(wiki_pair.endpoint("local"))
 
 
 @pytest.fixture(scope="session")

@@ -25,6 +25,7 @@ COMPOSE_FILE = REPO_ROOT / "docker-compose.yml"
 FIXTURES_MOUNT = "/fixtures"
 
 SERVICE_FOR_ROLE = {"upstream": "mediawiki", "local": "mediawiki-local"}
+DB_SERVICE_FOR_ROLE = {"upstream": "db", "local": "db-local"}
 
 
 def docker_available() -> bool:
@@ -161,6 +162,42 @@ class WikiStack:
 
             raise
         return completed.stdout
+
+    def sql(self, role: str, query: str, *, timeout: int = 120) -> list[dict[str, str]]:
+        """Run a read query against the wiki's MariaDB and return rows as dicts.
+
+        The point of having the database is that ``content_sha1`` and
+        ``content_size`` -- the values MediaWiki actually hashes and measures --
+        are not exposed by any read API. Reading them settles what the served
+        serialization can only be inferred from.
+        """
+        command = self._compose(
+            "exec",
+            "-T",
+            DB_SERVICE_FOR_ROLE[role],
+            "mariadb",
+            "-umediawiki",
+            "-pmediawiki",
+            "--batch",
+            "--raw",
+            "-e",
+            query,
+            "mediawiki",
+        )
+        completed = subprocess.run(
+            command,
+            cwd=REPO_ROOT,
+            env=self._env,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        lines = [ln for ln in completed.stdout.splitlines() if ln.strip()]
+        if not lines:
+            return []
+        headers = lines[0].split("\t")
+        return [dict(zip(headers, ln.split("\t"), strict=False)) for ln in lines[1:]]
 
     def import_dump(self, role: str, dump_name: str) -> str:
         """Import an XML dump from the mounted fixtures directory.
