@@ -65,3 +65,5 @@ __pycache__/
 /Query.sql
 /idea-flex.skeleton
 /editorStateDump-*.txt
+/apicache/
+/throttle.ctrl
