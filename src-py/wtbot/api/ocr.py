@@ -1,12 +1,12 @@
 import base64
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from ocrapi import service
-from ocrapi.api import OcrBackendList, OcrRunOut, backend_out
-from ocrapi.client import OcrCrop, OcrError, OcrRequest, build_client
 from pydantic import BaseModel
 from sqlmodel import Session
 
+from ocrapi import service
+from ocrapi.api import OcrBackendList, OcrRunOut, backend_out
+from ocrapi.client import OcrCrop, OcrError, OcrRequest, build_client
 from wtbot.api.debug_loggig_route import DebugLoggingRoute
 from wtbot.deps import get_session
 from wtbot.vfs.nodes import PageLeaf, resolve
@@ -28,7 +28,9 @@ viewer/src/lib/api.ts, which does exactly that). This module only reads,
 for the plugin's own box-menu discovery.
 """
 
-router = APIRouter(prefix="/pages/ocr", tags=["page-ocr"], route_class=DebugLoggingRoute)
+router = APIRouter(
+    prefix="/pages/ocr", tags=["page-ocr"], route_class=DebugLoggingRoute
+)
 
 
 def get_client_builder() -> service.ClientBuilder:
