@@ -8,7 +8,7 @@ from wtbot.model import Page, Site
 from wtbot.model.index_meta import IndexMeta
 from wtbot.model.namespace import NsRole
 from wtbot.model.page_meta import PageMeta
-from wtbot.ocr import FakeOcrClient, OcrError, OcrRequest, WikimediaOcrClient
+from wtbot.ocr import FakeOcrClient, OcrCrop, OcrError, OcrRequest, WikimediaOcrClient
 
 """Tests for the OCR wrapper: per-site backend config CRUD, backend
 discovery by page path, and /ocr/run — including the image-URL translation
@@ -161,6 +161,21 @@ def test_run_translates_image_url_and_applies_defaults(client, page_pk, fake_ocr
     assert sent.image_url == SOURCE_URL
     assert sent.engine == "tesseract"
     assert sent.langs == ["en"]
+    assert sent.crop is None  # no box, whole page
+
+
+def test_run_threads_the_bounding_box_as_a_crop(client, page_pk, fake_ocr):
+    _put_config(client, "wmocr")
+    resp = client.post(
+        "/ocr/run",
+        json={
+            "path": PAGE_PATH,
+            "box": {"x": 233.24, "y": 555.78, "width": 321.68, "height": 77.17},
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    crop = fake_ocr.last_request.crop
+    assert (crop.x, crop.y, crop.width, crop.height) == (233, 556, 322, 77)
 
 
 def test_run_request_overrides_defaults_and_threads_prompt(client, page_pk, fake_ocr):
@@ -252,6 +267,7 @@ def test_wikimedia_client_builds_the_documented_request(monkeypatch):
             image_url="https://img.example/p.jpg",
             engine="tesseract",
             langs=["en", "de"],
+            crop=OcrCrop(x=3, y=101, width=649, height=168),
         )
     )
     assert result.text == "recognized"
@@ -260,6 +276,10 @@ def test_wikimedia_client_builds_the_documented_request(monkeypatch):
     assert ("engine", "tesseract") in captured["params"]
     assert ("langs[]", "en") in captured["params"]
     assert ("langs[]", "de") in captured["params"]
+    assert ("crop[x]", "3") in captured["params"]
+    assert ("crop[y]", "101") in captured["params"]
+    assert ("crop[width]", "649") in captured["params"]
+    assert ("crop[height]", "168") in captured["params"]
 
 
 def test_wikimedia_client_requires_an_image_url():

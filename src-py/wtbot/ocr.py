@@ -28,17 +28,32 @@ class OcrError(Exception):
 
 
 @dataclass(slots=True)
+class OcrCrop:
+    """The bounding-box region to recognize, in pixels of the image behind
+    ``OcrRequest.image_url`` — the same rendition the editor annotates, so
+    box coordinates carry over unscaled."""
+
+    x: int
+    y: int
+    width: int
+    height: int
+
+
+@dataclass(slots=True)
 class OcrRequest:
     """One recognition request, already resolved to backend-usable terms.
 
     ``image_url`` is the *backend-reachable* URL of the page scan (the
-    wiki-side URL from PageMeta, never the plugin's localhost rendition).
-    ``image_base64`` is the cropped bounding-box segment as the editor sees
-    it, for backends that accept bytes. Either may be None; a client raises
-    OcrError when the part it needs is missing.
+    wiki-side URL from PageMeta, never the plugin's localhost rendition),
+    with ``crop`` narrowing it to the bounding-box region for backends
+    that crop server-side (Wikimedia OCR). ``image_base64`` is the
+    already-cropped segment as the editor sees it, for backends that
+    accept bytes. Any part may be None; a client raises OcrError when the
+    part it needs is missing.
     """
 
     image_url: str | None = None
+    crop: OcrCrop | None = None
     image_base64: str | None = None
     engine: str | None = None
     langs: list[str] = field(default_factory=list)
@@ -80,6 +95,13 @@ class WikimediaOcrClient:
             params.append(("engine", request.engine))
         for lang in request.langs:
             params.append(("langs[]", lang))
+        if request.crop is not None:
+            params += [
+                ("crop[x]", str(request.crop.x)),
+                ("crop[y]", str(request.crop.y)),
+                ("crop[width]", str(request.crop.width)),
+                ("crop[height]", str(request.crop.height)),
+            ]
         try:
             resp = requests.get(
                 f"{self._base_url}/api.php",

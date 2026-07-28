@@ -9,7 +9,7 @@ from sqlmodel import Session, select
 from wtbot.api.debug_loggig_route import DebugLoggingRoute
 from wtbot.deps import get_session
 from wtbot.model import OcrBackendConfig, OcrBackendKind, Site
-from wtbot.ocr import OcrClient, OcrError, OcrRequest, build_client
+from wtbot.ocr import OcrClient, OcrCrop, OcrError, OcrRequest, build_client
 from wtbot.vfs.nodes import PageLeaf, resolve
 from wtbot.vfs.store import PageStore
 
@@ -83,7 +83,10 @@ class OcrRunIn(BaseModel):
     path: str
     backend: str | None = None  # config name; default = first enabled
     annotation_id: str | None = None  # provenance only
-    box: OcrBox | None = None  # provenance only (the crop already happened)
+    # The bounding box, in pixels of the page rendition the editor
+    # annotates. URL-driven backends receive it as crop[...] params;
+    # byte backends get image_base64 (already cropped) instead.
+    box: OcrBox | None = None
     image_base64: str | None = None  # cropped segment, for byte backends
     engine: str | None = None
     langs: list[str] | None = None
@@ -253,8 +256,18 @@ def run_ocr(
     if meta is not None:
         image_url = meta.source_image_url or meta.thumb_url
 
+    crop = None
+    if body.box is not None:
+        crop = OcrCrop(
+            x=round(body.box.x),
+            y=round(body.box.y),
+            width=max(1, round(body.box.width)),
+            height=max(1, round(body.box.height)),
+        )
+
     request = OcrRequest(
         image_url=image_url,
+        crop=crop,
         image_base64=body.image_base64,
         engine=body.engine or config.default_engine,
         langs=body.langs if body.langs is not None else config.langs_list(),
