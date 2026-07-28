@@ -70,7 +70,12 @@ class WikiStack:
         port = (
             self.config.upstream_port if role == "upstream" else self.config.local_port
         )
-        base_url = f"http://127.0.0.1:{port}"
+        # Pywikibot shares an HTTP cookie jar process-wide, and cookies are
+        # scoped by hostname rather than port.  Use two names for the loopback
+        # interface so logging in to one harness wiki cannot replace the other
+        # wiki's session cookie.
+        host = "127.0.0.1" if role == "upstream" else "localhost"
+        base_url = f"http://{host}:{port}"
         return WikiEndpoint(
             role=role,
             base_url=base_url,
@@ -212,6 +217,12 @@ class WikiStack:
             "--no-updates",
             f"{FIXTURES_MOUNT}/scans/{dump_name}",
         )
+
+    def export_dump(self, role: str) -> str:
+        """Export every revision so an import can be checked through the same
+        portable XML representation as its source dump.
+        """
+        return self.maintenance(role, "dumpBackup", "--full")
 
     def import_scans(self, role: str, extension: str = "djvu") -> str:
         """Upload every scan of the given extension from the fixtures mount.

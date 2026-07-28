@@ -23,6 +23,7 @@ class DumpRevision:
     user: str | None
     comment: str | None
     declared_sha1: str | None
+    bytes: str
     """``rev_sha1`` as the source wiki stored it, base-36.
 
     For ``proofread-page`` revisions saved before ProofreadPage's stored
@@ -58,7 +59,15 @@ class DumpPage:
 
 def read_dump(path: Path | str) -> dict[str, DumpPage]:
     """Parse an export file into ``{title: DumpPage}``."""
-    root = ElementTree.parse(Path(path)).getroot()
+    return _pages(ElementTree.parse(Path(path)).getroot())
+
+
+def read_dump_text(xml: str) -> dict[str, DumpPage]:
+    """Parse an XML export already captured in memory."""
+    return _pages(ElementTree.fromstring(xml))
+
+
+def _pages(root: ElementTree.Element) -> dict[str, DumpPage]:
     pages: dict[str, DumpPage] = {}
     for page_el in root.findall("{*}page"):
         title = _text(page_el, "{*}title") or ""
@@ -81,6 +90,7 @@ def scan_dump(name: str) -> dict[str, DumpPage]:
 def _revision(rev_el: ElementTree.Element) -> DumpRevision:
     contributor = rev_el.find("{*}contributor")
     user = _text(contributor, "{*}username") if contributor is not None else None
+    byte_count = rev_el.find("{*}text").get("bytes")
     return DumpRevision(
         revid=int(_text(rev_el, "{*}id") or 0),
         timestamp=_text(rev_el, "{*}timestamp") or "",
@@ -90,6 +100,7 @@ def _revision(rev_el: ElementTree.Element) -> DumpRevision:
         # ElementTree has already decoded XML entities; this is the raw
         # wikitext the source wiki serves for the revision.
         text=_text(rev_el, "{*}text") or "",
+        bytes=byte_count,
     )
 
 

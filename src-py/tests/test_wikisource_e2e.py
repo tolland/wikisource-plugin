@@ -1,6 +1,8 @@
+import pytest
 import requests
 
 
+@pytest.mark.slow
 def test_wikisource_api_has_proofreadpage(wikisource) -> None:
     response = requests.get(
         wikisource.api_url,

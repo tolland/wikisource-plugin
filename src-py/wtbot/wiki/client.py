@@ -108,7 +108,12 @@ class PywikibotClient:
 
         self._pwb = pywikibot
         if settings.api_url:
-            self.site = pywikibot.Site(url=settings.api_url)
+            # Supply the configured family as the AutoFamily name.  Deriving
+            # it from the URL is not unique for two wikis on the same host:
+            # pywikibot ignores the port when constructing its Site cache key,
+            # so localhost:18581 and localhost:18582 otherwise share one
+            # APISite and the second client silently talks to the first wiki.
+            self.site = pywikibot.Site(fam=settings.family, url=settings.api_url)
         else:
             self.site = pywikibot.Site(code=settings.code, fam=settings.family)
 

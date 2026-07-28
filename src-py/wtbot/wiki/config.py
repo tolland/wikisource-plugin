@@ -11,15 +11,16 @@ pywikibot's tutorial flow wants a hand-written ``user-config.py`` and family
 files. That doesn't suit a backend that must be driven from tests, a Typer CLI,
 and an IntelliJ-launched process. Instead we configure pywikibot entirely from a
 ``WikiSettings`` object: no ``user-config.py`` on disk, an ephemeral
-``PYWIKIBOT_DIR``, and ``Site(url=...)`` (AutoFamily) so no family file is needed.
+``PYWIKIBOT_DIR``, and ``Site(url=..., fam=...)`` (AutoFamily) so no family file
+is needed.
 
 Must run before the first ``import pywikibot`` triggers config loading, which is
 why the pywikibot import lives inside this function and inside the client, never
 at module import time.
 
 ``write_password_entry`` is called AFTER the pywikibot Site object is
-constructed, because AutoFamily derives family name and code from the hostname
-at runtime -- we can't know the right 4-tuple discriminator before Site() runs.
+constructed, because AutoFamily derives its code from the endpoint at runtime
+-- we can't know the complete 4-tuple discriminator before Site() runs.
 """
 
 _PASSWORD_FILE = "user-password.cfg"
@@ -127,7 +128,9 @@ def _write_user_config(config_dir: str, settings: WikiSettings) -> None:
     ]
     if settings.api_url:
         lines.append(
-            f"# api_url = {settings.api_url!r}  (use Site(url=...) in scripts)"
+            "# api_url = "
+            f"{settings.api_url!r}  "
+            f"(use Site(url=..., fam={settings.family!r}) in scripts)"
         )
     lines.append("")
     if settings.username:

@@ -233,6 +233,9 @@ base = argmax_timestamp { r in upstream_history : norm(r.sha1) in local_norm_sha
 Two findings from building the harness change how this must be implemented.
 Both are verified, the second against live en.wikisource.
 
+The complete investigation and synchronization recommendation are recorded in
+[`proofread-page-sha1-discordance.md`](proofread-page-sha1-discordance.md).
+
 - [ ] **Get the sha1 encoding right.** The action API (hence pywikibot, hence
       `Page.sha1`) returns 40-char hex; the XML export and `rev_sha1` return
       31-char base-36. Intersecting one against the other matches nothing.

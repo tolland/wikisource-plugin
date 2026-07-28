@@ -4,6 +4,7 @@ from wiki_harness.dumps import (
     DumpPage,
     DumpRevision,
     read_dump,
+    read_dump_text,
     scan_dump,
 )
 from wiki_harness.endpoint import WikiEndpoint
@@ -37,6 +38,7 @@ __all__ = [
     "docker_available",
     "pywikibot_harness",
     "read_dump",
+    "read_dump_text",
     "scan_dump",
     "wait_for_mediawiki",
 ]

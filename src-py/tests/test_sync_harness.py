@@ -21,6 +21,7 @@ pin the empirical claims the sync design in docs/upstream-sync-TODO.md rests on:
 PAGE_2 = "Page:Canadian patent 29537.djvu/2"
 
 
+@pytest.mark.slow
 def test_pair_starts_as_two_independent_wikis(
     wiki_pair: WikiStack, upstream_api: WikiApi, local_api: WikiApi
 ) -> None:
@@ -34,6 +35,7 @@ def test_pair_starts_as_two_independent_wikis(
     assert not local_api.exists("Project:Isolation probe")
 
 
+@pytest.mark.slow
 def test_seeded_upstream_has_the_work_and_its_scan(seeded_upstream: WikiApi) -> None:
     assert seeded_upstream.exists(CANADIAN_PATENT_INDEX)
     assert seeded_upstream.exists(CANADIAN_PATENT_SCAN)
@@ -43,6 +45,7 @@ def test_seeded_upstream_has_the_work_and_its_scan(seeded_upstream: WikiApi) -> 
     assert slots, "ProofreadPage could not paginate the Index (DjVu support?)"
 
 
+@pytest.mark.slow
 def test_import_preserves_revision_history(seeded_upstream: WikiApi) -> None:
     """Depth of history and attribution must survive the import -- an API-level
     copy would flatten both."""
@@ -59,6 +62,7 @@ def test_import_preserves_revision_history(seeded_upstream: WikiApi) -> None:
     }
 
 
+@pytest.mark.slow
 def test_import_recomputes_sha1_from_content(seeded_upstream: WikiApi) -> None:
     """An importing wiki hashes the text it is given, so every imported
     revision's sha1 is the *content* hash -- not the ``rev_sha1`` the source
@@ -80,6 +84,7 @@ def test_import_recomputes_sha1_from_content(seeded_upstream: WikiApi) -> None:
     assert dump_page.latest.declared_sha1 in {rev.sha1_base36 for rev in revisions}
 
 
+@pytest.mark.slow
 def test_createonly_rejects_a_parallel_creation(
     local_promoter: WikiApi, local_bystander: WikiApi
 ) -> None:
@@ -93,6 +98,7 @@ def test_createonly_rejects_a_parallel_creation(
     assert excinfo.value.code == "articleexists"
 
 
+@pytest.mark.slow
 def test_baserevid_rejects_an_intervening_edit(
     local_promoter: WikiApi, local_bystander: WikiApi
 ) -> None:
@@ -157,6 +163,7 @@ def test_basetimestamp_cannot_see_a_same_second_edit(
     assert excinfo.value.code == "editconflict"
 
 
+@pytest.mark.slow
 def test_basetimestamp_is_suppressed_against_your_own_edit(
     local_promoter: WikiApi,
 ) -> None:
