@@ -2,22 +2,29 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
+from ocrapi.client import FakeOcrClient, OcrError
 from wtbot.api.ocr import get_client_builder
 from wtbot.main import create_app
 from wtbot.model import Page, Site
 from wtbot.model.index_meta import IndexMeta
 from wtbot.model.namespace import NsRole
 from wtbot.model.page_meta import PageMeta
-from wtbot.ocr import FakeOcrClient, OcrCrop, OcrError, OcrRequest, WikimediaOcrClient
 
-"""Tests for the OCR wrapper: per-site backend config CRUD, backend
-discovery by page path, and /ocr/run — including the image-URL translation
-(the backend gets the wiki-side URL, never a sidecar-local one), prompt
-threading, and backend selection. The client seam is exercised through
-FakeOcrClient via the get_client_builder dependency override."""
+"""Tests for wtbot's thin /pages/ocr wrapper: resolving a page path to a
+scope (site family/code) and a backend-reachable image URL, then
+delegating to the standalone ocrapi package for everything else. Backend
+*configuration* goes through the mounted /ocr sub-app directly (the same
+TestClient reaches it, since it's mounted on this app) rather than any
+wtbot-side CRUD -- there isn't any; see ocrapi.api for that.
+
+ocrapi's own generic behavior (crop threading, prompt defaults, backend
+resolution, the Wikimedia wire format) is covered in test_ocrapi.py and
+not re-tested here -- these tests are only about the page/site resolution
+this module adds on top."""
 
 FAMILY = "wikisource"
 CODE = "en"
+SCOPE = f"{FAMILY}/{CODE}"
 INDEX = "Index:Hertz.pdf"
 PAGE_TITLE = "Page:Hertz.pdf/103"
 PAGE_PATH = f"/{FAMILY}/{CODE}/{INDEX}/Pages/{PAGE_TITLE}"
@@ -83,84 +90,49 @@ def page_pk(engine) -> int:
 
 def _put_config(client, name: str, **overrides):
     body = {"kind": "wikimedia", "base_url": "https://ocr.wiki.lan", **overrides}
-    return client.put(
-        f"/ocr/config/{name}", params={"family": FAMILY, "code": CODE}, json=body
-    )
+    # The standalone app mounted at /ocr, reached through the same client.
+    return client.put(f"/ocr/config/{name}", params={"scope": SCOPE}, json=body)
 
 
-# -- config CRUD -----------------------------------------------------------------
+# -- backend discovery by page path ----------------------------------------------
 
 
-def test_config_upsert_and_list(client, page_pk):
-    resp = _put_config(
-        client, "wmocr", default_engine="tesseract", default_langs=["en", "de"]
-    )
-    assert resp.status_code == 200, resp.text
-    out = resp.json()
-    assert out["kind"] == "wikimedia"
-    assert out["default_langs"] == ["en", "de"]
-    assert out["supports_prompt"] is False
-    assert out["has_api_token"] is False
-    assert "api_token" not in out  # tokens are never echoed
-
-    listing = client.get("/ocr/config", params={"family": FAMILY, "code": CODE}).json()
-    assert [b["name"] for b in listing["backends"]] == ["wmocr"]
-
-    # Upsert replaces in place.
-    _put_config(client, "wmocr", default_engine="google")
-    listing = client.get("/ocr/config", params={"family": FAMILY, "code": CODE}).json()
-    [row] = listing["backends"]
-    assert row["default_engine"] == "google"
-
-
-def test_config_delete(client, page_pk):
+def test_backends_scoped_by_site_family_code(client, page_pk):
     _put_config(client, "wmocr")
-    resp = client.delete("/ocr/config/wmocr", params={"family": FAMILY, "code": CODE})
-    assert resp.status_code == 204
-    assert (
-        client.delete(
-            "/ocr/config/wmocr", params={"family": FAMILY, "code": CODE}
-        ).status_code
-        == 404
-    )
+    _put_config(client, "gemini", kind="token_api")
+    listing = client.get("/pages/ocr/backends", params={"path": PAGE_PATH}).json()
+    assert [b["name"] for b in listing["backends"]] == ["wmocr", "gemini"]
 
 
-def test_config_update_preserves_omitted_write_only_token(client, page_pk):
-    _put_config(client, "gemini", kind="token_api", api_token="s3cret")
-    response = _put_config(client, "gemini", kind="token_api")
-    assert response.json()["has_api_token"] is True
-
-    response = _put_config(client, "gemini", kind="token_api", api_token=None)
-    assert response.json()["has_api_token"] is False
-
-
-def test_config_unknown_site_is_404(client):
-    assert _put_config(client, "x").status_code == 404
-
-
-# -- backend discovery by page path ---------------------------------------------
-
-
-def test_backends_lists_only_enabled(client, page_pk):
+def test_backends_do_not_leak_across_scopes(client, page_pk):
     _put_config(client, "wmocr")
-    _put_config(client, "gemini", kind="token_api", api_token="s3cret", enabled=False)
-    listing = client.get("/ocr/backends", params={"path": PAGE_PATH}).json()
+    # A config under a different scope must not show up for this page.
+    client.put(
+        "/ocr/config/other-site-backend",
+        params={"scope": "wikisource/de"},
+        json={"kind": "wikimedia", "base_url": "https://ocr.wiki.lan"},
+    )
+    listing = client.get("/pages/ocr/backends", params={"path": PAGE_PATH}).json()
     assert [b["name"] for b in listing["backends"]] == ["wmocr"]
 
 
-def test_token_api_backend_advertises_capabilities(client, page_pk):
-    _put_config(client, "gemini", kind="token_api", default_prompt="transcribe latex")
-    [b] = client.get("/ocr/backends", params={"path": PAGE_PATH}).json()["backends"]
-    assert b["supports_prompt"] is True
-    assert b["supports_segment"] is True
+def test_backends_unknown_page_is_404(client):
+    resp = client.get("/pages/ocr/backends", params={"path": "/wikisource/en/nope"})
+    assert resp.status_code == 404
 
 
-# -- /ocr/run --------------------------------------------------------------------
+# -- /pages/ocr/run ---------------------------------------------------------------
 
 
-def test_run_translates_image_url_and_applies_defaults(client, page_pk, fake_ocr):
-    _put_config(client, "wmocr", default_engine="tesseract", default_langs=["en"])
-    resp = client.post("/ocr/run", json={"path": PAGE_PATH})
+def test_run_translates_image_url_and_threads_box_as_crop(client, page_pk, fake_ocr):
+    _put_config(client, "wmocr")
+    resp = client.post(
+        "/pages/ocr/run",
+        json={
+            "path": PAGE_PATH,
+            "box": {"x": 233.24, "y": 555.78, "width": 321.68, "height": 77.17},
+        },
+    )
     assert resp.status_code == 200, resp.text
     out = resp.json()
     assert out["backend"] == "wmocr"
@@ -169,43 +141,27 @@ def test_run_translates_image_url_and_applies_defaults(client, page_pk, fake_ocr
     sent = fake_ocr.last_request
     # The backend gets the wiki-side URL from PageMeta, not a localhost one.
     assert sent.image_url == SOURCE_URL
-    assert sent.engine == "tesseract"
-    assert sent.langs == ["en"]
-    assert sent.crop is None  # no box, whole page
-
-
-def test_run_threads_the_bounding_box_as_a_crop(client, page_pk, fake_ocr):
-    _put_config(client, "wmocr")
-    resp = client.post(
-        "/ocr/run",
-        json={
-            "path": PAGE_PATH,
-            "box": {"x": 233.24, "y": 555.78, "width": 321.68, "height": 77.17},
-        },
-    )
-    assert resp.status_code == 200, resp.text
-    crop = fake_ocr.last_request.crop
+    crop = sent.crop
     assert (crop.x, crop.y, crop.width, crop.height) == (233, 556, 322, 77)
 
 
-def test_run_request_overrides_defaults_and_threads_prompt(client, page_pk, fake_ocr):
-    _put_config(
-        client,
-        "gemini",
-        kind="token_api",
-        default_prompt="default prompt",
-        default_engine=None,
-    )
+def test_run_without_box_has_no_crop(client, page_pk, fake_ocr):
+    _put_config(client, "wmocr")
+    client.post("/pages/ocr/run", json={"path": PAGE_PATH})
+    assert fake_ocr.last_request.crop is None
+
+
+def test_run_annotation_id_and_image_base64_pass_through(client, page_pk, fake_ocr):
+    _put_config(client, "gemini", kind="token_api", default_prompt="default prompt")
     resp = client.post(
-        "/ocr/run",
+        "/pages/ocr/run",
         json={
             "path": PAGE_PATH,
             "backend": "gemini",
+            "annotation_id": "b1",
             "image_base64": "aGVsbG8=",
             "prompt": "custom latex instructions",
             "langs": ["de"],
-            "annotation_id": "b1",
-            "box": {"x": 1, "y": 2, "width": 3, "height": 4},
         },
     )
     assert resp.status_code == 200, resp.text
@@ -215,25 +171,21 @@ def test_run_request_overrides_defaults_and_threads_prompt(client, page_pk, fake
     assert sent.langs == ["de"]
 
 
-def test_run_falls_back_to_default_prompt(client, page_pk, fake_ocr):
-    _put_config(client, "gemini", kind="token_api", default_prompt="default prompt")
-    client.post(
-        "/ocr/run",
-        json={"path": PAGE_PATH, "backend": "gemini", "image_base64": "aGVsbG8="},
-    )
-    assert fake_ocr.last_request.prompt == "default prompt"
-
-
 def test_run_unknown_backend_is_404(client, page_pk):
     _put_config(client, "wmocr")
-    resp = client.post("/ocr/run", json={"path": PAGE_PATH, "backend": "nope"})
+    resp = client.post("/pages/ocr/run", json={"path": PAGE_PATH, "backend": "nope"})
     assert resp.status_code == 404
 
 
 def test_run_without_config_is_404(client, page_pk):
-    resp = client.post("/ocr/run", json={"path": PAGE_PATH})
+    resp = client.post("/pages/ocr/run", json={"path": PAGE_PATH})
     assert resp.status_code == 404
-    assert "no OCR backend configured" in resp.json()["detail"]
+    assert "no OCR backend" in resp.json()["detail"]
+
+
+def test_run_unknown_page_is_404(client):
+    resp = client.post("/pages/ocr/run", json={"path": "/wikisource/en/nope"})
+    assert resp.status_code == 404
 
 
 def test_run_maps_ocr_error_to_502(engine, page_pk):
@@ -247,87 +199,6 @@ def test_run_maps_ocr_error_to_502(engine, page_pk):
     )
     with TestClient(app) as c:
         _put_config(c, "wmocr")
-        resp = c.post("/ocr/run", json={"path": PAGE_PATH})
+        resp = c.post("/pages/ocr/run", json={"path": PAGE_PATH})
     assert resp.status_code == 502
     assert "engine exploded" in resp.json()["detail"]
-
-
-# -- WikimediaOcrClient wire format ---------------------------------------------
-
-
-def test_wikimedia_client_builds_the_documented_request(monkeypatch):
-    captured = {}
-
-    class Resp:
-        def raise_for_status(self):
-            pass
-
-        def json(self):
-            return {"engine": "tesseract", "text": "recognized"}
-
-    def fake_get(url, params=None, **kwargs):
-        captured["url"] = url
-        captured["params"] = params
-        return Resp()
-
-    monkeypatch.setattr("wtbot.ocr.requests.get", fake_get)
-    client = WikimediaOcrClient("https://ocr.wiki.lan/")
-    result = client.recognize(
-        OcrRequest(
-            image_url="https://img.example/p.jpg",
-            engine="tesseract",
-            langs=["en", "de"],
-            crop=OcrCrop(x=3, y=101, width=649, height=168),
-        )
-    )
-    assert result.text == "recognized"
-    assert captured["url"] == "https://ocr.wiki.lan/api.php"
-    assert ("image", "https://img.example/p.jpg") in captured["params"]
-    assert ("engine", "tesseract") in captured["params"]
-    assert ("langs[]", "en") in captured["params"]
-    assert ("langs[]", "de") in captured["params"]
-    assert ("crop[x]", "3") in captured["params"]
-    assert ("crop[y]", "101") in captured["params"]
-    assert ("crop[width]", "649") in captured["params"]
-    assert ("crop[height]", "168") in captured["params"]
-
-
-def test_wikimedia_client_defaults_to_tesseract_when_engine_unset(monkeypatch):
-    captured = {}
-
-    class Resp:
-        def raise_for_status(self):
-            pass
-
-        def json(self):
-            return {"text": "recognized"}
-
-    def fake_get(url, params=None, **kwargs):
-        captured["params"] = params
-        return Resp()
-
-    monkeypatch.setattr("wtbot.ocr.requests.get", fake_get)
-    WikimediaOcrClient("https://ocr.wiki.lan").recognize(
-        OcrRequest(image_url="https://img.example/p.jpg")
-    )
-    assert ("engine", "tesseract") in captured["params"]
-
-
-def test_wikimedia_client_requires_an_image_url():
-    client = WikimediaOcrClient("https://ocr.wiki.lan")
-    with pytest.raises(OcrError):
-        client.recognize(OcrRequest(image_url=None))
-
-
-def test_wikimedia_client_surfaces_api_errors(monkeypatch):
-    class Resp:
-        def raise_for_status(self):
-            pass
-
-        def json(self):
-            return {"error": "no engine"}
-
-    monkeypatch.setattr("wtbot.ocr.requests.get", lambda *a, **k: Resp())
-    client = WikimediaOcrClient("https://ocr.wiki.lan")
-    with pytest.raises(OcrError, match="no engine"):
-        client.recognize(OcrRequest(image_url="https://img.example/p.jpg"))

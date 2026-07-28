@@ -94,14 +94,24 @@ export function deleteSiteCredential(sitePk: number): Promise<void> {
   return deleteRequest(`/sites/${sitePk}/credential`);
 }
 
-function siteQuery(site: Pick<Site, 'family' | 'code'>): string {
-  return new URLSearchParams({ family: site.family, code: site.code }).toString();
+// OCR backend config lives in the standalone ocrapi app (mounted at /ocr,
+// see wtbot.main.create_app) -- it knows nothing about "sites", only a
+// scope string, so the viewer uses the site's family/code as that scope.
+function ocrScopeQuery(
+  site: Pick<Site, 'family' | 'code'>,
+  extra?: Record<string, string>
+): string {
+  return new URLSearchParams({ scope: `${site.family}/${site.code}`, ...extra }).toString();
 }
 
 export async function listOcrBackends(
   site: Pick<Site, 'family' | 'code'>
 ): Promise<OcrBackend[]> {
-  const result = await getJson<OcrBackendList>(`/ocr/config?${siteQuery(site)}`);
+  // enabled_only=false: the admin UI needs to show (and let you re-enable)
+  // disabled backends too, unlike the plugin's page-scoped discovery.
+  const result = await getJson<OcrBackendList>(
+    `/ocr/backends?${ocrScopeQuery(site, { enabled_only: 'false' })}`
+  );
   return result.backends;
 }
 
@@ -111,7 +121,7 @@ export function saveOcrBackend(
   payload: OcrBackendPayload
 ): Promise<OcrBackend> {
   return putJson<OcrBackend>(
-    `/ocr/config/${encodeURIComponent(name)}?${siteQuery(site)}`,
+    `/ocr/config/${encodeURIComponent(name)}?${ocrScopeQuery(site)}`,
     payload
   );
 }
@@ -120,7 +130,7 @@ export function deleteOcrBackend(
   site: Pick<Site, 'family' | 'code'>,
   name: string
 ): Promise<void> {
-  return deleteRequest(`/ocr/config/${encodeURIComponent(name)}?${siteQuery(site)}`);
+  return deleteRequest(`/ocr/config/${encodeURIComponent(name)}?${ocrScopeQuery(site)}`);
 }
 
 export function listIndexPages(): Promise<IndexPageSummary[]> {

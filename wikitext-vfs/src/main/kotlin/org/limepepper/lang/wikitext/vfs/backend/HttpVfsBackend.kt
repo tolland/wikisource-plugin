@@ -299,7 +299,7 @@ class HttpVfsBackend(
     }
 
     override fun listOcrBackends(path: String): List<OcrBackendInfo> {
-        val json = get("/ocr/backends", "path" to path)
+        val json = get("/pages/ocr/backends", "path" to path)
         return JsonReader(json).array("backends") { r ->
             OcrBackendInfo(
                 name = r.string("name"),
@@ -333,7 +333,7 @@ class HttpVfsBackend(
             fields += "\"box\":{\"x\":${request.boxX},\"y\":${request.boxY}," +
                 "\"width\":${request.boxWidth},\"height\":${request.boxHeight}}"
         }
-        val json = post("/ocr/run", fields.joinToString(",", "{", "}"))
+        val json = post("/pages/ocr/run", fields.joinToString(",", "{", "}"))
         return JsonReader(json).run {
             OcrRunResult(
                 backend = string("backend"),

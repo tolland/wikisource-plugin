@@ -14,6 +14,13 @@
 # Run the pair under its own COMPOSE_PROJECT_NAME: MW_SERVER (and therefore the
 # port) is baked into LocalSettings.php at install time, so a volume installed
 # for one port must not be reused on another.
+#
+# A third, unrelated service (wikimedia-ocr, under the `ocr` profile) runs a
+# real Wikimedia OCR instance for src-py/tests/test_ocr_wikimedia_docker.py --
+# it needs no wiki at all, just an image URL, so it has no dependency on the
+# services above:
+#
+#   docker compose --profile ocr up -d wikimedia-ocr
 
 x-mediawiki-common: &mediawiki-common
   build:
@@ -102,6 +109,14 @@ services:
     volumes:
       - mediawiki-local-images:/var/www/html/images
       - ./src-py/tests/fixtures:/fixtures:ro,z
+
+  wikimedia-ocr:
+    profiles: ["ocr"]
+    build:
+      context: .
+      dockerfile: docker/wikimedia-ocr/Dockerfile
+    ports:
+      - "${WIKIMEDIA_OCR_PORT:-8090}:80"
 
 volumes:
   mediawiki-db:

@@ -337,7 +337,7 @@ class HttpVfsBackendTest {
     }
 
     @Test fun `listOcrBackends parses capabilities`() {
-        handle("/ocr/backends", """
+        handle("/pages/ocr/backends", """
             {"backends":[
               {"name":"wmocr","kind":"wikimedia","base_url":"https://ocr.wiki.lan",
                "default_engine":"tesseract","default_langs":["en","de"],
@@ -360,7 +360,7 @@ class HttpVfsBackendTest {
 
     @Test fun `runOcr POSTs the request and decodes the text`() {
         var captured: String? = null
-        server.createContext("/ocr/run") { ex ->
+        server.createContext("/pages/ocr/run") { ex ->
             captured = ex.requestBody.readBytes().decodeToString()
             // "line one\nline two" base64-encoded
             val body = """{"backend":"gemini","kind":"token_api","engine":null,

@@ -1,25 +1,21 @@
+import os
 from dataclasses import dataclass, field
 from typing import Protocol
 
 import requests
 
-from wtbot.model.ocr_backend import OcrBackendConfig, OcrBackendKind
-from wtbot.settings import WikiSettings
+from ocrapi.model import OcrBackendConfig, OcrBackendKind
 
 """The OCR-access seam: a typed request/result pair, a client Protocol, and
-one client per backend kind — mirroring the WikiClient seam in wtbot.wiki.
+one client per backend kind.
 
-The API layer (wtbot.api.ocr) resolves *what* to OCR (the wiki-reachable
-image URL for the page, the cropped segment bytes the editor sent) and
-*which* backend (an OcrBackendConfig row); ``build_client`` turns the
-config into a client. That function is the extension point for alternative
-backends: add a kind to OcrBackendKind, a client class here, and a branch
-in build_client — nothing in the API layer changes.
-
-Every client gets the full OcrRequest and uses the parts its wire protocol
-supports (Wikimedia OCR only follows URLs; a token vision API only takes
-bytes + prompt). Failures raise OcrError with a human-readable message —
-the API layer maps that to a clean HTTP error instead of a stack trace.
+``build_client`` turns a config row into a client — the extension point for
+alternative backends: add a kind to OcrBackendKind, a client class here, and
+a branch in build_client. Every client gets the full OcrRequest and uses the
+parts its wire protocol supports (Wikimedia OCR only follows URLs; a token
+vision API only takes bytes + prompt). Failures raise OcrError with a
+human-readable message — the API layer maps that to a clean HTTP error
+instead of a stack trace.
 """
 
 
@@ -29,9 +25,9 @@ class OcrError(Exception):
 
 @dataclass(slots=True)
 class OcrCrop:
-    """The bounding-box region to recognize, in pixels of the image behind
-    ``OcrRequest.image_url`` — the same rendition the editor annotates, so
-    box coordinates carry over unscaled."""
+    """The region to recognize, in pixels of the image behind
+    ``OcrRequest.image_url`` — the caller's coordinate space carries over
+    unscaled, since it annotates that same rendition."""
 
     x: int
     y: int
@@ -43,13 +39,13 @@ class OcrCrop:
 class OcrRequest:
     """One recognition request, already resolved to backend-usable terms.
 
-    ``image_url`` is the *backend-reachable* URL of the page scan (the
-    wiki-side URL from PageMeta, never the plugin's localhost rendition),
-    with ``crop`` narrowing it to the bounding-box region for backends
-    that crop server-side (Wikimedia OCR). ``image_base64`` is the
-    already-cropped segment as the editor sees it, for backends that
-    accept bytes. Any part may be None; a client raises OcrError when the
-    part it needs is missing.
+    ``image_url`` must be reachable *from the backend*, not just the
+    caller — callers behind a proxy/localhost must resolve their own
+    reachable URL before building this. ``crop`` narrows it to a region for
+    backends that crop server-side (Wikimedia OCR). ``image_base64`` is an
+    already-cropped segment, for backends that accept bytes instead of a
+    URL. At least one of ``image_url``/``image_base64`` must be set; a
+    client raises OcrError when the part it needs is missing.
     """
 
     image_url: str | None = None
@@ -71,8 +67,11 @@ class OcrClient(Protocol):
 
 
 def _verify() -> bool | str:
-    """CA bundle for self-signed LAN backends — same knob the wiki side uses."""
-    return WikiSettings.from_env().ca_bundle or True
+    """CA bundle for a self-signed LAN backend. Independent of wtbot's
+    WikiSettings on purpose — this package must not need wiki config to
+    run standalone. OCRAPI_CA_BUNDLE points at a PEM file; unset verifies
+    normally."""
+    return os.environ.get("OCRAPI_CA_BUNDLE") or True
 
 
 class WikimediaOcrClient:
@@ -88,7 +87,7 @@ class WikimediaOcrClient:
         if not request.image_url:
             raise OcrError(
                 "Wikimedia OCR needs a backend-reachable image URL "
-                "and none is known for this page"
+                "and none was given"
             )
         params: list[tuple[str, str]] = [("image", request.image_url)]
         # Tesseract is free/local; Wikimedia OCR's other engines (e.g.
@@ -110,7 +109,7 @@ class WikimediaOcrClient:
                 params=params,
                 timeout=self._timeout,
                 verify=_verify(),
-                headers={"User-Agent": "wtbot (wikisource-plugin)"},
+                headers={"User-Agent": "ocrapi (wikisource-plugin)"},
             )
             resp.raise_for_status()
             payload = resp.json()
@@ -147,7 +146,7 @@ class TokenApiOcrClient:
     def recognize(self, request: OcrRequest) -> OcrResult:
         if not request.image_base64:
             raise OcrError("this OCR backend needs the image segment bytes")
-        headers = {"User-Agent": "wtbot (wikisource-plugin)"}
+        headers = {"User-Agent": "ocrapi (wikisource-plugin)"}
         if self._api_token:
             headers["Authorization"] = f"Bearer {self._api_token}"
         body = {
