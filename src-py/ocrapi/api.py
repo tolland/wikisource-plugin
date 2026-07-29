@@ -7,7 +7,7 @@ from sqlmodel import Session
 from ocrapi import service
 from ocrapi.client import OcrCrop, OcrError, OcrRequest, build_client
 from ocrapi.deps import get_ocr_session
-from ocrapi.model import DEFAULT_SCOPE, OcrBackendConfig, OcrBackendKind
+from wtbot.model.ocr_backend import DEFAULT_SCOPE, OcrBackendConfig, OcrBackendKind
 
 """Generic OCR HTTP surface — no wiki/page concepts, no credentials beyond
 a per-backend API token. A caller identifies what to OCR with a plain

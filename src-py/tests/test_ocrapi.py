@@ -10,20 +10,17 @@ from ocrapi.client import (
     OcrRequest,
     WikimediaOcrClient,
 )
-from ocrapi.db import create_ocr_engine
 
-"""Tests for the standalone ocrapi package: no wiki/page concepts anywhere
-here, only image_url/image_base64 + an optional scope string, which is the
-whole point -- this app has to be usable by something that has never heard
-of MediaWiki (e.g. an EXIF/metadata tool sending a selected image over for
-recognition). wtbot's page-path-aware wrapper on top is covered separately
-in test_ocr.py."""
-
-
-@pytest.fixture
-def ocr_engine(tmp_path):
-    db_path = tmp_path / "ocr-test.db"
-    return create_ocr_engine(f"sqlite:///{db_path}")
+"""Tests for the ocrapi HTTP surface and client logic: no wiki/page
+concepts anywhere here, only image_url/image_base64 + an optional scope
+string, which is the whole point -- this surface has to be usable by
+something that has never heard of MediaWiki (e.g. an EXIF/metadata tool
+sending a selected image over for recognition). Its persisted config
+(OcrBackendConfig) is still wtbot's own app state (see
+wtbot.model.ocr_backend), so these tests run against the same
+Alembic-migrated `engine` fixture (conftest.py) every other wtbot test
+uses. wtbot's page-path-aware wrapper on top is covered separately in
+test_ocr.py."""
 
 
 @pytest.fixture
@@ -32,8 +29,8 @@ def fake_ocr() -> FakeOcrClient:
 
 
 @pytest.fixture
-def client(ocr_engine, fake_ocr):
-    app = create_ocr_app(engine=ocr_engine)
+def client(engine, fake_ocr):
+    app = create_ocr_app(engine)
     app.dependency_overrides[get_client_builder] = lambda: (lambda config: fake_ocr)
     with TestClient(app) as c:
         yield c
@@ -211,12 +208,12 @@ def test_run_without_any_config_is_404(client):
     assert resp.status_code == 404
 
 
-def test_run_maps_ocr_error_to_502(ocr_engine):
+def test_run_maps_ocr_error_to_502(engine):
     class FailingClient:
         def recognize(self, request):
             raise OcrError("engine exploded")
 
-    app = create_ocr_app(engine=ocr_engine)
+    app = create_ocr_app(engine)
     app.dependency_overrides[get_client_builder] = lambda: (
         lambda config: FailingClient()
     )
@@ -256,7 +253,7 @@ def test_wikimedia_client_builds_the_documented_request(monkeypatch):
         )
     )
     assert result.text == "recognized"
-    assert captured["url"] == "https://ocr.wiki.lan/api.php"
+    assert captured["url"] == "https://ocr.wiki.lan/api"
     assert ("image", "https://img.example/p.jpg") in captured["params"]
     assert ("engine", "tesseract") in captured["params"]
     assert ("langs[]", "en") in captured["params"]

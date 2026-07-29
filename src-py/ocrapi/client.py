@@ -4,7 +4,7 @@ from typing import Protocol
 
 import requests
 
-from ocrapi.model import OcrBackendConfig, OcrBackendKind
+from wtbot.model.ocr_backend import OcrBackendConfig, OcrBackendKind
 
 """The OCR-access seam: a typed request/result pair, a client Protocol, and
 one client per backend kind.

@@ -5,7 +5,7 @@ from datetime import datetime
 from sqlmodel import Session, select
 
 from ocrapi.client import OcrClient, OcrRequest, OcrResult, build_client
-from ocrapi.model import OcrBackendConfig, OcrBackendKind
+from wtbot.model.ocr_backend import OcrBackendConfig, OcrBackendKind
 
 """Framework-agnostic core: everything ocrapi's own router (scope from a
 query param) and a host's own scoped routes (wtbot's page-scoped /pages/ocr,

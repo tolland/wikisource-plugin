@@ -4,12 +4,16 @@ from enum import StrEnum
 from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, SQLModel
 
-"""OCR backend configuration — deliberately scoped by a plain string, not a
-foreign key into anyone's site/tenant table, so this table (and this whole
-package) never needs to know what a "wiki" is. A caller that wants several
-independent configurations (e.g. wtbot, one scope per wiki family/code)
-picks its own scope strings; a caller with exactly one deployment can leave
-``scope`` at its default and never think about it again.
+"""OCR backend configuration — part of wtbot's own app state (this file's
+row class is the thing Alembic tracks and wtbot's shared database.db
+stores), even though the HTTP surface and client logic that use it
+(src-py/ocrapi) are factored out for reuse.
+
+Scoped by a plain string, not a foreign key into Site, so a config row
+doesn't require a Site to exist and the ocrapi layer that queries this
+table doesn't need to know what a "wiki" is — wtbot happens to pass a
+site's family/code pair as scope (see wtbot.api.ocr), but any other
+grouping works too.
 
 ``kind`` selects the wire protocol (see ocrapi.client.build_client, the
 extension point where alternative backends plug in):
@@ -42,8 +46,8 @@ class OcrBackendConfig(SQLModel, table=True):
     pk: int | None = Field(default=None, primary_key=True)
 
     # A caller-chosen namespace for its backends, e.g. a wiki "family/code"
-    # pair, an app name, or just the default — never a foreign key, so this
-    # table has no dependency on any other schema.
+    # pair, an app name, or just the default — never a foreign key, so a
+    # config row doesn't require its Site (or anything else) to exist.
     scope: str = Field(default=DEFAULT_SCOPE, index=True)
 
     name: str  # human-chosen handle, e.g. "wmocr", "gemini"
