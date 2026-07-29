@@ -105,7 +105,7 @@ class WikimediaOcrClient:
             ]
         try:
             resp = requests.get(
-                f"{self._base_url}/api.php",
+                f"{self._base_url}/api",
                 params=params,
                 timeout=self._timeout,
                 verify=_verify(),

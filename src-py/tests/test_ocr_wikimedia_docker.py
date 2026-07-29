@@ -35,10 +35,7 @@ COMPOSE_FILE = REPO_ROOT / "docker-compose.yml"
 # A small, stable, public test image with real printed text -- Testing
 # Wikimedia Commons' own OCR sandbox page uses similar fixtures, but any
 # world-readable image with recognizable text works here.
-SAMPLE_IMAGE_URL = (
-    "https://upload.wikimedia.org/wikipedia/commons/thumb/"
-    "9/9a/Example.jpg/440px-Example.jpg"
-)
+SAMPLE_IMAGE_URL = "https://wikisource-debian-13.lan/w/images/thumb/3/31/The_principles_of_mechanics_presented_in_a_new_form_%28Hertz%2C_1894%29.pdf/page7-706px-The_principles_of_mechanics_presented_in_a_new_form_%28Hertz%2C_1894%29.pdf.jpg"
 
 
 @pytest.fixture(scope="session")
@@ -120,6 +117,7 @@ def _wait_for_ocr_service(base_url: str, timeout_seconds: int = 180) -> None:
     )
 
 
+# @pytest.mark.slow
 def test_wikimedia_ocr_recognizes_sample_image(wikimedia_ocr_url: str) -> None:
     client = WikimediaOcrClient(wikimedia_ocr_url)
     result = client.recognize(
@@ -128,6 +126,7 @@ def test_wikimedia_ocr_recognizes_sample_image(wikimedia_ocr_url: str) -> None:
     assert result.text.strip(), "expected non-empty recognized text"
 
 
+@pytest.mark.slow
 def test_wikimedia_ocr_unknown_engine_raises(wikimedia_ocr_url: str) -> None:
     client = WikimediaOcrClient(wikimedia_ocr_url)
     with pytest.raises(OcrError):

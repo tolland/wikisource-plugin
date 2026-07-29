@@ -22,9 +22,14 @@ RUN set -eux; \
       git unzip \
       tesseract-ocr tesseract-ocr-all \
       libicu-dev libcurl4-openssl-dev libonig-dev \
-      curl gnupg; \
-    docker-php-ext-install bcmath intl curl mbstring; \
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash -; \
+      curl gnupg libpng-dev libfreetype-dev \
+      libjpeg62-turbo-dev libwebp-dev
+RUN set -eux; \
+    docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp; \
+    docker-php-ext-install -j$(nproc) bcmath intl curl mbstring gd
+
+RUN set -eux; \
+    curl -fsSL https://deb.nodesource.com/setup_18.x | bash -; \
     apt-get install -y --no-install-recommends nodejs; \
     curl -fsSL https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer; \
     rm -rf /var/lib/apt/lists/*
@@ -36,11 +41,14 @@ RUN git clone --depth 1 --branch "$OCR_REF" "$OCR_REPO" /var/www/tool
 WORKDIR /var/www/tool
 
 # --no-dev/--production: this is a runtime image, not a dev checkout.
-RUN composer install --no-dev --optimize-autoloader \
+RUN composer install --optimize-autoloader \
  && npm install && npm run build
 
 COPY docker/wikimedia-ocr/apache-vhost.conf /etc/apache2/sites-available/000-default.conf
 COPY docker/wikimedia-ocr/env.local /var/www/tool/.env.local
+
+COPY docker/certs/LPL-CA.crt /usr/local/share/ca-certificates/LPL-CA.crt
+RUN update-ca-certificates
 
 RUN chown -R www-data:www-data /var/www/tool
 
