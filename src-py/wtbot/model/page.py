@@ -59,5 +59,30 @@ class Page(SQLModel, table=True):
     fetch_status: FetchState = FetchState.unfetched
     fetch_error: str | None = None
 
+    # --- revision store (see wtbot.model.revision) -------------------------
+    # The columns above stay as the head denormalisation -- mirroring
+    # MediaWiki's own page_latest/page_len rather than deviating from it -- and
+    # remain the only thing most callers read. These two describe the Revision
+    # rows behind them.
+    latest_revision_pk: int | None = None
+    """The head Revision row, once fetched -- our analogue of ``page_latest``.
+
+    Deliberately *not* a declared foreign key. Revision already points at Page,
+    so declaring the reverse creates a cycle SQLAlchemy cannot order ("there are
+    unresolvable cycles between tables page, revision"), and under
+    ``PRAGMA foreign_keys=ON`` it would also block deleting a head revision.
+    MediaWiki's own DDL declares no foreign keys either -- ``page_latest`` and
+    ``rev_page`` are plain integers -- so this is the faithful mirror, not a
+    shortcut."""
+
+    history_complete_from_revid: int | None = None
+    """Oldest revid from which our Revision rows are known to be *contiguous*.
+
+    None means we hold no guaranteed-complete range, only whatever individual
+    revisions happened to be fetched. Without this, a base search cannot tell
+    "the histories diverge here" from "this is merely the oldest row we hold" --
+    the same known-absent/unknown hazard placeholders already have at page
+    level."""
+
     def __repr__(self) -> str:  # pragma: no cover - convenience only
         return f"Page(pk={self.pk}, title={self.title!r})"
