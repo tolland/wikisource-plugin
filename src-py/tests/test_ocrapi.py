@@ -1,5 +1,9 @@
+import base64
+import io
+
 import pytest
 from fastapi.testclient import TestClient
+from PIL import Image
 
 from ocrapi.api import get_client_builder
 from ocrapi.app import create_ocr_app
@@ -8,6 +12,7 @@ from ocrapi.client import (
     OcrCrop,
     OcrError,
     OcrRequest,
+    Pix2TexClient,
     WikimediaOcrClient,
 )
 
@@ -114,6 +119,15 @@ def test_token_api_backend_advertises_capabilities(client):
     _put_config(client, "gemini", kind="token_api", default_prompt="transcribe latex")
     [b] = client.get("/backends").json()["backends"]
     assert b["supports_prompt"] is True
+    assert b["supports_segment"] is True
+
+
+def test_pix2tex_backend_advertises_capabilities(client):
+    _put_config(client, "pix2tex", kind="pix2tex")
+    [b] = client.get("/backends").json()["backends"]
+    # Segment-driven like token_api, but no prompt -- the model isn't
+    # instructable.
+    assert b["supports_prompt"] is False
     assert b["supports_segment"] is True
 
 
@@ -303,3 +317,105 @@ def test_wikimedia_client_surfaces_api_errors(monkeypatch):
     client = WikimediaOcrClient("https://ocr.wiki.lan")
     with pytest.raises(OcrError, match="no engine"):
         client.recognize(OcrRequest(image_url="https://img.example/p.jpg"))
+
+
+# -- Pix2TexClient (mocked HTTP; the real thing is exercised, slowly, in
+# test_ocr_pix2tex_docker.py against the actual container) ---------------------
+
+
+def _png_bytes(size: tuple[int, int] = (40, 20), color: str = "white") -> bytes:
+    buf = io.BytesIO()
+    Image.new("RGB", size, color).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def test_pix2tex_client_uploads_base64_bytes_as_is(monkeypatch):
+    captured = {}
+
+    class Resp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return "x^2"
+
+    def fake_post(url, files=None, **kwargs):
+        captured["url"] = url
+        captured["files"] = files
+        return Resp()
+
+    monkeypatch.setattr("ocrapi.client.requests.post", fake_post)
+    segment = _png_bytes()
+    client = Pix2TexClient("https://pix2tex.wiki.lan/")
+    result = client.recognize(
+        OcrRequest(image_base64=base64.b64encode(segment).decode())
+    )
+    assert result.text == "x^2"
+    assert result.engine == "pix2tex"
+    assert captured["url"] == "https://pix2tex.wiki.lan/bytes/"
+    filename, data, content_type = captured["files"]["file"]
+    assert data == segment
+    assert content_type == "image/png"
+
+
+def test_pix2tex_client_fetches_and_crops_image_url(monkeypatch):
+    full = Image.new("RGB", (100, 100), "white")
+    full.paste(Image.new("RGB", (20, 10), "black"), (30, 40))
+    full_bytes = io.BytesIO()
+    full.save(full_bytes, format="PNG")
+
+    class FetchResp:
+        content = full_bytes.getvalue()
+
+        def raise_for_status(self):
+            pass
+
+    class PostResp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return "cropped"
+
+    captured = {}
+    monkeypatch.setattr("ocrapi.client.requests.get", lambda *a, **k: FetchResp())
+
+    def fake_post(url, files=None, **kwargs):
+        captured["files"] = files
+        return PostResp()
+
+    monkeypatch.setattr("ocrapi.client.requests.post", fake_post)
+
+    client = Pix2TexClient("https://pix2tex.wiki.lan")
+    result = client.recognize(
+        OcrRequest(
+            image_url="https://img.example/p.png",
+            crop=OcrCrop(x=30, y=40, width=20, height=10),
+        )
+    )
+    assert result.text == "cropped"
+    _filename, data, _content_type = captured["files"]["file"]
+    cropped = Image.open(io.BytesIO(data))
+    assert cropped.size == (20, 10)
+
+
+def test_pix2tex_client_requires_url_or_bytes():
+    client = Pix2TexClient("https://pix2tex.wiki.lan")
+    with pytest.raises(OcrError):
+        client.recognize(OcrRequest())
+
+
+def test_pix2tex_client_surfaces_non_string_response(monkeypatch):
+    class Resp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"detail": "not an image"}
+
+    monkeypatch.setattr("ocrapi.client.requests.post", lambda *a, **k: Resp())
+    client = Pix2TexClient("https://pix2tex.wiki.lan")
+    with pytest.raises(OcrError):
+        client.recognize(
+            OcrRequest(image_base64=base64.b64encode(_png_bytes()).decode())
+        )

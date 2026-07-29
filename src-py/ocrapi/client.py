@@ -1,8 +1,11 @@
+import base64
 import os
 from dataclasses import dataclass, field
+from io import BytesIO
 from typing import Protocol
 
 import requests
+from PIL import Image
 
 from wtbot.model.ocr_backend import OcrBackendConfig, OcrBackendKind
 
@@ -172,6 +175,72 @@ class TokenApiOcrClient:
         return OcrResult(text=text, engine=payload.get("engine"))
 
 
+def _image_bytes_for_upload(request: OcrRequest, *, verify: bool | str) -> bytes:
+    """Resolves an [OcrRequest] to raw image bytes for a multipart upload,
+    for backends (pix2tex) that take neither a URL nor server-side
+    cropping: ``image_base64`` is used as-is (already cropped, by
+    convention), otherwise ``image_url`` is fetched and, if ``crop`` is
+    set, cropped locally with Pillow before re-encoding to PNG."""
+    if request.image_base64:
+        return base64.b64decode(request.image_base64)
+    if not request.image_url:
+        raise OcrError("this OCR backend needs an image URL or the segment bytes")
+    try:
+        resp = requests.get(request.image_url, timeout=30, verify=verify)
+        resp.raise_for_status()
+    except Exception as exc:  # noqa: BLE001 - surface as OcrError
+        raise OcrError(f"could not fetch {request.image_url}: {exc}") from exc
+    if request.crop is None:
+        return resp.content
+    try:
+        image = Image.open(BytesIO(resp.content))
+        box = (
+            request.crop.x,
+            request.crop.y,
+            request.crop.x + request.crop.width,
+            request.crop.y + request.crop.height,
+        )
+        cropped = image.crop(box)
+        out = BytesIO()
+        cropped.save(out, format="PNG")
+        return out.getvalue()
+    except OcrError:
+        raise
+    except Exception as exc:  # noqa: BLE001 - surface as OcrError
+        raise OcrError(f"could not crop the fetched image: {exc}") from exc
+
+
+class Pix2TexClient:
+    """A self-hosted pix2tex/LaTeX-OCR instance (the
+    ``lukasblecher/pix2tex:api`` Docker image) — free, local, specialized
+    on mathematical notation rather than general text. Multipart file
+    upload only: no URL-fetch or crop support server-side, so this client
+    resolves the image itself (see [_image_bytes_for_upload]) and always
+    uploads bytes. No prompt: the model isn't instructable."""
+
+    def __init__(self, base_url: str, timeout: float = 120.0):
+        self._base_url = base_url.rstrip("/")
+        self._timeout = timeout
+
+    def recognize(self, request: OcrRequest) -> OcrResult:
+        image_bytes = _image_bytes_for_upload(request, verify=_verify())
+        try:
+            resp = requests.post(
+                f"{self._base_url}/bytes/",
+                files={"file": ("segment.png", image_bytes, "image/png")},
+                timeout=self._timeout,
+                verify=_verify(),
+                headers={"User-Agent": "ocrapi (wikisource-plugin)"},
+            )
+            resp.raise_for_status()
+            text = resp.json()
+        except Exception as exc:  # noqa: BLE001 - surface as OcrError
+            raise OcrError(f"pix2tex request failed: {exc}") from exc
+        if not isinstance(text, str):
+            raise OcrError(f"pix2tex returned an unexpected response: {text!r}")
+        return OcrResult(text=text, engine="pix2tex")
+
+
 class FakeOcrClient:
     """In-memory client for tests: canned text, records the last request."""
 
@@ -194,4 +263,6 @@ def build_client(config: OcrBackendConfig) -> OcrClient:
             return TokenApiOcrClient(
                 config.base_url, config.api_token, config.default_prompt
             )
+        case OcrBackendKind.pix2tex:
+            return Pix2TexClient(config.base_url)
     raise OcrError(f"unknown OCR backend kind: {config.kind}")

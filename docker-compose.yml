@@ -118,6 +118,18 @@ services:
     ports:
       - "${WIKIMEDIA_OCR_PORT:-8090}:80"
 
+  # pix2tex/LaTeX-OCR: a free, local, math-notation-specialized OCR model.
+  # A prebuilt public image (no Dockerfile), but a heavy one (~4.2GB, plus
+  # a first-run model download) -- its own profile so `docker compose
+  # --profile ocr up` doesn't drag it in for people only testing
+  # wikimedia-ocr. See src-py/tests/test_ocr_pix2tex_docker.py, which is
+  # marked slow for the same reason.
+  pix2tex:
+    profiles: ["pix2tex"]
+    image: lukasblecher/pix2tex:api
+    ports:
+      - "${PIX2TEX_PORT:-8502}:8502"
+
 volumes:
   mediawiki-db:
   mediawiki-images:

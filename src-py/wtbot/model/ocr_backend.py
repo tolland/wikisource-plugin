@@ -27,12 +27,20 @@ extension point where alternative backends plug in):
   sits behind. Segment-driven: requests carry the (already cropped)
   region's bytes and an optional prompt (e.g. custom LaTeX instructions
   for idiosyncratic typesetting).
+- ``pix2tex`` — a self-hosted pix2tex/LaTeX-OCR instance (the
+  ``lukasblecher/pix2tex:api`` image), a free/local model specialized on
+  mathematical notation. Segment-driven like token_api, but multipart file
+  upload rather than a JSON body, no prompt (the model isn't
+  instructable), and no server-side cropping — the wrapper crops with
+  Pillow before uploading when it's given a URL + crop instead of
+  pre-cropped bytes.
 """
 
 
 class OcrBackendKind(StrEnum):
     wikimedia = "wikimedia"
     token_api = "token_api"
+    pix2tex = "pix2tex"
 
 
 DEFAULT_SCOPE = "default"

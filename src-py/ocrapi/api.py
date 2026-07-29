@@ -92,8 +92,15 @@ class OcrRunOut(BaseModel):
     text_base64: str
 
 
+# Per-kind capability flags: which OcrRequest fields a backend actually
+# uses, so a caller can shape its UI (show a prompt box, crop client-side)
+# without knowing kinds. wikimedia is URL+server-crop only; token_api and
+# pix2tex both need bytes, but only token_api accepts a custom prompt.
+_SEGMENT_KINDS = {OcrBackendKind.token_api, OcrBackendKind.pix2tex}
+_PROMPT_KINDS = {OcrBackendKind.token_api}
+
+
 def backend_out(row: OcrBackendConfig) -> OcrBackendOut:
-    segment = row.kind is OcrBackendKind.token_api
     return OcrBackendOut(
         name=row.name,
         kind=row.kind,
@@ -103,8 +110,8 @@ def backend_out(row: OcrBackendConfig) -> OcrBackendOut:
         default_prompt=row.default_prompt,
         enabled=row.enabled,
         has_api_token=bool(row.api_token),
-        supports_prompt=segment,
-        supports_segment=segment,
+        supports_prompt=row.kind in _PROMPT_KINDS,
+        supports_segment=row.kind in _SEGMENT_KINDS,
     )
 
 
