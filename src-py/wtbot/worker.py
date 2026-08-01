@@ -19,6 +19,7 @@ from wtbot.page_processors import (
     ProcessContext,
     processor_for,
 )
+from wtbot.revision_store import record_head_revision
 from wtbot.settings import WikiSettings
 from wtbot.timeutil import utcnow
 from wtbot.wiki.client import WikiClient, get_wiki_client
@@ -264,6 +265,10 @@ def _upsert_page(
         session.flush()
         if page.pk is None:
             raise RuntimeError(f"page {remote.title!r} did not get a primary key")
+
+        # The fetch worker is the only writer of the revision store; the head
+        # columns above stay as the denormalisation of what this records.
+        record_head_revision(session, page, remote)
 
         meta = session.exec(select(PageMeta).where(PageMeta.page_pk == page.pk)).first()
         target = meta if meta is not None else PageMeta(page_pk=page.pk)

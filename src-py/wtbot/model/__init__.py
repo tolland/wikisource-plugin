@@ -8,6 +8,7 @@ classes. See ``src-py/DESIGN.md`` for the rationale behind each table.
 
 from wtbot.model.box_range_link import BoxRangeLink
 from wtbot.model.commit import Commit, CommitStatus
+from wtbot.model.content import Content
 from wtbot.model.edit_journal import EditJournal
 from wtbot.model.fetch_request import FetchKind, FetchRequest, FetchStatus
 from wtbot.model.file_blob import FileBlob
@@ -20,9 +21,11 @@ from wtbot.model.page_meta import (
     PageMeta,
     default_short_name,
 )
+from wtbot.model.revision import Revision
 from wtbot.model.scan_annotation import AnnotationCategory, ScanAnnotation
 from wtbot.model.site import Site
 from wtbot.model.site_credential import SiteCredential
+from wtbot.model.slot import MAIN_SLOT, Slot
 from wtbot.model.text_target_anchor import TextTargetAnchor
 from wtbot.model.transclusion import Transclusion
 
@@ -39,6 +42,10 @@ __all__ = [
     "role_for_canonical",
     "Page",
     "FetchState",
+    "Revision",
+    "Slot",
+    "MAIN_SLOT",
+    "Content",
     "IndexMeta",
     "PageMeta",
     "FileMeta",
