@@ -47,7 +47,10 @@ class Revision(SQLModel, table=True):
     minor: bool = False
 
     remote_sha1: str | None = None  # rev_sha1, base-36; informational
-    remote_size: int | None = None  # rev_len; informational
+    remote_size: int | None = None
+    """``rev_len``. For ProofreadPage content this is a sum of component sizes,
+    not a byte length -- see wtbot.model.content.Content.remote_size. Do not
+    compare it to the length of any text we hold."""
 
     observed_at: datetime = Field(default_factory=utcnow)
     """When we fetched this revision -- distinct from ``timestamp``, which is
