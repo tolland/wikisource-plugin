@@ -204,6 +204,30 @@ class FakeVfsBackendTest {
     }
 
     @Test
+    fun `ocr models are advertised per backend`() {
+        val path = "/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1"
+        val catalog = backend.listOcrModels(path)
+        assertEquals("fake-ocr", catalog.backend)
+        assertNull(catalog.error)
+        assertEquals(listOf("tesseract", "google", "pix2tex"), catalog.engines.map { it.engine })
+        assertEquals(listOf("en", "de", "fr"), catalog.engine("tesseract")!!.models.map { it.code })
+        // An engine with no language dimension, not a discovery failure.
+        assertTrue(catalog.engine("pix2tex")!!.models.isEmpty())
+
+        assertThrows(VfsBackendException::class.java) {
+            backend.listOcrModels(path, "nope")
+        }
+    }
+
+    @Test
+    fun `ocr discovery failure is reported as data, not an exception`() {
+        backend.ocrCatalogError = "discovery failed: refused"
+        val catalog = backend.listOcrModels("/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1")
+        assertTrue(catalog.engines.isEmpty())
+        assertEquals("discovery failed: refused", catalog.error)
+    }
+
+    @Test
     fun `deleting an unknown annotation throws`() {
         assertThrows(VfsBackendException::class.java) {
             backend.deleteAnnotation("/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1", "nope")

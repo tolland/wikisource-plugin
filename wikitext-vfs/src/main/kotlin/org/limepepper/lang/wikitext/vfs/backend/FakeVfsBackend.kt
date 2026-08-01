@@ -216,13 +216,60 @@ class FakeVfsBackend : VfsBackend {
 
     /** Backends advertised by [listOcrBackends]; tests/demos seed this. */
     val ocrBackends = mutableListOf(
-        OcrBackendInfo(name = "fake-ocr", kind = "wikimedia", defaultEngine = "tesseract"),
+        OcrBackendInfo(
+            name = "fake-ocr",
+            kind = "wikimedia",
+            defaultEngine = "tesseract",
+            supportsDiscovery = true,
+        ),
     )
+
+    /**
+     * Engines/models advertised by [listOcrModels], keyed by backend name.
+     * Seeded with the shape a real py-ocrapi instance has — several text
+     * engines plus a language-less LaTeX one — because that mix is exactly
+     * what the favourites menu exists to sort out.
+     */
+    val ocrEngines = mutableMapOf(
+        "fake-ocr" to mutableListOf(
+            OcrEngineInfo(
+                engine = "tesseract",
+                models = listOf(
+                    OcrModelInfo("en", "English"),
+                    OcrModelInfo("de", "German"),
+                    OcrModelInfo("fr", "French"),
+                ),
+            ),
+            OcrEngineInfo(
+                engine = "google",
+                models = listOf(OcrModelInfo("en", "English"), OcrModelInfo("la", "Latin")),
+            ),
+            OcrEngineInfo(engine = "pix2tex"),
+        ),
+    )
+
+    /** Set to make [listOcrModels] report a discovery failure. */
+    var ocrCatalogError: String? = null
 
     /** Requests [runOcr] received, newest last — for asserting in tests. */
     val ocrRequests = mutableListOf<Pair<String, OcrRunRequest>>()
 
     override fun listOcrBackends(path: String): List<OcrBackendInfo> = ocrBackends.toList()
+
+    override fun listOcrModels(path: String, backend: String?): OcrCatalog {
+        val info = backend?.let { name ->
+            ocrBackends.find { it.name == name }
+                ?: throw VfsBackendException("no OCR backend $name")
+        } ?: ocrBackends.firstOrNull()
+        ?: throw VfsBackendException("no OCR backend configured")
+        // Discovery failure is data, not an exception — the backend stays
+        // runnable on its configured defaults (see [OcrCatalog.error]).
+        ocrCatalogError?.let { return OcrCatalog(backend = info.name, error = it) }
+        return OcrCatalog(
+            backend = info.name,
+            engines = ocrEngines[info.name].orEmpty().toList(),
+        )
+    }
 
     override fun runOcr(path: String, request: OcrRunRequest): OcrRunResult {
         val backend = request.backend?.let { name ->

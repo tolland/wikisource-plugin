@@ -176,7 +176,50 @@ data class OcrBackendInfo(
     val defaultPrompt: String? = null,
     val supportsPrompt: Boolean = false,
     val supportsSegment: Boolean = false,
+    /** Whether GET /pages/ocr/models can enumerate this backend's engines. */
+    val supportsDiscovery: Boolean = false,
 )
+
+/** One recognizable language/model of an engine, e.g. `en` / "English". */
+data class OcrModelInfo(
+    val code: String,
+    val title: String,
+) {
+    /** "English (en)" — what a picker shows; codes alone are unreadable. */
+    val displayName: String get() = if (title.isBlank()) code else "$title ($code)"
+}
+
+/**
+ * One engine an OCR backend offers and the models it recognizes. An empty
+ * [models] is normal rather than a failure: pix2tex reads mathematical
+ * notation and has no language dimension at all.
+ */
+data class OcrEngineInfo(
+    val engine: String,
+    val models: List<OcrModelInfo> = emptyList(),
+)
+
+/**
+ * What one backend can be asked for, from GET /pages/ocr/models — the
+ * source the "Run OCR" menu's favourites are picked from. Far too big to
+ * put in a menu directly (Google Vision alone declares hundreds of
+ * languages), which is the whole reason favourites exist.
+ *
+ * [error] non-null means discovery failed and [engines] is empty; the
+ * backend is still runnable with its configured defaults, so callers show
+ * the message rather than dropping the backend.
+ */
+data class OcrCatalog(
+    val backend: String,
+    val engines: List<OcrEngineInfo> = emptyList(),
+    val error: String? = null,
+) {
+    fun engine(name: String): OcrEngineInfo? = engines.find { it.engine == name }
+
+    companion object {
+        val EMPTY = OcrCatalog(backend = "")
+    }
+}
 
 /**
  * One recognition request for POST /ocr/run. Everything is optional: the
@@ -197,6 +240,8 @@ data class OcrRunRequest(
     val engine: String? = null,
     val langs: List<String>? = null,
     val prompt: String? = null,
+    /** Degrees clockwise, applied by the backend after the crop. */
+    val rotate: Int = 0,
 )
 
 /**

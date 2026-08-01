@@ -18,5 +18,14 @@
             displayName="WTBot (VFS backend)"
             instance="org.limepepper.lang.wikitext.vfs.settings.WtbotProjectConfigurable"/>
 
+        <!-- Project-level, but the page edits the application defaults
+             instead when the project hasn't opted into its own list, so
+             what's on screen is always what this project will get. -->
+        <projectConfigurable
+            id="org.limepepper.wikitext.ocr.favorites"
+            parentId="tools"
+            displayName="OCR Favourites"
+            instance="org.limepepper.lang.wikitext.vfs.settings.OcrFavoritesConfigurable"/>
+
     </extensions>
 </idea-plugin>

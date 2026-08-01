@@ -4,6 +4,7 @@ import org.limepepper.lang.wikitext.annotation.AnnotationCategory
 import org.limepepper.lang.wikitext.annotation.BoundingBox
 import org.limepepper.lang.wikitext.annotation.BoundingBoxModel
 import org.limepepper.lang.wikitext.vfs.backend.OcrBackendInfo
+import org.limepepper.lang.wikitext.vfs.settings.OcrFavorite
 import javax.swing.ButtonGroup
 import javax.swing.JMenu
 import javax.swing.JMenuItem
@@ -32,7 +33,11 @@ class BoxCanvasPopup(
     /** The site's OCR backends (loaded async by the host; empty = none yet). */
     private val ocrBackends: (() -> List<OcrBackendInfo>)? = null,
     /** Sends the box to a backend; the host owns cropping and the review UI. */
-    private val onRunOcr: ((box: BoundingBox, backend: OcrBackendInfo) -> Unit)? = null,
+    private val onRunOcr: ((box: BoundingBox, choice: OcrMenuChoice) -> Unit)? = null,
+    /** The project's favourite engine/language combinations, in menu order. */
+    private val ocrFavorites: (() -> List<OcrFavorite>)? = null,
+    /** Opens the favourites settings page. */
+    private val onConfigureOcr: (() -> Unit)? = null,
 ) {
     fun menuFor(box: BoundingBox?): JPopupMenu? {
         if (box == null) {
@@ -54,23 +59,63 @@ class BoxCanvasPopup(
         }
         if (ocrBackends != null && onRunOcr != null) {
             menu.addSeparator()
-            val backends = ocrBackends.invoke()
-            if (backends.isEmpty()) {
-                menu.add(JMenuItem("Run OCR (no backends configured)").apply {
-                    isEnabled = false
-                })
-            } else {
-                for (info in backends) {
-                    menu.add(JMenuItem("Run OCR via ${info.name}").apply {
-                        addActionListener { onRunOcr.invoke(box, info) }
-                    })
-                }
-            }
+            menu.add(ocrMenu(box, ocrBackends.invoke(), onRunOcr))
         }
         menu.addSeparator()
         menu.add(JMenuItem("Delete Box").apply {
             addActionListener { boxModel.remove(box.id) }
         })
+        return menu
+    }
+
+    /**
+     * The "Run OCR" submenu, built fresh on every right-click from the
+     * project's favourites (see [OcrFavorite]) crossed with the backends
+     * the site actually offers.
+     *
+     * It is a submenu rather than a flat run of items because the entries
+     * are now a list of choices with a tail of management actions, and it
+     * is generated rather than fixed because the useful engines depend on
+     * both the wiki and the work — a stock Wikimedia OCR instance offers
+     * hundreds of language/engine combinations and no static menu could
+     * name the two or three that matter for the book in front of you.
+     */
+    private fun ocrMenu(
+        box: BoundingBox,
+        backends: List<OcrBackendInfo>,
+        onRunOcr: (BoundingBox, OcrMenuChoice) -> Unit,
+    ): JMenu {
+        val menu = JMenu("Run OCR")
+        if (backends.isEmpty()) {
+            // Also the "not discovered yet" case: the host loads backends
+            // asynchronously, so an empty list right after opening a page
+            // is normal and the menu recovers on the next right-click.
+            menu.add(JMenuItem("No OCR backends configured").apply { isEnabled = false })
+        } else {
+            val favorites = ocrFavorites?.invoke().orEmpty()
+            val choices = OcrMenuChoice.resolve(favorites, backends)
+            for (choice in choices) {
+                menu.add(JMenuItem(choice.label).apply {
+                    addActionListener { onRunOcr(box, choice) }
+                })
+            }
+            if (choices.isEmpty()) {
+                // Either there are no favourites yet, or every one of them
+                // names a backend this site doesn't have. Falling back to
+                // the raw backends keeps the feature usable either way.
+                for (choice in OcrMenuChoice.defaults(backends)) {
+                    menu.add(JMenuItem(choice.label).apply {
+                        addActionListener { onRunOcr(box, choice) }
+                    })
+                }
+            }
+        }
+        onConfigureOcr?.let { configure ->
+            menu.addSeparator()
+            menu.add(JMenuItem("Configure Favourites…").apply {
+                addActionListener { configure() }
+            })
+        }
         return menu
     }
 

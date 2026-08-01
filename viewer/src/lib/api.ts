@@ -16,7 +16,8 @@ import type {
   CredentialPayload,
   OcrBackend,
   OcrBackendList,
-  OcrBackendPayload
+  OcrBackendPayload,
+  OcrCatalog
 } from '$lib/types';
 
 async function getJson<T>(path: string): Promise<T> {
@@ -113,6 +114,21 @@ export async function listOcrBackends(
     `/ocr/backends?${ocrScopeQuery(site, { enabled_only: 'false' })}`
   );
   return result.backends;
+}
+
+/**
+ * The engines and languages a backend actually offers. Cached server-side
+ * (the raw list is hundreds of kilobytes); pass `refresh` to bypass that.
+ */
+export function listOcrModels(
+  site: Pick<Site, 'family' | 'code'>,
+  name?: string,
+  refresh = false
+): Promise<OcrCatalog> {
+  const extra: Record<string, string> = {};
+  if (name) extra.backend = name;
+  if (refresh) extra.refresh = 'true';
+  return getJson<OcrCatalog>(`/ocr/models?${ocrScopeQuery(site, extra)}`);
 }
 
 export function saveOcrBackend(

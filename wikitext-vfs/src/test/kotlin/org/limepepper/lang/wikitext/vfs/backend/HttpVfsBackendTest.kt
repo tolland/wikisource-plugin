@@ -387,6 +387,48 @@ class HttpVfsBackendTest {
         assertTrue(body.contains("\"prompt\":\"latex\""))
         assertTrue(body.contains("\"langs\":[\"en\"]"))
         assertTrue(body.contains("\"box\":{\"x\":1.0,\"y\":2.0,\"width\":3.0,\"height\":4.0}"))
+        assertTrue(body.contains("\"rotate\":0"))
+    }
+
+    @Test fun `listOcrModels parses nested engines and models`() {
+        var query: String? = null
+        server.createContext("/pages/ocr/models") { ex ->
+            query = ex.requestURI.query
+            // A title containing a bracket on purpose: JsonReader.array has
+            // to treat it as data, not as array structure.
+            val body = """{"backend":"wmocr","engines":[
+                {"engine":"tesseract","models":[
+                    {"code":"en","title":"English [Latn]"},
+                    {"code":"de","title":"German"}]},
+                {"engine":"pix2tex","models":[]}
+            ],"error":null}""".toByteArray()
+            ex.sendResponseHeaders(200, body.size.toLong())
+            ex.responseBody.use { it.write(body) }
+        }
+
+        val catalog = backend.listOcrModels(
+            "/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1",
+            "wmocr",
+        )
+        assertEquals("wmocr", catalog.backend)
+        assertNull(catalog.error)
+        assertEquals(listOf("tesseract", "pix2tex"), catalog.engines.map { it.engine })
+        assertEquals(2, catalog.engines[0].models.size)
+        assertEquals("English [Latn]", catalog.engines[0].models[0].title)
+        assertEquals("English [Latn] (en)", catalog.engines[0].models[0].displayName)
+        // An engine with no language dimension, not a parse failure.
+        assertTrue(catalog.engines[1].models.isEmpty())
+        assertTrue(query!!.contains("backend=wmocr"))
+    }
+
+    @Test fun `listOcrModels surfaces a discovery error as data`() {
+        handle("/pages/ocr/models", """
+            {"backend":"wmocr","engines":[],"error":"discovery failed: refused"}
+        """.trimIndent())
+
+        val catalog = backend.listOcrModels("/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1")
+        assertTrue(catalog.engines.isEmpty())
+        assertEquals("discovery failed: refused", catalog.error)
     }
 
     @Test fun `throws VfsBackendException on HTTP error`() {
