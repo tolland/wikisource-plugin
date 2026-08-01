@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, model_validator
 from sqlmodel import Session
 
-from ocrapi import service
+from ocrapi import catalog, service
 from ocrapi.client import OcrCrop, OcrError, OcrRequest, build_client
 from ocrapi.deps import get_ocr_session
 from wtbot.model.ocr_backend import DEFAULT_SCOPE, OcrBackendConfig, OcrBackendKind
@@ -27,6 +27,12 @@ def get_client_builder() -> service.ClientBuilder:
     return build_client
 
 
+def get_catalog_fetcher() -> catalog.CatalogFetcher:
+    """Dependency seam for engine/model discovery: tests override this to
+    return a canned catalog instead of calling a real service."""
+    return catalog.fetch_catalog
+
+
 class OcrBackendOut(BaseModel):
     name: str
     kind: OcrBackendKind
@@ -39,10 +45,32 @@ class OcrBackendOut(BaseModel):
     # Capability flags so a caller can shape its UI without knowing kinds.
     supports_prompt: bool
     supports_segment: bool
+    # Whether GET /models can enumerate this backend's engines/languages.
+    supports_discovery: bool
 
 
 class OcrBackendList(BaseModel):
     backends: list[OcrBackendOut]
+
+
+class OcrModelOut(BaseModel):
+    code: str
+    title: str
+
+
+class OcrEngineOut(BaseModel):
+    engine: str
+    models: list[OcrModelOut]
+
+
+class OcrCatalogOut(BaseModel):
+    """One backend's engines and the models each offers. [error] non-null
+    means discovery failed and [engines] is empty — a caller should still
+    offer the backend with its configured defaults rather than hide it."""
+
+    backend: str
+    engines: list[OcrEngineOut]
+    error: str | None = None
 
 
 class OcrBackendUpsert(BaseModel):
@@ -73,6 +101,7 @@ class OcrRunIn(BaseModel):
     engine: str | None = None
     langs: list[str] | None = None
     prompt: str | None = None
+    rotate: int = 0  # degrees clockwise, applied after the crop
 
     @model_validator(mode="after")
     def _need_an_image(self) -> "OcrRunIn":
@@ -94,10 +123,14 @@ class OcrRunOut(BaseModel):
 
 # Per-kind capability flags: which OcrRequest fields a backend actually
 # uses, so a caller can shape its UI (show a prompt box, crop client-side)
-# without knowing kinds. wikimedia is URL+server-crop only; token_api and
-# pix2tex both need bytes, but only token_api accepts a custom prompt.
-_SEGMENT_KINDS = {OcrBackendKind.token_api, OcrBackendKind.pix2tex}
+# without knowing kinds. wikimedia is URL-driven and crops/rotates
+# server-side; token_api needs the segment bytes and is the only kind that
+# reads a prompt today.
+_SEGMENT_KINDS = {OcrBackendKind.token_api}
 _PROMPT_KINDS = {OcrBackendKind.token_api}
+# Only URL-driven backends expose an engine/model discovery API; see
+# ocrapi.catalog.
+_DISCOVERABLE_KINDS = {OcrBackendKind.wikimedia}
 
 
 def backend_out(row: OcrBackendConfig) -> OcrBackendOut:
@@ -112,6 +145,21 @@ def backend_out(row: OcrBackendConfig) -> OcrBackendOut:
         has_api_token=bool(row.api_token),
         supports_prompt=row.kind in _PROMPT_KINDS,
         supports_segment=row.kind in _SEGMENT_KINDS,
+        supports_discovery=row.kind in _DISCOVERABLE_KINDS,
+    )
+
+
+def catalog_out(found: catalog.OcrCatalog) -> OcrCatalogOut:
+    return OcrCatalogOut(
+        backend=found.backend,
+        engines=[
+            OcrEngineOut(
+                engine=engine.engine,
+                models=[OcrModelOut(code=m.code, title=m.title) for m in engine.models],
+            )
+            for engine in found.engines
+        ],
+        error=found.error,
     )
 
 
@@ -126,6 +174,27 @@ def list_backends(
 ) -> OcrBackendList:
     rows = service.list_backends(session, scope, enabled_only=enabled_only)
     return OcrBackendList(backends=[backend_out(row) for row in rows])
+
+
+@router.get("/models")
+def list_models(
+    scope: str = Query(DEFAULT_SCOPE),
+    backend: str | None = Query(
+        None, description="config name; default = scope's first enabled backend"
+    ),
+    refresh: bool = Query(False, description="bypass the TTL cache"),
+    session: Session = Depends(get_ocr_session),
+    fetcher: catalog.CatalogFetcher = Depends(get_catalog_fetcher),
+) -> OcrCatalogOut:
+    """The engines and languages [backend] can actually be asked for.
+    Cached (see ocrapi.catalog): a full Google Vision language list is
+    hundreds of kilobytes and changes only on redeploy, so this must never
+    be a per-keystroke call."""
+    try:
+        config = service.resolve_backend(session, scope, backend)
+    except service.UnknownBackend as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return catalog_out(catalog.catalog_for(config, fetcher=fetcher, refresh=refresh))
 
 
 @router.put("/config/{name}")
@@ -188,6 +257,7 @@ def run_ocr(
         engine=body.engine,
         langs=body.langs or [],
         prompt=body.prompt,
+        rotate=body.rotate,
     )
     try:
         config, result = service.recognize(

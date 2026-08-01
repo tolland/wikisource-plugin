@@ -1,18 +1,14 @@
-import base64
-import io
-
 import pytest
 from fastapi.testclient import TestClient
-from PIL import Image
 
-from ocrapi.api import get_client_builder
+from ocrapi import catalog
+from ocrapi.api import get_catalog_fetcher, get_client_builder
 from ocrapi.app import create_ocr_app
 from ocrapi.client import (
     FakeOcrClient,
     OcrCrop,
     OcrError,
     OcrRequest,
-    Pix2TexClient,
     WikimediaOcrClient,
 )
 
@@ -26,6 +22,16 @@ wtbot.model.ocr_backend), so these tests run against the same
 Alembic-migrated `engine` fixture (conftest.py) every other wtbot test
 uses. wtbot's page-path-aware wrapper on top is covered separately in
 test_ocr.py."""
+
+
+@pytest.fixture(autouse=True)
+def clear_catalog_cache():
+    """The engine/model catalog cache is process-wide (see ocrapi.catalog),
+    so a discovery result from one test would otherwise be served to the
+    next -- they share a base_url."""
+    catalog.CACHE.clear()
+    yield
+    catalog.CACHE.clear()
 
 
 @pytest.fixture
@@ -122,13 +128,17 @@ def test_token_api_backend_advertises_capabilities(client):
     assert b["supports_segment"] is True
 
 
-def test_pix2tex_backend_advertises_capabilities(client):
-    _put_config(client, "pix2tex", kind="pix2tex")
+def test_wikimedia_backend_advertises_capabilities(client):
+    # pix2tex is no longer a kind of its own: py-ocrapi fronts it behind
+    # the same URL+crop contract, so it is a wikimedia row whose engine
+    # happens to be "pix2tex" -- URL-driven, no segment upload, and the
+    # only kind that can be introspected for engines/languages.
+    _put_config(client, "pix2tex", default_engine="pix2tex")
     [b] = client.get("/backends").json()["backends"]
-    # Segment-driven like token_api, but no prompt -- the model isn't
-    # instructable.
     assert b["supports_prompt"] is False
-    assert b["supports_segment"] is True
+    assert b["supports_segment"] is False
+    assert b["supports_discovery"] is True
+    assert b["default_engine"] == "pix2tex"
 
 
 def test_config_delete(client):
@@ -319,17 +329,10 @@ def test_wikimedia_client_surfaces_api_errors(monkeypatch):
         client.recognize(OcrRequest(image_url="https://img.example/p.jpg"))
 
 
-# -- Pix2TexClient (mocked HTTP; the real thing is exercised, slowly, in
-# test_ocr_pix2tex_docker.py against the actual container) ---------------------
-
-
-def _png_bytes(size: tuple[int, int] = (40, 20), color: str = "white") -> bytes:
-    buf = io.BytesIO()
-    Image.new("RGB", size, color).save(buf, format="PNG")
-    return buf.getvalue()
-
-
-def test_pix2tex_client_uploads_base64_bytes_as_is(monkeypatch):
+def test_wikimedia_client_sends_rotate_and_prompt(monkeypatch):
+    # rotate is part of the shared backend contract; prompt is not read by
+    # any engine behind it today but rides along so a prompt-aware one
+    # needs no client change (an unknown query param is ignored).
     captured = {}
 
     class Resp:
@@ -337,85 +340,104 @@ def test_pix2tex_client_uploads_base64_bytes_as_is(monkeypatch):
             pass
 
         def json(self):
-            return "x^2"
+            return {"text": "hi"}
 
-    def fake_post(url, files=None, **kwargs):
-        captured["url"] = url
-        captured["files"] = files
+    def fake_get(url, params=None, **kwargs):
+        captured["params"] = params
         return Resp()
 
-    monkeypatch.setattr("ocrapi.client.requests.post", fake_post)
-    segment = _png_bytes()
-    client = Pix2TexClient("https://pix2tex.wiki.lan/")
-    result = client.recognize(
-        OcrRequest(image_base64=base64.b64encode(segment).decode())
-    )
-    assert result.text == "x^2"
-    assert result.engine == "pix2tex"
-    assert captured["url"] == "https://pix2tex.wiki.lan/bytes/"
-    filename, data, content_type = captured["files"]["file"]
-    assert data == segment
-    assert content_type == "image/png"
-
-
-def test_pix2tex_client_fetches_and_crops_image_url(monkeypatch):
-    full = Image.new("RGB", (100, 100), "white")
-    full.paste(Image.new("RGB", (20, 10), "black"), (30, 40))
-    full_bytes = io.BytesIO()
-    full.save(full_bytes, format="PNG")
-
-    class FetchResp:
-        content = full_bytes.getvalue()
-
-        def raise_for_status(self):
-            pass
-
-    class PostResp:
-        def raise_for_status(self):
-            pass
-
-        def json(self):
-            return "cropped"
-
-    captured = {}
-    monkeypatch.setattr("ocrapi.client.requests.get", lambda *a, **k: FetchResp())
-
-    def fake_post(url, files=None, **kwargs):
-        captured["files"] = files
-        return PostResp()
-
-    monkeypatch.setattr("ocrapi.client.requests.post", fake_post)
-
-    client = Pix2TexClient("https://pix2tex.wiki.lan")
-    result = client.recognize(
+    monkeypatch.setattr("ocrapi.client.requests.get", fake_get)
+    WikimediaOcrClient("https://ocr.wiki.lan").recognize(
         OcrRequest(
-            image_url="https://img.example/p.png",
-            crop=OcrCrop(x=30, y=40, width=20, height=10),
+            image_url="https://img.example/p.jpg",
+            rotate=90,
+            prompt="transcribe the latex",
         )
     )
-    assert result.text == "cropped"
-    _filename, data, _content_type = captured["files"]["file"]
-    cropped = Image.open(io.BytesIO(data))
-    assert cropped.size == (20, 10)
+    assert ("rotate", "90") in captured["params"]
+    assert ("prompt", "transcribe the latex") in captured["params"]
 
 
-def test_pix2tex_client_requires_url_or_bytes():
-    client = Pix2TexClient("https://pix2tex.wiki.lan")
-    with pytest.raises(OcrError):
-        client.recognize(OcrRequest())
+def test_wikimedia_client_omits_a_zero_rotation(monkeypatch):
+    captured = {}
 
-
-def test_pix2tex_client_surfaces_non_string_response(monkeypatch):
     class Resp:
         def raise_for_status(self):
             pass
 
         def json(self):
-            return {"detail": "not an image"}
+            return {"text": "hi"}
 
-    monkeypatch.setattr("ocrapi.client.requests.post", lambda *a, **k: Resp())
-    client = Pix2TexClient("https://pix2tex.wiki.lan")
-    with pytest.raises(OcrError):
-        client.recognize(
-            OcrRequest(image_base64=base64.b64encode(_png_bytes()).decode())
-        )
+    def fake_get(url, params=None, **kwargs):
+        captured["params"] = params
+        return Resp()
+
+    monkeypatch.setattr("ocrapi.client.requests.get", fake_get)
+    WikimediaOcrClient("https://ocr.wiki.lan").recognize(
+        OcrRequest(image_url="https://img.example/p.jpg")
+    )
+    assert not any(key == "rotate" for key, _ in captured["params"])
+
+
+# -- engine/model discovery ----------------------------------------------------
+
+
+def _catalog_fetcher(engines):
+    return lambda base_url: engines
+
+
+def test_models_lists_engines_and_languages(client):
+    _put_config(client, "wmocr")
+    client.app.dependency_overrides[get_catalog_fetcher] = lambda: _catalog_fetcher(
+        [
+            catalog.OcrEngineModels(
+                engine="tesseract",
+                models=[
+                    catalog.OcrModel(code="en", title="English"),
+                    catalog.OcrModel(code="de", title="German"),
+                ],
+            ),
+            catalog.OcrEngineModels(engine="pix2tex", models=[]),
+        ]
+    )
+    body = client.get("/models").json()
+    assert body["backend"] == "wmocr"
+    assert body["error"] is None
+    assert [e["engine"] for e in body["engines"]] == ["tesseract", "pix2tex"]
+    assert body["engines"][0]["models"][0] == {"code": "en", "title": "English"}
+    # pix2tex recognizes mathematical notation: no language dimension at
+    # all, which is an empty list rather than a discovery failure.
+    assert body["engines"][1]["models"] == []
+
+
+def test_models_reports_discovery_failure_without_failing_the_request(client):
+    _put_config(client, "wmocr")
+
+    def boom(base_url):
+        raise RuntimeError("connection refused")
+
+    client.app.dependency_overrides[get_catalog_fetcher] = lambda: boom
+    body = client.get("/models").json()
+    # A backend that can't be introspected must still be offerable with its
+    # configured defaults, so this is a 200 with an error field, not a 502.
+    assert body["engines"] == []
+    assert "connection refused" in body["error"]
+
+
+def test_models_is_empty_for_a_backend_with_no_discovery_api(client):
+    _put_config(client, "gemini", kind="token_api")
+    called = []
+
+    def fetcher(base_url):
+        called.append(base_url)
+        return []
+
+    client.app.dependency_overrides[get_catalog_fetcher] = lambda: fetcher
+    body = client.get("/models").json()
+    assert body == {"backend": "gemini", "engines": [], "error": None}
+    assert called == []  # never even attempted
+
+
+def test_models_404s_for_an_unknown_backend(client):
+    _put_config(client, "wmocr")
+    assert client.get("/models", params={"backend": "nope"}).status_code == 404
