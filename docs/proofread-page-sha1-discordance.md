@@ -140,6 +140,41 @@ At the database level, `revision.rev_sha1` agrees with the main slot's
 `content.content_sha1`. Both describe the bytes MediaWiki stored. They are not
 independent values.
 
+### `content_size` is not a byte length
+
+`rev_len`/`content_size` disagrees with the served text even on revisions whose
+hash agrees, and this is by construction rather than staleness. ProofreadPage
+does **not** override `getSha1()`, so it falls through to core and hashes the
+*serialized* form — the bytes the API serves. It **does** override `getSize()`
+in both content classes, to sum the component parts:
+
+```php
+// includes/Page/PageContent.php
+public function getSize() {
+    return $this->header->getSize() + $this->body->getSize() + $this->footer->getSize();
+}
+
+// includes/Index/IndexContent.php
+foreach ( $this->fields as $value ) { $size += $value->getSize(); }
+```
+
+Neither includes the `<noinclude>`/`<pagequality>` wrappers, nor — for an index
+— the `{{:MediaWiki:Proofreadpage_index_template …}}` call and its field names.
+
+Observed on a freshly synced local wiki, where the hashes agree in both cases:
+
+| Page | Served bytes | `content_size` | Hash agrees |
+|---|---:|---:|---|
+| An empty `Page:` (`level="0"`, no text) | 86 | 0 | yes |
+| An `Index:` | 1,918 | 1,582 | yes |
+
+The empty `Page:` is the clearest case: its 86 served bytes are entirely
+`<noinclude>` wrapper, and the header, body and footer are each empty, so the
+sum is 0.
+
+So the hash and the size measure different things. A hash may be compared once
+normalized; a size may not be compared to a length at all.
+
 ProofreadPage's content handler may store a structured or wrapper-free form and
 serve a reconstructed `text/x-wiki` form containing the
 `<noinclude><pagequality … /></noinclude>` header and footer. The stored and

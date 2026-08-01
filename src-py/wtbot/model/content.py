@@ -47,11 +47,29 @@ class Content(SQLModel, table=True):
     text: str
     size: int  # byte length of `text` as UTF-8
 
-    # The wiki's own values, for the stored bytes. Informational: usable to
-    # *prove* equality when they match a hash we hold, never to prove
-    # difference when they don't.
     remote_sha1: str | None = None
+    """The wiki's ``content_sha1``. Informational: usable to *prove* equality
+    when it matches a hash we hold, never to prove difference when it doesn't."""
+
     remote_size: int | None = None
+    """The wiki's ``content_size`` -- **not a byte length of any serialization**,
+    and never comparable to :attr:`size`.
+
+    ``Content::getSha1()`` is not overridden by ProofreadPage, so it falls
+    through to core and hashes the *serialized* form -- the bytes the API
+    serves, which is why ``remote_sha1`` can agree with ours. But both
+    ProofreadPage content classes **do** override ``getSize()`` to sum their
+    component parts:
+
+        PageContent::getSize()  = header + body + footer sizes
+        IndexContent::getSize() = sum of field values + category texts
+
+    Neither includes the ``<noinclude>``/``<pagequality>`` wrappers or, for an
+    index, the template call and field names. So an empty Page: whose served
+    text is 86 bytes of wrapper reports ``content_size`` 0, and the two
+    disagreeing is correct rather than a fault. The pair are measures of
+    different things by construction, not a hash and a length of the same
+    bytes."""
 
     @property
     def sha1_agrees(self) -> bool | None:

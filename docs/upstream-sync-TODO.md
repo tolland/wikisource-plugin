@@ -102,12 +102,19 @@ we don't want to mirror.
       missing titles come back in `query.missing`. One `proofreadpagesinindex`
       call plus `⌈N/50⌉` probes covers a 400-page work in ~9 calls.
 - [ ] **The probe answers "did the revision change?", not "did the content
-      change?"** — see §4.2. Against en.wikisource, for `proofread-page`, both
-      `sha1` *and* `size` are unreliable: measured on
-      `Page:Canadian patent 29537.djvu/2`, `rev_len` disagrees with the served
-      content length on **4 of 4** revisions and `rev_sha1` on 3 of 4. So the
-      probe is a cheap way to detect *presence* and *new revids*, and content
-      equality must come from a hash we compute. Use it to narrow, never to
+      change?"** — see §4.2. `size` is never usable and `sha1` only sometimes:
+      - **`rev_len` is not a byte length at all**, so it can never be compared
+        to the length of text we hold. ProofreadPage overrides `getSize()` to
+        sum its component parts — header + body + footer for a `Page:`, field
+        values for an `Index:` — excluding the `<noinclude>`/`<pagequality>`
+        wrappers and the index template call. An empty `Page:` whose served
+        text is 86 bytes of wrapper reports `content_size` 0. This is by
+        construction, not staleness, and it holds on a wiki synced minutes ago.
+      - **`rev_sha1` *is* over the served bytes** — `getSha1()` is not
+        overridden, so it hashes the serialized form — but only revisions
+        written under the current serialization are self-consistent.
+      So the probe cheaply detects *presence* and *new revids*; content
+      equality comes from a hash we compute. Use it to narrow, never to
       conclude "unchanged".
 - [ ] Full-fetch where the probe shows a revid we have not seen.
 - [ ] **`sha1` encoding gotcha — verified, and it bites.** MediaWiki reports the
@@ -272,10 +279,12 @@ this cannot be worked around by changing how fixtures are extracted.
 `action=compare` reports an **empty diff** for r1193309→r2650547 and
 r2650547→r7673287 — it considers those revisions identical, exactly as the
 content hashes do, while their stored `rev_sha1` values differ. The stored
-metadata is the stale party, and `rev_len` is staler still: it disagrees with
-the served length on all four revisions (1617/1624/1639/1513 stored versus
-1601/1608/1608/1608 served), including the one whose `sha1` *does* match. Treat
-`rev_len` as unusable for `proofread-page`.
+metadata is the stale party. `rev_len` disagrees on all four (1617/1624/1639/1513
+versus 1601/1608/1608/1608 served) **including the one whose `sha1` matches** —
+but that one is not staleness: `getSize()` is overridden to sum component parts
+while `getSha1()` is not overridden and hashes the serialized form, so the two
+measure different things by construction (§3.3). Treat `rev_len` as never
+comparable to a length.
 
 - [ ] **This is an artefact of long-lived upstream history, not of the model in
       general.** A freshly installed wiki computes `rev_sha1` from the text it
