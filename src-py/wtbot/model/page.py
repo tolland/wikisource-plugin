@@ -45,7 +45,10 @@ class Page(SQLModel, table=True):
     remote_timestamp: datetime | None = None
     contributor: str | None = None
     comment: str | None = None
-    sha1: str | None = None
+    # `sha1` used to live here. It was dropped rather than kept: nothing read
+    # it, and it held the *remote* hash in *hex* while Content.content_sha1
+    # holds *ours* in *base-36* -- the same name for a different quantity in a
+    # different encoding. Read hashes off the slot's Content instead.
 
     # Local editing state
     # `text` is the full raw content as returned by the MediaWiki API

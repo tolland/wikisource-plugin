@@ -15,7 +15,9 @@ from wtbot.model import (
     PageMeta,
     Site,
 )
+from wtbot.revision_store import head_content
 from wtbot.wiki.client import FakeWikiClient
+from wtbot.wiki.sha1 import normalize_sha1
 from wtbot.wiki.wiki_types import RemotePage, RemotePageImages
 from wtbot.worker import run_pending
 
@@ -164,7 +166,13 @@ def test_fetch_enqueues_drains_and_persists(app_with_fake, engine):
     with Session(engine) as s:
         rows = s.exec(select(Page).where(Page.title == index_remote.title)).all()
         assert len(rows) == 1
-        assert rows[0].sha1 == index_remote.sha1
+        # The wiki's hash lives on the slot's Content, normalised to base-36 --
+        # Page.sha1 was dropped because it held the same value under a name
+        # that now means our own hash.
+        content = head_content(s, rows[0])
+        assert content is not None
+        assert content.remote_sha1 == normalize_sha1(index_remote.sha1)
+        assert content.text == index_remote.text
 
 
 def test_fetch_missing_page_records_error(engine):

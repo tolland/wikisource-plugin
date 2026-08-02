@@ -19,6 +19,32 @@ us; see docs/proofread-page-sha1-discordance.md for why it cannot replace ours.
 """
 
 
+def head_revision(session: Session, page: Page) -> Revision | None:
+    """The page's current revision, or None for a placeholder."""
+    if page.latest_revision_pk is None:
+        return None
+    return session.get(Revision, page.latest_revision_pk)
+
+
+def head_content(
+    session: Session, page: Page, *, role: str = MAIN_SLOT
+) -> Content | None:
+    """The Content of one slot of the page's current revision.
+
+    Takes an explicit ``session`` rather than being a property on ``Page``.
+    This codebase deliberately works from detached snapshots -- the commit
+    worker loads a page, rolls back, then does slow network I/O -- so a
+    lazy-loading attribute would raise ``DetachedInstanceError`` exactly where
+    it is least expected. Requiring the session makes the database access
+    visible at the call site.
+    """
+    revision = head_revision(session, page)
+    if revision is None:
+        return None
+    slot = session.get(Slot, (revision.pk, role))
+    return None if slot is None else session.get(Content, slot.content_pk)
+
+
 def upsert_content(
     session: Session,
     text: str,
@@ -97,8 +123,6 @@ def record_head_revision(
     revision.timestamp = remote.timestamp
     revision.contributor = remote.user
     revision.comment = remote.comment
-    revision.remote_sha1 = normalize_sha1(remote.sha1)
-    revision.remote_size = remote.size
     session.add(revision)
     session.flush()
 

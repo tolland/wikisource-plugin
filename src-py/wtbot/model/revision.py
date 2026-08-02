@@ -19,10 +19,15 @@ Two deliberate divergences from MediaWiki's schema:
 - ``rev_actor``/``rev_comment_id`` normalisation is dropped. It exists to dedupe
   across billions of rows; we hold thousands, so contributor and comment are
   inline.
-- ``remote_sha1``/``remote_size`` are kept but are informational only. For a
-  single-slot revision MediaWiki's ``rev_sha1`` is just the main slot's
-  ``content_sha1``; see wtbot.model.content for why that is not a portable
-  identity for ``proofread-page``.
+- ``rev_sha1``/``rev_len`` are dropped entirely. For a single-slot revision
+  MediaWiki's ``rev_sha1`` *is* the main slot's ``content_sha1`` and ``rev_len``
+  its ``content_size``, so carrying them here would be the same number under a
+  second name -- and a second name is exactly what made this area hard to reason
+  about. Upstream reached the same conclusion: T389026 ("Rethink rev_sha1
+  field") is resolved as *"drop rev_sha1 and compute it on the fly from
+  content_sha1"*. Read them through the slot; for a hypothetical multi-slot
+  revision, combine the slots' hashes the way MediaWiki does rather than storing
+  a third thing.
 """
 
 
@@ -45,12 +50,6 @@ class Revision(SQLModel, table=True):
     contributor: str | None = None
     comment: str | None = None
     minor: bool = False
-
-    remote_sha1: str | None = None  # rev_sha1, base-36; informational
-    remote_size: int | None = None
-    """``rev_len``. For ProofreadPage content this is a sum of component sizes,
-    not a byte length -- see wtbot.model.content.Content.remote_size. Do not
-    compare it to the length of any text we hold."""
 
     observed_at: datetime = Field(default_factory=utcnow)
     """When we fetched this revision -- distinct from ``timestamp``, which is
