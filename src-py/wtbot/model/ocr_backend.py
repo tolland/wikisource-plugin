@@ -18,29 +18,28 @@ grouping works too.
 ``kind`` selects the wire protocol (see ocrapi.client.build_client, the
 extension point where alternative backends plug in):
 
-- ``wikimedia`` — the Wikimedia OCR HTTP API (GET /api.php?engine=&langs[]=
-  &image=&crop[...]=). URL-driven: the service fetches the image itself
-  (and can crop server-side), so requests carry a URL the service can
-  reach, never client-local bytes.
+- ``wikimedia`` — the Wikimedia OCR HTTP API (GET /api?engine=&langs[]=
+  &image=&crop[...]=&rotate=). URL-driven: the service fetches the image
+  itself (and crops/rotates server-side), so requests carry a URL the
+  service can reach, never client-local bytes. In practice this is
+  py-ocrapi (https://github.com/tolland/py-ocrapi), whose ``engine``
+  parameter covers tesseract, Google Vision *and* pix2tex — which is why
+  pix2tex is no longer a kind of its own: switching URL→image→bytes is the
+  backend's job now, not ours.
 - ``token_api`` — a generic bearer-token JSON vision API (POST base_url
   with {image_base64, prompt, langs}); the shape a Gemini-style adapter
   sits behind. Segment-driven: requests carry the (already cropped)
   region's bytes and an optional prompt (e.g. custom LaTeX instructions
   for idiosyncratic typesetting).
-- ``pix2tex`` — a self-hosted pix2tex/LaTeX-OCR instance (the
-  ``lukasblecher/pix2tex:api`` image), a free/local model specialized on
-  mathematical notation. Segment-driven like token_api, but multipart file
-  upload rather than a JSON body, no prompt (the model isn't
-  instructable), and no server-side cropping — the wrapper crops with
-  Pillow before uploading when it's given a URL + crop instead of
-  pre-cropped bytes.
+
+Which engines/models a ``wikimedia`` row actually offers is discovered at
+runtime rather than configured here — see ocrapi.catalog.
 """
 
 
 class OcrBackendKind(StrEnum):
     wikimedia = "wikimedia"
     token_api = "token_api"
-    pix2tex = "pix2tex"
 
 
 DEFAULT_SCOPE = "default"

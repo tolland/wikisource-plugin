@@ -71,6 +71,35 @@ export interface OcrBackend {
   has_api_token: boolean;
   supports_prompt: boolean;
   supports_segment: boolean;
+  /** Whether GET /ocr/models can enumerate this backend's engines/languages. */
+  supports_discovery: boolean;
+}
+
+/** One recognizable language/model of an engine, e.g. `en` / "English". */
+export interface OcrModel {
+  code: string;
+  title: string;
+}
+
+/**
+ * One engine a backend offers. An empty `models` is normal rather than a
+ * failure: pix2tex reads mathematical notation and has no language
+ * dimension at all.
+ */
+export interface OcrEngine {
+  engine: string;
+  models: OcrModel[];
+}
+
+/**
+ * What one backend can be asked for, from GET /ocr/models. A non-null
+ * `error` means discovery failed and `engines` is empty; the backend is
+ * still runnable on its configured defaults.
+ */
+export interface OcrCatalog {
+  backend: string;
+  engines: OcrEngine[];
+  error?: string | null;
 }
 
 export interface OcrBackendPayload {

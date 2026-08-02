@@ -108,6 +108,12 @@ class PrpFileEditor private constructor(
                 onRevealRange = revealRange,
                 ocrBackends = { ocrBackends },
                 onRunOcr = ::runOcr,
+                ocrFavorites = {
+                    org.limepepper.lang.wikitext.vfs.settings.OcrFavoritesProjectSettings
+                        .getInstance(project)
+                        .effectiveFavorites()
+                },
+                onConfigureOcr = ::configureOcrFavorites,
             )::menuFor,
         )
         loadOcrBackends()
@@ -176,16 +182,26 @@ class PrpFileEditor private constructor(
 
     // ---- OCR ---------------------------------------------------------------
 
-    /** Fetches the site's OCR backends once, off the EDT; no backends = no menu items. */
+    /**
+     * Discovers the site's OCR backends and their engines once, off the
+     * EDT; no backends = no menu items. The engine/model half is not used
+     * by this editor — it is published to [OcrCatalogService] so that the
+     * favourites settings page, which has no page path of its own to
+     * discover from, has real engines and languages to offer.
+     */
     private fun loadOcrBackends() {
         val vfsPath = (file as? WtVirtualFile)?.path ?: return
-        ApplicationManager.getApplication().executeOnPooledThread {
-            try {
-                ocrBackends = WtVfsService.instance.backend.listOcrBackends(vfsPath)
-            } catch (e: Exception) {
-                PRP_LOG.warn("OCR backend discovery failed for $vfsPath", e)
-            }
-        }
+        org.limepepper.lang.wikitext.vfs.settings.OcrCatalogService
+            .getInstance(project)
+            .discoverAsync(vfsPath) { backends, _ -> ocrBackends = backends }
+    }
+
+    /** Opens Settings > Tools > OCR Favourites. */
+    private fun configureOcrFavorites() {
+        com.intellij.openapi.options.ShowSettingsUtil.getInstance().showSettingsDialog(
+            project,
+            org.limepepper.lang.wikitext.vfs.settings.OcrFavoritesConfigurable::class.java,
+        )
     }
 
     /**
@@ -198,9 +214,10 @@ class PrpFileEditor private constructor(
      */
     private fun runOcr(
         box: org.limepepper.lang.wikitext.annotation.BoundingBox,
-        backendInfo: org.limepepper.lang.wikitext.vfs.backend.OcrBackendInfo,
+        choice: OcrMenuChoice,
     ) {
         val vfsPath = (file as? WtVirtualFile)?.path ?: return
+        val backendInfo = choice.backend
         val segment = if (backendInfo.supportsSegment) {
             previewHalf.referenceImagePane.cropBoxImage(box)
         } else {
@@ -213,18 +230,27 @@ class PrpFileEditor private constructor(
                     javax.imageio.ImageIO.write(img, "png", bytes)
                     java.util.Base64.getEncoder().encodeToString(bytes.toByteArray())
                 }
-                val result = WtVfsService.instance.backend.runOcr(
-                    vfsPath,
-                    org.limepepper.lang.wikitext.vfs.backend.OcrRunRequest(
-                        backend = backendInfo.name,
-                        annotationId = box.id,
-                        boxX = box.x,
-                        boxY = box.y,
-                        boxWidth = box.width,
-                        boxHeight = box.height,
-                        imageBase64 = imageBase64,
-                    ),
+                // A favourite carries the engine/languages the user picked;
+                // without one, every field stays unset so the sidecar fills
+                // it from the backend's own configured defaults.
+                val request = choice.favorite?.toRunRequest(
+                    backendName = backendInfo.name,
+                    annotationId = box.id,
+                    boxX = box.x,
+                    boxY = box.y,
+                    boxWidth = box.width,
+                    boxHeight = box.height,
+                    imageBase64 = imageBase64,
+                ) ?: org.limepepper.lang.wikitext.vfs.backend.OcrRunRequest(
+                    backend = backendInfo.name,
+                    annotationId = box.id,
+                    boxX = box.x,
+                    boxY = box.y,
+                    boxWidth = box.width,
+                    boxHeight = box.height,
+                    imageBase64 = imageBase64,
                 )
+                val result = WtVfsService.instance.backend.runOcr(vfsPath, request)
                 org.limepepper.lang.wikitext.ocr.OcrProposal(
                     title = "${file.name} · ${box.label ?: box.id.take(8)}",
                     pagePath = vfsPath,
@@ -235,12 +261,13 @@ class PrpFileEditor private constructor(
                     applyToTarget = { text -> applyOcrText(box.id, text) },
                 )
             } catch (e: Exception) {
-                PRP_LOG.warn("OCR run failed for $vfsPath box ${box.id}", e)
+                PRP_LOG.warn("OCR run failed for $vfsPath box ${box.id} via ${choice.label}", e)
                 org.limepepper.lang.wikitext.ocr.OcrProposal(
                     title = "OCR failed · ${file.name}",
                     pagePath = vfsPath,
                     boxId = box.id,
                     backend = backendInfo.name,
+                    engine = choice.engine,
                     text = "OCR request failed: ${e.message ?: e.javaClass.simpleName}",
                 )
             }

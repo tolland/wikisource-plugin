@@ -131,6 +131,7 @@ def recognize(
         engine=request.engine or config.default_engine,
         langs=request.langs if request.langs else config.langs_list(),
         prompt=request.prompt or config.default_prompt,
+        rotate=request.rotate,
     )
     result = client_builder(config).recognize(filled)
     return config, result

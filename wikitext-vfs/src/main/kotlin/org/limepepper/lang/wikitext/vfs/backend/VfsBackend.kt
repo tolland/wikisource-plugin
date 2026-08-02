@@ -88,6 +88,14 @@ interface VfsBackend {
     fun listOcrBackends(path: String): List<OcrBackendInfo>
 
     /**
+     * The engines and languages [backend] (default: the site's first)
+     * offers — what the "Run OCR" menu's favourites are chosen from. The
+     * sidecar caches this; a failure arrives as [OcrCatalog.error] rather
+     * than an exception. Blocking; call off the EDT.
+     */
+    fun listOcrModels(path: String, backend: String? = null): OcrCatalog
+
+    /**
      * Runs one OCR recognition for [path] through the sidecar's wrapper —
      * the sidecar picks the backend (named in [request] or the site's
      * first), translates the image reference to a backend-reachable URL,

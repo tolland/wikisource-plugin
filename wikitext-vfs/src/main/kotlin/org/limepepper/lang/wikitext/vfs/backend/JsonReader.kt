@@ -123,7 +123,9 @@ internal class JsonReader(private val json: String) {
 
     /**
      * Extracts a JSON array value for [key] and maps each element object
-     * through [block]. Objects must be flat (no nested arrays/objects).
+     * through [block]. Each element is handed to [block] whole, so an
+     * element may itself contain arrays/objects — nest another [array] or
+     * [objectOrNull] call inside [block] to reach them.
      */
     fun <T> array(key: String, block: (JsonReader) -> T): List<T> {
         // Find the array bracket after the key
@@ -135,9 +137,23 @@ internal class JsonReader(private val json: String) {
         var depth = 0
         var objStart = -1
         var i = arrStart
+        // Brackets inside string values are data, not structure: page
+        // titles, box labels and OCR language names all contain them, and
+        // counting those as depth silently truncates the array.
+        var inString = false
 
         while (i < json.length) {
-            when (json[i]) {
+            val c = json[i]
+            if (inString) {
+                when (c) {
+                    '\\' -> i++ // skip the escaped char
+                    '"' -> inString = false
+                }
+                i++
+                continue
+            }
+            when (c) {
+                '"' -> inString = true
                 '[' -> depth++
                 '{' -> { if (depth == 1) objStart = i; depth++ }
                 '}' -> {

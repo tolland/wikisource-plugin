@@ -309,6 +309,30 @@ class HttpVfsBackend(
                 defaultPrompt = r.stringOrNull("default_prompt"),
                 supportsPrompt = r.boolOrDefault("supports_prompt", false),
                 supportsSegment = r.boolOrDefault("supports_segment", false),
+                supportsDiscovery = r.boolOrDefault("supports_discovery", false),
+            )
+        }
+    }
+
+    override fun listOcrModels(path: String, backend: String?): OcrCatalog {
+        val params = mutableListOf("path" to path)
+        backend?.let { params += "backend" to it }
+        val json = get("/pages/ocr/models", *params.toTypedArray())
+        return JsonReader(json).run {
+            OcrCatalog(
+                backend = string("backend"),
+                engines = array("engines") { engine ->
+                    OcrEngineInfo(
+                        engine = engine.string("engine"),
+                        models = engine.array("models") { model ->
+                            OcrModelInfo(
+                                code = model.string("code"),
+                                title = model.stringOrNull("title").orEmpty(),
+                            )
+                        },
+                    )
+                },
+                error = stringOrNull("error"),
             )
         }
     }
@@ -323,6 +347,7 @@ class HttpVfsBackend(
             "\"image_base64\":${jsonValue(request.imageBase64)}",
             "\"engine\":${jsonValue(request.engine)}",
             "\"prompt\":${jsonValue(request.prompt)}",
+            "\"rotate\":${request.rotate}",
         )
         request.langs?.let { langs ->
             fields += "\"langs\":[" + langs.joinToString(",") { jsonValue(it) } + "]"
