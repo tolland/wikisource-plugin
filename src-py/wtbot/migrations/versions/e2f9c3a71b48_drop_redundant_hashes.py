@@ -33,18 +33,17 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    with op.batch_alter_table("revision", schema=None) as batch_op:
-        batch_op.drop_column("remote_sha1")
-        batch_op.drop_column("remote_size")
-
-    with op.batch_alter_table("page", schema=None) as batch_op:
-        batch_op.drop_column("sha1")
+    # Plain drop_column, NOT batch_alter_table. SQLite's batch mode rebuilds the
+    # table -- create, copy, DROP TABLE, rename -- and under
+    # ``PRAGMA foreign_keys=ON`` dropping `revision` fails as soon as any
+    # `slot` row references it. Native ALTER TABLE DROP COLUMN (SQLite >= 3.35)
+    # touches no other table, so the foreign keys never come into it.
+    op.drop_column("revision", "remote_sha1")
+    op.drop_column("revision", "remote_size")
+    op.drop_column("page", "sha1")
 
 
 def downgrade() -> None:
-    with op.batch_alter_table("page", schema=None) as batch_op:
-        batch_op.add_column(sa.Column("sha1", sa.String(), nullable=True))
-
-    with op.batch_alter_table("revision", schema=None) as batch_op:
-        batch_op.add_column(sa.Column("remote_size", sa.Integer(), nullable=True))
-        batch_op.add_column(sa.Column("remote_sha1", sa.String(), nullable=True))
+    op.add_column("page", sa.Column("sha1", sa.String(), nullable=True))
+    op.add_column("revision", sa.Column("remote_size", sa.Integer(), nullable=True))
+    op.add_column("revision", sa.Column("remote_sha1", sa.String(), nullable=True))
