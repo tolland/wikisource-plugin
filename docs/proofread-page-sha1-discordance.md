@@ -175,11 +175,39 @@ sum is 0.
 So the hash and the size measure different things. A hash may be compared once
 normalized; a size may not be compared to a length at all.
 
-ProofreadPage's content handler may store a structured or wrapper-free form and
-serve a reconstructed `text/x-wiki` form containing the
-`<noinclude><pagequality … /></noinclude>` header and footer. The stored and
-served byte sequences can therefore differ legitimately even though they
-represent the same page content.
+### The stored blob is not wrapper-free
+
+An earlier hypothesis here was that ProofreadPage stores a structured or
+wrapper-free form and reconstructs the `<noinclude>` wrappers on the way out.
+Reading the storage layer directly disproves it. For an empty local `Page:`,
+joining `text` through `content_address`:
+
+```text
+old_text     : <noinclude><pagequality level="0" user="Tolland" /></noinclude><noinclude></noinclude>
+content_size : 0
+content_sha1 : olrw2f2f01ajvxtb4aj1bdt0j54pp6r
+rev_len      : 0
+page_len     : 0
+```
+
+The stored blob carries the wrappers in full and is byte-identical to what the
+API serves; its SHA-1 is the SHA-1 of those 86 bytes. Only the *size* columns
+diverge.
+
+So the correct model is:
+
+- `text.old_text` holds the serialization **as written at save time**;
+- `content_sha1` is the SHA-1 of that same blob, so served and stored agree
+  whenever the serialization format has not changed since the save — which is
+  why current revisions are self-consistent, and why the pre-2018 English
+  Wikisource revisions are not;
+- `content_size`, `rev_len` and `page_len` all come from `getSize()`, which
+  ProofreadPage overrides to a **semantic** size — transcribed content only,
+  excluding the wrappers and, for an index, the template call and field names.
+
+The size override is arguably deliberate rather than a defect: it makes a
+`Page:`'s recorded length measure transcribed text, so an untranscribed page
+reads as 0 bytes in history and page lists rather than as its markup overhead.
 
 The exact historical serialization that produced the three old English
 Wikisource hashes was not recovered. It is not available through the public
