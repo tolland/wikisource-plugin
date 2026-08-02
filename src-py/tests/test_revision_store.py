@@ -144,7 +144,9 @@ def test_remote_hash_is_normalised_and_kept_separate(session: Session) -> None:
     assert content.remote_sha1 == hex_to_base36(remote_hex)
     assert content.content_sha1 == content_sha1_base36("served body")
     assert content.sha1_agrees is False
-    assert revision.remote_sha1 == hex_to_base36(remote_hex)
+    # The revision carries no hash of its own: rev_sha1 is the main slot's
+    # content_sha1, so storing it again would be a second name for one value.
+    assert not hasattr(revision, "remote_sha1")
 
 
 def test_sha1_agrees_when_stored_and_served_coincide(session: Session) -> None:

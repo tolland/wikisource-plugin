@@ -253,7 +253,6 @@ def _upsert_page(
         page.remote_timestamp = remote.timestamp
         page.contributor = remote.user
         page.comment = remote.comment
-        page.sha1 = remote.sha1
 
         processor.enrich(page, remote)
 
