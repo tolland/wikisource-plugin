@@ -77,25 +77,23 @@ def upgrade() -> None:
     )
     op.create_index(op.f("ix_slot_content_pk"), "slot", ["content_pk"], unique=False)
 
-    # SQLite cannot add a column with an inline REFERENCES clause, and batch
-    # mode would rewrite `page` -- which is exactly what must not happen, since
-    # a rewrite would renumber nothing but does re-create every FK into it.
-    # Plain nullable columns keep this additive; the relationship is enforced in
-    # the model layer.
-    with op.batch_alter_table("page", schema=None) as batch_op:
-        batch_op.add_column(
-            sa.Column("latest_revision_pk", sa.Integer(), nullable=True)
-        )
-        batch_op.add_column(
-            sa.Column("history_complete_from_revid", sa.Integer(), nullable=True)
-        )
+    # Plain add_column, never batch_alter_table. On SQLite, batch mode rebuilds
+    # the table (create, copy, DROP TABLE, rename), and dropping `page` fails
+    # under PRAGMA foreign_keys=ON because eleven tables reference page.pk.
+    # Native ALTER TABLE ADD COLUMN touches nothing else. The columns are plain
+    # nullable integers with no REFERENCES clause -- see Page.latest_revision_pk
+    # for why that link is deliberately not a declared foreign key.
+    op.add_column("page", sa.Column("latest_revision_pk", sa.Integer(), nullable=True))
+    op.add_column(
+        "page", sa.Column("history_complete_from_revid", sa.Integer(), nullable=True)
+    )
 
 
 def downgrade() -> None:
-    with op.batch_alter_table("page", schema=None) as batch_op:
-        batch_op.drop_column("history_complete_from_revid")
-        batch_op.drop_column("latest_revision_pk")
+    op.drop_column("page", "history_complete_from_revid")
+    op.drop_column("page", "latest_revision_pk")
 
+    # slot before revision/content: it references both.
     op.drop_index(op.f("ix_slot_content_pk"), table_name="slot")
     op.drop_table("slot")
     op.drop_index(op.f("ix_revision_revid"), table_name="revision")
