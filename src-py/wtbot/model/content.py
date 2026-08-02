@@ -13,12 +13,17 @@ quantities (see docs/proofread-page-sha1-discordance.md):
 
 - ``content_sha1`` is ours, over the bytes the API actually served us. It is
   the only portable identity token, and the one cross-wiki comparison joins on.
-- ``remote_sha1`` is the wiki's own ``content_sha1``, over the bytes it stored.
-  ProofreadPage can store a structured, wrapper-free form and serve a
-  reconstructed ``text/x-wiki`` form, so this may hash bytes we never receive.
+- ``remote_sha1`` is the wiki's own ``content_sha1``, over the blob it stored.
 
-MediaWiki needs only one because it hashes what it stores; we cannot see those
-bytes, so we cannot reproduce it.
+The stored blob is the serialization **as written at save time**, wrappers and
+all -- reading ``text.old_text`` directly shows it byte-identical to what the
+API serves. So the two hashes agree whenever the serialization format has not
+changed since that save, which is the normal case. They diverge only for
+revisions written under a format the current code no longer emits, as the
+pre-2018 English Wikisource ``proofread-page`` revisions were.
+
+We keep both because we cannot tell those cases apart from the outside: the
+wiki's hash may corroborate ours, and never contradicts it usefully.
 """
 
 
@@ -52,24 +57,24 @@ class Content(SQLModel, table=True):
     when it matches a hash we hold, never to prove difference when it doesn't."""
 
     remote_size: int | None = None
-    """The wiki's ``content_size`` -- **not a byte length of any serialization**,
+    """The wiki's ``content_size`` -- a **semantic** size, not a byte length,
     and never comparable to :attr:`size`.
 
-    ``Content::getSha1()`` is not overridden by ProofreadPage, so it falls
-    through to core and hashes the *serialized* form -- the bytes the API
-    serves, which is why ``remote_sha1`` can agree with ours. But both
-    ProofreadPage content classes **do** override ``getSize()`` to sum their
-    component parts:
+    ``getSha1()`` is not overridden by ProofreadPage, so it falls through to
+    core and hashes the stored blob. But both ProofreadPage content classes
+    **do** override ``getSize()`` to sum their component parts:
 
         PageContent::getSize()  = header + body + footer sizes
         IndexContent::getSize() = sum of field values + category texts
 
-    Neither includes the ``<noinclude>``/``<pagequality>`` wrappers or, for an
-    index, the template call and field names. So an empty Page: whose served
-    text is 86 bytes of wrapper reports ``content_size`` 0, and the two
-    disagreeing is correct rather than a fault. The pair are measures of
-    different things by construction, not a hash and a length of the same
-    bytes."""
+    Neither counts the ``<noinclude>``/``<pagequality>`` wrappers or, for an
+    index, the template call and field names -- so it measures transcribed
+    content rather than markup. An empty ``Page:`` whose stored *and* served
+    text is 86 bytes of wrapper reports ``content_size`` 0, with its hash
+    agreeing. ``rev_len`` and ``page_len`` are the same value.
+
+    Comparing this to a length is therefore always wrong, even on rows where
+    the hashes agree."""
 
     @property
     def sha1_agrees(self) -> bool | None:
