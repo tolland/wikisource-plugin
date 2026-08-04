@@ -4,34 +4,31 @@ import re
 from pathlib import Path
 
 import requests
-from fastapi import (
-    APIRouter,
-    BackgroundTasks,
-    Depends,
-    HTTPException,
-    Query,
-    Request,
-    Response,
-)
+from fastapi import BackgroundTasks, HTTPException, Request, Response
 from sqlalchemy import func
 from sqlmodel import Session, select
 
-from wtbot.deps import get_session
 from wtbot.model import Page
 from wtbot.model.page_meta import PageMeta
 from wtbot.settings import WikiSettings
-from wtbot.vfs.nodes import PageLeaf, resolve
 from wtbot.vfs.store import PageStore, canonical_title
 
-"""Scan-image bytes for proofread pages.
+"""Scan-image bytes for proofread pages — the cache-and-serve engine behind
+the image route, not a router itself.
 
-GET /pages/image?path={wikisource VFS path}&width=N streams the page's scan
-rendition. The client never needs a wiki URL (or the wiki's CA/credentials):
-the image for an open editor is addressable from the path the editor already
-holds. The wiki-side URLs in PageMeta are this endpoint's implementation
-detail — used to fill a bytes cache under blob_root on first request, local
-forever after. When the raster cache lands (local ddvu/pdftoppm extraction),
-only the cache-fill step changes; the contract does not.
+`serve_scan_image()` streams a page's scan rendition from a local bytes
+cache under blob_root, filling it from the wiki-side URLs in PageMeta on
+first request. The client never needs a wiki URL (or the wiki's
+CA/credentials): the image for an open editor is addressable from the path
+the editor already holds. When the raster cache lands (local ddjvu/pdftoppm
+extraction), only the cache-fill step changes; the contract does not.
+
+The HTTP surface is `GET /preview/page-image` (see wtbot.api.preview), which
+adds path/title resolution and the placeholder-SVG fallback. A second,
+strict `GET /pages/image` route used to live here and had no callers on
+either side of the contract; it was removed rather than left to rot. If a
+strict (404-on-no-scan) variant is wanted again, it belongs next to the
+lenient one as a query flag, not as a separate endpoint.
 
 Width handling: MediaWiki thumb URLs carry a `page{N}-{W}px-` token, and the
 thumb handler renders any width on demand, so one known URL yields every
@@ -40,8 +37,6 @@ rendition. No width means the stored reference/fullsize rendition as-is.
 Sequential transcription is the normal workflow, so serving page N warms
 page N+1 at the same width in the background (best-effort).
 """
-
-router = APIRouter(prefix="/pages", tags=["page-images"])
 
 _PX_TOKEN = re.compile(r"(page\d+-)(\d+)(px-)")
 
@@ -85,28 +80,6 @@ def _fill_cache(cache: Path, url: str) -> None:
     cache.write_bytes(data)
 
 
-@router.get("/image")
-def get_page_image(
-    request: Request,
-    background: BackgroundTasks,
-    path: str = Query(..., description="wikisource:// VFS path of the Page: leaf"),
-    width: int | None = Query(None, ge=16, le=4096),
-    session: Session = Depends(get_session),
-) -> Response:
-    store = PageStore(session)
-    node = resolve(store, path)
-    if not isinstance(node, PageLeaf):
-        raise HTTPException(status_code=404, detail=f"not a proofread page: {path}")
-
-    response = serve_scan_image(request, background, session, node.page, width)
-    if response is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"no scan image known for {node.page.title} — fetch the page first",
-        )
-    return response
-
-
 def serve_scan_image(
     request: Request,
     background: BackgroundTasks,
@@ -115,8 +88,8 @@ def serve_scan_image(
     width: int | None,
 ) -> Response | None:
     """Cached scan-rendition bytes for [page], or None while no scan URL is
-    known. Shared by GET /pages/image (canonical, 404 on None) and the
-    preview pane's GET /preview/page-image (placeholder SVG on None)."""
+    known — the caller decides what a miss means (GET /preview/page-image
+    answers with a placeholder SVG)."""
     store = PageStore(session)
     meta = store.page_meta(page)
     url = _rendition_url(meta, width)

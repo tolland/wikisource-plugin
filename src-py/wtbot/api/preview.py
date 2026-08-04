@@ -8,7 +8,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
-from wtbot.api.debug_loggig_route import DebugLoggingRoute
+from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.api.page_image import serve_scan_image
 from wtbot.deps import get_session
 from wtbot.model import Page, Site
@@ -214,9 +214,9 @@ def page_image(
     fed by the imageforpage URLs the fetch worker stored) when one is known,
     and degrades to a generated placeholder SVG labelled with the page title
     while it is not — an unfetched page still gets a split pane, just an
-    empty one. GET /pages/image is the canonical strict endpoint (404 when
-    no scan is known); this one exists for the preview pane's
-    graceful-degradation flow.
+    empty one. This is the only image endpoint: a strict sibling under
+    /pages/image existed and had no callers, so a future strict mode belongs
+    here as a query flag rather than as a second route.
     """
     page: Page | None = None
     if path:

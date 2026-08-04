@@ -3,7 +3,6 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.openapi.utils import get_openapi
 from sqlalchemy.engine import Engine
 from sqlmodel import Session, select
 
@@ -15,7 +14,6 @@ from wtbot.api import (
     health,
     namespace,
     ocr,
-    page_image,
     page_meta,
     page_nav,
     pages,
@@ -41,23 +39,6 @@ This is the plugin-facing contract: a thin FastAPI app over the SQLite cache.
 Surfaces (VFS, cache-fill, commit) are described in ``src-py/DESIGN.md``; only a
 health check and a sites vertical slice are wired up so far.
 """
-
-
-def custom_openapi():
-    if app.openapi_schema:
-        return app.openapi_schema
-    openapi_schema = get_openapi(
-        title="Custom title",
-        version="2.5.0",
-        summary="This is a very custom OpenAPI schema",
-        description="Here's a longer description of the custom **OpenAPI** schema",
-        routes=app.routes,
-    )
-    openapi_schema["info"]["x-logo"] = {
-        "url": "https://fastapi.tiangolo.com/img/logo-margin/logo-teal.png"
-    }
-    app.openapi_schema = openapi_schema
-    return app.openapi_schema
 
 
 def _make_db_client_factory(engine) -> ClientFactory:
@@ -107,8 +88,6 @@ def create_app(
         lifespan=lifespan,
     )
 
-    app.openapi = custom_openapi
-
     app.state.engine = engine
     app.state.client_factory = client_factory or _make_db_client_factory(engine)
     app.state.blob_root = (
@@ -118,21 +97,28 @@ def create_app(
     )
 
     app.include_router(health.router)
-    app.include_router(annotations.router)
     app.include_router(commit_api.router)
     app.include_router(edit_journal.router)
     app.include_router(fetch.router)
     app.include_router(file_blob.router)
     app.include_router(namespace.router)
-    app.include_router(ocr.router)
-    app.include_router(page_image.router)
-    app.include_router(page_meta.router)
-    app.include_router(page_nav.router)
-    app.include_router(pages.router)
     app.include_router(preview.router)
     app.include_router(sites.router)
     app.include_router(vfs.router)
     app.include_router(viewer.router)
+
+    # ORDER IS LOAD-BEARING for the routers sharing the /pages prefix.
+    # Routes are matched first-registered-wins (Starlette), and
+    # `pages.router` owns the catch-all `GET /pages/{page_pk}`. Every router
+    # contributing a *static* /pages/<segment> route must be registered
+    # before it, or that segment is swallowed by {page_pk} and 422s on the
+    # int parse. `test_route_order.py` pins this.
+    # /pages/{annotations,text-anchors,box-links}
+    app.include_router(annotations.router)
+    app.include_router(ocr.router)  # /ocr/* and /pages/ocr/*
+    app.include_router(page_meta.router)  # /pages/resolve, /pages/{pk}/*-meta
+    app.include_router(page_nav.router)  # /pages/nav
+    app.include_router(pages.router)  # /pages/, /pages/{page_pk} — must be last
 
     return app
 

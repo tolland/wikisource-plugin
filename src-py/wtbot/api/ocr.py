@@ -6,7 +6,7 @@ from sqlmodel import Session
 
 from ocrapi import catalog, service
 from ocrapi.client import OcrCrop, OcrError, OcrRequest, OcrResult, build_client
-from wtbot.api.debug_loggig_route import DebugLoggingRoute
+from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.deps import get_session
 from wtbot.model.ocr_backend import DEFAULT_SCOPE, OcrBackendConfig, OcrBackendKind
 from wtbot.vfs.nodes import PageLeaf, resolve
@@ -322,7 +322,7 @@ def run_page_ocr(
     scope = _scope_for(leaf.site.family, leaf.site.code)
 
     # Translate to the backend-reachable image URL: the wiki-side rendition
-    # from PageMeta, never the sidecar's localhost /pages/image endpoint.
+    # from PageMeta, never the sidecar's localhost image endpoint.
     meta = PageStore(session).page_meta(leaf.page)
     image_url = (meta.source_image_url or meta.thumb_url) if meta is not None else None
 

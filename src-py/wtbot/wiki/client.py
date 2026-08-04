@@ -30,8 +30,8 @@ and ``download_file`` are all the fetch path needs. Two implementations:
 
 # Width requested for the small tree/preview thumbnail. The API's default
 # rendition (no prppifpsize) is ~1280px -- that is ProofreadPage's edit-view
-# reference image, not a thumbnail; the /pages/image endpoint serves other
-# widths on demand by rewriting the thumb URL.
+# reference image, not a thumbnail; the /preview/page-image endpoint serves
+# other widths on demand by rewriting the thumb URL.
 PAGE_THUMB_WIDTH = 240
 
 

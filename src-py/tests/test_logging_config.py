@@ -18,8 +18,8 @@ def test_sqlalchemy_echo_from_static_config():
 def test_configure_logging_enables_vfs_trace_only():
     configure_logging(LoggingConfig(trace_debug_route_tags=frozenset({"vfs"})))
 
-    assert logging.getLogger("wtbot.api.debug_loggig_route.vfs").level == TRACE
-    assert logging.getLogger("wtbot.api.debug_loggig_route.preview").level != TRACE
+    assert logging.getLogger("wtbot.api.debug_logging_route.vfs").level == TRACE
+    assert logging.getLogger("wtbot.api.debug_logging_route.preview").level != TRACE
 
 
 def test_configure_logging_enables_sql_debug():

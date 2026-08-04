@@ -75,7 +75,7 @@ class WtVirtualFile(
     /** Uncommitted local edits (EditJournal) exist for the backing page. */
     @Volatile var dirty: Boolean = dirty
         private set
-    /** A scan reference image is known; pixels via GET /pages/image. */
+    /** A scan reference image is known; pixels via GET /preview/page-image. */
     @Volatile var hasPageImage: Boolean = hasPageImage
         private set
     /** No remote revision backs this file — a missing proofread page's
