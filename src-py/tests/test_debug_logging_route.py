@@ -4,7 +4,7 @@ import httpx
 import pytest
 from fastapi import APIRouter, FastAPI, Response
 
-from wtbot.api.debug_loggig_route import DebugLoggingRoute
+from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.log_levels import TRACE, TRACE_LEVEL_NAME
 
 router = APIRouter(route_class=DebugLoggingRoute)
@@ -34,7 +34,7 @@ def test_trace_logging_level_is_registered():
 
 @pytest.mark.anyio
 async def test_debug_logging_route_does_not_log_body_at_debug(caplog):
-    caplog.set_level(logging.DEBUG, logger="wtbot.api.debug_loggig_route")
+    caplog.set_level(logging.DEBUG, logger="wtbot.api.debug_logging_route")
 
     transport = httpx.ASGITransport(app=_app())
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
@@ -48,7 +48,7 @@ async def test_debug_logging_route_does_not_log_body_at_debug(caplog):
 
 @pytest.mark.anyio
 async def test_debug_logging_route_logs_body_at_trace(caplog):
-    caplog.set_level(TRACE, logger="wtbot.api.debug_loggig_route")
+    caplog.set_level(TRACE, logger="wtbot.api.debug_logging_route")
 
     transport = httpx.ASGITransport(app=_app())
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
@@ -62,7 +62,7 @@ async def test_debug_logging_route_logs_body_at_trace(caplog):
 
 @pytest.mark.anyio
 async def test_debug_logging_route_summarizes_non_text_bodies(caplog):
-    caplog.set_level(TRACE, logger="wtbot.api.debug_loggig_route")
+    caplog.set_level(TRACE, logger="wtbot.api.debug_logging_route")
 
     transport = httpx.ASGITransport(app=_app())
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:

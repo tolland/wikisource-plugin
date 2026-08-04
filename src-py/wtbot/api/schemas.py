@@ -1,19 +1,26 @@
 """
-Pydantic schemas for the VFS contract between the IntelliJ plugin and wtbot.
+Pydantic schemas for the VFS contract between the IntelliJ plugin and wtbot,
+plus the commit surface's response shapes.
 
-Two surfaces:
+Three sections:
   A) Operations  -- request/response, map to VirtualFileSystem method calls
-  B) Change feed -- poll-based notification of remote-originated changes
+  B) Commit      -- shapes for /commits (here for now; they are not VFS)
+  C) Reserved    -- designed, not served: rename/delete/create + change feed
 
-The OpenAPI spec is generated from these by FastAPI (GET /openapi.json); the
-Kotlin client is generated from that spec. This file is the source of truth.
+The OpenAPI spec is generated from these by FastAPI (GET /openapi.json).
+The Kotlin client is NOT generated from that spec -- wikitext-vfs's
+`backend/VfsModels.kt` is a hand-maintained mirror and `HttpVfsBackend`
+builds its JSON by hand, so a change here has to be mirrored there by a
+human. Treat this file as the source of truth and the Kotlin side as a
+copy that can drift.
 
-Design invariant (load-bearing): a rename/move is represented AS a rename in
-the change feed -- carrying old_path, new_path, and the stable id -- never as
-a delete+create pair. The plugin cannot reconstruct rename identity from a
-path diff after the fact; getting this wrong kills open editor tabs on every
-remote rename. The FastAPI layer can see pageid continuity in SQLite that a
-raw path diff cannot, so it is the right place to classify this.
+Design invariant (load-bearing, section C): a rename/move is represented AS
+a rename in the change feed -- carrying old_path, new_path, and the stable
+id -- never as a delete+create pair. The plugin cannot reconstruct rename
+identity from a path diff after the fact; getting this wrong kills open
+editor tabs on every remote rename. The FastAPI layer can see pageid
+continuity in SQLite that a raw path diff cannot, so it is the right place
+to classify this.
 """
 
 from enum import Enum
@@ -72,7 +79,7 @@ class Node(BaseModel):
     has_page_image: bool = Field(
         False,
         description="True when a scan reference image is known for this page; "
-        "fetch pixels from GET /pages/image?path=...&width=...",
+        "fetch pixels from GET /preview/page-image?path=...&width=...",
     )
     placeholder: bool = Field(
         False,
@@ -150,6 +157,9 @@ class WriteResult(BaseModel):
     message: str | None = None
 
 
+# --------------------------------------------------------------------------
+# B) Commit
+# --------------------------------------------------------------------------
 class CommitRunResponse(BaseModel):
     handled: int = Field(
         ...,
@@ -184,6 +194,14 @@ class PendingCommitPage(BaseModel):
     journals: list[PendingCommitJournal]
 
 
+# --------------------------------------------------------------------------
+# C) Reserved -- designed, not served
+#
+# No route answers these today. They stay because they encode decisions that
+# are expensive to rediscover (above all the rename-identity invariant in the
+# module docstring); the routes that used to return a constant "unsupported"
+# were removed so the OpenAPI spec only describes what wtbot actually does.
+# --------------------------------------------------------------------------
 class RenameRequest(BaseModel):
     path: str
     new_name: str
@@ -218,9 +236,7 @@ class OperationResult(BaseModel):
     message: str | None = None
 
 
-# --------------------------------------------------------------------------
-# B) Change feed
-# --------------------------------------------------------------------------
+# --- change feed ----------------------------------------------------------
 class ChangeKind(str, Enum):
     create = "create"
     delete = "delete"

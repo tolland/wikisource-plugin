@@ -25,7 +25,7 @@ data class StatResult(
     val qualityLevel: Int? = null,
     /** Uncommitted local edits (EditJournal) exist for the backing page. */
     val dirty: Boolean = false,
-    /** A scan reference image is known; pixels via GET /pages/image?path=&width=. */
+    /** A scan reference image is known; pixels via GET /preview/page-image?path=&width=. */
     val hasPageImage: Boolean = false,
     /** No remote revision backs this file — a missing proofread page's local stub. */
     val placeholder: Boolean = false,

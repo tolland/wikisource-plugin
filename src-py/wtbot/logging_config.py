@@ -10,7 +10,7 @@ from wtbot.log_levels import TRACE, install_trace_logging
 
 DEFAULT_LOG_FORMAT = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
 DEFAULT_LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
-DEBUG_ROUTE_LOGGER = "wtbot.api.debug_loggig_route"
+DEBUG_ROUTE_LOGGER = "wtbot.api.debug_logging_route"
 KNOWN_DEBUG_ROUTE_TAGS = frozenset({"preview", "vfs"})
 DOTENV_PATH = Path(".env")
 
