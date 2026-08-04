@@ -75,10 +75,44 @@ $wgGroupPermissions['sysop']['importupload'] = true;
 
 wfLoadExtension( 'ProofreadPage' );
 wfLoadExtension( 'TemplateStyles' );
+wfLoadExtension( 'ParserFunctions' );
 wfLoadExtension( 'Scribunto' );
 PHP
 fi
 
-php maintenance/update.php --quick
+printf "running maintenance update\n"
+
+php maintenance/run.php update --quick
+
+# @TODO replace with loop over module names
+php maintenance/run.php edit \
+  -u Admin \
+  -s "Install Wikisource modules" \
+  "Module:ISO_639" \
+  < /bootstrap/modules/ISO_639.lua
+
+php maintenance/run.php edit \
+  -u Admin \
+  -s "Install Wikisource modules" \
+  "Module:Message_box" \
+  < /bootstrap/modules/Message_box.lua
+
+php maintenance/run.php edit \
+  -u Admin \
+  -s "Install Wikisource modules" \
+  "Module:Yesno" \
+  < /bootstrap/modules/Yesno.lua
+
+php maintenance/run.php edit \
+  -u Admin \
+  -s "Install Wikisource modules" \
+  "Module:Proofreadpage_index_template" \
+  < /bootstrap/modules/Proofreadpage_index_template.lua
+
+php maintenance/run.php edit \
+  -u Admin \
+  -s "Install ProofreadPage configuration" \
+  "MediaWiki:Proofreadpage_index_data_config.json" \
+  < /bootstrap/mediawiki/Proofreadpage_index_data_config.json
 
 exec apache2-foreground

@@ -19,6 +19,8 @@ RUN set -eux; \
       /var/www/html/extensions/TemplateStyles
 
 COPY docker/mediawiki/start-wikisource.sh /usr/local/bin/start-wikisource
+COPY docker/pywikibot/context/modules /bootstrap/modules
+COPY docker/pywikibot/context/mediawiki /bootstrap/mediawiki
 
 RUN chmod +x /usr/local/bin/start-wikisource
 

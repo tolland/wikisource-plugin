@@ -80,6 +80,15 @@ services:
       - mediawiki-images:/var/www/html/images
       - ./src-py/tests/fixtures:/fixtures:ro,z
 
+# @TODO fix this. Currently this gets redirected to http://localhost:8080
+#  pywikibot:
+#    depends_on:
+#      mediawiki:
+#        condition: service_healthy
+#    build:
+#      context: .
+#      dockerfile: docker/pywikibot/Dockerfile
+
   db-local:
     <<: *db-common
     profiles: ["pair"]
