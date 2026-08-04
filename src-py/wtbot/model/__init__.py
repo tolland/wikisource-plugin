@@ -21,6 +21,7 @@ from wtbot.model.page_meta import (
     PageMeta,
     default_short_name,
 )
+from wtbot.model.remote_link import LinkOrigin, RemoteLink
 from wtbot.model.revision import Revision
 from wtbot.model.scan_annotation import AnnotationCategory, ScanAnnotation
 from wtbot.model.site import Site
@@ -43,6 +44,8 @@ __all__ = [
     "Page",
     "FetchState",
     "Revision",
+    "RemoteLink",
+    "LinkOrigin",
     "Slot",
     "MAIN_SLOT",
     "Content",

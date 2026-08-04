@@ -38,43 +38,45 @@ The immediate work list. Reasoning, rejected approaches and policy live in
 - **Migration discipline** — never `batch_alter_table` on a table something
   references; `test_migrations.py` runs migrations over populated tables.
 
+- **`RemoteLink`** — the assertion that **two revisions, one per site, are the
+  same content**. Asserted and recorded, never computed from hashes (discussion
+  §3: a `pagequality` header makes cross-site hashes disagree precisely as
+  proofreading progresses).
+
+  ```python
+  class RemoteLink(SQLModel, table=True):
+      __table_args__ = (
+          UniqueConstraint("local_revision_pk", "remote_revision_pk", name="uq_link"),
+      )
+      pk: int | None = Field(default=None, primary_key=True)
+
+      local_revision_pk: int = Field(foreign_key="revision.pk", index=True)
+      remote_revision_pk: int = Field(foreign_key="revision.pk", index=True)
+
+      origin: LinkOrigin          # copy | title_match | manual | reconciled
+  ```
+
+  Four fields from the original sketch were dropped rather than carried
+  unread: `confidence` (a proposal's score belongs to the proposal — a link we
+  are not confident in should not be stored at all), `note`, `asserted_by`, and
+  `asserted_at`. Ordering — which is all "the most recent link is the anchor"
+  actually needs — comes off the monotonic `pk`, and a wall clock would be a
+  second, less reliable answer to the same question. Add any of them back when
+  something reads them.
+
+  Enforced in `wtbot.remote_link_store`, the only writer: append-only (no
+  update, no retract), cross-site only (within one wiki, revision ancestry
+  already says everything a link would), and idempotent on the pair with the
+  first `origin` winning. Page-level correspondence is *derived* by
+  `corresponding_page` walking `link → revision → page`, in either direction;
+  a target redlink has no link, which is correct — there is nothing to compare,
+  and "local present, target absent" is a pairing question, not a linking one.
+  `origin=reconciled` records the forward re-anchoring of discussion §2.
+
 ## Now
 
-Numbered as originally listed; item 3 (content-model-aware comparison) is done
-and moved to *Built* above.
-
-### 1. `RemoteLink`
-
-A model asserting that **two revisions, one per site, are the same content**.
-Correspondence is asserted and recorded, never computed from hashes — see
-discussion §3 for why a `pagequality` header makes cross-site hashes disagree
-precisely as proofreading progresses.
-
-```python
-class RemoteLink(SQLModel, table=True):
-    __table_args__ = (
-        UniqueConstraint("local_revision_pk", "remote_revision_pk", name="uq_link"),
-    )
-    pk: int | None = Field(default=None, primary_key=True)
-
-    local_revision_pk: int = Field(foreign_key="revision.pk", index=True)
-    remote_revision_pk: int = Field(foreign_key="revision.pk", index=True)
-
-    origin: LinkOrigin          # copy | title_match | manual | reconciled
-    confidence: float | None    # for proposed title matches
-    asserted_at: datetime
-    asserted_by: str | None
-    note: str | None
-```
-
-- [ ] Links are **append-only**. The set of links for a page pair is the ladder
-      (item 4); the most recent is the current anchor.
-- [ ] Page-level correspondence is *derived* (`revision → page`), not stored. A
-      target redlink therefore has no link, which is correct: there is nothing
-      to compare. "Local present, target absent" is a pairing question, not a
-      linking one.
-- [ ] `origin=reconciled` records the forward re-anchoring of discussion §2 —
-      a human made the two sides identical and that becomes the new base.
+Numbered as originally listed; items 1 (`RemoteLink`) and 3
+(content-model-aware comparison) are done and moved to *Built* above.
 
 ### 2. Incremental fetch
 
@@ -112,6 +114,8 @@ differ.
 - [ ] `POST /links/propose { index_page_pk, remote_site_pk }` → proposed
       revision pairs with confidence, plus the ones that could not be matched
       and the reason (no counterpart, ambiguous, target not `normal`).
+      Confidence lives on the **proposal response only** — it is a property of
+      a guess, and `RemoteLink` stores no guesses.
 - [ ] `POST /links` to confirm one or many; `DELETE` to retract.
 - [ ] Title normalisation compares namespace *roles* resolved per site, never
       numeric ids — `Page`/`Index` ids differ between installs.
@@ -132,6 +136,52 @@ column on an audit log (discussion §12).
 - [ ] Intent (`create` | `update`) recorded explicitly, not inferred from
       `base_revid is None`. This is what lets the push set
       `createonly`/`nocreate` correctly.
+
+### 7. Seeding a work that exists only upstream
+
+The motivating case is `Index:The varieties of religious experience, a study in
+human nature.djvu` — present on en.wikisource, absent locally. Two ways to get
+it, and they are not alternatives:
+
+1. **`pwb transwikiimport`**, then `wtbot fetch-page` the result:
+
+   ```
+   pwb transwikiimport -interwikisource:s \
+       -prefixindex:"Index:The varieties of religious experience, a study in human nature.djvu"
+   uv run wtbot fetch-page --family mywikisource --code en \
+       --api-url https://wikisource-debian-13.lan/w/api.php \
+       "Index:The varieties of religious experience, a study in human nature.djvu"
+   ```
+
+   Works today, and it transfers *history*, which our own push path structurally
+   cannot: every push appends exactly one revision (discussion §2). Keep it as
+   the bulk bootstrap.
+
+2. **Downward promotion through `Promotion`/`PromotionBatch`** — item 6 with
+   source and target swapped. Same preflight chain, same queue, same audit
+   trail. This is what the data model has to support regardless: a set of
+   changes derived from another site is the same object whichever way it points,
+   and building it only for the outbound direction means building it twice.
+
+The gap between them is what to fix first. (1) copies pages *outside* the data
+model, so nothing records that the local revisions came from the upstream ones.
+The first sync run then has to re-derive correspondence by title match — the
+weaker claim, for a fact that was known at the moment of the import.
+
+- [ ] `wtctl adopt --from <site> --to <site> Index:X` — run after an import,
+      match by namespace role + page number, and write `origin=copy` links
+      against both sides' head revisions. Cheap, and it turns a title guess back
+      into a recorded fact.
+- [ ] **Not `EditJournal` + the commit worker.** The two-step (stage, then
+      apply) is right, but the journal is the *local per-save* transaction log;
+      putting cross-site intent in it repeats the overloading discussion §12
+      identifies in `Commit`. Stage in `Promotion`, which is the table that
+      exists for reviewable intent.
+- [ ] Assets are the reason this must not stay a pywikibot shell-out: a work
+      like Wittgenstein's *Tractatus* carries embedded SVG diagrams, and syncing
+      an `Index:` should be able to bring its `File:` dependencies with it.
+      That is discussion §7's local-only-`File:` block in reverse, and it needs
+      the dependency set to be a thing the model can enumerate.
 
 ## Next, agreed but not yet scheduled
 
