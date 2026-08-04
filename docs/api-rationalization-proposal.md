@@ -221,60 +221,28 @@ decision first.
 
 ### 2.10 `ScanAnnotation` is keyed to a page, but describes an image
 
-This one is a data-model problem that the API is currently baking in, so it
-belongs here even though the fix is not an API fix.
+A bounding box is not a property of a *page*. It is a property of a specific
+raster: one page of one version of one backing file, at some coordinate
+space. `ScanAnnotation` is keyed `(page_pk, annotation_id)` and the whole
+annotation surface is addressed as `/pages/annotations?path=…`, so the page
+is doing duty as the image's identity — conveniently, and wrongly. It breaks
+when the backing file is re-uploaded, when a page is inserted mid-file, and
+today, because nothing records which coordinate space the numbers are in.
 
-`ScanAnnotation` is `(page_pk, annotation_id)` plus `x/y/width/height`, and
-the whole annotation surface is addressed as `/pages/annotations?path=…`. But
-a bounding box is not a property of a *page*. It is a property of a specific
-raster: one page of one version of one DjVu/PDF, at some coordinate space.
-The page is a convenient handle for it — and a wrong one.
+This turned out to be a thread of its own rather than an API finding, and it
+is written up separately in **`docs/scan-image-modeling.md`** — including the
+requirement that motivates fixing it (starting a transcription against one
+scan and later finding a better one), what a swap would involve, and the
+short list of cheap moves that keep it reachable. One item from it is a live
+bug rather than a latent one: the scan bytes cache keys on
+`{page_pk}-{width}`, so a re-uploaded scan is served stale forever.
 
-Three ways it breaks, in rough order of nastiness:
-
-1. **The backing file changes.** A re-scan, a cleaned-up DjVu, or an OCR-layer
-   re-upload gives `Page:Foo.djvu/12` new pixels under the same title. Every
-   box on it still resolves, still renders, still looks fine — and now points
-   at the wrong part of the scan. Silent wrongness, not an error.
-2. **A page is inserted or removed in the file.** Every subsequent page's
-   raster shifts by one. The entire index's annotations drift while remaining
-   individually "valid". This is the case that would cost the most to clean up
-   after the fact, because nothing recorded what the boxes were drawn on.
-3. **Coordinate space is unrecorded.** The model docstring says scan-pixel
-   coordinates "independent of any on-screen zoom", but what the client is
-   served is a width-parameterised thumb rendition (`page{N}-{W}px-`,
-   rewritten per request). Nothing in the row says which space the numbers are
-   in, so changing the preview width either silently invalidates every box or
-   doesn't, depending on client behaviour nobody has written down.
-
-Worth noting: only (3) is a bug we can hit today. (1) and (2) are latent, and
-they are the kind that surfaces as "why are all my boxes off by a page" long
-after the upload that caused it.
-
-Directions, cheapest first — none of these are proposed for this pass:
-
-- **Normalise coordinates** to 0..1 fractions of the rendition. Kills (3)
-  outright, is independent of the rest, and is a migration plus a client
-  change. Probably worth doing regardless of what happens to (1)/(2).
-- **Record what the box was drawn on.** The minimum useful version is the
-  backing file's identity plus page number captured at draw time.
-  `FileBlob.file_sha1` and `FileBlob.upload_timestamp` already exist and are
-  exactly the handle needed. This does not migrate anything — it makes
-  staleness *detectable*, which is the property that actually matters: "these
-  40 boxes were drawn on a scan that has since changed" beats silent drift.
-- **Model the raster.** A `ScanImage` row per (file version, page number),
-  with annotations FK'd to it and `PageMeta` pointing at the current one. A
-  re-upload then mints a new `ScanImage`; old annotations stay attached to the
-  old one and are visibly stale rather than quietly wrong. This is the honest
-  model, and `PageMeta.source_image_url` / `thumb_url` / `raster_path` are
-  already a `ScanImage` in all but name.
-
-API consequence either way: keep `?path=` addressing on the annotation
-endpoints — it is what the editor holds, and re-addressing them by scan id
-would make every caller do a lookup it can't do. But the *response* should
-carry the scan identity the boxes belong to, so a client can tell it is
-looking at annotations drawn on a scan it is no longer displaying. That is an
-additive field, so it does not block anything above.
+The API consequence, which stays here: keep `?path=` addressing on the
+annotation endpoints — it is what the editor holds, and re-addressing them by
+scan id would make every caller do a lookup it cannot do. But the *response*
+should carry the scan identity the boxes belong to, and
+`GET /preview/page-image` should leave room for naming a source, so the wire
+contract does not bake in "one image per page". Both are additive.
 
 ## 3. Target shape
 
@@ -338,10 +306,9 @@ The rules that fall out:
 - **Where the Index listing lives** (§2.9): promote to `/indexes`, or keep the
   URL and re-frame `/viewer`. Recommend promote. **Needs a decision** — it is
   the one finding from this pass that was left unapplied.
-- **Annotation identity** (§2.10): normalise coordinates now, record scan
-  identity, or model `ScanImage` properly. Recommend normalising coordinates
-  regardless (independent, cheap) and adding scan identity to make staleness
-  detectable before the annotation surface gets more users.
+- **Annotation identity** (§2.10): moved to `docs/scan-image-modeling.md`.
+  Nothing there blocks this proposal; the two additive API items above are
+  the only overlap.
 - **Page-meta by path.** One `/pages/meta?path=` returning a union, or three
   routes (`/pages/index-meta`, `/pages/page-meta`, `/pages/file-meta`)? Three
   keeps the response models flat and the roles distinct; recommend three.
