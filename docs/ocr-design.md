@@ -65,7 +65,8 @@ fails — an over-broad list beats no list.
 
 The result is cached per base URL with a TTL (default one hour): it changes
 only when the service is redeployed, and discovery sits on the path of
-opening a page. Exposed as `GET /ocr/models?scope=` and, for the plugin,
+opening a page. Both routes are part of wtbot's main API: exposed as
+`GET /ocr/models?scope=` and, for the plugin,
 `GET /pages/ocr/models?path=`.
 
 **A discovery failure is a 200 with an `error` field, not a 502.** A

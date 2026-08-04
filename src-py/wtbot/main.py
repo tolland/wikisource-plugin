@@ -7,7 +7,6 @@ from fastapi.openapi.utils import get_openapi
 from sqlalchemy.engine import Engine
 from sqlmodel import Session, select
 
-from ocrapi.app import create_ocr_app
 from wtbot.api import (
     annotations,
     edit_journal,
@@ -93,12 +92,8 @@ def create_app(
     the file-blob download cache (all three are used by tests)."""
     configure_logging(logging_config)
     engine = engine or create_db_engine(echo=configured_sqlalchemy_echo(logging_config))
-    # Migrate synchronously (not just in lifespan below): the /ocr mount
-    # built further down runs ocrapi's own create_all against this engine
-    # immediately, and that must see wtbot's migrations already applied —
-    # in particular the one that drops the old wiki-coupled ocrbackendconfig
-    # table ocrapi's scope-based one replaces. Idempotent, so also leaving
-    # it in lifespan costs nothing and keeps a real ASGI boot self-healing.
+    # Migrate synchronously so callers can use the returned app immediately.
+    # Leaving this in lifespan as well keeps a real ASGI boot self-healing.
     init_db(engine)
 
     @asynccontextmanager
@@ -138,14 +133,6 @@ def create_app(
     app.include_router(sites.router)
     app.include_router(vfs.router)
     app.include_router(viewer.router)
-
-    # The standalone OCR wrapper (src-py/ocrapi), mounted rather than
-    # imported-and-included: it is a complete, independent FastAPI app that
-    # needs no wiki concepts to run on its own (see ocrapi/__init__.py), and
-    # mounting keeps that boundary real instead of aspirational. It shares
-    # wtbot's database file (its one table needs no migration coordination
-    # beyond what init_db already did above) but nothing else.
-    app.mount("/ocr", create_ocr_app(engine=engine))
 
     return app
 

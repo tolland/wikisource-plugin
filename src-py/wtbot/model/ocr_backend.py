@@ -6,8 +6,8 @@ from sqlmodel import Field, SQLModel
 
 """OCR backend configuration — part of wtbot's own app state (this file's
 row class is the thing Alembic tracks and wtbot's shared database.db
-stores), even though the HTTP surface and client logic that use it
-(src-py/ocrapi) are factored out for reuse.
+stores). Its HTTP surface lives in ``wtbot.api.ocr``; reusable service,
+client, and catalog helpers remain in ``src-py/ocrapi``.
 
 Scoped by a plain string, not a foreign key into Site, so a config row
 doesn't require a Site to exist and the ocrapi layer that queries this

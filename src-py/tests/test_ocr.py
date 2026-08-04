@@ -10,17 +10,9 @@ from wtbot.model.index_meta import IndexMeta
 from wtbot.model.namespace import NsRole
 from wtbot.model.page_meta import PageMeta
 
-"""Tests for wtbot's thin /pages/ocr wrapper: resolving a page path to a
-scope (site family/code) and a backend-reachable image URL, then
-delegating to the standalone ocrapi package for everything else. Backend
-*configuration* goes through the mounted /ocr sub-app directly (the same
-TestClient reaches it, since it's mounted on this app) rather than any
-wtbot-side CRUD -- there isn't any; see ocrapi.api for that.
-
-ocrapi's own generic behavior (crop threading, prompt defaults, backend
-resolution, the Wikimedia wire format) is covered in test_ocrapi.py and
-not re-tested here -- these tests are only about the page/site resolution
-this module adds on top."""
+"""Tests for wtbot's /pages/ocr routes: resolving a page path to a site
+scope and backend-reachable image URL. Generic /ocr route behavior is
+covered in test_ocrapi.py; these tests focus on page/site resolution."""
 
 FAMILY = "wikisource"
 CODE = "en"
@@ -90,7 +82,6 @@ def page_pk(engine) -> int:
 
 def _put_config(client, name: str, **overrides):
     body = {"kind": "wikimedia", "base_url": "https://ocr.wiki.lan", **overrides}
-    # The standalone app mounted at /ocr, reached through the same client.
     return client.put(f"/ocr/config/{name}", params={"scope": SCOPE}, json=body)
 
 
