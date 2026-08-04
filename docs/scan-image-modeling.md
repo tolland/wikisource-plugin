@@ -28,7 +28,7 @@ metadata row, and an endpoint that rewrites one of those URLs:
 | `PageMeta.page_number` | this page's number within the backing file |
 | `IndexMeta.page_count` | total pages per the Index's pagelist |
 | `FileBlob.file_sha1`, `upload_timestamp` | binary identity of a fetched File: — the one real identity handle in the system |
-| `GET /preview/page-image?path=&width=` | serves it, rewriting the `page{N}-{W}px-` token to hit any width |
+| `GET /preview/page-image?path=&width=` | serves it, rewriting the `page{N}-{W}px-` token to synthesise a width |
 | `ScanAnnotation(page_pk, annotation_id, x, y, w, h)` | boxes, keyed to the *page* |
 | `FileMeta.crop_x/y/w/h`, `source_page_number` | crop provenance "in source raster pixels" |
 
@@ -47,10 +47,20 @@ a third. `FileBlob.file_sha1` + `upload_timestamp` is exactly the handle for
 this, and nothing currently uses it that way.
 
 **A rendition.** One page of one source, rasterised at one width. This is
-what a URL actually points at and what a client actually displays. There are
-unboundedly many per source — MediaWiki's thumb handler renders any width on
-demand, which is why `_rendition_url()` can synthesise them by string
-substitution.
+what a URL actually points at and what a client actually displays.
+
+How many exist per source is **site-dependent, and this is a trap**. A stock
+MediaWiki/ProofreadPage install renders any requested width on demand, so a
+local wiki behaves as though renditions are free. Wikimedia production does
+not: off-bucket widths are refused outright with
+
+> Use thumbnail sizes listed on https://w.wiki/GHai
+
+so the set of valid renditions upstream is a fixed, configured list, not an
+open range. Any model of renditions has to treat the allowed widths as a
+per-site property rather than as "whatever you ask for" — which is a second,
+independent reason renditions want to be a modelled thing rather than a
+string rewrite.
 
 **A choice.** Which source this logical page is currently being transcribed
 against. Today this is implicit and singular: whatever the fetch worker last
@@ -69,6 +79,18 @@ which width the numbers were captured against. `FileMeta.crop_x/y/w/h` has
 the same ambiguity — its docstring says "source raster pixels", which is a
 different space again if the client was displaying a thumb. Two independent
 consumers, one undeclared convention.
+
+**Synthesised widths are not portable.** `_rendition_url()`
+(`wtbot/api/page_image.py:59`) produces a URL for any requested width by
+rewriting the `page{N}-{W}px-` token. That is valid against a local wiki and
+invalid against Wikimedia, which only serves bucketed sizes. Two things keep
+this latent rather than live: the sidecar only ever *asks the API* for two
+renditions — the default ~1280px reference image and a 240px thumb
+(`PAGE_THUMB_WIDTH`, `wtbot/wiki/client.py:35`), both server-blessed — and the
+plugin never passes `width` at all (`VfsBackend.pageImageUrl` has no width
+parameter). The first zoom control built against upstream is what would find
+it. Worth fixing when renditions get modelled, not before: the fix is to pick
+from a known-valid set rather than to compute a URL.
 
 **The bytes cache cannot see a re-upload.** `_cache_path()` in
 `wtbot/api/page_image.py:71` keys on `{page_pk}-{width}.{ext}`; the URL
@@ -129,6 +151,9 @@ model has somewhere to put it.
 None of these implement alternative sources. They are the moves that stop the
 door closing, cheapest first.
 
+0. **Treat the valid width set as per-site data**, not as an assumption. This
+   is the item the local-vs-upstream difference above turns into a
+   requirement; everything else in this list is unaffected by it.
 1. **Normalise coordinates** to fractions of the page raster, for
    `ScanAnnotation` and `FileMeta` crops alike. Independent of everything
    else here, fixes the live ambiguity in §3, and is a precondition for
@@ -158,7 +183,9 @@ Sketch, not a proposal:
 ScanSource     one version of one backing file
                (site, file title, file_sha1, upload_timestamp, page_count)
 
-ScanRendition  one page of one source at one width — the cache's real key
+ScanRendition  one page of one source at one width — the cache's real key.
+               Rows exist for widths the site will actually serve, rather
+               than being synthesised per request.
                (scan_source_pk, page_number, width, url, local_path)
 
 PageScan       a logical page's choice of source, plus that source's
@@ -190,6 +217,10 @@ of a `ScanSource`.
 
 ## 8. Open questions
 
+- Where does the per-site valid-width set come from — `siteinfo`, a
+  configured list, or discovered by trying? (`siteinfo` exposes
+  `thumblimits`, which is probably the answer, and would sit naturally
+  alongside the existing per-site namespace-role resolution.)
 - Fractional coordinates relative to *what* — the full page raster, or the
   displayed rendition's box? The former is stable, the latter is what the
   client measures. (The former, with the client converting, is almost

@@ -45,7 +45,7 @@ about which routes are contract and which are conveniences.
 ### 2.1 `/pages` is a five-way shared prefix
 
 `pages`, `page_meta`, `page_nav`, `annotations`, and half of `ocr` all mount
-under `/pages` (`page_image` did too, until the cleanup below).
+under `/pages` (`page_image` did too, until the phase-1 cleanup).
 
 To be precise about the mechanism, because "one router masks another" would be
 the wrong description: `include_router()` does not create an isolated
@@ -55,26 +55,51 @@ operations in a single file ("`/users/me` needs to be declared before
 `/users/{user_id}`"). Nothing extra happens because the operations arrived
 from different modules; the rule just stops being visible in any one file.
 
-That does bite here. `pages` owns `GET /pages/{page_pk}`, which matches any
-single segment, so `/pages/nav`, `/pages/resolve`, `/pages/annotations`,
-`/pages/text-anchors` and `/pages/box-links` are all live only because
-`create_app()` includes `pages.router` last. Verified against the pinned
-FastAPI (0.140.0): with the dynamic router included first, `GET /pages/nav`
-answers **422**, not 404 — it matched `{page_pk}` and failed to parse `"nav"`
-as an int. A 422 on a route that exists is a confusing way to find this out,
-which is why `src-py/tests/test_route_order.py` now pins it and `create_app()`
-carries the constraint as a comment.
+The ambiguity is that `GET /pages/{page_pk}` and `GET /pages/nav?path=…`
+occupy the same shape: one segment after `/pages`. `{page_pk}` matches any
+single segment, so `nav`, `resolve`, `annotations`, `text-anchors` and
+`box-links` are all live only because `create_app()` includes `pages.router`
+last. Verified against the pinned FastAPI (0.140.0): with the dynamic router
+first, `GET /pages/nav` answers **422**, not 404 — it matched `{page_pk}` and
+failed to parse `"nav"` as an int. A 422 on a route that exists is a poor way
+to discover this, so `src-py/tests/test_route_order.py` pins it and
+`create_app()` carries the constraint as a comment.
 
-So this is not a latent bug — everything works — but it is a real
-comprehension cost: five modules, no single place showing what `/pages` means,
-and an ordering rule that is invisible unless you know to look for it. That is
-the thing worth fixing (§3, rule 1), not a broken route.
+Nothing is broken today. The cost is comprehension: five modules, no single
+place showing what `/pages` means, and an ordering rule that is invisible
+unless you know to look.
+
+**The rule to adopt: no variable first segment under `/pages`.** Once
+`GET /pages/{page_pk}` is not in that position, every `/pages/<segment>` is
+static, the routers become order-independent, and the whole hazard evaporates
+rather than being managed. Two ways to get there:
+
+- **Move the row access.** `GET /pages/` and `GET /pages/{page_pk}` are raw
+  row reads for the viewer and tests — exactly the second-class tier §3
+  already proposes as `/objects/*`. Relocating them to
+  `/objects/pages/{page_pk}` leaves `/pages/*` as a clean path-addressed
+  feature surface, and does not invent a segment for the sake of it.
+- **Move the features out** to top-level prefixes instead —
+  `/page-annotations`, `/page-nav`, `/page-ocr/…`. Equally unambiguous, but it
+  scatters one coherent surface across six prefixes and weakens the
+  `/ocr` vs `/page-ocr` distinction rather than clarifying it.
+
+Recommended: the first. It also answers the "why is `/pages/ocr/backends`
+under `/pages`?" question by making the prefix mean something checkable —
+**everything under `/pages/` is page-scoped and takes `?path=`**. On that
+reading `/pages/ocr/backends` is "the OCR backends *for this page*" (site
+resolved from the page) and `/ocr/backends` is the same query with an explicit
+scope; the prefix becomes the discriminator between the two OCR surfaces
+instead of a coincidence. Member routes one level down —
+`PUT /pages/annotations/{annotation_id}` — stay fine, because `annotations`
+owns that whole subtree unambiguously.
 
 Related, and genuinely confusing rather than merely implicit: `/commits` uses
 `{page_pk}` and `{commit_pk}` in **the same path position** —
 `POST /commits/{page_pk}` runs a page's pending commit,
 `GET /commits/{commit_pk}` fetches a commit row. Two different id spaces, one
-URL shape, and no way to tell from the URL which one you hold.
+URL shape, and no way to tell from the URL which one you hold. The same rule
+applies: an id in a path segment should have exactly one meaning per prefix.
 
 ### 2.2 Two addressing schemes, unevenly applied
 
@@ -255,11 +280,12 @@ Organize by **consumer and addressing scheme**, not by model.
 /vfs/stat            /vfs/stat/bulk       /vfs/children
 /vfs/content         (GET read, POST write)
 
-# Plugin page surface — path-addressed, one page's features
-/pages/nav?path=            /pages/image?path=       (moved off /preview)
+# Plugin page surface — everything here is page-scoped and takes ?path=
+# No variable first segment: /pages/{page_pk} is NOT in this surface.
+/pages/nav                  /pages/image             (moved off /preview)
 /pages/annotations          /pages/text-anchors      /pages/box-links
 /pages/ocr/{backends,models,run}
-/pages/{index,page,file}-meta?path=
+/pages/{index,page,file}-meta
 /pages/preview              (POST render)
 
 # Index listing — promoted out of /viewer, see 2.9
@@ -271,41 +297,52 @@ Organize by **consumer and addressing scheme**, not by model.
 # Configuration
 /sites  (+ /sites/{pk}/credential)      /ocr/backends, /ocr/config/{name}, /ocr/run
 
-# Raw row access, explicitly second-class: viewer + tests only
-/objects/pages   /objects/namespaces   /objects/edit-journal   /objects/file-blobs
+# Raw row access, explicitly second-class: viewer + tests only.
+# /pages/{page_pk} moves here — that is what frees the /pages prefix.
+/objects/pages/{page_pk}   /objects/namespaces   /objects/edit-journal
+/objects/file-blobs
 /viewer/*
 ```
 
 The rules that fall out:
 
-1. **One prefix, one router.** `/pages` becomes a single package
+1. **No variable first segment under a feature prefix** (§2.1). `/pages/*` is
+   the page-scoped, `?path=`-addressed surface and contains no `{page_pk}`;
+   numeric row access lives under `/objects/pages/{page_pk}`. This is what
+   makes router include order stop mattering, rather than something to be
+   managed by a comment and a test. `/commits` gets the same treatment: one
+   id space per prefix.
+2. **One prefix, one router.** `/pages` becomes a single package
    (`api/pages/{nav,image,meta,annotations,ocr}.py`) mounted by one parent
-   router. The first-match ordering rule from §2.1 does not go away — it
-   becomes readable, because one file shows the whole `/pages` table instead
-   of it being an emergent property of `create_app()`'s include order.
-2. **Path is the client-facing identifier.** Every route the plugin calls takes
+   router, so the whole `/pages` table is readable in one file instead of
+   being an emergent property of `create_app()`'s include order.
+3. **Path is the client-facing identifier.** Every route the plugin calls takes
    `?path=`. `page_pk` addressing is confined to `/objects/*` and `/viewer/*`.
    `/pages/resolve` stops being a required round trip (it can stay as a
    debugging convenience).
-3. **One shared resolver dependency.** `PageLeafDep = Annotated[PageLeaf,
+4. **One shared resolver dependency.** `PageLeafDep = Annotated[PageLeaf,
    Depends(resolve_page_leaf)]` replaces the copies; the 404 lives in the
    dependency.
-4. **App-level exception handlers.** Move `vfs._ERROR_STATUS` to a
+5. **App-level exception handlers.** Move `vfs._ERROR_STATUS` to a
    `VfsError` handler registered in `create_app()`, and give the page-scoped
    errors the same treatment. Handlers, not 29 inline raises.
-5. **Explicit response models.** No table class as a `response_model`. Start
+6. **Explicit response models.** No table class as a `response_model`. Start
    with the credential read; do the rest opportunistically.
-6. **Schemas next to their surface.** `api/schemas.py` becomes
+7. **Schemas next to their surface.** `api/schemas.py` becomes
    `api/schemas/{vfs,commit,pages,ocr}.py`; inline models move in with them.
-7. **Uniform paths.** No trailing-slash collection roots, plural nouns
+8. **Uniform paths.** No trailing-slash collection roots, plural nouns
    throughout, `DebugLoggingRoute` as the default route class for the whole
    app rather than per-router opt-in.
 
 ### Open choices to settle first
 
+- **Where `GET /pages/{page_pk}` goes** (§2.1): `/objects/pages/{page_pk}`
+  (recommended — frees the `/pages` prefix and uses the tier this doc already
+  defines), or leave the row routes and move the *features* to top-level
+  `/page-*` prefixes instead. Either removes the ambiguity; they differ in
+  which surface takes the churn. **Needs a decision.**
 - **Where the Index listing lives** (§2.9): promote to `/indexes`, or keep the
-  URL and re-frame `/viewer`. Recommend promote. **Needs a decision** — it is
-  the one finding from this pass that was left unapplied.
+  URL and re-frame `/viewer`. Recommend promote. **Needs a decision.**
 - **Annotation identity** (§2.10): moved to `docs/scan-image-modeling.md`.
   Nothing there blocks this proposal; the two additive API items above are
   the only overlap.
@@ -348,9 +385,13 @@ page's bytes, not a preview concern) and fold `preview/render` in as
 `/pages/preview`.
 
 **Phase 4 — addressing cleanup (the only client-visible break).**
-Path-addressed meta routes; the Index-listing promotion from §2.9;
-`/objects/*` (or the deprecation alternative); trailing-slash normalization.
-Land the Kotlin
+Move `GET /pages/` and `GET /pages/{page_pk}` to `/objects/pages` so no
+variable first segment remains under `/pages` — at which point
+`test_route_order.py`'s ordering constraint can be deleted rather than
+maintained, and `create_app()` loses its load-bearing comment. Give `/commits`
+one id space per path position. Then: path-addressed meta routes; the
+Index-listing promotion from §2.9; trailing-slash normalization. Land the
+Kotlin
 `HttpVfsBackend` change in the same commit — it's hand-written, so there is no
 generated-client step, and 17 call sites are the entire blast radius.
 
