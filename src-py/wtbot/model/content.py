@@ -30,10 +30,19 @@ wiki's hash may corroborate ours, and never contradicts it usefully.
 class Content(SQLModel, table=True):
     """One distinct body, keyed by our hash of it.
 
-    Rows are shared across revisions *and across sites*: two revisions on two
-    different wikis holding the same text resolve to one row, which is what
-    turns cross-wiki "is this the same content?" into a join rather than a
-    comparison.
+    Rows are shared across revisions and, when the bytes genuinely match, across
+    sites. Within a site that makes ``content_sha1`` a reliable identity: dedup,
+    change detection, "did this edit alter anything".
+
+    It is **not** a cross-site join, despite sharing rows when it can. A
+    ``proofread-page`` body carries site-specific metadata in the text --
+    ``<pagequality level="3" user="Hesperian" />`` names a user on *that* wiki
+    and that wiki's proofreading state -- and proofreading a page locally is
+    precisely the act of changing both. Two identical transcriptions will
+    routinely hash differently, and diverge further as the work progresses. A
+    hash match is strong evidence of sameness; a mismatch is no evidence of
+    difference. Cross-site correspondence is asserted and recorded (RemoteLink),
+    with comparison done content-model-aware.
     """
 
     __table_args__ = (
