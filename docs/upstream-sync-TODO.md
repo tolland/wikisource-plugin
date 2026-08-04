@@ -18,10 +18,30 @@ The immediate work list. Reasoning, rejected approaches and policy live in
 - **Two-wiki test harness** — `docker compose --profile pair`, upstream + local
   on 18581/18582, real dumps imported with history, pywikibot bound to each,
   and direct SQL access to the wikis' own databases.
+- **Content-model-aware comparison** (`wtbot.content_model`) — the replacement
+  for cross-site hashing. A `ProofreadPageDocument` splits a body into header /
+  body / footer / level / user and compares them by what they mean:
+  - header, body and footer are comparable (a running header is a real
+    difference, so the header is compared with the pagequality tag removed
+    rather than ignored wholesale);
+  - `level` is comparable **and directional** — equal words do not make it safe
+    to overwrite, so `quality_delta` and `is_downgrade` are part of the result;
+  - `user` must be present but is never compared — it names an account on one
+    wiki.
+
+  The verdict is a `Significance`, not a boolean: `identical`,
+  `metadata_only` (same transcription, different attribution — the cross-site
+  norm), `metadata_significant` (same words, different proofreading state) or
+  `content`. Tested against the real Canadian patent revisions, including a
+  lossless parse/serialize round-trip over every one of them.
+
 - **Migration discipline** — never `batch_alter_table` on a table something
   references; `test_migrations.py` runs migrations over populated tables.
 
 ## Now
+
+Numbered as originally listed; item 3 (content-model-aware comparison) is done
+and moved to *Built* above.
 
 ### 1. `RemoteLink`
 
@@ -48,7 +68,7 @@ class RemoteLink(SQLModel, table=True):
 ```
 
 - [ ] Links are **append-only**. The set of links for a page pair is the ladder
-      (item 3); the most recent is the current anchor.
+      (item 4); the most recent is the current anchor.
 - [ ] Page-level correspondence is *derived* (`revision → page`), not stored. A
       target redlink therefore has no link, which is correct: there is nothing
       to compare. "Local present, target absent" is a pairing question, not a
@@ -73,7 +93,7 @@ Refresh a curated subset without refetching everything.
 - [ ] This is for *planning*, not safety. The `baserevid` precondition covers
       the race between fetch and push; they are complementary.
 
-### 3. `wtctl sync --from Index:X [--to Index:Y]`
+### 4. `wtctl sync --from Index:X [--to Index:Y]`
 
 The happy path, end to end. `--to` is only needed when the titles or namespaces
 differ.
@@ -87,7 +107,7 @@ differ.
       than guessing.
 - [ ] Output is a report, not an edit. No writes to either wiki.
 
-### 4. RemoteLink proposal endpoint
+### 5. RemoteLink proposal endpoint
 
 - [ ] `POST /links/propose { index_page_pk, remote_site_pk }` → proposed
       revision pairs with confidence, plus the ones that could not be matched
@@ -97,7 +117,7 @@ differ.
       numeric ids — `Page`/`Index` ids differ between installs.
 - [ ] Never auto-confirm. Proposals are proposals.
 
-### 5. `Promotion` / `PromotionBatch` schema
+### 6. `Promotion` / `PromotionBatch` schema
 
 The push queue: mutable, reviewable, cancellable — deliberately not a status
 column on an audit log (discussion §12).
@@ -119,9 +139,6 @@ column on an audit log (discussion §12).
 - [ ] Push path: `baserevid` + `createonly`/`nocreate` + error-code mapping +
       post-push content verification (discussion §8). Worth doing independently
       of sync — the silent-overwrite-on-create gap exists today.
-- [ ] Content-model-aware comparison: compare body while treating the
-      pagequality header as metadata (level significant and directional, user
-      required but not comparable).
 - [ ] Normalise the remaining `Page` head columns (`text`, `revid`,
       `remote_timestamp`, `contributor`, `comment`) behind
       `head_revision`/`head_content`, so the denormalisation has one writer.
