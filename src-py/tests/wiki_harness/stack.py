@@ -58,6 +58,33 @@ class StackConfig:
     with_pair: bool = False
 
 
+# Distinct env names from the single-instance fixture's WIKISOURCE_PORT:
+# overriding that one must not silently move the pair onto a colliding port.
+PAIR_PROJECT = "wtbot-sync-pair"
+PAIR_UPSTREAM_PORT = 18581
+PAIR_LOCAL_PORT = 18582
+
+
+def pair_config() -> StackConfig:
+    """The two-wiki harness's compose project, from the environment.
+
+    Shared by the pytest fixture and ``python -m wiki_harness`` so that standing
+    the pair up by hand and running the tests drive the same containers, volumes
+    and ports. Two definitions of this would mean a hand-run stack the tests
+    then rebuild from scratch -- MW_SERVER is baked into LocalSettings.php at
+    install time, so a volume installed for one port must never be reused on
+    another.
+    """
+    return StackConfig(
+        project_name=os.environ.get("SYNC_COMPOSE_PROJECT_NAME", PAIR_PROJECT),
+        upstream_port=int(os.environ.get("SYNC_UPSTREAM_PORT", PAIR_UPSTREAM_PORT)),
+        local_port=int(os.environ.get("SYNC_LOCAL_PORT", PAIR_LOCAL_PORT)),
+        username=os.environ.get("MW_ADMIN_USER", "Admin"),
+        password=os.environ.get("MW_ADMIN_PASSWORD", "AdminPassword123!"),
+        with_pair=True,
+    )
+
+
 class WikiStack:
     """A compose project holding one or two MediaWiki instances."""
 

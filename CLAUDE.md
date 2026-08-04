@@ -47,6 +47,11 @@ Dependencies are managed with `uv` (`pyproject.toml` + `uv.lock`).
 uv run fastapi dev src-py/wtbot/main.py   # start FastAPI dev server
 uv run pytest                              # run Python tests (uses pythonpath=src-py, testpaths=src-py/tests)
 uv run pytest src-py/tests/test_fetch.py -k some_case  # single test
+uv run pytest -m slow                      # incl. the docker-backed harness suites (deselected by default)
+
+# Stand the two-wiki sync harness up by hand and hold it open until Ctrl-C.
+# Same compose project and scenario builders the slow tests use.
+PYTHONPATH=src-py/tests uv run python -m wiki_harness --scenario diverged
 uv run ruff check --fix                    # lint (mirrors the pre-commit hook)
 uv run black .                             # format (mirrors the pre-commit hook)
 ```

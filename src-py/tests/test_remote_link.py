@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from wtbot.model import LinkOrigin, Page, RemoteLink, Revision, Site
@@ -9,6 +10,7 @@ from wtbot.remote_link_store import (
     assert_link,
     corresponding_page,
     current_anchor,
+    find_link,
     ladder,
     links_for_revision,
 )
@@ -126,6 +128,89 @@ def test_re_asserting_a_pair_keeps_the_original_row(
     assert len(session.exec(select(RemoteLink)).all()) == 1
 
 
+def test_the_same_link_reversed_is_the_same_link(
+    session: Session, pair: tuple[Revision, Revision]
+) -> None:
+    """Neither side is privileged. "A corresponds to B" and "B corresponds to
+    A" are one fact, so asserting it the other way round must return the row
+    already there rather than adding a second."""
+    local, remote = pair
+    first = assert_link(
+        session,
+        local_revision_pk=local.pk,
+        remote_revision_pk=remote.pk,
+        origin=LinkOrigin.copy,
+    )
+    session.commit()
+
+    reversed_assertion = assert_link(
+        session,
+        local_revision_pk=remote.pk,
+        remote_revision_pk=local.pk,
+        origin=LinkOrigin.manual,
+    )
+    session.commit()
+
+    assert reversed_assertion.pk == first.pk
+    assert reversed_assertion.origin is LinkOrigin.copy
+    assert len(session.exec(select(RemoteLink)).all()) == 1
+
+
+def test_the_database_itself_rejects_a_reversed_duplicate(
+    session: Session, pair: tuple[Revision, Revision]
+) -> None:
+    """The store is not the only thing that can write this table, so the
+    guarantee cannot live only in the store. A raw insert bypassing
+    ``assert_link`` must still fail."""
+    local, remote = pair
+    assert_link(
+        session,
+        local_revision_pk=local.pk,
+        remote_revision_pk=remote.pk,
+        origin=LinkOrigin.copy,
+    )
+    session.commit()
+
+    session.add(
+        RemoteLink(
+            local_revision_pk=remote.pk,
+            remote_revision_pk=local.pk,
+            origin=LinkOrigin.manual,
+        )
+    )
+    with pytest.raises(IntegrityError, match="uq_remotelink_pair"):
+        session.commit()
+    session.rollback()
+
+
+def test_a_reversed_link_is_found_from_either_orientation(
+    session: Session, pair: tuple[Revision, Revision]
+) -> None:
+    """A pair asserted one way must be readable the other way, or a page pair
+    silently grows a second, empty ladder."""
+    local, remote = pair
+    link = assert_link(
+        session,
+        local_revision_pk=remote.pk,
+        remote_revision_pk=local.pk,
+        origin=LinkOrigin.copy,
+    )
+    session.commit()
+
+    forward = ladder(session, page_pk=local.page_pk, other_page_pk=remote.page_pk)
+    backward = ladder(session, page_pk=remote.page_pk, other_page_pk=local.page_pk)
+
+    assert forward == backward == [link]
+    assert (
+        current_anchor(session, page_pk=local.page_pk, other_page_pk=remote.page_pk).pk
+        == link.pk
+    )
+    assert (
+        find_link(session, revision_pk=local.pk, other_revision_pk=remote.pk).pk
+        == link.pk
+    )
+
+
 def test_two_revisions_of_the_same_site_cannot_be_linked(session: Session) -> None:
     """Within one wiki, ancestry already says everything a link would."""
     site = _site(session, "mywikisource")
@@ -210,13 +295,13 @@ def test_the_ladder_grows_and_the_last_rung_is_the_anchor(
     )
     session.commit()
 
-    rungs = ladder(session, local_page_pk=local.page_pk, remote_page_pk=remote.page_pk)
+    rungs = ladder(session, page_pk=local.page_pk, other_page_pk=remote.page_pk)
     assert [rung.origin for rung in rungs] == [
         LinkOrigin.copy,
         LinkOrigin.reconciled,
     ]
     anchor = current_anchor(
-        session, local_page_pk=local.page_pk, remote_page_pk=remote.page_pk
+        session, page_pk=local.page_pk, other_page_pk=remote.page_pk
     )
     assert anchor.pk == reconciled.pk
     assert anchor.local_revision_pk == local_next.pk
@@ -227,9 +312,7 @@ def test_an_unlinked_pair_has_no_anchor(
 ) -> None:
     local, remote = pair
     assert (
-        current_anchor(
-            session, local_page_pk=local.page_pk, remote_page_pk=remote.page_pk
-        )
+        current_anchor(session, page_pk=local.page_pk, other_page_pk=remote.page_pk)
         is None
     )
 

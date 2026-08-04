@@ -1,6 +1,6 @@
 from enum import Enum
 
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import Index, text
 from sqlmodel import Field, SQLModel
 
 """An assertion that two revisions, one per site, are the same content.
@@ -62,10 +62,28 @@ class RemoteLink(SQLModel, table=True):
     a proposal's score belongs to the proposal, and a link that is not
     confident should not be stored. Insertion order, which is what "the most
     recent link is the anchor" needs, is carried by the monotonic ``pk``.
+
+    **The pair is unordered.** ``local`` and ``remote`` record the direction the
+    assertion was made from -- which side ``origin=copy`` copied from, which
+    site the operator was looking at -- but neither is privileged, and nothing
+    stops a later caller naming them the other way round. "A corresponds to B"
+    and "B corresponds to A" are the same fact, so storing both would give one
+    page pair two ladders and two anchors that could disagree. That is the kind
+    of error every layer above would inherit, so it is prevented here rather
+    than checked for later.
     """
 
     __table_args__ = (
-        UniqueConstraint("local_revision_pk", "remote_revision_pk", name="uq_link"),
+        # Unique on the *unordered* pair. A plain UniqueConstraint over
+        # (local, remote) would happily admit the same link reversed; SQLite
+        # indexes expressions, so min/max canonicalises the pair for the index
+        # without the columns having to lie about which side is which.
+        Index(
+            "uq_remotelink_pair",
+            text("min(local_revision_pk, remote_revision_pk)"),
+            text("max(local_revision_pk, remote_revision_pk)"),
+            unique=True,
+        ),
     )
 
     pk: int | None = Field(default=None, primary_key=True)

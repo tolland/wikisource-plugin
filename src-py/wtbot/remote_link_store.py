@@ -14,6 +14,13 @@ Three rules, all of them enforced here rather than left to callers:
 - **Cross-site only.** A link between two revisions of the same site is
   meaningless -- within a site, revision ancestry already says everything -- so
   it is refused rather than stored.
+- **The pair is unordered.** ``local``/``remote`` name the direction an
+  assertion was made from, not a hierarchy, so every read here matches a pair in
+  either orientation and ``assert_link`` treats an existing reversed row as the
+  same link. A page pair has exactly one ladder and therefore one anchor, no
+  matter which way round the caller asks. The database enforces the same thing
+  (``uq_remotelink_pair``), because a convention only the store honours is one
+  raw ``session.add`` away from being untrue.
 - **Page correspondence is derived.** ``corresponding_page`` walks
   ``link -> revision -> page``; no page-pair table exists, because a target
   redlink must have no link rather than a link to nothing.
@@ -33,10 +40,11 @@ def assert_link(
 ) -> RemoteLink:
     """Record that two revisions hold the same content.
 
-    Idempotent on the pair: re-asserting an existing link returns the row
-    already stored, keeping its original origin. That the two sides were
-    already linked is not new information, and overwriting the origin would
-    quietly rewrite history in a table whose whole point is that it does not.
+    Idempotent on the *unordered* pair: re-asserting an existing link returns
+    the row already stored -- including one stored with the two sides the other
+    way round -- and keeps its original origin. That the two sides were already
+    linked is not new information, and overwriting the origin would quietly
+    rewrite history in a table whose whole point is that it does not.
     """
     local, remote = _load_pair(session, local_revision_pk, remote_revision_pk)
 
@@ -50,12 +58,11 @@ def assert_link(
             f"both revisions are on site {local_page.site_pk}"
         )
 
-    existing = session.exec(
-        select(RemoteLink).where(
-            RemoteLink.local_revision_pk == local_revision_pk,
-            RemoteLink.remote_revision_pk == remote_revision_pk,
-        )
-    ).first()
+    existing = find_link(
+        session,
+        revision_pk=local_revision_pk,
+        other_revision_pk=remote_revision_pk,
+    )
     if existing is not None:
         return existing
 
@@ -69,10 +76,27 @@ def assert_link(
     return link
 
 
-def ladder(
-    session: Session, *, local_page_pk: int, remote_page_pk: int
-) -> list[RemoteLink]:
+def find_link(
+    session: Session, *, revision_pk: int, other_revision_pk: int
+) -> RemoteLink | None:
+    """The link between two revisions, whichever way round it was stored."""
+    return session.exec(
+        select(RemoteLink).where(
+            _either_way(
+                RemoteLink.local_revision_pk,
+                RemoteLink.remote_revision_pk,
+                revision_pk,
+                other_revision_pk,
+            )
+        )
+    ).first()
+
+
+def ladder(session: Session, *, page_pk: int, other_page_pk: int) -> list[RemoteLink]:
     """Every link asserted between two pages, oldest first.
+
+    The two arguments are interchangeable: a page pair has one ladder, not one
+    per direction of asking.
 
     Ordered by ``pk``, which is insertion order. Wall-clock assertion time is
     deliberately not stored: it would be a second, less reliable answer to the
@@ -92,8 +116,12 @@ def ladder(
                 RemoteLink.remote_revision_pk == remote_revision.pk,
             )
             .where(
-                local_revision.page_pk == local_page_pk,
-                remote_revision.page_pk == remote_page_pk,
+                _either_way(
+                    local_revision.page_pk,
+                    remote_revision.page_pk,
+                    page_pk,
+                    other_page_pk,
+                )
             )
             .order_by(RemoteLink.pk)
         ).all()
@@ -101,7 +129,7 @@ def ladder(
 
 
 def current_anchor(
-    session: Session, *, local_page_pk: int, remote_page_pk: int
+    session: Session, *, page_pk: int, other_page_pk: int
 ) -> RemoteLink | None:
     """The most recent link for a page pair -- the base a push works from.
 
@@ -109,7 +137,7 @@ def current_anchor(
     "linked but diverged": the latter has an anchor whose revisions are no
     longer either side's head.
     """
-    rungs = ladder(session, local_page_pk=local_page_pk, remote_page_pk=remote_page_pk)
+    rungs = ladder(session, page_pk=page_pk, other_page_pk=other_page_pk)
     return rungs[-1] if rungs else None
 
 
@@ -165,6 +193,16 @@ def links_for_revision(session: Session, revision_pk: int) -> list[RemoteLink]:
             .order_by(RemoteLink.pk)
         ).all()
     )
+
+
+def _either_way(left, right, first: int, second: int):
+    """Match a two-column pair against two values in either orientation.
+
+    Written once because forgetting it in one query is invisible until the day
+    a link happens to have been asserted the other way round, and then a page
+    pair silently has two ladders.
+    """
+    return ((left == first) & (right == second)) | ((left == second) & (right == first))
 
 
 def _load_pair(

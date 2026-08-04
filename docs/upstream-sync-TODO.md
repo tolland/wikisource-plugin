@@ -64,10 +64,20 @@ The immediate work list. Reasoning, rejected approaches and policy live in
   second, less reliable answer to the same question. Add any of them back when
   something reads them.
 
+  **The pair is unordered.** `local`/`remote` record the direction an assertion
+  was made from — which side `origin=copy` copied from, which site the operator
+  was looking at — but neither is privileged, so "A corresponds to B" and "B
+  corresponds to A" must be one row, not two. Two rows would give a page pair
+  two ladders and two anchors that could disagree, and every layer above would
+  inherit the error. Enforced in the database, not only in the store:
+  `uq_remotelink_pair` is unique over `min(local, remote), max(local, remote)`,
+  which SQLite can index because it indexes expressions. Every read matches a
+  pair in either orientation.
+
   Enforced in `wtbot.remote_link_store`, the only writer: append-only (no
   update, no retract), cross-site only (within one wiki, revision ancestry
-  already says everything a link would), and idempotent on the pair with the
-  first `origin` winning. Page-level correspondence is *derived* by
+  already says everything a link would), and idempotent on the unordered pair
+  with the first `origin` winning. Page-level correspondence is *derived* by
   `corresponding_page` walking `link → revision → page`, in either direction;
   a target redlink has no link, which is correct — there is nothing to compare,
   and "local present, target absent" is a pairing question, not a linking one.
@@ -196,6 +206,25 @@ weaker claim, for a fact that was known at the moment of the import.
 
 ## Testing
 
+Cross-wiki situations are built by `wiki_harness.scenarios` and used two ways:
+by the `@pytest.mark.slow` suite (`test_remote_link_sync.py` runs the
+`RemoteLink` rules over revisions fetched through the real worker), and by hand:
+
+```bash
+PYTHONPATH=src-py/tests uv run python -m wiki_harness --scenario diverged
+```
+
+which brings the pair up, builds the named situation, prints both wikis' URLs
+and holds them open until Ctrl-C — same compose project, same builders, so what
+you poke at by hand is what CI asserts on. `--pdb` only reaches the state of a
+test that *failed*; this reaches any of them on demand.
+
+- [x] The copied-work fixture: copy a page across, link it, and confirm the two
+      sides read as the same transcription under different attribution.
+- [x] Diverge one side and confirm the anchor falls behind the head — the link
+      stays true, the distance from it is what says work has happened.
+- [ ] Extend from one page to a whole `Index:`, which is where pagination and
+      the scan-offset check (§6) come in.
 - [ ] Build the diverged fixture on the two-wiki harness: copy a work across,
       edit both sides, assert the pairing reports divergence rather than
       silently promoting.

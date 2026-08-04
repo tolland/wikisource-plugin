@@ -9,10 +9,23 @@ from wiki_harness.dumps import (
 )
 from wiki_harness.endpoint import WikiEndpoint
 from wiki_harness.pwb import PwbHarness, pywikibot_harness
+from wiki_harness.scenarios import (
+    CANADIAN_PATENT_DUMP,
+    CANADIAN_PATENT_INDEX,
+    CANADIAN_PATENT_SCAN,
+    LOCAL_EDIT_MARKER,
+    PAGE_2,
+    CopiedWork,
+    copy_page_to_local,
+    diverge_locally,
+    reconcile_to_upstream,
+    seed_upstream_work,
+)
 from wiki_harness.stack import (
     StackConfig,
     WikiStack,
     docker_available,
+    pair_config,
     wait_for_mediawiki,
 )
 
@@ -24,7 +37,13 @@ cannot model: revision history, MediaWiki's sha1 semantics, conditional edits
 """
 
 __all__ = [
+    "CANADIAN_PATENT_DUMP",
+    "CANADIAN_PATENT_INDEX",
+    "CANADIAN_PATENT_SCAN",
+    "LOCAL_EDIT_MARKER",
+    "PAGE_2",
     "SCANS_DIR",
+    "CopiedWork",
     "DumpPage",
     "DumpRevision",
     "EditResult",
@@ -35,10 +54,15 @@ __all__ = [
     "WikiApiError",
     "WikiEndpoint",
     "WikiStack",
+    "copy_page_to_local",
+    "diverge_locally",
     "docker_available",
+    "pair_config",
     "pywikibot_harness",
     "read_dump",
     "read_dump_text",
+    "reconcile_to_upstream",
     "scan_dump",
+    "seed_upstream_work",
     "wait_for_mediawiki",
 ]

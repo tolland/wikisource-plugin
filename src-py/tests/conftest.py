@@ -11,12 +11,15 @@ from fastapi.testclient import TestClient
 from sqlalchemy.engine import Engine
 from sqlmodel import Session
 from wiki_harness import (
+    CANADIAN_PATENT_INDEX,
+    CANADIAN_PATENT_SCAN,
     PwbHarness,
-    StackConfig,
     WikiApi,
     WikiStack,
     docker_available,
+    pair_config,
     pywikibot_harness,
+    seed_upstream_work,
 )
 
 from wtbot.db import create_db_engine, init_db
@@ -25,8 +28,9 @@ from wtbot.main import create_app
 REPO_ROOT = Path(__file__).resolve().parents[2]
 COMPOSE_FILE = REPO_ROOT / "docker-compose.yml"
 
-CANADIAN_PATENT_INDEX = "Index:Canadian patent 29537.djvu"
-CANADIAN_PATENT_SCAN = "File:Canadian patent 29537.djvu"
+# Re-exported: several tests import these from conftest, and wiki_harness owns
+# them so `python -m wiki_harness` builds the same fixture the tests assert on.
+__all__ = ["CANADIAN_PATENT_INDEX", "CANADIAN_PATENT_SCAN"]
 
 
 @dataclass(frozen=True)
@@ -76,35 +80,19 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 # volume installed for one port must never be reused on another.
 # --------------------------------------------------------------------------
 
-WIKI_PAIR_PROJECT = "wtbot-sync-pair"
-WIKI_PAIR_UPSTREAM_PORT = 18581
-WIKI_PAIR_LOCAL_PORT = 18582
-
 
 @pytest.fixture(scope="session")
 def wiki_pair(pytestconfig: pytest.Config) -> Iterator[WikiStack]:
     """Two independent MediaWiki+ProofreadPage instances, empty.
 
     `upstream` stands in for en.wikisource.org, `local` for the staging wiki.
+    The compose project comes from ``pair_config()`` so that
+    ``python -m wiki_harness`` drives the very same containers.
     """
     if not docker_available():
         pytest.skip("A running Docker daemon is required for the two-wiki harness")
 
-    stack = WikiStack(
-        StackConfig(
-            # Distinct env names from the single-instance fixture's
-            # WIKISOURCE_PORT: overriding that one must not silently move the
-            # pair onto a colliding port.
-            project_name=os.environ.get("SYNC_COMPOSE_PROJECT_NAME", WIKI_PAIR_PROJECT),
-            upstream_port=int(
-                os.environ.get("SYNC_UPSTREAM_PORT", WIKI_PAIR_UPSTREAM_PORT)
-            ),
-            local_port=int(os.environ.get("SYNC_LOCAL_PORT", WIKI_PAIR_LOCAL_PORT)),
-            username=os.environ.get("MW_ADMIN_USER", "Admin"),
-            password=os.environ.get("MW_ADMIN_PASSWORD", "AdminPassword123!"),
-            with_pair=True,
-        )
-    )
+    stack = WikiStack(pair_config())
     reuse = pytestconfig.getoption("--reuse-wikisource")
 
     if not reuse:
@@ -201,11 +189,7 @@ def seeded_upstream(wiki_pair: WikiStack, upstream_api: WikiApi) -> WikiApi:
     the template/Module closure). Importing both duplicates every revision of
     the work.
     """
-    if upstream_api.exists(CANADIAN_PATENT_INDEX):
-        return upstream_api
-    wiki_pair.import_scans("upstream", extension="djvu")
-    wiki_pair.import_dump("upstream", "Canadian_patent_29537_all.xml")
-    wiki_pair.rebuild_links("upstream")
+    seed_upstream_work(wiki_pair, upstream_api)
     return upstream_api
 
 
