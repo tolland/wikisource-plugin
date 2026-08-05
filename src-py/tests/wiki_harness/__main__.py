@@ -1,5 +1,8 @@
 import argparse
+import dataclasses
 import sys
+import urllib.error
+import urllib.request
 
 from wiki_harness.api import WikiApi
 from wiki_harness.scenarios import CANADIAN_PATENT_INDEX, NotSeeded, assert_seeded
@@ -16,12 +19,23 @@ There is no ``--scenario`` and nothing to hold open. The wikis seed themselves
 from ``SEED_DUMPS``/``SEED_SCANS``, and ``compose up -d`` leaves them running
 until something takes them down -- so this is a convenience over
 
-    docker compose --profile pair up -d --wait
+    docker compose -f compose.seeded.yml --profile pair up -d --wait
 
-that prints the URLs and checks the content actually landed. Differences a test
-needs are made by the test, over the API, in a line or two; see
-``wiki_harness.scenarios``.
+that prints the URLs and checks the content actually landed. ``--api`` adds the
+wtbot service (compose.wtbot.yml), so the whole system is up and reachable over
+HTTP rather than only from inside pytest.
+
+Differences a test needs are made by the test, over the API, in a line or two;
+see ``wiki_harness.scenarios``.
 """
+
+
+def _wtbot_state(url: str) -> str:
+    try:
+        with urllib.request.urlopen(f"{url}/health", timeout=5) as response:
+            return f"health {response.status}"
+    except (urllib.error.URLError, OSError) as exc:
+        return f"UNREACHABLE -- {exc}"
 
 
 def _report(stack: WikiStack) -> int:
@@ -42,6 +56,10 @@ def _report(stack: WikiStack) -> int:
         print(f"  {'':9} {endpoint.base_url}/wiki/{CANADIAN_PATENT_INDEX}")
         print(f"  {'':9} api {endpoint.api_url}")
     print(f"  login: {config.username} / {config.password}")
+
+    if stack.wtbot_url:
+        print(f"  wtbot     {stack.wtbot_url}  [{_wtbot_state(stack.wtbot_url)}]")
+        print(f"  {'':9} {stack.wtbot_url}/docs")
 
     print("\n  fetch either side into wtbot with, e.g.:\n")
     for role in stack.roles:
@@ -68,6 +86,11 @@ def main(argv: list[str] | None = None) -> int:
         "down: remove containers and volumes.",
     )
     parser.add_argument(
+        "--api",
+        action="store_true",
+        help="also run the wtbot API (compose.wtbot.yml, `api` profile)",
+    )
+    parser.add_argument(
         "--rebuild",
         action="store_true",
         help="destroy existing volumes first, forcing a clean install and reseed",
@@ -78,10 +101,16 @@ def main(argv: list[str] | None = None) -> int:
         print("no reachable docker daemon", file=sys.stderr)
         return 1
 
-    stack = WikiStack(pair_config())
+    config = pair_config()
+    if args.api:
+        config = dataclasses.replace(config, with_api=True)
+    stack = WikiStack(config)
 
     if args.action == "down":
-        stack.down()
+        # Always tear down through the API overlay too, whether or not --api
+        # was passed: a `down` that leaves a wtbot container and its volume
+        # behind is not a down, and removing what is not there is a no-op.
+        WikiStack(dataclasses.replace(config, with_api=True)).down()
         return 0
 
     if args.action == "up":

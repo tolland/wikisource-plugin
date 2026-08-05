@@ -59,6 +59,14 @@ class StackConfig:
     username: str = "Admin"
     password: str = "AdminPassword123!"
     with_pair: bool = False
+    with_api: bool = False
+    """Also run the wtbot API (compose.wtbot.yml, `api` profile).
+
+    Off by default. The tests still speak to the app in-process via
+    TestClient, so starting a second copy of it alongside them would be a
+    container nobody talks to -- it is here for standing the whole system up
+    by hand, and for the tests that will eventually go over HTTP."""
+    wtbot_port: int = 18583
 
 
 # Distinct env names from the single-instance fixture's WIKISOURCE_PORT:
@@ -66,6 +74,11 @@ class StackConfig:
 PAIR_PROJECT = "wtbot-sync-pair"
 PAIR_UPSTREAM_PORT = 18581
 PAIR_LOCAL_PORT = 18582
+PAIR_WTBOT_PORT = 18583
+
+# Overlaid on COMPOSE_FILE when the API is wanted; see compose.wtbot.yml for
+# why it is a separate file rather than a copy in each base.
+WTBOT_COMPOSE_FILE = REPO_ROOT / "compose.wtbot.yml"
 
 
 def pair_config() -> StackConfig:
@@ -85,6 +98,8 @@ def pair_config() -> StackConfig:
         username=os.environ.get("MW_ADMIN_USER", "Admin"),
         password=os.environ.get("MW_ADMIN_PASSWORD", "AdminPassword123!"),
         with_pair=True,
+        with_api=os.environ.get("SYNC_WITH_API", "") not in ("", "0", "false"),
+        wtbot_port=int(os.environ.get("SYNC_WTBOT_PORT", PAIR_WTBOT_PORT)),
     )
 
 
@@ -125,12 +140,24 @@ class WikiStack:
             "MW_ADMIN_PASSWORD": self.config.password,
             "WIKISOURCE_PORT": str(self.config.upstream_port),
             "WIKISOURCE_LOCAL_PORT": str(self.config.local_port),
+            "WTBOT_PORT": str(self.config.wtbot_port),
         }
+
+    @property
+    def wtbot_url(self) -> str | None:
+        """Where the wtbot API is, if it is running in this stack."""
+        if not self.config.with_api:
+            return None
+        return f"http://127.0.0.1:{self.config.wtbot_port}"
 
     def _compose(self, *args: str) -> list[str]:
         base = ["docker", "compose", "-f", str(COMPOSE_FILE)]
+        if self.config.with_api:
+            base += ["-f", str(WTBOT_COMPOSE_FILE)]
         if self.config.with_pair:
             base += ["--profile", "pair"]
+        if self.config.with_api:
+            base += ["--profile", "api"]
         return [*base, *args]
 
     def up(self) -> None:

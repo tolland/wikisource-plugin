@@ -216,8 +216,19 @@ fixture was really "never converged", and the local wiki held a lone `Page:`
 with no `Index:` and no `File:` for the scan check to compare.
 
 ```bash
-docker compose --profile pair up -d --wait     # blocks until seeding is done
+docker compose -f compose.seeded.yml --profile pair up -d --wait
+
+# ...and the API too, for anything that should speak HTTP rather than reach
+# into the ASGI app in-process:
+docker compose -f compose.seeded.yml -f compose.wtbot.yml \
+    --profile pair --profile api up -d --wait
 ```
+
+`compose.wtbot.yml` is an overlay rather than a copy in each base, since the
+two bases already duplicate the MediaWiki services and that is the part that
+drifts. wtbot's SQLite sits on its own volume and is disposable by design —
+everything in it is refetchable or not yet pushed — so `WTBOT_RESET_DB=1`
+empties it without rebuilding the wikis, which are the slow half.
 
 `--wait` is only trustworthy because the healthcheck requires a marker written
 after the import; without it the extension check goes green as soon as
