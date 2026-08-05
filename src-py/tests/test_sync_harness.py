@@ -61,10 +61,16 @@ def test_the_pair_starts_converged(
         assert api.exists(CANADIAN_PATENT_SCAN), role
         assert api.list_index_pages(CANADIAN_PATENT_INDEX), role
 
-    assert seeded_upstream.page_text(PAGE_2) == seeded_local.page_text(PAGE_2)
+    stale = (
+        "the seeded work differs between the wikis. Nothing edits it -- mutating "
+        "tests use SCRATCH_PAGE -- so this is either a stack dirtied by an older "
+        "revision of these tests, or something edited it by hand. Reset with "
+        "`PYTHONPATH=src-py/tests uv run python -m wiki_harness up --rebuild`."
+    )
+    assert seeded_upstream.page_text(PAGE_2) == seeded_local.page_text(PAGE_2), stale
     assert len(seeded_upstream.revisions(PAGE_2, limit=50)) == len(
         seeded_local.revisions(PAGE_2, limit=50)
-    )
+    ), stale
 
 
 @pytest.mark.slow

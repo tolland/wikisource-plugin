@@ -228,6 +228,15 @@ Differences are then made by whoever needs them — `copy_page_to_local`,
 each, no scenario enum to trace. Nothing tears the stack down: `wiki_pair` only
 ensures it is up, so a failed run leaves something to look at.
 
+**The seeded work is read-only; mutating tests use `SCRATCH_PAGE`.** That
+follows from not tearing down — a test that edits an imported page leaves the
+pair diverged, and the next run starts from a base that is no longer the base.
+The scratch pair is removed before creation as well as after, so a run that
+died mid-test cannot hand the next one a page with an unexpected history. A
+stack dirtied before this rule existed needs one
+`python -m wiki_harness up --rebuild`; `test_the_pair_starts_converged` says so
+when it fails.
+
 One deliberate asymmetry, and it is not content: `local` burns a few revision
 ids first (`SEED_REVID_BURN`). Two wikis installed from empty and seeded in the
 same order otherwise assign the *same* revids to the same pages, and a bug
