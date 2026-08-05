@@ -53,7 +53,7 @@ build-backend = "hatchling.build"
 wtbot = "wtbot.cli.run_cli:run_cli"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src-py/wtbot", "src-py/ocrapi"]
+packages = ["src-py/wtbot"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src-py"]

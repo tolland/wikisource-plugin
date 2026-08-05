@@ -2,13 +2,13 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from ocrapi.client import FakeOcrClient, OcrError
 from wtbot.api.ocr import get_client_builder
 from wtbot.main import create_app
 from wtbot.model import Page, Site
 from wtbot.model.index_meta import IndexMeta
 from wtbot.model.namespace import NsRole
 from wtbot.model.page_meta import PageMeta
+from wtbot.ocrapi.client import FakeOcrClient, OcrError
 
 """Tests for wtbot's /pages/ocr routes: resolving a page path to a site
 scope and backend-reachable image URL. Generic /ocr route behavior is

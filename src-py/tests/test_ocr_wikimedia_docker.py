@@ -8,7 +8,7 @@ import pytest
 import requests
 from wiki_harness import docker_available
 
-from ocrapi.client import OcrError, OcrRequest, WikimediaOcrClient
+from wtbot.ocrapi.client import OcrError, OcrRequest, WikimediaOcrClient
 
 """Integration test against a *real* Wikimedia OCR instance
 (https://gitlab.wikimedia.org/toolforge-repos/ocr), built from

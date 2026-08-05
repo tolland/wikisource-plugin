@@ -29,7 +29,7 @@ cd /var/www/html
 
 rm -f "$READY_MARKER"
 
-cat <<EOF
+cat <<'EOF'
 
                                 _ _    _
  _ __ _   _ _ __      __      _(_) | _(_)___  ___  _   _ _ __ ___ ___

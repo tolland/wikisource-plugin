@@ -1,16 +1,16 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from ocrapi import catalog
-from ocrapi.client import (
+from wtbot.api.ocr import get_catalog_fetcher, get_client_builder
+from wtbot.main import create_app
+from wtbot.ocrapi import catalog
+from wtbot.ocrapi.client import (
     FakeOcrClient,
     OcrCrop,
     OcrError,
     OcrRequest,
     WikimediaOcrClient,
 )
-from wtbot.api.ocr import get_catalog_fetcher, get_client_builder
-from wtbot.main import create_app
 
 """Tests for wtbot's generic /ocr HTTP surface and its client logic.
 
@@ -267,7 +267,7 @@ def test_wikimedia_client_builds_the_documented_request(monkeypatch):
         captured["params"] = params
         return Resp()
 
-    monkeypatch.setattr("ocrapi.client.requests.get", fake_get)
+    monkeypatch.setattr("wtbot.ocrapi.client.requests.get", fake_get)
     client = WikimediaOcrClient("https://ocr.wiki.lan/")
     result = client.recognize(
         OcrRequest(
@@ -303,7 +303,7 @@ def test_wikimedia_client_defaults_to_tesseract_when_engine_unset(monkeypatch):
         captured["params"] = params
         return Resp()
 
-    monkeypatch.setattr("ocrapi.client.requests.get", fake_get)
+    monkeypatch.setattr("wtbot.ocrapi.client.requests.get", fake_get)
     WikimediaOcrClient("https://ocr.wiki.lan").recognize(
         OcrRequest(image_url="https://img.example/p.jpg")
     )
@@ -324,7 +324,7 @@ def test_wikimedia_client_surfaces_api_errors(monkeypatch):
         def json(self):
             return {"error": "no engine"}
 
-    monkeypatch.setattr("ocrapi.client.requests.get", lambda *a, **k: Resp())
+    monkeypatch.setattr("wtbot.ocrapi.client.requests.get", lambda *a, **k: Resp())
     client = WikimediaOcrClient("https://ocr.wiki.lan")
     with pytest.raises(OcrError, match="no engine"):
         client.recognize(OcrRequest(image_url="https://img.example/p.jpg"))
@@ -347,7 +347,7 @@ def test_wikimedia_client_sends_rotate_and_prompt(monkeypatch):
         captured["params"] = params
         return Resp()
 
-    monkeypatch.setattr("ocrapi.client.requests.get", fake_get)
+    monkeypatch.setattr("wtbot.ocrapi.client.requests.get", fake_get)
     WikimediaOcrClient("https://ocr.wiki.lan").recognize(
         OcrRequest(
             image_url="https://img.example/p.jpg",
@@ -373,7 +373,7 @@ def test_wikimedia_client_omits_a_zero_rotation(monkeypatch):
         captured["params"] = params
         return Resp()
 
-    monkeypatch.setattr("ocrapi.client.requests.get", fake_get)
+    monkeypatch.setattr("wtbot.ocrapi.client.requests.get", fake_get)
     WikimediaOcrClient("https://ocr.wiki.lan").recognize(
         OcrRequest(image_url="https://img.example/p.jpg")
     )

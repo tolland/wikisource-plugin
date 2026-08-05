@@ -4,11 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, model_validator
 from sqlmodel import Session
 
-from ocrapi import catalog, service
-from ocrapi.client import OcrCrop, OcrError, OcrRequest, OcrResult, build_client
 from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.deps import get_session
 from wtbot.model.ocr_backend import DEFAULT_SCOPE, OcrBackendConfig, OcrBackendKind
+from wtbot.ocrapi import catalog, service
+from wtbot.ocrapi.client import OcrCrop, OcrError, OcrRequest, OcrResult, build_client
 from wtbot.vfs.nodes import PageLeaf, resolve
 from wtbot.vfs.store import PageStore
 
