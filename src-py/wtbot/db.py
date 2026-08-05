@@ -1,3 +1,4 @@
+import os
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -30,9 +31,20 @@ PACKAGE_ROOT = Path(__file__).resolve().parent
 PROJECT_ROOT = PACKAGE_ROOT.parents[1]
 
 
-def create_db_engine(
-    url: str = DEFAULT_SQLITE_URL, *, echo: bool | str = False
-) -> Engine:
+def database_url() -> str:
+    """Where the database lives, when the caller has not said.
+
+    ``WTBOT_DATABASE_URL`` was already read by ``migrations/env.py`` but not by
+    the application, so a deployment that pointed migrations at one file left
+    the app on the relative default -- two databases, one of them unmigrated.
+    Containerising made that immediate: the volume is not the working
+    directory.
+    """
+    return os.environ.get("WTBOT_DATABASE_URL") or DEFAULT_SQLITE_URL
+
+
+def create_db_engine(url: str | None = None, *, echo: bool | str = False) -> Engine:
+    url = url or database_url()
     engine = create_engine(
         url,
         echo=echo,
