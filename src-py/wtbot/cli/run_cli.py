@@ -5,6 +5,7 @@ from wtbot.cli.commands import (
     fetch_page,
     fetch_refresh,
     import_svg_annotations,
+    link,
     show_config,
 )
 
@@ -31,6 +32,7 @@ def create_app() -> typer.Typer:
 
     cli.add_typer(fetch_page.app)
     cli.add_typer(fetch_refresh.app)
+    cli.add_typer(link.app)
     cli.add_typer(show_config.app)
     cli.add_typer(import_svg_annotations.app)
 
