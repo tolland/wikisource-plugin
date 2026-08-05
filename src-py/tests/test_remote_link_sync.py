@@ -1,12 +1,15 @@
+from collections.abc import Iterator
+
 import pytest
 from sqlmodel import Session, select
 from wiki_harness import (
-    PAGE_2,
+    SCRATCH_PAGE,
     PwbHarness,
     WikiApi,
-    copy_page_to_local,
+    create_scratch_pair,
     diverge_locally,
     reconcile_to_upstream,
+    remove_scratch_pair,
 )
 
 from wtbot.content_model import Significance, parse_document
@@ -78,17 +81,28 @@ def _head(session: Session, page: Page) -> Revision:
 
 
 @pytest.fixture
-def copied(seeded_upstream: WikiApi, seeded_local: WikiApi) -> tuple[WikiApi, WikiApi]:
-    """The local side replaced by an API-level copy of upstream's head.
+def copied(
+    seeded_upstream: WikiApi, seeded_local: WikiApi, local_promoter: WikiApi
+) -> Iterator[tuple[WikiApi, WikiApi]]:
+    """A disposable page pair, the local side an API-level copy of upstream's.
 
-    The pair already starts converged -- both containers import the same dump --
-    so this delta exists to produce the *other* situation: one flattened
-    revision instead of a history, attributed to whoever saved it. A test that
-    needs that asymmetry makes it here rather than inheriting it from how the
-    fixture happened to be built.
+    Deliberately **not** the seeded work. These tests edit their subject, and
+    nothing tears the stack down any more, so editing an imported page would
+    leave the pair diverged for the next run -- which is exactly the failure
+    that made a second `pytest -m slow` go red. The seeded work stays
+    read-only; mutation happens on a page these tests own and remove.
+
+    Saved on the local side as `Promoter`, so the two hold the same
+    transcription under a username that exists on one wiki only -- the
+    cross-site norm, constructed rather than hoped for. Removal runs as the
+    sysop accounts on both sides, before as well as after: a run that died
+    mid-test must not hand the next one a page with a history it did not
+    expect.
     """
-    copy_page_to_local(seeded_upstream, seeded_local)
-    return seeded_upstream, seeded_local
+    remove_scratch_pair(seeded_upstream, seeded_local)
+    create_scratch_pair(seeded_upstream, local_promoter)
+    yield seeded_upstream, seeded_local
+    remove_scratch_pair(seeded_upstream, seeded_local)
 
 
 @pytest.fixture
@@ -103,8 +117,8 @@ def linked(
     """
     upstream_site = _register(session, upstream_pwb)
     local_site = _register(session, local_pwb)
-    upstream_page = _fetch(session, upstream_site, upstream_pwb, PAGE_2)
-    local_page = _fetch(session, local_site, local_pwb, PAGE_2)
+    upstream_page = _fetch(session, upstream_site, upstream_pwb, SCRATCH_PAGE)
+    local_page = _fetch(session, local_site, local_pwb, SCRATCH_PAGE)
 
     assert_link(
         session,
@@ -226,7 +240,7 @@ def test_a_local_edit_leaves_the_anchor_behind_the_head(
     anchored_revid = _head(session, local_page).revid
 
     diverge_locally(seeded_local)
-    _fetch(session, session.get(Site, local_page.site_pk), local_pwb, PAGE_2)
+    _fetch(session, session.get(Site, local_page.site_pk), local_pwb, SCRATCH_PAGE)
 
     anchor = current_anchor(
         session, page_pk=local_page.pk, other_page_pk=upstream_page.pk
@@ -259,10 +273,10 @@ def test_reconciling_appends_a_rung_rather_than_editing_the_broken_one(
     local_page, upstream_page = linked
 
     diverge_locally(seeded_local)
-    _fetch(session, session.get(Site, local_page.site_pk), local_pwb, PAGE_2)
+    _fetch(session, session.get(Site, local_page.site_pk), local_pwb, SCRATCH_PAGE)
 
     reconcile_to_upstream(seeded_upstream, seeded_local)
-    _fetch(session, session.get(Site, local_page.site_pk), local_pwb, PAGE_2)
+    _fetch(session, session.get(Site, local_page.site_pk), local_pwb, SCRATCH_PAGE)
 
     reconciled_head = _head(session, local_page)
     assert_link(
