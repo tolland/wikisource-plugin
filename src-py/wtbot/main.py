@@ -12,6 +12,7 @@ from wtbot.api import (
     fetch,
     file_blob,
     health,
+    links,
     namespace,
     ocr,
     page_meta,
@@ -100,6 +101,7 @@ def create_app(
     app.include_router(commit_api.router)
     app.include_router(edit_journal.router)
     app.include_router(fetch.router)
+    app.include_router(links.router)
     app.include_router(file_blob.router)
     app.include_router(namespace.router)
     app.include_router(preview.router)

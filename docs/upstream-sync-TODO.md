@@ -158,15 +158,46 @@ differ.
 
 ### 5. RemoteLink proposal endpoint
 
-- [ ] `POST /links/propose { index_page_pk, remote_site_pk }` → proposed
-      revision pairs with confidence, plus the ones that could not be matched
-      and the reason (no counterpart, ambiguous, target not `normal`).
-      Confidence lives on the **proposal response only** — it is a property of
-      a guess, and `RemoteLink` stores no guesses.
-- [ ] `POST /links` to confirm one or many; `DELETE` to retract.
-- [ ] Title normalisation compares namespace *roles* resolved per site, never
-      numeric ids — `Page`/`Index` ids differ between installs.
-- [ ] Never auto-confirm. Proposals are proposals.
+Built: `wtbot.matching` + `POST /links/propose`, `POST /links`, `GET /links`,
+and `wtbot link propose|add|show`.
+
+- [x] `POST /links/propose { local, remote, index_title, remote_index_title? }`
+      → a proposal per page pair with an outcome, plus counts. Outcomes are
+      `same`, `quality_differs`, `diverged`, `no_counterpart`, `unfetched`,
+      `already_linked` — distinct because the ways a pairing fails need
+      different actions, and a boolean-plus-message loses which.
+- [x] `POST /links` to confirm one pair by title. `DELETE` to retract is still
+      absent, and stays absent while links are append-only.
+- [x] Title normalisation compares namespace *roles* resolved per site, never
+      numeric ids. Pages pair on **page number within the index** rather than
+      title text: `--to` exists because the titles can differ, and the scan
+      offset is what has to line up (§6). Title equality is only a fallback for
+      pages with no number.
+- [x] Never auto-confirm. `propose` writes nothing without `confirm`, and
+      `confirm_proposals` refuses a non-proposable pair rather than skipping it
+      — silently skipping is how "confirm everything that looked fine" creeps
+      back in.
+
+**Only heads are compared, and that is the answer to "which revision do we
+link".** Finding the revision in their history matching ours has no single
+answer: null and touch edits leave runs of byte-identical revisions (four in
+the Canadian patent fixture; en.wikisource ran a whole `Pywikibot touch edit`
+campaign in 2018), so a content match lands anywhere in the run with nothing
+to choose between members. The question is also one §2 already declined —
+remote history is append-only, there is no merge base to discover, the anchor
+is recorded on pull and re-established by hand when it breaks — and our
+revision store is deliberately sparse, so a walk would be bounded by our
+sampling rather than by the wiki's history. Heads have exactly one revision
+per side.
+
+Were a historical base ever wanted, the rule would be **the newest revision of
+a content-equal run**: every member is equally true, so the newest is the
+tightest claim, and an older anchor makes a page look diverged when it is not.
+
+"Same content" is decided by the content-model comparison, not by bytes or
+sha1: a `pagequality user=` names an account on one wiki, so equivalent
+transcriptions routinely differ. `metadata_significant` (same words, different
+level) is proposable but reported separately, because level is directional.
 
 ### 6. `Promotion` / `PromotionBatch` schema
 
