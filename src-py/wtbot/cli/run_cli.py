@@ -1,0 +1,43 @@
+import typer
+
+from wtbot.cli.callbacks import get_callback
+from wtbot.cli.commands import fetch_page, import_svg_annotations, show_config
+
+"""Typer CLI for wtbot. Thin demonstration of the wiki-access seam from the
+command line; the same WikiSettings injection works under tests and IntelliJ."""
+
+
+def create_app() -> typer.Typer:
+
+    callback = get_callback()
+
+    cli = typer.Typer(
+        help="wtbot — Wikisource editor backend",
+        add_completion=False,
+        no_args_is_help=True,
+        pretty_exceptions_enable=False,
+        pretty_exceptions_short=False,
+        # @TODO according to doc, this should work. but does not
+        # <https://typer.tiangolo.com/tutorial/commands/callback/#adding-a-callback-on-creation>
+        # callback=callback,
+    )
+
+    cli.callback()(callback)
+
+    cli.add_typer(fetch_page.app)
+    cli.add_typer(show_config.app)
+    cli.add_typer(import_svg_annotations.app)
+
+    return cli
+
+
+def run_cli() -> None:
+    app = create_app()
+
+    # debug inspection stuff goes here. e.g. start a pydevd and attach it
+
+    app()
+
+
+if __name__ == "__main__":
+    run_cli()
