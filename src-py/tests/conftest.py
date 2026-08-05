@@ -26,7 +26,7 @@ from wtbot.db import create_db_engine, init_db
 from wtbot.main import create_app
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-COMPOSE_FILE = REPO_ROOT / "docker-compose.yml"
+COMPOSE_FILE = REPO_ROOT / "compose.seeded.yml"
 
 # Re-exported: several tests import these from conftest, and wiki_harness owns
 # them so `python -m wiki_harness` builds the same fixture the tests assert on.
@@ -82,19 +82,12 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 
 @pytest.fixture(scope="session")
-def wiki_pair() -> WikiStack:
+def wiki_pair(pytestconfig: pytest.Config) -> Iterator[WikiStack]:
     """Two MediaWiki+ProofreadPage instances holding the same works.
 
     `upstream` stands in for en.wikisource.org, `local` for the staging wiki.
     Both seed themselves from the same compose anchor, so the pair starts
     *converged* and any difference between them was made on purpose.
-
-    Deliberately does **not** tear down, and does not wipe volumes first. The
-    stack is a thing you keep: a cold start installs two wikis and imports a
-    work into each, which is minutes, and destroying it after every run also
-    destroyed the only artifact worth looking at when something failed.
-    ``stack.up()`` is idempotent, so this is "make sure it is up", not "make
-    it". Remove it deliberately with ``python -m wiki_harness down``.
 
     The compose project comes from ``pair_config()`` so that
     ``python -m wiki_harness`` drives the very same containers.
@@ -103,11 +96,19 @@ def wiki_pair() -> WikiStack:
         pytest.skip("A running Docker daemon is required for the two-wiki harness")
 
     stack = WikiStack(pair_config())
+    reuse = pytestconfig.getoption("--reuse-wikisource")
+
+    if not reuse:
+        stack.down()
+
     try:
         stack.up()
     except (OSError, subprocess.CalledProcessError) as exc:
         pytest.fail(f"failed to start the two-wiki harness: {exc}")
-    return stack
+    yield stack
+
+    if not reuse:
+        stack.down()
 
 
 @pytest.fixture(scope="session")

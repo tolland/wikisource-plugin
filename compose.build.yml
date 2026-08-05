@@ -8,12 +8,13 @@ services:
       interval: 5s
       timeout: 5s
       retries: 24
-
     environment:
       MARIADB_DATABASE: mediawiki
       MARIADB_USER: mediawiki
       MARIADB_PASSWORD: mediawiki
       MARIADB_ROOT_PASSWORD: mediawiki-root
+    volumes:
+      - mediawiki-db-seed:/var/lib/mysql
 
   mediawiki:
     build:
@@ -46,4 +47,9 @@ services:
     ports:
       - "${WIKISOURCE_PORT:-8080}:80"
     volumes:
+      - mediawiki-images:/var/www/html/images
       - ./src-py/tests/fixtures:/fixtures:ro,z
+
+volumes:
+  mediawiki-db-seed:
+  mediawiki-images:

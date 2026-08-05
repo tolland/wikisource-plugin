@@ -19,9 +19,9 @@ timestamps, contributors and therefore sha1, which no API-level copy does.
 """
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-COMPOSE_FILE = REPO_ROOT / "docker-compose.yml"
+COMPOSE_FILE = REPO_ROOT / "compose.seeded.yml"
 
-# Container-side mount of src-py/tests/fixtures (see docker-compose.yml). The
+# Container-side mount of src-py/tests/fixtures (see compose.yml). The
 # wikis seed *themselves* from here at startup -- importDump and importImages
 # used to be driven from out here, one role at a time, which is exactly how the
 # two sides came to hold different content.

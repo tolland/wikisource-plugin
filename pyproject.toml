@@ -58,7 +58,7 @@ packages = ["src-py/wtbot", "src-py/ocrapi"]
 [tool.pytest.ini_options]
 pythonpath = ["src-py"]
 testpaths = ["src-py/tests"]
-addopts = "-ra -q --strict-markers -m 'not slow'"
+addopts = "-ra --strict-markers -m 'not slow'"
 markers = [
     "slow: marks a test as longrunning"
     ]

@@ -173,6 +173,7 @@ def test_baserevid_rejects_an_intervening_edit(
     assert excinfo.value.code == "editconflict"
 
 
+@pytest.mark.slow
 def test_basetimestamp_cannot_see_a_same_second_edit(
     local_promoter: WikiApi, local_bystander: WikiApi
 ) -> None:
