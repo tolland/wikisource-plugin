@@ -12,7 +12,7 @@
 #   docker compose --profile pair up -d     # both
 #
 # Run the pair under its own COMPOSE_PROJECT_NAME: MW_SERVER (and therefore the
-# port) is baked into LocalSettings.php at install time, so a volume installed
+# port) is baked into Wikisource.php at install time, so a volume installed
 # for one port must not be reused on another.
 #
 # A third, unrelated service (wikimedia-ocr, under the `ocr` profile) runs a
@@ -30,7 +30,7 @@ x-mediawiki-common: &mediawiki-common
     # The marker is written by start-wikisource *after* seeding and removed at
     # the top of every start, so `up --wait` cannot return while an import is
     # still running. Without it the extension check goes green as soon as
-    # LocalSettings.php exists and tests race the import.
+    # Wikisource.php exists and tests race the import.
     test:
       [
         "CMD-SHELL",

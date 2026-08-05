@@ -116,7 +116,7 @@ printf "running maintenance update\n"
 
 php maintenance/run.php update --quick
 
-for module in ISO_639 Message_box Yesno Proofreadpage_index_template; do
+for module in ISO_639 Message_box Yesno Proofreadpage_index_template Warning; do
   php maintenance/run.php edit \
     -u "$MW_ADMIN_USER" \
     -s "Install Wikisource modules" \

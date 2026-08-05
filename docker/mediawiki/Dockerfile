@@ -16,7 +16,19 @@ RUN set -eux; \
       /var/www/html/extensions/ProofreadPage; \
     git clone --depth 1 --branch "$PROOFREADPAGE_BRANCH" \
       https://gerrit.wikimedia.org/r/mediawiki/extensions/TemplateStyles \
-      /var/www/html/extensions/TemplateStyles
+      /var/www/html/extensions/TemplateStyles; \
+    git clone --depth 1 --branch "$PROOFREADPAGE_BRANCH" \
+      https://gerrit.wikimedia.org/r/mediawiki/extensions/Wikisource \
+      /var/www/html/extensions/Wikisource; \
+    git clone --depth 1 --branch "$PROOFREADPAGE_BRANCH" \
+      https://gerrit.wikimedia.org/r/mediawiki/extensions/JsonConfig \
+      /var/www/html/extensions/JsonConfig; \
+    git clone --depth 1 --branch "$PROOFREADPAGE_BRANCH" \
+      https://gerrit.wikimedia.org/r/mediawiki/extensions/CodeMirror \
+      /var/www/html/extensions/CodeMirror; \
+    git clone --depth 1 --branch "$PROOFREADPAGE_BRANCH" \
+      https://gerrit.wikimedia.org/r/mediawiki/extensions/LabeledSectionTransclusion \
+      /var/www/html/extensions/LabeledSectionTransclusion;
 
 COPY docker/mediawiki/start-wikisource.sh /usr/local/bin/start-wikisource
 COPY docker/mediawiki/run-wikisource.sh /usr/local/bin/run-wikisource

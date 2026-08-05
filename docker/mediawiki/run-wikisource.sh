@@ -84,49 +84,21 @@ if [ ! -f LocalSettings.php ]; then
     "$MW_SITE_NAME" \
     "$MW_ADMIN_USER"
 
+echo "cat out extra bit of LocalSettings"
+
   cat >> LocalSettings.php <<'PHP'
 
-// Minimal Wikisource-like configuration for e2e tests.
-define( 'NS_PAGE', 104 );
-define( 'NS_PAGE_TALK', 105 );
-define( 'NS_INDEX', 106 );
-define( 'NS_INDEX_TALK', 107 );
+foreach (glob("LocalSettings.d/*.php") as $filename)
+{
+    include $filename;
+}
 
-$wgExtraNamespaces[NS_PAGE] = 'Page';
-$wgExtraNamespaces[NS_PAGE_TALK] = 'Page_talk';
-$wgExtraNamespaces[NS_INDEX] = 'Index';
-$wgExtraNamespaces[NS_INDEX_TALK] = 'Index_talk';
-
-$wgProofreadPageNamespaceIds = [
-    'page' => NS_PAGE,
-    'index' => NS_INDEX,
-];
-
-$wgEnableUploads = true;
-$wgGroupPermissions['*']['edit'] = true;
-$wgGroupPermissions['*']['createpage'] = true;
-$wgGroupPermissions['*']['createtalk'] = true;
-
-// DjVu scans: required for Index: pagination and page-image reference scans.
-$wgFileExtensions[] = 'djvu';
-// $wgDjvuDump = 'djvutoxml';
-$wgDjvuDump = "djvudump";
-$wgDjvuRenderer = 'ddjvu';
-$wgDjvuTxt = 'djvutxt';
-$wgDjvuPostProcessor = "pnmtojpeg";
-$wgDjvuOutputExtension = 'jpg';
-
-// Imports (Special:Import / importDump.php) are how test fixtures are seeded
-// with real revision history.
-$wgGroupPermissions['sysop']['import'] = true;
-$wgGroupPermissions['sysop']['importupload'] = true;
-
-wfLoadExtension( 'ProofreadPage' );
-wfLoadExtension( 'TemplateStyles' );
-wfLoadExtension( 'ParserFunctions' );
-wfLoadExtension( 'Scribunto' );
 PHP
+
+echo "END OF cat out extra bit of LocalSettings"
 fi
+
+sleep 1
 
 printf "running maintenance update\n"
 
@@ -136,7 +108,7 @@ php maintenance/run.php update --quick
 # Content seeding. Guarded on the database so a warm volume restarts fast and,
 # more importantly, so a restart cannot stack extra revisions onto pages whose
 # revision counts the tests assert on.
-if [ -n "$SEED_DUMPS$SEED_SCANS" ] && ! already_seeded; then
+if [ -n "$SEED_DUMPS$SEED_SCANS" ] ; then
 
   # Burn revision ids before importing anything real. Both wikis install the
   # same modules in the same order from empty, so without this they assign the
@@ -182,5 +154,7 @@ fi
 
 
 touch "$READY_MARKER"
+
+chown www-data:www-data /tmp/scribunto.log || true
 
 exec apache2-foreground

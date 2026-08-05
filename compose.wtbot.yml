@@ -7,6 +7,9 @@
 #   docker compose -f compose.yml -f compose.wtbot.yml \
 #       --profile api up -d --wait
 #
+# The viewer is available at http://localhost:18584 by default. Set
+# WTBOT_VIEWER_PORT to publish it on a different host port.
+#
 # A separate file rather than a copy in each base, because the two bases
 # already duplicate the MediaWiki services between them and that is the part
 # that drifts. One definition, composed with whichever base is wanted.
@@ -53,6 +56,37 @@ services:
           "python",
           "-c",
           "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  viewer:
+    profiles: ["api"]
+    build:
+      context: .
+      dockerfile: docker/viewer/Dockerfile
+    depends_on:
+      wtbot:
+        condition: service_healthy
+    environment:
+      # The browser calls the viewer at /api; Vite proxies those requests over
+      # the Compose network rather than trying to reach wtbot via localhost.
+      WTBOT_API_URL: "http://wtbot:8000"
+    ports:
+      - "${WTBOT_VIEWER_PORT:-18584}:5173"
+    volumes:
+      # Keep application edits hot-reloadable without hiding the dependencies
+      # installed in the image at /app/node_modules.
+      - ./viewer/src:/app/src:ro,z
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:5173').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))",
         ]
       interval: 5s
       timeout: 5s

@@ -5,11 +5,15 @@ x-mediawiki-common: &mediawiki-common
   build:
     context: .
     dockerfile: docker/mediawiki/Dockerfile
+  volumes:
+    - mediawiki-local-images:/var/www/html/images
+    - ./src-py/tests/fixtures:/fixtures:ro,z
+    - ./docker/mediawiki/Wikisource.php:/var/www/html/LocalSettings.d/Wikisource.php:z,ro
   healthcheck:
     # The marker is written by start-wikisource *after* seeding and removed at
     # the top of every start, so `up --wait` cannot return while an import is
     # still running. Without it the extension check goes green as soon as
-    # LocalSettings.php exists and tests race the import.
+    # Wikisource.php exists and tests race the import.
     test:
       [
         "CMD-SHELL",
@@ -79,15 +83,12 @@ services:
       MW_DB_USER: mediawiki
       MW_LANG: en
       MW_SCRIPT_PATH: ""
-      MW_SERVER: "http://localhost:${WIKISOURCE_PORT:-8080}"
+      MW_SERVER: "http://localhost:${WIKISOURCE_PORT:-18581}"
       MW_SITE_NAME: "${WIKISOURCE_SITE_NAME:-Test Wikisource}"
       <<: *seed-env
       SEED_REVID_BURN: "0"
     ports:
-      - "${WIKISOURCE_PORT:-8080}:80"
-    volumes:
-      - mediawiki-images:/var/www/html/images
-      - ./src-py/tests/fixtures:/fixtures:ro,z
+      - "${WIKISOURCE_PORT:-18581}:80"
 
 
   seed-restore-local:
@@ -136,9 +137,6 @@ services:
       SEED_REVID_BURN: "${SEED_REVID_BURN-7}"
     ports:
       - "${WIKISOURCE_LOCAL_PORT:-18582}:80"
-    volumes:
-      - mediawiki-local-images:/var/www/html/images
-      - ./src-py/tests/fixtures:/fixtures:ro,z
 
   wikimedia-ocr:
     profiles: ["ocr"]
