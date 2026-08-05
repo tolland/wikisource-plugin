@@ -1,5 +1,6 @@
 import logging
 from dataclasses import replace
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
@@ -8,6 +9,7 @@ from wtbot.wiki.wiki_types import (
     EditConflict,
     IndexPageEntry,
     PageNotFound,
+    RemoteChange,
     RemoteFileInfo,
     RemotePage,
     RemotePageImages,
@@ -73,6 +75,24 @@ class WikiClient(Protocol):
     def download_file(self, title: str, dest: Path) -> Path: ...
 
     def get_namespaces(self): ...  # returns pwb NamespacesDict or None
+
+    def recent_changes(
+        self,
+        *,
+        since: datetime,
+        namespace_keys: list[int] | None = None,
+        limit: int = 5000,
+    ) -> list[RemoteChange]: ...
+
+    def oldest_retained_change(self) -> datetime | None:
+        """The oldest entry recentchanges still holds, or None if empty.
+
+        The recentchanges table is pruned (``$wgRCMaxAge``, 90 days by
+        default), so "nothing changed since X" is indistinguishable from "X is
+        older than the wiki remembers" unless you ask. Asking is one request
+        and turns a silent wrong answer into a fallback.
+        """
+        ...
 
     def save_page(
         self,
@@ -387,6 +407,103 @@ class PywikibotClient:
             script_path=self.site.scriptpath(),
         )
 
+    def recent_changes(
+        self,
+        *,
+        since: datetime,
+        namespace_keys: list[int] | None = None,
+        limit: int = 5000,
+    ) -> list[RemoteChange]:
+        """Entries newer than ``since``, oldest first, following continuation.
+
+        ``rcstart`` is inclusive and we scan forwards, so a caller that stores
+        the newest timestamp seen and passes it back re-reads that instant's
+        entries rather than risking a gap. Refetching a page is idempotent;
+        missing one is not.
+
+        There is no ``rcprefix`` -- ``rctitle`` filters to a single page -- so
+        narrowing to one work is the caller's job, done on titles we already
+        hold. That is a client-side filter over cheap metadata, not a page
+        fetch per candidate.
+        """
+        params: dict[str, str] = {
+            "action": "query",
+            "list": "recentchanges",
+            "rcdir": "newer",
+            "rcstart": _api_timestamp(since),
+            # Deliberately not `log`: moves and deletions are real sync events
+            # (see docs/upstream-sync-discussion.md section 5) but they need
+            # list=logevents to read properly, and half-reading them here would
+            # look like coverage. Edits and creations only.
+            "rctype": "edit|new",
+            "rcprop": "title|ids|timestamp",
+            "rclimit": str(limit),
+        }
+        if namespace_keys:
+            params["rcnamespace"] = "|".join(str(key) for key in sorted(namespace_keys))
+
+        changes: list[RemoteChange] = []
+        while True:
+            data = self.site.simple_request(**params).submit()
+            for entry in data.get("query", {}).get("recentchanges", []):
+                change = _change_from_api(entry)
+                if change is not None:
+                    changes.append(change)
+            cont = data.get("continue", {}).get("rccontinue")
+            if not cont:
+                return changes
+            params["rccontinue"] = cont
+
+    def oldest_retained_change(self) -> datetime | None:
+        data = self.site.simple_request(
+            action="query",
+            list="recentchanges",
+            rcdir="newer",
+            rclimit="1",
+            rcprop="timestamp",
+        ).submit()
+        entries = data.get("query", {}).get("recentchanges", [])
+        if not entries:
+            return None
+        return _parse_api_timestamp(entries[0].get("timestamp"))
+
+
+def _api_timestamp(moment: datetime) -> str:
+    """MediaWiki's ISO-8601-with-Z form, always in UTC.
+
+    A naive datetime is treated as UTC rather than local: every timestamp this
+    codebase stores is UTC (see wtbot.timeutil), and guessing the local zone
+    here would silently shift the window.
+    """
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _parse_api_timestamp(value) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def _change_from_api(entry: dict) -> RemoteChange | None:
+    timestamp = _parse_api_timestamp(entry.get("timestamp"))
+    title = entry.get("title")
+    if timestamp is None or not title:
+        return None
+    return RemoteChange(
+        title=title,
+        timestamp=timestamp,
+        kind=entry.get("type", "edit"),
+        pageid=entry.get("pageid") or None,
+        revid=entry.get("revid") or None,
+        old_revid=entry.get("old_revid") or None,
+        namespace_key=entry.get("ns"),
+    )
+
 
 class FakeWikiClient:
     """Network-free WikiClient backed by in-memory dicts."""
@@ -398,12 +515,21 @@ class FakeWikiClient:
         page_images: dict[str, RemotePageImages] | None = None,
         index_pages: dict[str, list[IndexPageEntry]] | None = None,
         default_contents: dict[str, str] | None = None,
+        changes: list[RemoteChange] | None = None,
+        oldest_change: datetime | None = None,
     ):
         self._pages = dict(pages or {})
         self._files = dict(files or {})
         self._page_images = dict(page_images or {})
         self._index_pages = dict(index_pages or {})
         self._default_contents = dict(default_contents or {})
+        self._changes = sorted(changes or [], key=lambda c: c.timestamp)
+        # The retention horizon is set independently of `changes`, because on a
+        # real wiki the two are unrelated: recentchanges holds every namespace's
+        # entries, while `changes` stands for the handful matching a filter.
+        # Deriving one from the other would make every fixture look pruned.
+        # None means "holds everything", which is the case most tests want.
+        self._oldest_change = oldest_change
 
     def get_page(self, title: str) -> RemotePage:
         try:
@@ -459,6 +585,22 @@ class FakeWikiClient:
 
     def get_namespaces(self):
         return None
+
+    def recent_changes(
+        self,
+        *,
+        since: datetime,
+        namespace_keys: list[int] | None = None,
+        limit: int = 5000,
+    ) -> list[RemoteChange]:
+        # `since` inclusive, mirroring rcstart.
+        selected = [c for c in self._changes if c.timestamp >= since]
+        if namespace_keys:
+            selected = [c for c in selected if c.namespace_key in set(namespace_keys)]
+        return selected[:limit]
+
+    def oldest_retained_change(self) -> datetime | None:
+        return self._oldest_change
 
     def save_page(
         self,

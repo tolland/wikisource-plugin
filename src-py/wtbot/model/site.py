@@ -27,4 +27,16 @@ class Site(SQLModel, table=True):
     api_url: str | None = None  # full action=... endpoint
     label: str | None = None  # human-readable, for the IDE ('Local', 'en.wikisource')
 
+    changes_seen_through: datetime | None = None
+    """Newest ``recentchanges`` timestamp we have acted on for this site.
+
+    The watermark an incremental refresh resumes from (see wtbot.incremental).
+    Stored per site because it is a position in *that* wiki's change stream --
+    two wikis holding the same work have unrelated ones.
+
+    None means "never refreshed incrementally", which is not the same as "no
+    changes": it downgrades the next plan to a full pass rather than letting an
+    empty answer read as up to date.
+    """
+
     created_at: datetime = Field(default_factory=utcnow)

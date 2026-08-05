@@ -90,18 +90,52 @@ Numbered as originally listed; items 1 (`RemoteLink`) and 3
 
 ### 2. Incremental fetch
 
-Refresh a curated subset without refetching everything.
+Refresh a curated subset without refetching everything. Built on
+`list=recentchanges` rather than the `probe_pages` sketch below, and it is
+*planning* only: the titles it produces go to the ordinary fetch queue, so
+there is one fetch mechanism and a shorter list — not a second path.
 
-- [ ] `WikiClient.probe_pages(titles) -> dict[str, PageProbe]` over
-      `prop=revisions&rvprop=ids|timestamp|user`, 50 titles per request; missing
-      titles come back in `query.missing`.
-- [ ] Fetch only pages whose revid differs from the one behind
-      `Page.latest_revision_pk`. A 400-page work becomes ~8 calls plus the pages
-      that actually moved.
-- [ ] **A changed revid is not a changed page.** Null and touch edits bump the
+`POST /fetch/refresh { family, code, title_prefix?, since?, dry_run? }` →
+`wtbot.incremental.plan_refresh`.
+
+- [x] **The recentchanges table is pruned** (`$wgRCMaxAge`, 90 days by
+      default). Past that horizon "nothing changed" and "the wiki no longer
+      remembers" are the same empty response — so the oldest retained entry is
+      asked for (one request), and a watermark older than it downgrades the
+      plan to a full pass. The result carries its `basis`
+      (`incremental` | `full`) and the reason: a caller that cannot tell the
+      two apart cannot tell "two pages moved" from "we gave up and listed
+      everything".
+- [x] **The watermark is the newest change seen, not `now`.** An edit saved
+      during the query can carry a timestamp earlier than the moment we
+      finished reading. `rcstart` is inclusive, so passing the observed maximum
+      back re-reads that instant — duplicates, which a fetch absorbs, rather
+      than a gap, which it does not. Stored per site
+      (`Site.changes_seen_through`), advanced only on an incremental plan.
+- [x] **Namespace ids are per-site**, so the `rcnamespace` filter is resolved
+      from this site's `Namespace` rows by role. An unresolved table sends no
+      filter at all: an empty `rcnamespace` matches nothing, which looks
+      exactly like a wiki where nothing ever changes.
+- [x] **A changed revid is not a changed page.** Null and touch edits bump the
       revid with identical content (four such in the Canadian patent fixture).
-      Decide "diverged" from the content comparison after fetching, or every
-      upstream maintenance run shows up as a false conflict.
+      This produces candidates, never verdicts; "diverged" comes from the
+      content comparison after fetching, or every upstream maintenance run
+      shows up as a false conflict.
+- [x] There is no `rcprefix` — `rctitle` filters to a *single* page — so
+      narrowing to one work is done here, over metadata already paid for. With
+      a prefix, titles we do not yet hold are taken too: that is how a
+      partially transcribed index grows.
+
+Not covered, and deliberately not half-covered:
+
+- [ ] **Moves and deletions.** They are `log` entries needing
+      `list=logevents`, and discussion §5 wants them *classified*
+      (`redirect`/`deleted`/`moved`), not merely noticed. `rctype` stays
+      `edit|new` so the gap is visible rather than apparently handled.
+- [ ] `probe_pages(titles)` over `prop=revisions`, 50 titles per request, as
+      the complement: bounded by the size of the work rather than by wiki
+      activity, and with no retention horizon. Worth having for the "watermark
+      is ancient" path, which currently refetches everything known.
 - [ ] This is for *planning*, not safety. The `baserevid` precondition covers
       the race between fetch and push; they are complementary.
 
