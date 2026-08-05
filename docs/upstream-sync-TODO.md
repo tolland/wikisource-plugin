@@ -208,7 +208,7 @@ weaker claim, for a fact that was known at the moment of the import.
 
 **The base state belongs to compose, the deltas to the tests.** Both wikis seed
 themselves at startup from one shared anchor (`SEED_DUMPS`/`SEED_SCANS` in
-`docker-compose.yml` → `docker/mediawiki/start-wikisource.sh`), so the pair
+`../compose.yml` → `docker/mediawiki/start-wikisource.sh`), so the pair
 starts *converged* — same works, same history, same content — because the two
 services are configured identically, not because a builder remembered to run
 twice. That was a real bug: only upstream was ever seeded, so every "diverged"

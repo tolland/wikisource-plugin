@@ -45,6 +45,12 @@ def wiki_client() -> RecordingWikiClient:
 
 @pytest.fixture
 def preview_client(engine, wiki_client) -> TestClient:
+    """
+    yield the TestClient with the FastApi app embedded in it
+    :param engine:
+    :param wiki_client:
+    :return:
+    """
     app = create_app(engine=engine, client_factory=lambda site: wiki_client)
     with Session(engine) as s:
         site = Site(family=FAMILY, code=CODE)

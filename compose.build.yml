@@ -1,0 +1,49 @@
+---
+
+services:
+  db:
+    image: mariadb:11.4
+    healthcheck:
+      test: [ "CMD", "healthcheck.sh", "--connect", "--innodb_initialized" ]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+
+    environment:
+      MARIADB_DATABASE: mediawiki
+      MARIADB_USER: mediawiki
+      MARIADB_PASSWORD: mediawiki
+      MARIADB_ROOT_PASSWORD: mediawiki-root
+
+  mediawiki:
+    build:
+      context: .
+      dockerfile: docker/mediawiki/Dockerfile
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "php /var/www/html/maintenance/run.php eval 'exit(ExtensionRegistry::getInstance()->isLoaded(\"ProofreadPage\") ? 0 : 1);'",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      MW_ADMIN_PASSWORD: "${MW_ADMIN_PASSWORD:-AdminPassword123!}"
+      MW_ADMIN_USER: "${MW_ADMIN_USER:-Admin}"
+      MW_DB_HOST: db
+      MW_DB_NAME: mediawiki
+      MW_DB_PASSWORD: mediawiki
+      MW_DB_USER: mediawiki
+      MW_LANG: en
+      MW_SCRIPT_PATH: ""
+      MW_SERVER: "http://localhost:${WIKISOURCE_PORT:-8080}"
+      MW_SITE_NAME: "${WIKISOURCE_SITE_NAME:-Test Wikisource}"
+    ports:
+      - "${WIKISOURCE_PORT:-8080}:80"
+    volumes:
+      - ./src-py/tests/fixtures:/fixtures:ro,z
