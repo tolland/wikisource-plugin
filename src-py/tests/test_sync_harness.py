@@ -46,6 +46,50 @@ def test_seeded_upstream_has_the_work_and_its_scan(seeded_upstream: WikiApi) -> 
 
 
 @pytest.mark.slow
+def test_the_pair_starts_converged(
+    seeded_upstream: WikiApi, seeded_local: WikiApi
+) -> None:
+    """Both wikis seed themselves from the same compose anchor, so the pair
+    begins as a mirror and any difference is one a test made.
+
+    This is the invariant whose absence made "diverged" meaningless: only
+    upstream was ever seeded, so the local side held a lone Page: with no
+    Index:, no File:, and one revision.
+    """
+    for api, role in ((seeded_upstream, "upstream"), (seeded_local, "local")):
+        assert api.exists(CANADIAN_PATENT_INDEX), role
+        assert api.exists(CANADIAN_PATENT_SCAN), role
+        assert api.list_index_pages(CANADIAN_PATENT_INDEX), role
+
+    assert seeded_upstream.page_text(PAGE_2) == seeded_local.page_text(PAGE_2)
+    assert len(seeded_upstream.revisions(PAGE_2, limit=50)) == len(
+        seeded_local.revisions(PAGE_2, limit=50)
+    )
+
+
+@pytest.mark.slow
+def test_the_two_wikis_do_not_agree_on_revision_ids(
+    seeded_upstream: WikiApi, seeded_local: WikiApi
+) -> None:
+    """Same content, different revids -- on purpose.
+
+    Two wikis installed from empty and seeded in the same order would otherwise
+    assign the *same* revids to the same pages, and a bug that compared revids
+    across sites would pass here while failing against real wikis. ``local``
+    burns a few ids first (``SEED_REVID_BURN``) so that mistake fails loudly in
+    the fixture instead.
+    """
+    upstream_revids = {rev.revid for rev in seeded_upstream.revisions(PAGE_2, limit=50)}
+    local_revids = {rev.revid for rev in seeded_local.revisions(PAGE_2, limit=50)}
+
+    assert upstream_revids
+    assert not (upstream_revids & local_revids), (
+        "the two wikis assigned overlapping revids; SEED_REVID_BURN did not take "
+        "effect, and cross-site revid comparison would pass here undetected"
+    )
+
+
+@pytest.mark.slow
 def test_import_preserves_revision_history(seeded_upstream: WikiApi) -> None:
     """Depth of history and attribution must survive the import -- an API-level
     copy would flatten both."""

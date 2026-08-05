@@ -1,20 +1,26 @@
 from dataclasses import dataclass
 
 from wiki_harness.api import WikiApi
-from wiki_harness.stack import WikiStack
 
-"""Named cross-wiki situations, built on the two-wiki harness.
+"""Deltas applied to the two-wiki harness, and the assertion that its base is
+what it claims to be.
 
-These exist twice over: as the setup for the sync tests, and as something a
-human can stand up and click around in (``python -m wiki_harness``). Keeping
-one definition means the thing being debugged by hand is the same thing CI
-asserts against -- a scenario that only exists inside a test body cannot be
-reproduced when it fails, and a fixture that only exists in a shell script
-drifts from what is tested.
+The **base state** -- two wikis holding the same works, imported with real
+revision history -- is built by the containers themselves from ``SEED_DUMPS``/
+``SEED_SCANS`` (see docker/mediawiki/start-wikisource.sh). Both wikis read the
+same compose anchor, so they are identical because they are configured
+identically, not because a builder out here remembered to run twice. That is
+what this module used to get wrong: it seeded upstream only, and every "the two
+sides diverged" fixture was really "the two sides were never the same".
 
-Every builder is idempotent: run it twice and the second run is a no-op, so a
-reused stack (``--reuse-wikisource``) does not accumulate revisions and quietly
-break the tests that count them.
+What is left here is the **deltas** -- the differences a test deliberately
+creates. They are ordinary functions, not a scenario enum with a chain of
+conditionals: a test that wants divergence calls ``diverge_locally`` and says so
+in one line, rather than naming a scenario whose meaning has to be traced
+through fallthroughs.
+
+Every delta is idempotent, so a reused stack does not accumulate revisions the
+tests count.
 """
 
 CANADIAN_PATENT_INDEX = "Index:Canadian patent 29537.djvu"
@@ -23,8 +29,12 @@ CANADIAN_PATENT_DUMP = "Canadian_patent_29537_all.xml"
 PAGE_2 = "Page:Canadian patent 29537.djvu/2"
 
 # Marks a body this harness wrote, so an idempotency check can tell "already
-# built" from "someone edited it".
+# applied" from "someone edited it".
 LOCAL_EDIT_MARKER = "<!-- harness: local divergence -->"
+
+
+class NotSeeded(RuntimeError):
+    """The wiki is up but does not hold the works the harness expects."""
 
 
 @dataclass(frozen=True)
@@ -36,41 +46,45 @@ class CopiedWork:
     local_revid: int
 
 
-def seed_upstream_work(stack: WikiStack, upstream: WikiApi) -> None:
-    """Load the real Canadian patent work into the upstream wiki.
+def assert_seeded(api: WikiApi, *, role: str = "wiki") -> WikiApi:
+    """Fail loudly if a wiki came up without its content.
 
-    Imported rather than API-written: importDump preserves each revision's
-    text, timestamp and contributor, and therefore its sha1. An API copy would
-    flatten the history to a single revision, which is precisely the property
-    the sync tests need to be real.
+    Seeding is the container's job now, so a test's only responsibility is to
+    notice when it did not happen -- and to say why rather than failing later
+    on a missing page. The usual cause is a stack started with ``SEED_DUMPS``
+    blanked, or one whose healthcheck was bypassed while an import was still
+    running.
     """
-    if upstream.exists(CANADIAN_PATENT_INDEX):
-        return
-    stack.import_scans("upstream", extension="djvu")
-    stack.import_dump("upstream", CANADIAN_PATENT_DUMP)
-    stack.rebuild_links("upstream")
+    if not api.exists(CANADIAN_PATENT_INDEX):
+        raise NotSeeded(
+            f"{role} does not hold {CANADIAN_PATENT_INDEX}. Start the pair with "
+            "`docker compose --profile pair up -d --wait` and check SEED_DUMPS."
+        )
+    return api
 
 
 def copy_page_to_local(
     upstream: WikiApi, local: WikiApi, title: str = PAGE_2
 ) -> CopiedWork:
-    """Copy one page's *current* body upstream -> local, as a fresh creation.
+    """Replace the local page with an API-level copy of upstream's head.
 
-    This is the API-level copy on purpose, not an import: it is what a
-    downward promotion would do, and it is the case where the two sides hold
-    the same transcription under different attribution. ProofreadPage rewrites
-    ``pagequality user=`` to the saving account, so the local copy is expected
-    to differ from its source in exactly that field -- which is the whole
-    reason correspondence is asserted rather than hashed.
+    Deletes first, so this is a *creation* even against the seeded base: the
+    point is to produce what a downward promotion produces -- one revision
+    instead of a history, and ``pagequality user=`` reattributed to the saving
+    account -- rather than the imported mirror, which is identical on both
+    sides by construction. Those are different situations and the tests need
+    both.
     """
     body = upstream.page_text(title)
     if body is None:
-        raise RuntimeError(f"{title} does not exist upstream; seed it first")
+        raise NotSeeded(f"{title} does not exist upstream")
 
-    if not local.exists(title):
-        local.edit(
-            title, body, summary="harness: copied from upstream", createonly=True
-        )
+    local_history = local.revisions(title, limit=2)
+    already_flattened = len(local_history) == 1
+    if not already_flattened:
+        if local.exists(title):
+            local.delete(title, reason="harness: replacing with an API-level copy")
+        local.edit(title, body, summary="harness: copied from upstream")
 
     return CopiedWork(
         title=title,
@@ -87,7 +101,7 @@ def diverge_locally(local: WikiApi, title: str = PAGE_2) -> int:
     """
     revisions = local.revisions(title, limit=1, with_content=True)
     if not revisions:
-        raise RuntimeError(f"{title} does not exist locally; copy it first")
+        raise NotSeeded(f"{title} does not exist locally")
     head = revisions[0]
     if LOCAL_EDIT_MARKER in (head.content or ""):
         return head.revid
@@ -107,7 +121,7 @@ def reconcile_to_upstream(
     """
     body = upstream.page_text(title)
     if body is None:
-        raise RuntimeError(f"{title} does not exist upstream")
+        raise NotSeeded(f"{title} does not exist upstream")
     local_head = local.revisions(title, limit=1, with_content=True)[0]
     if local_head.content == body:
         return local_head.revid

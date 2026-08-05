@@ -12,7 +12,39 @@ set -euo pipefail
 : "${MW_SERVER:=http://localhost:8080}"
 : "${MW_SITE_NAME:=Test Wikisource}"
 
+# --- seeding ---------------------------------------------------------------
+# A wiki seeds itself from these, rather than being seeded from outside once it
+# is up. Two wikis given the same values are then identical *because they are
+# configured identically*, which is a property compose can guarantee and a
+# script that has to remember to do both sides cannot.
+: "${SEED_SCANS:=}"       # file extension for importImages, e.g. 'djvu'
+: "${SEED_DUMPS:=}"       # space-separated XML dumps under /fixtures/scans
+: "${SEED_REVID_BURN:=0}" # throwaway revisions, to desynchronise revids
+
+# Written last, removed first: the healthcheck waits on it so that
+# `compose up --wait` cannot return while an import is still running.
+READY_MARKER=/var/www/html/images/.harness-ready
+
 cd /var/www/html
+
+rm -f "$READY_MARKER"
+
+mw_sql() {
+  MYSQL_PWD="$MW_DB_PASSWORD" mysql \
+    --host="$MW_DB_HOST" \
+    --user="$MW_DB_USER" \
+    --database="$MW_DB_NAME" \
+    --skip-column-names --batch --execute="$1"
+}
+
+already_seeded() {
+  # Asked of the database rather than a file, because the database is what the
+  # persistent volume holds -- a marker file could survive a wiped database or
+  # vice versa, and either way round the wiki would come up subtly wrong.
+  local count
+  count="$(mw_sql 'SELECT COUNT(*) FROM page WHERE page_namespace = 106' || echo 0)"
+  [ "${count:-0}" -gt 0 ]
+}
 
 until mysqladmin ping \
   --host="$MW_DB_HOST" \
@@ -84,35 +116,67 @@ printf "running maintenance update\n"
 
 php maintenance/run.php update --quick
 
-# @TODO replace with loop over module names
-php maintenance/run.php edit \
-  -u Admin \
-  -s "Install Wikisource modules" \
-  "Module:ISO_639" \
-  < /bootstrap/modules/ISO_639.lua
+for module in ISO_639 Message_box Yesno Proofreadpage_index_template; do
+  php maintenance/run.php edit \
+    -u "$MW_ADMIN_USER" \
+    -s "Install Wikisource modules" \
+    "Module:${module}" \
+    < "/bootstrap/modules/${module}.lua"
+done
 
 php maintenance/run.php edit \
-  -u Admin \
-  -s "Install Wikisource modules" \
-  "Module:Message_box" \
-  < /bootstrap/modules/Message_box.lua
-
-php maintenance/run.php edit \
-  -u Admin \
-  -s "Install Wikisource modules" \
-  "Module:Yesno" \
-  < /bootstrap/modules/Yesno.lua
-
-php maintenance/run.php edit \
-  -u Admin \
-  -s "Install Wikisource modules" \
-  "Module:Proofreadpage_index_template" \
-  < /bootstrap/modules/Proofreadpage_index_template.lua
-
-php maintenance/run.php edit \
-  -u Admin \
+  -u "$MW_ADMIN_USER" \
   -s "Install ProofreadPage configuration" \
   "MediaWiki:Proofreadpage_index_data_config.json" \
   < /bootstrap/mediawiki/Proofreadpage_index_data_config.json
+
+# Content seeding. Guarded on the database so a warm volume restarts fast and,
+# more importantly, so a restart cannot stack extra revisions onto pages whose
+# revision counts the tests assert on.
+if [ -n "$SEED_DUMPS$SEED_SCANS" ] && ! already_seeded; then
+
+  # Burn revision ids before importing anything real. Both wikis install the
+  # same modules in the same order from empty, so without this they assign the
+  # *same* revids to the same content -- and a bug that compared revids across
+  # sites would pass here while failing against real wikis, which is precisely
+  # the mistake site-local ids exist to make impossible. Wasting a few ids on
+  # one side makes that bug fail loudly in the fixture instead.
+  i=1
+  while [ "$i" -le "$SEED_REVID_BURN" ]; do
+    printf 'Revid burn %s.\n' "$i" \
+      | php maintenance/run.php edit \
+          -u "$MW_ADMIN_USER" \
+          -s "harness: revid burn $i" \
+          "Project:Harness revid burn"
+    i=$((i + 1))
+  done
+
+  if [ -n "$SEED_SCANS" ]; then
+    printf 'importing scans (*.%s)\n' "$SEED_SCANS"
+    # importImages derives each File: title from the filename (underscores
+    # become spaces), which is how the dumps' File: references resolve.
+    php maintenance/run.php importImages \
+      --comment="harness scan import" \
+      "--extensions=$SEED_SCANS" \
+      /fixtures/scans
+  fi
+
+  for dump in $SEED_DUMPS; do
+    printf 'importing dump %s\n' "$dump"
+    # --no-updates skips link/category table updates, which rebuildall does in
+    # one pass below; importDump preserves each revision's text, timestamp and
+    # contributor, which an API-level copy would flatten to a single revision.
+    php maintenance/run.php importDump --no-updates "/fixtures/scans/$dump"
+  done
+
+  if [ -n "$SEED_DUMPS" ]; then
+    # ProofreadPage's Index: pagination needs the link tables --no-updates left
+    # empty.
+    printf 'rebuilding link tables\n'
+    php maintenance/run.php rebuildall
+  fi
+fi
+
+touch "$READY_MARKER"
 
 exec apache2-foreground

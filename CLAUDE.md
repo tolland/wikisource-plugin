@@ -49,9 +49,11 @@ uv run pytest                              # run Python tests (uses pythonpath=s
 uv run pytest src-py/tests/test_fetch.py -k some_case  # single test
 uv run pytest -m slow                      # incl. the docker-backed harness suites (deselected by default)
 
-# Stand the two-wiki sync harness up by hand and hold it open until Ctrl-C.
-# Same compose project and scenario builders the slow tests use.
-PYTHONPATH=src-py/tests uv run python -m wiki_harness --scenario diverged
+# The two-wiki sync harness. Both wikis seed themselves from the same compose
+# anchor (SEED_DUMPS/SEED_SCANS), so the pair starts converged; `--wait` blocks
+# until seeding is done. `up`/`status`/`down` is a convenience wrapper on it.
+docker compose --profile pair up -d --wait
+PYTHONPATH=src-py/tests uv run python -m wiki_harness status
 uv run ruff check --fix                    # lint (mirrors the pre-commit hook)
 uv run black .                             # format (mirrors the pre-commit hook)
 ```

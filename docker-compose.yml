@@ -27,15 +27,29 @@ x-mediawiki-common: &mediawiki-common
     context: .
     dockerfile: docker/mediawiki/Dockerfile
   healthcheck:
+    # The marker is written by start-wikisource *after* seeding and removed at
+    # the top of every start, so `up --wait` cannot return while an import is
+    # still running. Without it the extension check goes green as soon as
+    # LocalSettings.php exists and tests race the import.
     test:
       [
         "CMD-SHELL",
-        "php /var/www/html/maintenance/run.php eval 'exit(ExtensionRegistry::getInstance()->isLoaded(\"ProofreadPage\") ? 0 : 1);'",
+        "test -f /var/www/html/images/.harness-ready && php /var/www/html/maintenance/run.php eval 'exit(ExtensionRegistry::getInstance()->isLoaded(\"ProofreadPage\") ? 0 : 1);'",
       ]
     interval: 10s
     timeout: 10s
-    retries: 30
+    # A cold start installs MediaWiki, imports a scan and a dump, then runs
+    # rebuildall -- minutes, not seconds. A warm volume skips all of it.
+    retries: 60
     start_period: 30s
+
+# Content, as distinct from services. Both wikis reference this one anchor, so
+# they hold the same works because they are configured identically rather than
+# because something remembered to seed both. Blank it to get bare wikis:
+#   SEED_DUMPS= SEED_SCANS= docker compose --profile pair up -d --wait
+x-seed-env: &seed-env
+  SEED_SCANS: "${SEED_SCANS-djvu}"
+  SEED_DUMPS: "${SEED_DUMPS-Canadian_patent_29537_all.xml}"
 
 x-db-common: &db-common
   image: mariadb:11.4
@@ -74,6 +88,8 @@ services:
       MW_SCRIPT_PATH: ""
       MW_SERVER: "http://localhost:${WIKISOURCE_PORT:-8080}"
       MW_SITE_NAME: "${WIKISOURCE_SITE_NAME:-Test Wikisource}"
+      <<: *seed-env
+      SEED_REVID_BURN: "0"
     ports:
       - "${WIKISOURCE_PORT:-8080}:80"
     volumes:
@@ -113,6 +129,11 @@ services:
       MW_SCRIPT_PATH: ""
       MW_SERVER: "http://localhost:${WIKISOURCE_LOCAL_PORT:-18582}"
       MW_SITE_NAME: "${WIKISOURCE_LOCAL_SITE_NAME:-Test Wikisource (local)}"
+      <<: *seed-env
+      # The one deliberate asymmetry, and it is not content: throwaway
+      # revisions so the two wikis do not assign the same revids to the same
+      # pages. See the burn loop in start-wikisource.sh.
+      SEED_REVID_BURN: "${SEED_REVID_BURN-7}"
     ports:
       - "${WIKISOURCE_LOCAL_PORT:-18582}:80"
     volumes:

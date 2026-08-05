@@ -31,12 +31,13 @@ come back with different attribution, that a real revid is what lands in the
 link, and that a page pair keeps one ladder no matter which side is called
 local.
 
-These are the reproducible situations as much as they are assertions. The
-scenarios are built by `wiki_harness.scenarios`, so
+The pair starts *converged* -- both containers import the same dump from the
+same compose anchor -- so every difference below is one a test made, in a line
+you can see. Stand the same base up by hand with
 
-    PYTHONPATH=src-py/tests uv run python -m wiki_harness --scenario diverged
+    docker compose --profile pair up -d --wait
 
-stands up the state a failing test here was looking at.
+and apply the same deltas from `wiki_harness.scenarios`.
 """
 
 pytestmark = pytest.mark.slow
@@ -77,10 +78,17 @@ def _head(session: Session, page: Page) -> Revision:
 
 
 @pytest.fixture
-def copied(seeded_upstream: WikiApi, local_api: WikiApi) -> tuple[WikiApi, WikiApi]:
-    """`PAGE_2` present on both wikis, the local side copied from upstream."""
-    copy_page_to_local(seeded_upstream, local_api)
-    return seeded_upstream, local_api
+def copied(seeded_upstream: WikiApi, seeded_local: WikiApi) -> tuple[WikiApi, WikiApi]:
+    """The local side replaced by an API-level copy of upstream's head.
+
+    The pair already starts converged -- both containers import the same dump --
+    so this delta exists to produce the *other* situation: one flattened
+    revision instead of a history, attributed to whoever saved it. A test that
+    needs that asymmetry makes it here rather than inheriting it from how the
+    fixture happened to be built.
+    """
+    copy_page_to_local(seeded_upstream, seeded_local)
+    return seeded_upstream, seeded_local
 
 
 @pytest.fixture
@@ -207,7 +215,7 @@ def test_page_correspondence_resolves_across_the_two_sites(
 def test_a_local_edit_leaves_the_anchor_behind_the_head(
     session: Session,
     linked: tuple[Page, Page],
-    local_api: WikiApi,
+    seeded_local: WikiApi,
     local_pwb: PwbHarness,
 ) -> None:
     """Divergence is visible as an anchor that is no longer the head, not as a
@@ -217,7 +225,7 @@ def test_a_local_edit_leaves_the_anchor_behind_the_head(
     local_page, upstream_page = linked
     anchored_revid = _head(session, local_page).revid
 
-    diverge_locally(local_api)
+    diverge_locally(seeded_local)
     _fetch(session, session.get(Site, local_page.site_pk), local_pwb, PAGE_2)
 
     anchor = current_anchor(
@@ -241,7 +249,7 @@ def test_reconciling_appends_a_rung_rather_than_editing_the_broken_one(
     session: Session,
     linked: tuple[Page, Page],
     seeded_upstream: WikiApi,
-    local_api: WikiApi,
+    seeded_local: WikiApi,
     local_pwb: PwbHarness,
 ) -> None:
     """Forward re-anchoring, end to end. Remote history is append-only, so a
@@ -250,10 +258,10 @@ def test_reconciling_appends_a_rung_rather_than_editing_the_broken_one(
     answerable after the fact."""
     local_page, upstream_page = linked
 
-    diverge_locally(local_api)
+    diverge_locally(seeded_local)
     _fetch(session, session.get(Site, local_page.site_pk), local_pwb, PAGE_2)
 
-    reconcile_to_upstream(seeded_upstream, local_api)
+    reconcile_to_upstream(seeded_upstream, seeded_local)
     _fetch(session, session.get(Site, local_page.site_pk), local_pwb, PAGE_2)
 
     reconciled_head = _head(session, local_page)

@@ -206,18 +206,33 @@ weaker claim, for a fact that was known at the moment of the import.
 
 ## Testing
 
-Cross-wiki situations are built by `wiki_harness.scenarios` and used two ways:
-by the `@pytest.mark.slow` suite (`test_remote_link_sync.py` runs the
-`RemoteLink` rules over revisions fetched through the real worker), and by hand:
+**The base state belongs to compose, the deltas to the tests.** Both wikis seed
+themselves at startup from one shared anchor (`SEED_DUMPS`/`SEED_SCANS` in
+`docker-compose.yml` → `docker/mediawiki/start-wikisource.sh`), so the pair
+starts *converged* — same works, same history, same content — because the two
+services are configured identically, not because a builder remembered to run
+twice. That was a real bug: only upstream was ever seeded, so every "diverged"
+fixture was really "never converged", and the local wiki held a lone `Page:`
+with no `Index:` and no `File:` for the scan check to compare.
 
 ```bash
-PYTHONPATH=src-py/tests uv run python -m wiki_harness --scenario diverged
+docker compose --profile pair up -d --wait     # blocks until seeding is done
 ```
 
-which brings the pair up, builds the named situation, prints both wikis' URLs
-and holds them open until Ctrl-C — same compose project, same builders, so what
-you poke at by hand is what CI asserts on. `--pdb` only reaches the state of a
-test that *failed*; this reaches any of them on demand.
+`--wait` is only trustworthy because the healthcheck requires a marker written
+after the import; without it the extension check goes green as soon as
+`LocalSettings.php` exists and tests race the import.
+
+Differences are then made by whoever needs them — `copy_page_to_local`,
+`diverge_locally`, `reconcile_to_upstream` in `wiki_harness.scenarios`, one line
+each, no scenario enum to trace. Nothing tears the stack down: `wiki_pair` only
+ensures it is up, so a failed run leaves something to look at.
+
+One deliberate asymmetry, and it is not content: `local` burns a few revision
+ids first (`SEED_REVID_BURN`). Two wikis installed from empty and seeded in the
+same order otherwise assign the *same* revids to the same pages, and a bug
+comparing revids across sites would pass in the fixture while failing against
+real wikis.
 
 - [x] The copied-work fixture: copy a page across, link it, and confirm the two
       sides read as the same transcription under different attribution.

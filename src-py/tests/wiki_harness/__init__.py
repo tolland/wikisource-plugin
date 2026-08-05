@@ -16,10 +16,11 @@ from wiki_harness.scenarios import (
     LOCAL_EDIT_MARKER,
     PAGE_2,
     CopiedWork,
+    NotSeeded,
+    assert_seeded,
     copy_page_to_local,
     diverge_locally,
     reconcile_to_upstream,
-    seed_upstream_work,
 )
 from wiki_harness.stack import (
     StackConfig,
@@ -44,6 +45,8 @@ __all__ = [
     "PAGE_2",
     "SCANS_DIR",
     "CopiedWork",
+    "NotSeeded",
+    "assert_seeded",
     "DumpPage",
     "DumpRevision",
     "EditResult",
@@ -63,6 +66,5 @@ __all__ = [
     "read_dump_text",
     "reconcile_to_upstream",
     "scan_dump",
-    "seed_upstream_work",
     "wait_for_mediawiki",
 ]

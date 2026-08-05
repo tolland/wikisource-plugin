@@ -16,10 +16,10 @@ from wiki_harness import (
     PwbHarness,
     WikiApi,
     WikiStack,
+    assert_seeded,
     docker_available,
     pair_config,
     pywikibot_harness,
-    seed_upstream_work,
 )
 
 from wtbot.db import create_db_engine, init_db
@@ -82,10 +82,20 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 
 @pytest.fixture(scope="session")
-def wiki_pair(pytestconfig: pytest.Config) -> Iterator[WikiStack]:
-    """Two independent MediaWiki+ProofreadPage instances, empty.
+def wiki_pair() -> WikiStack:
+    """Two MediaWiki+ProofreadPage instances holding the same works.
 
     `upstream` stands in for en.wikisource.org, `local` for the staging wiki.
+    Both seed themselves from the same compose anchor, so the pair starts
+    *converged* and any difference between them was made on purpose.
+
+    Deliberately does **not** tear down, and does not wipe volumes first. The
+    stack is a thing you keep: a cold start installs two wikis and imports a
+    work into each, which is minutes, and destroying it after every run also
+    destroyed the only artifact worth looking at when something failed.
+    ``stack.up()`` is idempotent, so this is "make sure it is up", not "make
+    it". Remove it deliberately with ``python -m wiki_harness down``.
+
     The compose project comes from ``pair_config()`` so that
     ``python -m wiki_harness`` drives the very same containers.
     """
@@ -93,19 +103,11 @@ def wiki_pair(pytestconfig: pytest.Config) -> Iterator[WikiStack]:
         pytest.skip("A running Docker daemon is required for the two-wiki harness")
 
     stack = WikiStack(pair_config())
-    reuse = pytestconfig.getoption("--reuse-wikisource")
-
-    if not reuse:
-        stack.down()
     try:
         stack.up()
     except (OSError, subprocess.CalledProcessError) as exc:
         pytest.fail(f"failed to start the two-wiki harness: {exc}")
-
-    yield stack
-
-    if not reuse:
-        stack.down()
+    return stack
 
 
 @pytest.fixture(scope="session")
@@ -174,23 +176,34 @@ def local_pwb(wiki_pair: WikiStack) -> PwbHarness:
 
 
 @pytest.fixture(scope="session")
-def seeded_upstream(wiki_pair: WikiStack, upstream_api: WikiApi) -> WikiApi:
-    """Upstream loaded with the real Canadian patent work: the backing DjVu, the
-    Index:, its 24 Page: subpages with full revision history, and the template
-    and Module: closure needed for them to render.
+def seeded_upstream(upstream_api: WikiApi) -> WikiApi:
+    """Upstream, confirmed to hold the real Canadian patent work: the backing
+    DjVu, the Index:, its 24 Page: subpages with full revision history, and the
+    template and Module: closure needed for them to render.
 
-    Imported rather than API-written on purpose -- importDump preserves each
-    revision's text, timestamp, contributor and therefore sha1, which is what
-    the cross-wiki base discovery in docs/upstream-sync-TODO.md section 4.2
-    intersects on. An API copy would flatten history to a single revision.
+    It no longer *does* the seeding -- the container does, from ``SEED_DUMPS``,
+    and so does the local wiki from the same compose anchor. This fixture only
+    asserts it happened, because a test that quietly seeds one side is how the
+    two wikis came to differ before anyone diverged them on purpose.
 
-    Only ``_all.xml`` is imported: it is a strict superset of
-    ``_revisions.xml`` (same 25 work pages, same per-page revision counts, plus
-    the template/Module closure). Importing both duplicates every revision of
-    the work.
+    Imported rather than API-written on purpose: importDump preserves each
+    revision's text, timestamp and contributor, and recomputes sha1 from the
+    text it stores. An API copy would flatten history to a single revision --
+    which is a situation the tests also want, and build explicitly via
+    ``copy_page_to_local``.
     """
-    seed_upstream_work(wiki_pair, upstream_api)
-    return upstream_api
+    return assert_seeded(upstream_api, role="upstream")
+
+
+@pytest.fixture(scope="session")
+def seeded_local(local_api: WikiApi) -> WikiApi:
+    """The local wiki, holding the same work as upstream.
+
+    The symmetric counterpart, and the fixture whose absence was the bug: with
+    only ``seeded_upstream`` there was no way to say "both sides start equal",
+    so "diverged" meant "never converged".
+    """
+    return assert_seeded(local_api, role="local")
 
 
 @pytest.fixture(scope="session")

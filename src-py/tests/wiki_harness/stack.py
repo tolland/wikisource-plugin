@@ -21,7 +21,10 @@ timestamps, contributors and therefore sha1, which no API-level copy does.
 REPO_ROOT = Path(__file__).resolve().parents[3]
 COMPOSE_FILE = REPO_ROOT / "docker-compose.yml"
 
-# Container-side mount of src-py/tests/fixtures (see docker-compose.yml).
+# Container-side mount of src-py/tests/fixtures (see docker-compose.yml). The
+# wikis seed *themselves* from here at startup -- importDump and importImages
+# used to be driven from out here, one role at a time, which is exactly how the
+# two sides came to hold different content.
 FIXTURES_MOUNT = "/fixtures"
 
 SERVICE_FOR_ROLE = {"upstream": "mediawiki", "local": "mediawiki-local"}
@@ -231,47 +234,11 @@ class WikiStack:
         headers = lines[0].split("\t")
         return [dict(zip(headers, ln.split("\t"), strict=False)) for ln in lines[1:]]
 
-    def import_dump(self, role: str, dump_name: str) -> str:
-        """Import an XML dump from the mounted fixtures directory.
-
-        ``--uploads`` is deliberately not passed: the dumps carry page text
-        only, and the backing scan is imported separately by
-        :meth:`import_scan`.
-        """
-        return self.maintenance(
-            role,
-            "importDump",
-            "--no-updates",
-            f"{FIXTURES_MOUNT}/scans/{dump_name}",
-        )
-
     def export_dump(self, role: str) -> str:
         """Export every revision so an import can be checked through the same
         portable XML representation as its source dump.
         """
         return self.maintenance(role, "dumpBackup", "--full")
-
-    def import_scans(self, role: str, extension: str = "djvu") -> str:
-        """Upload every scan of the given extension from the fixtures mount.
-
-        importImages takes a directory, deriving each File: title from the
-        filename (underscores become spaces), so
-        ``Canadian_patent_29537.djvu`` lands as
-        ``File:Canadian patent 29537.djvu`` -- matching the title the dumps
-        reference.
-        """
-        return self.maintenance(
-            role,
-            "importImages",
-            "--comment=harness scan import",
-            f"--extensions={extension}",
-            f"{FIXTURES_MOUNT}/scans",
-        )
-
-    def rebuild_links(self, role: str) -> None:
-        """importDump --no-updates skips link/category tables; ProofreadPage's
-        index pagination needs them populated."""
-        self.maintenance(role, "rebuildall")
 
 
 def wait_for_mediawiki(api_url: str, timeout_seconds: int = 300) -> None:
