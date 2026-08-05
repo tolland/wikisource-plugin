@@ -96,7 +96,10 @@ Refresh a curated subset without refetching everything. Built on
 there is one fetch mechanism and a shorter list — not a second path.
 
 `POST /fetch/refresh { family, code, title_prefix?, since?, dry_run? }` →
-`wtbot.incremental.plan_refresh`.
+`wtbot.incremental.plan_refresh`, or `wtbot fetch-refresh` from the CLI. The
+request and response are typed (`RefreshCreate`/`RefreshResult`), so Swagger
+renders described fields and an example rather than an opaque JSON blob, and
+`basis` reaches the caller as an enum rather than a string in a dict.
 
 - [x] **The recentchanges table is pruned** (`$wgRCMaxAge`, 90 days by
       default). Past that horizon "nothing changed" and "the wiki no longer
