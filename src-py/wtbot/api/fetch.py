@@ -156,10 +156,19 @@ class DrainResponse(BaseModel):
     stop_reason: DrainStop = Field(
         description=(
             "'queue_empty' when the queue ran out; 'max_passes' when the bound "
-            "was hit first, which leaves work queued."
+            "was hit first; 'rate_limited' when the wiki refused us. The last "
+            "two leave work queued."
         )
     )
     complete: bool = Field(description="Queue empty and nothing left behind.")
+    retry_after: float | None = Field(
+        default=None,
+        description=(
+            "Seconds the wiki asked us to wait, when it said so. Reported "
+            "rather than slept through -- draining again straight away is how "
+            "a rate limit becomes a worse rate limit."
+        ),
+    )
 
 
 class QueueStatsResponse(BaseModel):
@@ -245,6 +254,7 @@ def drain(
         remaining=result.remaining,
         stop_reason=result.stop_reason,
         complete=result.complete,
+        retry_after=result.retry_after,
     )
 
 

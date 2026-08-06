@@ -7,6 +7,7 @@ from pathlib import Path
 from sqlmodel import Session, func, select
 
 from wtbot.model import FetchRequest, FetchStatus
+from wtbot.wiki.failures import FailureKind, WikiFailure
 from wtbot.worker import ClientFactory, run_pending
 
 """Draining the fetch queue.
@@ -43,6 +44,7 @@ class DrainStop(str, Enum):
 
     queue_empty = "queue_empty"
     max_passes = "max_passes"
+    rate_limited = "rate_limited"
 
 
 @dataclass(frozen=True)
@@ -51,6 +53,9 @@ class DrainResult:
     passes: int
     remaining: int  # still pending/in-progress when the drain returned
     stop_reason: DrainStop
+    #: Seconds the wiki asked us to wait, when it said. Reported, never slept
+    #: through here: a drain that pauses is a drain still holding its caller.
+    retry_after: float | None = None
 
     @property
     def complete(self) -> bool:
@@ -90,6 +95,7 @@ def drain_queue(
     handled = 0
     passes = 0
     stop = DrainStop.queue_empty
+    limiter = _RateLimitWatch()
 
     while True:
         if max_passes is not None and passes >= max_passes:
@@ -101,9 +107,28 @@ def drain_queue(
                 pending_count(session),
             )
             break
-        done = run_pending(session, client_factory, blob_root=blob_root, limit=batch)
+        done = run_pending(
+            session,
+            client_factory,
+            blob_root=blob_root,
+            limit=batch,
+            on_failure=limiter,
+        )
         passes += 1
         handled += done
+        if limiter.hit:
+            stop = DrainStop.rate_limited
+            log.warning(
+                "drain stopped: the wiki rate-limited us%s. The remaining "
+                "requests stay queued; lower WTBOT_WIKI_READ_THROTTLE rather "
+                "than draining again immediately",
+                (
+                    f" and asked for {limiter.retry_after:g}s"
+                    if limiter.retry_after
+                    else ""
+                ),
+            )
+            break
         if done == 0:
             break
 
@@ -112,6 +137,7 @@ def drain_queue(
         passes=passes,
         remaining=pending_count(session),
         stop_reason=stop,
+        retry_after=limiter.retry_after,
     )
     if handled:
         log.info(
@@ -121,6 +147,29 @@ def drain_queue(
             result.remaining,
         )
     return result
+
+
+class _RateLimitWatch:
+    """Notices the first rate-limited failure of a drain.
+
+    Continuing past a 429 is the one reaction guaranteed to make things worse:
+    the limit is per identity and per minute, so the next request in the batch
+    meets the same refusal, and a queue of hundreds turns one refusal into
+    hundreds of them. Retrying is not the fix either -- being rate-limited
+    means the throttle is set too fast, and that is a configuration change, not
+    something to paper over at runtime.
+    """
+
+    def __init__(self) -> None:
+        self.hit = False
+        self.retry_after: float | None = None
+
+    def __call__(self, failure: WikiFailure) -> None:
+        if failure.kind is not FailureKind.rate_limited:
+            return
+        self.hit = True
+        if failure.retry_after is not None:
+            self.retry_after = max(self.retry_after or 0.0, failure.retry_after)
 
 
 def pending_count(session: Session) -> int:

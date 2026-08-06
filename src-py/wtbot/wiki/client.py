@@ -156,7 +156,7 @@ class PywikibotClient:
         self._log_identity()
 
     def _log_identity(self) -> None:
-        """Record who we are on this wiki, once per client.
+        """Record who we are on this wiki, once per client, for free.
 
         Rate limits are per identity: anonymous traffic gets a far smaller
         allowance than an authenticated account, and "we thought we were
@@ -164,19 +164,34 @@ class PywikibotClient:
         looks like the wiki became unreliable. There is no API that reports
         which rate-limit tier the CDN put us in, so group membership -- which
         the tiers are drawn from, `bot` most decisively -- is the closest
-        observable proxy. It rides along on pywikibot's cached userinfo, so
-        this costs at most one request per client, and clients are reused per
-        site.
+        observable proxy.
+
+        Reads only what pywikibot already holds. ``site.userinfo`` is a
+        property that *fetches* when cold, so asking would spend a request per
+        client to log a line about conserving requests. Site construction and a
+        successful ``login()`` both populate the cache as a side effect of what
+        they were doing anyway, and no credentials means anonymous without
+        having to ask -- so both branches are answerable from memory.
         """
         try:
-            if not self.site.logged_in():
+            info = getattr(self.site, "_userinfo", None)
+            if not self.settings.username:
                 log.warning(
                     "wiki client for %s is ANONYMOUS -- the lower rate-limit "
                     "tier applies; set a SiteCredential to raise it",
                     self.site,
                 )
                 return
-            info = self.site.userinfo
+            if not info:
+                # Credentials configured but no userinfo cached: the login did
+                # not complete. Worth saying, because the symptom otherwise is
+                # just "the wiki started rate-limiting us".
+                log.warning(
+                    "wiki client for %s has credentials for %s but is not " "logged in",
+                    self.site,
+                    self.settings.username,
+                )
+                return
             groups = info.get("groups", [])
             log.info(
                 "wiki client for %s logged in as %s (groups=%s, bot_flag=%s)",
@@ -217,10 +232,30 @@ class PywikibotClient:
             return None
 
     def get_page(self, title: str) -> RemotePage:
+        """One page, in one upstream request.
+
+        It used to take two. ``page.exists()`` reads ``pageid``, which triggers
+        ``loadpageinfo`` (prop=info) on its own; the revision load that follows
+        is a second request that carries prop=info anyway and so establishes
+        existence by itself -- a missing page raises NoPageError out of it.
+        Recorded fan-outs show the cost plainly: 26 info-only requests
+        alongside 24 info+revisions requests for one 24-page book, i.e. half
+        of the rate-limit budget spent asking a question the next request
+        answers. Existence now comes from the revision load.
+
+        ``rev.text`` rather than ``page.text``: identical content (the
+        revision was loaded with content=True), but it cannot fall through to
+        another fetch, and a redirect is returned as its own wikitext rather
+        than raising -- which is what the previous ``page.text`` did too.
+        """
         page = self._pwb.Page(self.site, title)
-        if not page.exists():
-            raise PageNotFound(title)
-        rev = page.latest_revision
+        try:
+            rev = page.latest_revision
+        except (
+            self._pwb.exceptions.NoPageError,
+            self._pwb.exceptions.InvalidPageError,
+        ) as exc:
+            raise PageNotFound(title) from exc
         ns = page.namespace()
 
         # For Index pages use IndexPage so we get num_pages from the ProofreadPage
@@ -239,8 +274,10 @@ class PywikibotClient:
             title=page.title(),
             namespace_key=ns.id,
             namespace_canonical=ns.canonical_name or "",
+            # Both are populated by the revision load above (its response
+            # carries prop=info), so neither costs a request of its own.
             content_model=page.content_model,
-            text=page.text,
+            text=rev.text,
             pageid=getattr(page, "pageid", None),
             revid=rev.revid,
             parentid=rev.parentid,

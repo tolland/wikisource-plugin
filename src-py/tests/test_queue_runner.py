@@ -129,6 +129,88 @@ def test_drain_of_an_empty_queue_is_a_no_op(engine, seeded):
     )
 
 
+class _RateLimitedClient(FakeWikiClient):
+    """Refuses like a rate-limited wiki: the first call succeeds, then every
+    call raises with a Retry-After, which is how a limit actually arrives --
+    part way through a batch, not before it."""
+
+    def __init__(self, *args, allow: int = 1, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._allow = allow
+        self.calls = 0
+
+    def get_page(self, title):
+        self.calls += 1
+        if self.calls > self._allow:
+            raise _TooManyRequests()
+        return super().get_page(title)
+
+
+class _Response:
+    status_code = 429
+    headers = {"retry-after": "45"}
+
+
+class _TooManyRequests(Exception):
+    def __init__(self):
+        super().__init__("429 Too Many Requests")
+        self.response = _Response()
+
+
+def test_a_drain_stops_when_the_wiki_rate_limits_us(engine, seeded):
+    """The reaction that matters. A 429 means we are going too fast, so
+    continuing through the queue turns one refusal into hundreds -- and
+    retrying is not a fix either, since the throttle is what is wrong."""
+    _, site_pk = seeded
+    pages = {f"Page:Queue.djvu/{n}": _page(f"Page:Queue.djvu/{n}") for n in (1, 2, 3)}
+    wiki = _RateLimitedClient(pages=pages, allow=1)
+    for n in (1, 2, 3):
+        _enqueue(engine, site_pk, f"Page:Queue.djvu/{n}")
+
+    with Session(engine) as session:
+        result = drain_queue(session, lambda _site: wiki, batch=1)
+
+    assert result.stop_reason is DrainStop.rate_limited
+    assert not result.complete
+    assert result.retry_after == 45.0  # parsed from the Retry-After header
+    # The refusal stopped the drain rather than being spent on every request:
+    # two calls (one ok, one refused), not one per queued page.
+    assert wiki.calls == 2
+    assert result.remaining >= 1
+
+
+def test_the_rate_limited_stop_reaches_the_drain_endpoint(engine, seeded):
+    _, site_pk = seeded
+    pages = {f"Page:Queue.djvu/{n}": _page(f"Page:Queue.djvu/{n}") for n in (1, 2)}
+    wiki = _RateLimitedClient(pages=pages, allow=0)
+    app = create_app(engine=engine, client_factory=lambda site: wiki)
+    with TestClient(app) as c:
+        c.post(
+            "/fetch/",
+            json={"title": "Page:Queue.djvu/1", "family": "mywikisource", "code": "en"},
+        )
+        report = drain(c)
+
+    assert report["stop_reason"] == DrainStop.rate_limited.value
+    assert report["complete"] is False
+    assert report["retry_after"] == 45.0
+
+
+def test_an_ordinary_failure_does_not_stop_the_drain(engine, seeded):
+    """Only rate limiting stops it. A missing page is one request's problem,
+    and halting the queue over one would strand every other page of a book."""
+    wiki, site_pk = seeded
+    _enqueue(engine, site_pk, "Page:Missing.djvu/1")
+    _enqueue(engine, site_pk, _INDEX)
+
+    with Session(engine) as session:
+        result = drain_queue(session, lambda _site: wiki, batch=1)
+
+    assert result.handled == 2
+    assert result.stop_reason is DrainStop.queue_empty
+    assert result.complete
+
+
 def test_pending_count_includes_in_progress(engine, seeded):
     """A row left in_progress by a crashed run is unfinished work. Counting
     only `pending` would report an interrupted drain as a finished one."""

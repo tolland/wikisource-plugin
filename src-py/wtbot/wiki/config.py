@@ -112,8 +112,8 @@ def _apply_rate_limits(pwbconfig, settings: WikiSettings) -> None:
 
     The retry policy (see WikiSettings) fails fast instead of using pywikibot's
     default 15 retries with exponential backoff. Every failure mode we have
-    actually hit -- missing token turning into rate limiting, a VCR cassette
-    rejecting an unrecorded request, a dead local service -- was a bug that
+    actually hit -- missing token turning into rate limiting, a dead local
+    service, a wiki that refused us for going too fast -- was a bug that
     backoff only hid; a genuinely flaky link can raise these via env. Retrying
     a 429 in particular is the wrong response: it means the throttle above is
     wrong, and retrying makes it worse.
@@ -122,13 +122,14 @@ def _apply_rate_limits(pwbconfig, settings: WikiSettings) -> None:
     releases, and a renamed knob should degrade to "not throttled by us and
     said so", not to an AttributeError inside client construction.
     """
+    policy = settings.rate_limits
     applied: list[str] = []
     for name, value in (
-        ("minthrottle", settings.read_throttle),
-        ("put_throttle", settings.put_throttle),
-        ("maxlag", settings.maxlag),
-        ("max_retries", settings.max_retries),
-        ("retry_wait", settings.retry_wait),
+        ("minthrottle", policy.read_throttle),
+        ("put_throttle", policy.put_throttle),
+        ("maxlag", policy.maxlag),
+        ("max_retries", policy.max_retries),
+        ("retry_wait", policy.retry_wait),
     ):
         if hasattr(pwbconfig, name):
             setattr(pwbconfig, name, value)
@@ -143,10 +144,19 @@ def _apply_rate_limits(pwbconfig, settings: WikiSettings) -> None:
     # user_agent_format is a str.format template over pywikibot's own fields;
     # a literal string passes through untouched, which is what we want -- the
     # contact URL the policy asks for is ours to state, not pywikibot's.
-    pwbconfig.user_agent_format = settings.user_agent.replace("{", "{{").replace(
+    pwbconfig.user_agent_format = policy.user_agent.replace("{", "{{").replace(
         "}", "}}"
     )
-    log.debug("pywikibot rate limits: %s ua=%r", " ".join(applied), settings.user_agent)
+    if not policy.fits_tier():
+        # Chosen numbers, checked against published ones -- the alternative is
+        # discovering the mismatch as an intermittent failure days later.
+        log.warning(
+            "read_throttle=%ss allows %.0f req/min, above the %s tier",
+            policy.read_throttle,
+            policy.reads_per_minute,
+            policy.target_tier.value,
+        )
+    log.debug("pywikibot rate limits: %s ua=%r", " ".join(applied), policy.user_agent)
 
 
 def write_password_entry(

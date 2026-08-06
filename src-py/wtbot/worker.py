@@ -23,6 +23,7 @@ from wtbot.page_processors import (
 from wtbot.revision_store import record_head_revision
 from wtbot.timeutil import utcnow
 from wtbot.wiki.client import WikiClient
+from wtbot.wiki.failures import WikiFailure
 from wtbot.wiki.namespaces import sync_namespaces
 from wtbot.wiki.wiki_types import PageNotFound, RemotePage
 
@@ -34,11 +35,17 @@ bookkeeping. Everything type-specific (blobs, index fan-out, scan-image
 metadata) lives in ``wtbot.page_processors``, one class per page type.
 
 Kept as plain functions over a Session + a client factory so it is fully
-testable with FakeWikiClient and reusable from either the API (inline, today)
-or a future background loop / ``wtbot worker`` command.
+testable with FakeWikiClient and reusable from either the API, the drain
+endpoint, or ``wtbot drain``.
 """
 
 ClientFactory = Callable[[Site], WikiClient]
+
+#: Called with each classified failure as it is recorded. The failure is
+#: already on the row; this exists so a caller draining a whole queue can react
+#: to *why* a request failed -- notably to stop on a rate limit rather than
+#: send the next two hundred requests at a wiki that just refused one.
+FailureObserver = Callable[[WikiFailure], None]
 
 
 def run_pending(
@@ -47,6 +54,7 @@ def run_pending(
     *,
     limit: int = 100,
     blob_root: Path | None = None,
+    on_failure: FailureObserver | None = None,
 ) -> int:
     """Process up to ``limit`` pending requests. Returns how many were handled."""
     handled = 0
@@ -54,7 +62,9 @@ def run_pending(
         req = _claim_next(session)
         if req is None:
             break
-        _process(session, req, client_factory, blob_root=blob_root)
+        _process(
+            session, req, client_factory, blob_root=blob_root, on_failure=on_failure
+        )
         handled += 1
     return handled
 
@@ -118,6 +128,7 @@ def _process(
     client_factory: ClientFactory,
     *,
     blob_root: Path | None = None,
+    on_failure: FailureObserver | None = None,
 ) -> None:
     site = _load_site_snapshot(session, req.site_pk)
     status = FetchStatus.error
@@ -127,7 +138,6 @@ def _process(
     try:
         client = client_factory(site)
         _maybe_sync_namespaces(session, site, client)
-        # with vcr.use_cassette("fixtures/vcr_cassettes/fetch-worker.yaml"):
         remote = client.get_page(req.title)
 
         # Drive behaviour from what was actually fetched, not from req.kind.
@@ -161,6 +171,8 @@ def _process(
             exc,
         )
         error_message = failure.summary
+        if on_failure is not None:
+            on_failure(failure)
 
     _record_fetch_result(
         session,

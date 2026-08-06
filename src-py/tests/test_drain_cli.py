@@ -92,6 +92,27 @@ def test_an_incomplete_drain_says_so(api):
     assert "run again to continue" in result.output
 
 
+def test_a_rate_limited_drain_says_not_to_just_run_again(api):
+    """The one incomplete case where "run again" is wrong advice: the wiki
+    refused us for going too fast, so going again asks for the same refusal."""
+    api["drain"] = {
+        "handled": 12,
+        "passes": 1,
+        "remaining": 88,
+        "stop_reason": "rate_limited",
+        "complete": False,
+        "retry_after": 45.0,
+    }
+
+    result = runner.invoke(create_app(), ["drain", "--base-url", "http://w:8000"])
+
+    assert result.exit_code == 0, result.output
+    assert "rate-limited" in result.output
+    assert "45s" in result.output
+    assert "WTBOT_WIKI_READ_THROTTLE" in result.output
+    assert "run again to continue" not in result.output
+
+
 def test_status_reports_the_queue_without_draining(api):
     result = runner.invoke(
         create_app(), ["drain", "--status", "--base-url", "http://wtbot:8000"]

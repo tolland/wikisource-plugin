@@ -31,7 +31,6 @@ Issues = "https://github.com/tolland/wikisource-plugin/issues"
 [dependency-groups]
 test = [
     "pytest>=9.1.1",
-    "vcrpy>=8.2.1",
     "black>=26.0",
     "ruff>=0.15",
 ]
@@ -42,7 +41,6 @@ dev = [
     "ipykernel>=7.3.0",
     "pre-commit>=4.0",
     "pandas==3.0.3",
-    "vcrpy>=8.2.1",
 ]
 
 [build-system]

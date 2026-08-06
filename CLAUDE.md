@@ -70,7 +70,7 @@ uv run black .                             # format (mirrors the pre-commit hook
 
 `pre-commit` (`.pre-commit-config.yaml`) runs `ruff check --fix` + `black` on pre-commit, and `./gradlew check` on pre-push — both sides of the repo are gated by the same hooks.
 
-Wiki access in tests goes through `vcrpy` cassettes under `src-py/tests/cassettes/` rather than live network calls; see `WikiClient`/`FakeWikiClient` below for the non-cassette fake path.
+Wiki access in tests is either faked in-memory (`FakeWikiClient`, the default — fast, no network) or live-fire against the docker harness wikis (`@pytest.mark.slow`, needs `--runslow` and a docker daemon). There is no recorded-cassette layer: recordings drifted out of date against pywikibot and could only be refreshed from a machine with access to both wikis, so a stale recording failed on requests our code never made.
 
 ### Viewer (SvelteKit, debug UI only)
 
@@ -135,7 +135,7 @@ Transaction handling is the driver's normal deferred style — an earlier eager 
 - `src-py/wtbot/vfs/` — VFS-surface implementation backing the `/vfs` router
 - `src-py/wtbot/worker.py` — the fetch worker (`run_pending`) that drains the `FetchRequest` queue; today invoked inline by `POST /fetch` rather than as a background loop
 - `src-py/DESIGN.md` — backend operations & data-model design (read this before touching the fetch/VFS/commit contract)
-- `src-py/tests/` — pytest suite (`uv run pytest`); wiki calls are mocked either via `vcrpy` cassettes (`src-py/tests/cassettes/`) or `FakeWikiClient`
+- `src-py/tests/` — pytest suite (`uv run pytest`); wiki calls use `FakeWikiClient` by default, or a real wiki from the docker harness in the `@pytest.mark.slow` suites
 
 ### Tests
 

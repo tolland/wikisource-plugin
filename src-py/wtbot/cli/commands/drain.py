@@ -75,13 +75,26 @@ def drain(
         f"drained {result['handled']} request(s) in {result['passes']} pass(es); "
         f"{result['remaining']} remaining"
     )
-    if not result["complete"]:
-        # Saying "done" over a queue that is not empty is the failure mode
-        # worth avoiding: the caller would stop watching.
+    if result["complete"]:
+        return
+
+    # Saying "done" over a queue that is not empty is the failure mode worth
+    # avoiding: the caller would stop watching.
+    typer.echo(f"  incomplete: stopped because {result['stop_reason']}")
+    if result["stop_reason"] == "rate_limited":
+        # "Run again" is the wrong advice here, and the only case where it is:
+        # the wiki refused us because we are going too fast, so going again is
+        # asking for the same refusal.
+        wait = result.get("retry_after")
         typer.echo(
-            f"  incomplete: stopped because {result['stop_reason']} -- "
-            "run again to continue"
+            "  the wiki rate-limited us" + (f"; it asked for {wait:g}s" if wait else "")
         )
+        typer.echo(
+            "  lower the request rate (WTBOT_WIKI_READ_THROTTLE) before "
+            "draining again"
+        )
+    else:
+        typer.echo("  run again to continue")
 
 
 def _print_queue(resp) -> None:
