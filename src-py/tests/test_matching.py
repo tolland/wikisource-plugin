@@ -27,8 +27,8 @@ INDEX = "Index:Canadian patent 29537.djvu"
 PROOFREAD = "proofread-page"
 
 
-def _site(session: Session, family: str) -> Site:
-    site = Site(family=family, code="en")
+def _site(session: Session, family: str, label: str | None = None) -> Site:
+    site = Site(family=family, code="en", label=label or family)
     session.add(site)
     session.commit()
     session.refresh(site)
@@ -270,8 +270,8 @@ def test_the_propose_endpoint_writes_nothing_by_default(client, engine) -> None:
         _page(session, remote, 1, body=_body(3, "Hesperian"), revid=900)
 
     body = {
-        "local": {"family": "mywikisource", "code": "en"},
-        "remote": {"family": "wikisource", "code": "en"},
+        "local_label": "mywikisource",
+        "remote_label": "wikisource",
         "index_title": INDEX,
     }
     response = client.post("/links/propose", json=body)
@@ -295,8 +295,8 @@ def test_linking_a_diverged_pair_needs_force(client, engine) -> None:
         _page(session, remote, 1, body=_body(3, "B", "Theirs."), revid=900)
 
     body = {
-        "local": {"family": "mywikisource", "code": "en"},
-        "remote": {"family": "wikisource", "code": "en"},
+        "local_label": "mywikisource",
+        "remote_label": "wikisource",
         "local_title": "Page:Canadian patent 29537.djvu/1",
     }
     refused = client.post("/links/", json=body)
@@ -324,11 +324,9 @@ def test_the_ladder_endpoint_reports_whether_the_anchor_is_current(
         session.commit()
 
     params = {
-        "local_family": "mywikisource",
-        "local_code": "en",
+        "local_label": "mywikisource",
+        "remote_label": "wikisource",
         "local_title": "Page:Canadian patent 29537.djvu/1",
-        "remote_family": "wikisource",
-        "remote_code": "en",
     }
     current = client.get("/links/", params=params).json()
     assert len(current["rungs"]) == 1
@@ -363,3 +361,48 @@ def test_the_ladder_endpoint_reports_whether_the_anchor_is_current(
     moved = client.get("/links/", params=params).json()
     assert len(moved["rungs"]) == 1
     assert moved["anchor_is_current"] is False
+
+
+def test_the_site_pair_is_inferred_from_a_naming_convention(client, engine) -> None:
+    """The common setup needs no flags: labels matching a convention are paired
+    without being named. `origin`/`upstream` is included because it already
+    means exactly this to anyone who has forked a repository."""
+    with Session(engine) as session:
+        local = _site(session, "mywikisource", label="origin")
+        remote = _site(session, "wikisource", label="upstream")
+        _page(session, local, 1, body=_body(3, "LocalEditor"), revid=5)
+        _page(session, remote, 1, body=_body(3, "Hesperian"), revid=900)
+
+    response = client.post("/links/propose", json={"index_title": INDEX})
+
+    assert response.status_code == 200
+    assert response.json()["counts"] == {"same": 1}
+
+
+def test_naming_only_one_side_is_refused(client, engine) -> None:
+    """Pairing the named side with whatever else is registered would be one
+    typo away from proposing links against the wrong wiki."""
+    with Session(engine) as session:
+        _site(session, "mywikisource", label="local")
+        _site(session, "wikisource", label="remote")
+
+    response = client.post(
+        "/links/propose", json={"index_title": INDEX, "local_label": "local"}
+    )
+
+    assert response.status_code == 400
+    assert "only the local site was named" in response.json()["detail"]
+
+
+def test_unconventional_labels_ask_rather_than_guess(client, engine) -> None:
+    """Two sites in no known convention have no inherent direction."""
+    with Session(engine) as session:
+        _site(session, "mywikisource", label="staging")
+        _site(session, "wikisource", label="canonical")
+
+    response = client.post("/links/propose", json={"index_title": INDEX})
+
+    assert response.status_code == 400
+    detail = response.json()["detail"]
+    assert "canonical, staging" in detail
+    assert "origin/upstream" in detail
