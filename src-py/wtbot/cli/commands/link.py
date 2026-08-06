@@ -1,7 +1,9 @@
-import os
+from typing import Annotated
 
 import typer
-from typer_di import TyperDI
+from typer_di import Depends, TyperDI
+
+from wtbot.cli.deps import ApiClient, get_api
 
 app = TyperDI(
     no_args_is_help=True,
@@ -9,23 +11,48 @@ app = TyperDI(
     help="Cross-site correspondence between revisions (RemoteLink).",
 )
 
+"""Driving RemoteLink from the command line.
 
-def _base_url_option() -> str:
-    return os.environ.get("WTBOT_API_URL", "http://127.0.100.1:8000")
+Sites are named by ``--local``/``--remote``, which take the same registered
+labels as ``--label`` elsewhere. Both, or neither: with neither, the server
+matches the registered labels against its naming conventions
+(``local``/``remote``, ``origin``/``upstream``, ``mywikisource``/
+``wikisource``) so the common setup needs no flags at all. One label alone is
+refused rather than paired with whatever else is registered -- silently
+choosing the other side is one typo away from proposing links against the
+wrong wiki.
+"""
 
 
-BaseUrl = typer.Option(_base_url_option, help="wtbot API base URL")
+def get_pair(
+    local: Annotated[
+        str | None,
+        typer.Option(
+            "--local",
+            envvar="WTBOT_LOCAL_LABEL",
+            show_envvar=False,
+            help="Registered site holding our copy (see `wtbot site list`).",
+        ),
+    ] = None,
+    remote: Annotated[
+        str | None,
+        typer.Option(
+            "--remote",
+            envvar="WTBOT_REMOTE_LABEL",
+            show_envvar=False,
+            help="Registered site holding the other copy.",
+        ),
+    ] = None,
+) -> dict[str, str | None]:
+    """Dependency: the two site labels, both optional.
+
+    Returned as the payload fragment the endpoints take, so no command has to
+    remember the field names.
+    """
+    return {"local_label": local, "remote_label": remote}
 
 
-def _post(base_url: str, path: str, payload: dict) -> dict:
-    import httpx
-
-    resp = httpx.post(f"{base_url.rstrip('/')}{path}", json=payload, timeout=300.0)
-    if resp.status_code >= 400:
-        detail = resp.json().get("detail", resp.text)
-        typer.secho(f"{resp.status_code}: {detail}", fg=typer.colors.RED, err=True)
-        raise typer.Exit(1)
-    return resp.json()
+Pair = Depends(get_pair)
 
 
 @app.command("add")
@@ -34,10 +61,6 @@ def add(
     remote_title: str | None = typer.Argument(
         None, help="Title on the remote site; defaults to the local title"
     ),
-    local_family: str = typer.Option("mywikisource"),
-    local_code: str = typer.Option("en"),
-    remote_family: str = typer.Option("wikisource"),
-    remote_code: str = typer.Option("en"),
     origin: str = typer.Option(
         "manual", help="copy | title_match | manual | reconciled"
     ),
@@ -45,7 +68,8 @@ def add(
         False,
         help="Assert the link even when the heads hold different transcriptions.",
     ),
-    base_url: str = BaseUrl,
+    pair: dict = Pair,
+    api: ApiClient = Depends(get_api),
 ) -> None:
     """Assert that one page on each site holds the same content.
 
@@ -53,12 +77,10 @@ def add(
     unless --force: a link states that two revisions are the same content, and
     asserting that of a diverged pair makes every later comparison lie.
     """
-    data = _post(
-        base_url,
+    data = api.post(
         "/links/",
         {
-            "local": {"family": local_family, "code": local_code},
-            "remote": {"family": remote_family, "code": remote_code},
+            **pair,
             "local_title": local_title,
             "remote_title": remote_title,
             "origin": origin,
@@ -77,17 +99,14 @@ def propose(
     remote_index_title: str | None = typer.Option(
         None, "--to", help="Only needed when the two sides' index titles differ"
     ),
-    local_family: str = typer.Option("mywikisource"),
-    local_code: str = typer.Option("en"),
-    remote_family: str = typer.Option("wikisource"),
-    remote_code: str = typer.Option("en"),
     confirm: bool = typer.Option(
         False, help="Write links for every proposable pair (default: report only)."
     ),
     show: str = typer.Option(
         "all", help="Filter the listing: all | proposable | problems"
     ),
-    base_url: str = BaseUrl,
+    pair: dict = Pair,
+    api: ApiClient = Depends(get_api),
 ) -> None:
     """Walk an index's pages and report what could be linked.
 
@@ -95,16 +114,9 @@ def propose(
     index, not on title text. Reports only unless --confirm, because a
     proposal is a guess from a comparison and a link outlives it.
     """
-    data = _post(
-        base_url,
+    data = api.post(
         "/links/propose",
-        {
-            "local": {"family": local_family, "code": local_code},
-            "remote": {"family": remote_family, "code": remote_code},
-            "index_title": index_title,
-            "remote_index_title": remote_index_title,
-            "confirm": confirm,
-        },
+        {**pair, "index_title": index_title, "remote_index_title": remote_index_title},
     )
 
     counts = data["counts"]
@@ -130,10 +142,23 @@ def propose(
             line += f"  ({proposal['detail']})"
         typer.echo(line)
 
-    if confirm:
-        typer.echo(f"confirmed {data['confirmed']} link(s)")
-    elif any(p["proposable"] for p in data["proposals"]):
-        typer.echo("nothing written; re-run with --confirm to assert these")
+    if not confirm:
+        if any(p["proposable"] for p in data["proposals"]):
+            typer.echo("nothing written; re-run with --confirm to assert these")
+        return
+
+    # Confirmed as a second call over the same proposals rather than a flag on
+    # the first: what gets written is then exactly what was just printed.
+    written = api.post(
+        "/links/propose",
+        {
+            **pair,
+            "index_title": index_title,
+            "remote_index_title": remote_index_title,
+            "confirm": True,
+        },
+    )
+    typer.echo(f"confirmed {written['confirmed']} link(s)")
 
 
 @app.command("show")
@@ -142,30 +167,16 @@ def show(
     remote_title: str | None = typer.Argument(
         None, help="Title on the remote site; defaults to the local title"
     ),
-    local_family: str = typer.Option("mywikisource"),
-    local_code: str = typer.Option("en"),
-    remote_family: str = typer.Option("wikisource"),
-    remote_code: str = typer.Option("en"),
-    base_url: str = BaseUrl,
+    pair: dict = Pair,
+    api: ApiClient = Depends(get_api),
 ) -> None:
     """Show the ladder for a page pair, and whether its anchor is current."""
-    import httpx
-
-    params = {
-        "local_family": local_family,
-        "local_code": local_code,
-        "local_title": local_title,
-        "remote_family": remote_family,
-        "remote_code": remote_code,
-    }
+    params = {k: v for k, v in pair.items() if v}
+    params["local_title"] = local_title
     if remote_title:
         params["remote_title"] = remote_title
-    resp = httpx.get(f"{base_url.rstrip('/')}/links/", params=params, timeout=60.0)
-    if resp.status_code >= 400:
-        detail = resp.json().get("detail", resp.text)
-        typer.secho(f"{resp.status_code}: {detail}", fg=typer.colors.RED, err=True)
-        raise typer.Exit(1)
-    data = resp.json()
+
+    data = api.get("/links/", **params)
 
     typer.echo(f"{data['local_title']}  <->  {data['remote_title']}")
     typer.echo(

@@ -15,6 +15,7 @@ from wtbot.matching import (
 from wtbot.model import LinkOrigin, Page, Site
 from wtbot.remote_link_store import LinkError, assert_link, current_anchor, ladder
 from wtbot.revision_store import head_revision
+from wtbot.site_store import resolve_pair
 from wtbot.timeutil import utcnow
 
 """Cross-site correspondence: propose, confirm, inspect.
@@ -28,16 +29,23 @@ comparison that suggested it, and the design does not auto-confirm guesses
 router = APIRouter(prefix="/links", tags=["links"])
 
 
-class SiteRef(BaseModel):
-    family: str = Field(description="pywikibot family, e.g. 'wikisource'")
-    code: str = Field(description="pywikibot language code, e.g. 'en'")
+LOCAL_LABEL = Field(
+    default=None,
+    description=(
+        "Registered site holding our copy. Omit both labels to use a naming "
+        "convention (local/remote, origin/upstream, mywikisource/wikisource)."
+    ),
+)
+REMOTE_LABEL = Field(
+    default=None, description="Registered site holding the other copy."
+)
 
 
 class LinkPageRequest(BaseModel):
     """Link one named page on each site, by their current head revisions."""
 
-    local: SiteRef
-    remote: SiteRef
+    local_label: str | None = LOCAL_LABEL
+    remote_label: str | None = REMOTE_LABEL
     local_title: str = Field(description="Title on the local site")
     remote_title: str | None = Field(
         default=None,
@@ -64,8 +72,8 @@ class LinkPageRequest(BaseModel):
 
 
 class ProposeRequest(BaseModel):
-    local: SiteRef
-    remote: SiteRef
+    local_label: str | None = LOCAL_LABEL
+    remote_label: str | None = REMOTE_LABEL
     index_title: str = Field(description="e.g. 'Index:Some book.djvu'")
     remote_index_title: str | None = Field(
         default=None,
@@ -131,21 +139,14 @@ class LadderOut(BaseModel):
     checked_at: datetime | None = None
 
 
-def _site(session: Session, ref: SiteRef) -> Site:
-    site = session.exec(
-        select(Site).where(Site.family == ref.family, Site.code == ref.code)
-    ).first()
-    if site is None:
-        raise HTTPException(404, f"no site {ref.family}:{ref.code}")
-    return site
-
-
 def _page(session: Session, site: Site, title: str) -> Page:
     page = session.exec(
         select(Page).where(Page.site_pk == site.pk, Page.title == title)
     ).first()
     if page is None:
-        raise HTTPException(404, f"{title} is not cached for {site.family}:{site.code}")
+        raise HTTPException(
+            404, f"{title} is not cached for site {site.label or site.family}"
+        )
     return page
 
 
@@ -173,8 +174,9 @@ def propose(
     index rather than on title text, because the two sides' titles can differ
     and the scan offset is what has to line up.
     """
-    local_site = _site(session, payload.local)
-    remote_site = _site(session, payload.remote)
+    local_site, remote_site = resolve_pair(
+        session, payload.local_label, payload.remote_label
+    )
     proposals = propose_index_links(
         session,
         local_site=local_site,
@@ -205,8 +207,9 @@ def create_link(
     payload: LinkPageRequest, session: Session = Depends(get_session)
 ) -> LinkOut:
     """Assert that two named pages' head revisions hold the same content."""
-    local_site = _site(session, payload.local)
-    remote_site = _site(session, payload.remote)
+    local_site, remote_site = resolve_pair(
+        session, payload.local_label, payload.remote_label
+    )
     local_page = _page(session, local_site, payload.local_title)
     remote_page = _page(
         session, remote_site, payload.remote_title or payload.local_title
@@ -239,12 +242,10 @@ def create_link(
 
 @router.get("/", response_model=LadderOut)
 def get_ladder(
-    local_family: str,
-    local_code: str,
     local_title: str,
-    remote_family: str,
-    remote_code: str,
     remote_title: str | None = None,
+    local_label: str | None = None,
+    remote_label: str | None = None,
     session: Session = Depends(get_session),
 ) -> LadderOut:
     """The ladder for one page pair, and whether its anchor is still current.
@@ -252,8 +253,7 @@ def get_ladder(
     Query parameters rather than a body: this is a read, and it should be
     reachable by pasting a URL.
     """
-    local_site = _site(session, SiteRef(family=local_family, code=local_code))
-    remote_site = _site(session, SiteRef(family=remote_family, code=remote_code))
+    local_site, remote_site = resolve_pair(session, local_label, remote_label)
     local_page = _page(session, local_site, local_title)
     remote_page = _page(session, remote_site, remote_title or local_title)
 
