@@ -6,7 +6,7 @@ which is also the only way to test the state *between* them.
 """
 
 import pytest
-from conftest import fetch_and_drain
+from conftest import fetch_and_drain, register_site
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -26,6 +26,7 @@ from wtbot.wiki.sha1 import normalize_sha1
 from wtbot.wiki.wiki_types import RemotePage, RemotePageImages
 from wtbot.worker import run_pending
 
+LABEL = "test"
 _INDEX_TITLE = "Index:Tractatus.djvu"
 _FILE_TITLE = "File:Tractatus.djvu"
 _FAKE_FILE_BYTES = b"%PDF-fake"
@@ -104,6 +105,7 @@ def app_with_fake(engine, index_remote):
     client = FakeWikiClient(pages={index_remote.title: index_remote})
     app = create_app(engine=engine, client_factory=lambda site: client)
     with TestClient(app) as c:
+        register_site(c, label=LABEL)
         yield c, index_remote
 
 
@@ -135,6 +137,7 @@ def app_with_index_fanout(engine, tmp_path, index_remote_with_pagelist):
         blob_root=tmp_path / "blobs",
     )
     with TestClient(app) as c:
+        register_site(c, label=LABEL)
         yield c, index_remote_with_pagelist, tmp_path
 
 
@@ -145,8 +148,7 @@ def test_fetch_enqueues_without_fetching(app_with_fake, engine):
         "/fetch/",
         json={
             "title": index_remote.title,
-            "family": "mywikisource",
-            "code": "en",
+            "label": LABEL,
             "kind": "single",
         },
     )
@@ -167,9 +169,7 @@ def test_fetch_then_drain_persists(app_with_fake, engine):
         client,
         {
             "title": index_remote.title,
-            "family": "mywikisource",
-            "code": "en",
-            "api_url": "https://wikisource-debian-13.lan/w/api.php",
+            "label": LABEL,
             "kind": "single",
         },
     )
@@ -204,9 +204,10 @@ def test_fetch_missing_page_records_error(engine):
     client = FakeWikiClient(pages={})  # nothing exists
     app = create_app(engine=engine, client_factory=lambda site: client)
     with TestClient(app) as c:
+        register_site(c, label=LABEL)
         body = fetch_and_drain(
             c,
-            {"title": "Index:Nope.djvu", "family": "mywikisource", "code": "en"},
+            {"title": "Index:Nope.djvu", "label": LABEL},
         )
     assert body["request"]["status"] == FetchStatus.error.value
     assert "not found" in body["request"]["error_message"]
@@ -217,7 +218,7 @@ def test_get_fetch_request(app_with_fake):
     client, index_remote = app_with_fake
     pk = client.post(
         "/fetch/",
-        json={"title": index_remote.title, "family": "mywikisource", "code": "en"},
+        json={"title": index_remote.title, "label": LABEL},
     ).json()["request"]["pk"]
 
     got = client.get(f"/fetch/{pk}")
@@ -230,7 +231,7 @@ def test_get_fetch_request(app_with_fake):
 def test_refetch_updates_in_place(app_with_fake, engine):
     """Two fetches of the same title yield one row, not two."""
     client, index_remote = app_with_fake
-    payload = {"title": index_remote.title, "family": "mywikisource", "code": "en"}
+    payload = {"title": index_remote.title, "label": LABEL}
     fetch_and_drain(client, payload)
     fetch_and_drain(client, payload)
 
@@ -246,8 +247,7 @@ def test_index_fanout_creates_pages_and_children(app_with_index_fanout, engine):
         client,
         {
             "title": _INDEX_TITLE,
-            "family": "mywikisource",
-            "code": "en",
+            "label": LABEL,
             "depth": 1,
             # kind omitted — fan-out is driven by content_model, not kind
         },
@@ -621,12 +621,12 @@ def test_index_fanout_no_pagelist_creates_no_children(engine, tmp_path):
         blob_root=tmp_path / "blobs",
     )
     with TestClient(app) as c:
+        register_site(c, label=LABEL)
         body = fetch_and_drain(
             c,
             {
                 "title": _INDEX_TITLE,
-                "family": "mywikisource",
-                "code": "en",
+                "label": LABEL,
                 "depth": 1,
             },
         )
@@ -653,12 +653,12 @@ def test_index_fanout_fetches_subpages_without_pagelist(engine, tmp_path):
         blob_root=tmp_path / "blobs",
     )
     with TestClient(app) as c:
+        register_site(c, label=LABEL)
         body = fetch_and_drain(
             c,
             {
                 "title": _INDEX_TITLE,
-                "family": "mywikisource",
-                "code": "en",
+                "label": LABEL,
                 "depth": 1,
             },
         )
@@ -700,9 +700,10 @@ def test_file_fetch_downloads_blob(engine, tmp_path):
         blob_root=tmp_path / "blobs",
     )
     with TestClient(app) as c:
+        register_site(c, label=LABEL)
         body = fetch_and_drain(
             c,
-            {"title": _FILE_TITLE, "family": "mywikisource", "code": "en"},
+            {"title": _FILE_TITLE, "label": LABEL},
         )
 
     assert body["request"]["status"] == FetchStatus.done.value

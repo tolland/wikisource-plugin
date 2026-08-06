@@ -9,7 +9,12 @@ def test_health(client):
 
 
 def test_create_and_list_site(client):
-    payload = {"family": "mywikisource", "code": "en", "articlepath": "/wiki/$1"}
+    payload = {
+        "label": "local",
+        "family": "mywikisource",
+        "code": "en",
+        "articlepath": "/wiki/$1",
+    }
     resp = client.post("/sites/", json=payload)
     assert resp.status_code == 201
     created = resp.json()
@@ -23,7 +28,7 @@ def test_create_and_list_site(client):
 
 def test_update_site(client):
     created = client.post(
-        "/sites/", json={"family": "mywikisource", "code": "en"}
+        "/sites/", json={"label": "local", "family": "mywikisource", "code": "en"}
     ).json()
 
     resp = client.put(

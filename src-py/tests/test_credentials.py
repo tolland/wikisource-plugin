@@ -19,7 +19,9 @@ def app_client(engine):
 
 
 def _create_site(client: TestClient) -> dict:
-    r = client.post("/sites/", json={"family": "mywikisource", "code": "en"})
+    r = client.post(
+        "/sites/", json={"label": "local", "family": "mywikisource", "code": "en"}
+    )
     assert r.status_code == 201
     return r.json()
 

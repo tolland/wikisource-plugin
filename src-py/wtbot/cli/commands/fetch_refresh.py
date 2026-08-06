@@ -1,8 +1,9 @@
-import os
 from datetime import datetime
 
 import typer
-from typer_di import TyperDI
+from typer_di import Depends, TyperDI
+
+from wtbot.cli.deps import ApiClient, get_api, get_label
 
 app = TyperDI(
     no_args_is_help=False,
@@ -13,9 +14,6 @@ app = TyperDI(
 @app.callback(invoke_without_command=True)
 def fetch_refresh(
     ctx: typer.Context,
-    family: str = typer.Option("wikisource"),
-    code: str = typer.Option("en"),
-    api_url: str | None = typer.Option(None, help="action API URL stored on the Site"),
     title_prefix: str | None = typer.Option(
         None,
         help=(
@@ -32,12 +30,12 @@ def fetch_refresh(
     dry_run: bool = typer.Option(
         False, help="Plan only: print what would be refetched, advance nothing."
     ),
-    base_url: str = typer.Option(
-        lambda: os.environ.get("WTBOT_API_URL", "http://127.0.100.1:8000"),
-        help="wtbot API base URL",
-    ),
+    label: str = Depends(get_label),
+    api: ApiClient = Depends(get_api),
 ) -> None:
-    """Refetch only what moved upstream, via ``list=recentchanges``.
+    """Plan a refetch of whatever moved upstream, via ``list=recentchanges``.
+
+    Enqueues; ``wtbot drain`` fetches.
 
     Not a second fetch mechanism: it plans a shorter list of titles and hands
     them to the same queue ``fetch-page`` uses. Read the *basis* in the output
@@ -49,21 +47,15 @@ def fetch_refresh(
     if ctx.invoked_subcommand is not None:
         return
 
-    import httpx
-
-    payload = {
-        "family": family,
-        "code": code,
-        "api_url": api_url,
-        "title_prefix": title_prefix,
-        "since": since.isoformat() if since else None,
-        "dry_run": dry_run,
-    }
-    resp = httpx.post(
-        f"{base_url.rstrip('/')}/fetch/refresh", json=payload, timeout=300.0
+    data = api.post(
+        "/fetch/refresh",
+        {
+            "label": label,
+            "title_prefix": title_prefix,
+            "since": since.isoformat() if since else None,
+            "dry_run": dry_run,
+        },
     )
-    resp.raise_for_status()
-    data = resp.json()
     plan = data["plan"]
 
     typer.echo(
@@ -80,3 +72,5 @@ def fetch_refresh(
         # A full pass reads no change stream, so it advances nothing; saying so
         # beats leaving the operator to wonder why the next run is full again.
         typer.echo("  watermark unchanged (a full pass claims no position)")
+    if not dry_run and data["enqueued"]:
+        typer.echo("  run `wtbot drain` to fetch them")

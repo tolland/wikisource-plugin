@@ -8,6 +8,8 @@ from wtbot.cli.commands import (
     import_svg_annotations,
     link,
     show_config,
+    site,
+    site_credential,
 )
 
 """Typer CLI for wtbot. Thin demonstration of the wiki-access seam from the
@@ -31,6 +33,8 @@ def create_app() -> typer.Typer:
 
     cli.callback()(callback)
 
+    cli.add_typer(site.app)
+    cli.add_typer(site_credential.app)
     cli.add_typer(drain.app)
     cli.add_typer(fetch_page.app)
     cli.add_typer(fetch_refresh.app)

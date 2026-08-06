@@ -19,6 +19,7 @@ from wtbot.queue_runner import DrainStop, drain_queue, pending_count, queue_stat
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import RemotePage
 
+LABEL = "test"
 _INDEX = "Index:Queue.djvu"
 
 
@@ -55,7 +56,7 @@ def seeded(engine):
     )
     wiki = FakeWikiClient(pages=pages)
     with Session(engine) as session:
-        site = Site(family="mywikisource", code="en")
+        site = Site(family="mywikisource", code="en", label=LABEL)
         session.add(site)
         session.commit()
         session.refresh(site)
@@ -185,10 +186,7 @@ def test_the_rate_limited_stop_reaches_the_drain_endpoint(engine, seeded):
     wiki = _RateLimitedClient(pages=pages, allow=0)
     app = create_app(engine=engine, client_factory=lambda site: wiki)
     with TestClient(app) as c:
-        c.post(
-            "/fetch/",
-            json={"title": "Page:Queue.djvu/1", "family": "mywikisource", "code": "en"},
-        )
+        c.post("/fetch/", json={"title": "Page:Queue.djvu/1", "label": LABEL})
         report = drain(c)
 
     assert report["stop_reason"] == DrainStop.rate_limited.value
@@ -257,7 +255,7 @@ def http(engine, seeded):
 def test_enqueue_does_not_fetch_and_drain_does(http, engine):
     enqueued = http.post(
         "/fetch/",
-        json={"title": _INDEX, "family": "mywikisource", "code": "en"},
+        json={"title": _INDEX, "label": LABEL},
     )
     assert enqueued.status_code == 202
     assert enqueued.json()["request"]["status"] == FetchStatus.pending.value
@@ -277,10 +275,10 @@ def test_enqueue_does_not_fetch_and_drain_does(http, engine):
 
 
 def test_drain_endpoint_passes_its_bounds_through(http):
-    http.post("/fetch/", json={"title": _INDEX, "family": "mywikisource", "code": "en"})
+    http.post("/fetch/", json={"title": _INDEX, "label": LABEL})
     http.post(
         "/fetch/",
-        json={"title": "Page:Queue.djvu/1", "family": "mywikisource", "code": "en"},
+        json={"title": "Page:Queue.djvu/1", "label": LABEL},
     )
 
     report = drain(http, batch=1, max_passes=1)
@@ -291,7 +289,7 @@ def test_drain_endpoint_passes_its_bounds_through(http):
 
 
 def test_queue_endpoint_does_not_drain(http, engine):
-    http.post("/fetch/", json={"title": _INDEX, "family": "mywikisource", "code": "en"})
+    http.post("/fetch/", json={"title": _INDEX, "label": LABEL})
 
     assert http.get("/fetch/queue").json()["pending"] == 1
     assert http.get("/fetch/queue").json()["pending"] == 1  # still queued

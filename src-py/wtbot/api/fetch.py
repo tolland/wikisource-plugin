@@ -6,7 +6,7 @@ from sqlmodel import Session, select
 
 from wtbot.deps import get_session
 from wtbot.incremental import RefreshBasis, RefreshPlan, plan_refresh
-from wtbot.model import FetchKind, FetchRequest, FetchStatus, Page, Site
+from wtbot.model import FetchKind, FetchRequest, FetchStatus, Page
 from wtbot.queue_runner import (
     DEFAULT_BATCH,
     DEFAULT_MAX_PASSES,
@@ -14,13 +14,14 @@ from wtbot.queue_runner import (
     drain_queue,
     queue_stats,
 )
+from wtbot.site_store import require_site
 
 from .debug_logging_route import DebugLoggingRoute
 
 """Cache-fill endpoint (surface B).
 
-The plugin/CLI POST a fetch request; we upsert the Site and enqueue a
-FetchRequest. Draining that queue -- the worker making the wiki calls and
+The plugin/CLI POST a fetch request naming a registered site by label; we
+enqueue a FetchRequest against it. Draining that queue -- the worker making the wiki calls and
 writing pages back to SQLite -- is a *separate* operation: ``POST /fetch/drain``
 or ``wtbot drain``.
 
@@ -31,6 +32,12 @@ response to a 429 -- going slower -- makes the caller's wait longer rather than
 shorter. Splitting them means the throttle can be whatever the wiki demands,
 and progress is observed by polling ``GET /fetch/{pk}`` or ``GET /fetch/queue``
 instead of by holding a socket open.
+
+Sites are addressed by ``label`` and are never created here. Taking
+family/code/api_url per request meant a typo registered a new wiki -- with no
+credentials -- and fetched from it anonymously; the first sign was a log line
+saying so, long after the fact. Registration is its own deliberate step
+(``POST /sites`` / ``wtbot site add``), where credentials can be attached.
 """
 
 router = APIRouter(
@@ -46,12 +53,7 @@ class RefreshCreate(BaseModel):
     ignores the docstring form unless ``use_attribute_docstrings`` is set, and a
     body that renders as an undocumented JSON blob is the thing this fixes."""
 
-    family: str = Field(description="pywikibot family, e.g. 'wikisource'")
-    code: str = Field(description="pywikibot language code, e.g. 'en'")
-    api_url: str | None = Field(
-        default=None,
-        description="Full action API endpoint; stored on the Site when given.",
-    )
+    label: str = Field(description="The registered site to refresh (see POST /sites).")
     since: datetime | None = Field(
         default=None,
         description=(
@@ -77,8 +79,7 @@ class RefreshCreate(BaseModel):
         "json_schema_extra": {
             "examples": [
                 {
-                    "family": "wikisource",
-                    "code": "en",
+                    "label": "en.wikisource",
                     "title_prefix": "Page:Canadian patent 29537.djvu/",
                     "dry_run": True,
                 }
@@ -124,9 +125,13 @@ class RefreshResult(BaseModel):
 
 class FetchCreate(BaseModel):
     title: str
-    family: str
-    code: str
-    api_url: str | None = None
+    label: str = Field(
+        description=(
+            "The registered site to fetch from. A site is never created here: "
+            "an unknown label is a 404, because inventing one would fetch from "
+            "a wiki nobody configured, with no credentials."
+        )
+    )
     kind: FetchKind = FetchKind.single
     depth: int = 0
 
@@ -182,25 +187,6 @@ class QueueStatsResponse(BaseModel):
     )
 
 
-def _get_or_create_site(
-    session: Session, family: str, code: str, api_url: str | None
-) -> Site:
-    site = session.exec(
-        select(Site).where(Site.family == family, Site.code == code)
-    ).first()
-    if site is None:
-        site = Site(family=family, code=code, api_url=api_url)
-        session.add(site)
-        session.commit()
-        session.refresh(site)
-    elif api_url and site.api_url != api_url:
-        site.api_url = api_url
-        session.add(site)
-        session.commit()
-        session.refresh(site)
-    return site
-
-
 @router.post("/", status_code=202)
 def create_fetch(payload: FetchCreate, session: Session = Depends(get_session)) -> dict:
     """Enqueue a fetch. Returns immediately; nothing is fetched yet.
@@ -209,7 +195,7 @@ def create_fetch(payload: FetchCreate, session: Session = Depends(get_session)) 
     first fetch, and a *stale* snapshot on a refetch. It is what we hold, not
     what was just fetched: run a drain and re-read to get that.
     """
-    site = _get_or_create_site(session, payload.family, payload.code, payload.api_url)
+    site = require_site(session, payload.label)
 
     req = FetchRequest(
         site_pk=site.pk,
@@ -291,7 +277,7 @@ def refresh(
     Like ``POST /fetch``, this enqueues without fetching: ``enqueued`` is a
     count of queued work, not of pages written. Drain to make it real.
     """
-    site = _get_or_create_site(session, payload.family, payload.code, payload.api_url)
+    site = require_site(session, payload.label)
     factory = request.app.state.client_factory
     plan = plan_refresh(
         session,
