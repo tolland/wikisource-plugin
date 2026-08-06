@@ -42,13 +42,14 @@ services:
       MW_DB_USER: mediawiki
       MW_LANG: en
       MW_SCRIPT_PATH: ""
-      MW_SERVER: "http://localhost:${WIKISOURCE_PORT:-8080}"
+      MW_SERVER: "http://localhost:${WIKISOURCE_PORT:-18575}"
       MW_SITE_NAME: "${WIKISOURCE_SITE_NAME:-Test Wikisource}"
     ports:
-      - "${WIKISOURCE_PORT:-8080}:80"
+      - "${WIKISOURCE_PORT:-18575}:80"
     volumes:
       - mediawiki-images:/var/www/html/images
       - ./src-py/tests/fixtures:/fixtures:ro,z
+      - ./docker/mediawiki/Wikisource.php:/var/www/html/LocalSettings.d/Wikisource.php:z,ro
 
 volumes:
   mediawiki-db-seed:

@@ -29,6 +29,16 @@ cd /var/www/html
 
 rm -f "$READY_MARKER"
 
+cat <<'EOF'
+
+     _             _                _ _    _
+ ___| |_ __ _ _ __| |_    __      _(_) | _(_)___  ___  _   _ _ __ ___ ___
+/ __| __/ _` | '__| __|___\ \ /\ / / | |/ / / __|/ _ \| | | | '__/ __/ _ \
+\__ \ || (_| | |  | ||_____\ V  V /| |   <| \__ \ (_) | |_| | | | (_|  __/
+|___/\__\__,_|_|   \__|     \_/\_/ |_|_|\_\_|___/\___/ \__,_|_|  \___\___|
+
+EOF
+
 mw_sql() {
   MYSQL_PWD="$MW_DB_PASSWORD" mysql \
     --host="$MW_DB_HOST" \
@@ -70,45 +80,11 @@ if [ ! -f LocalSettings.php ]; then
 
   cat >> LocalSettings.php <<'PHP'
 
-// Minimal Wikisource-like configuration for e2e tests.
-define( 'NS_PAGE', 104 );
-define( 'NS_PAGE_TALK', 105 );
-define( 'NS_INDEX', 106 );
-define( 'NS_INDEX_TALK', 107 );
+foreach (glob("LocalSettings.d/*.php") as $filename)
+{
+    include $filename;
+}
 
-$wgExtraNamespaces[NS_PAGE] = 'Page';
-$wgExtraNamespaces[NS_PAGE_TALK] = 'Page_talk';
-$wgExtraNamespaces[NS_INDEX] = 'Index';
-$wgExtraNamespaces[NS_INDEX_TALK] = 'Index_talk';
-
-$wgProofreadPageNamespaceIds = [
-    'page' => NS_PAGE,
-    'index' => NS_INDEX,
-];
-
-$wgEnableUploads = true;
-$wgGroupPermissions['*']['edit'] = true;
-$wgGroupPermissions['*']['createpage'] = true;
-$wgGroupPermissions['*']['createtalk'] = true;
-
-// DjVu scans: required for Index: pagination and page-image reference scans.
-$wgFileExtensions[] = 'djvu';
-// $wgDjvuDump = 'djvutoxml';
-$wgDjvuDump = "djvudump";
-$wgDjvuRenderer = 'ddjvu';
-$wgDjvuTxt = 'djvutxt';
-$wgDjvuPostProcessor = "pnmtojpeg";
-$wgDjvuOutputExtension = 'jpg';
-
-// Imports (Special:Import / importDump.php) are how test fixtures are seeded
-// with real revision history.
-$wgGroupPermissions['sysop']['import'] = true;
-$wgGroupPermissions['sysop']['importupload'] = true;
-
-wfLoadExtension( 'ProofreadPage' );
-wfLoadExtension( 'TemplateStyles' );
-wfLoadExtension( 'ParserFunctions' );
-wfLoadExtension( 'Scribunto' );
 PHP
 fi
 
@@ -163,6 +139,8 @@ if [ -n "$SEED_DUMPS$SEED_SCANS" ] && ! already_seeded; then
     # empty.
     printf 'rebuilding link tables\n'
     php maintenance/run.php rebuildall
+#    php maintenance/run.php showJobs
+#    php maintenance/run.php runJobs
   fi
 fi
 

@@ -9,6 +9,9 @@ x-mediawiki-common: &mediawiki-common
     - mediawiki-local-images:/var/www/html/images:z
     - ./src-py/tests/fixtures:/fixtures:ro,z
     - ./docker/mediawiki/Wikisource.php:/var/www/html/LocalSettings.d/Wikisource.php:z,ro
+    # shim in the start scripts to avoid havhng to rebuild
+    - ./docker/mediawiki/start-wikisource.sh:/usr/local/bin/start-wikisource:ro,z
+    - ./docker/mediawiki/run-wikisource.sh:/usr/local/bin/run-wikisource:ro,z
   healthcheck:
     # The marker is written by start-wikisource *after* seeding and removed at
     # the top of every start, so `up --wait` cannot return while an import is

@@ -3011,6 +3011,212 @@ return p</text>
     </revision>
   </page>
   <page>
+    <title>Template:Font-variant normal</title>
+    <ns>10</ns>
+    <id>5312</id>
+    <revision>
+      <id>10607</id>
+      <timestamp>2026-03-06T10:04:16Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Created page with "&lt;includeonly&gt;&lt;span style="font-variant:normal; font-size:100%;"&gt;{{{1}}}&lt;/span&gt;&lt;/includeonly&gt;&lt;noinclude&gt; {{documentation}} &lt;/noinclude&gt;"</comment>
+      <origin>10607</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="134" sha1="ewj77wacmwd7bd1px55klxlqruape1n" xml:space="preserve">&lt;includeonly&gt;&lt;span style="font-variant:normal; font-size:100%;"&gt;{{{1}}}&lt;/span&gt;&lt;/includeonly&gt;&lt;noinclude&gt;
+{{documentation}}
+&lt;/noinclude&gt;</text>
+      <sha1>ewj77wacmwd7bd1px55klxlqruape1n</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Larger</title>
+    <ns>10</ns>
+    <id>5307</id>
+    <revision>
+      <id>10602</id>
+      <timestamp>2026-03-06T09:58:31Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Created page with "&lt;includeonly&gt;{{font-size-base|font-size=120%|style={{{style|}}}|1={{{1}}}}}&lt;/includeonly&gt;&lt;noinclude&gt; {{documentation|Template:X-smaller/doc}} &lt;/noinclude&gt;"</comment>
+      <origin>10602</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="154" sha1="thxusr6xnm4iot8j595q45ngzgr5j08" xml:space="preserve">&lt;includeonly&gt;{{font-size-base|font-size=120%|style={{{style|}}}|1={{{1}}}}}&lt;/includeonly&gt;&lt;noinclude&gt;
+{{documentation|Template:X-smaller/doc}}
+&lt;/noinclude&gt;</text>
+      <sha1>thxusr6xnm4iot8j595q45ngzgr5j08</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Nsl</title>
+    <ns>10</ns>
+    <id>1464</id>
+    <redirect title="Template:Namespace link" />
+    <revision>
+      <id>2915</id>
+      <timestamp>2026-03-06T09:49:55Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Redirected page to [[Template:Namespace link]]</comment>
+      <origin>2915</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="37" sha1="fj1ud0ngjkysfl7st774xo56x3mzxh4" xml:space="preserve">#REDIRECT [[Template:Namespace link]]</text>
+      <sha1>fj1ud0ngjkysfl7st774xo56x3mzxh4</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:C</title>
+    <ns>10</ns>
+    <id>518</id>
+    <redirect title="Template:Center" />
+    <revision>
+      <id>1024</id>
+      <timestamp>2026-03-06T09:38:27Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Redirected page to [[Template:Center]]</comment>
+      <origin>1024</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="28" sha1="qa6iho1g6zd1isc1dgkxzjw3iypvy01" xml:space="preserve">#REDIRECT[[Template:Center]]</text>
+      <sha1>qa6iho1g6zd1isc1dgkxzjw3iypvy01</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Span</title>
+    <ns>10</ns>
+    <id>5315</id>
+    <revision>
+      <id>10611</id>
+      <timestamp>2026-03-06T10:07:37Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Created page with "&lt;includeonly&gt;&lt;!-- --&gt;&lt;span {{#if:{{{class|}}}|class="{{{class}}}" |}}{{#if:{{{lang|}}}|lang="{{{lang}}}" |}}{{#if:{{{id|}}}|id="{{{id}}}" |}}{{optional style|style=&lt;!-- --&gt;{{span tag/parse|{{{1|}}}}}&lt;!-- --&gt;{{span tag/parse|{{{2|}}}}}&lt;!-- --&gt;{{span tag/parse|{{{3|}}}}}&lt;!-- --&gt;{{span tag/parse|{{{4|}}}}}&lt;!-- --&gt;{{span tag/parse|{{{5|}}}}}&lt;!-- --&gt;{{span tag/parse|{{{6|}}}}}&lt;!-- --&gt;{{span tag/parse|{{{7|}}}}}&lt;!-- --&gt;{{span tag/parse|{{{8|}}}}}&lt;!-- --&gt;{{span tag/parse|{{{9|}..."</comment>
+      <origin>10611</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="625" sha1="mvyb1id2hykse8ovd6cxvhvzq394ao0" xml:space="preserve">&lt;includeonly&gt;&lt;!--
+--&gt;&lt;span {{#if:{{{class|}}}|class="{{{class}}}" |}}{{#if:{{{lang|}}}|lang="{{{lang}}}" |}}{{#if:{{{id|}}}|id="{{{id}}}" |}}{{optional style|style=&lt;!--
+--&gt;{{span tag/parse|{{{1|}}}}}&lt;!--
+--&gt;{{span tag/parse|{{{2|}}}}}&lt;!--
+--&gt;{{span tag/parse|{{{3|}}}}}&lt;!--
+--&gt;{{span tag/parse|{{{4|}}}}}&lt;!--
+--&gt;{{span tag/parse|{{{5|}}}}}&lt;!--
+--&gt;{{span tag/parse|{{{6|}}}}}&lt;!--
+--&gt;{{span tag/parse|{{{7|}}}}}&lt;!--
+--&gt;{{span tag/parse|{{{8|}}}}}&lt;!--
+--&gt;{{span tag/parse|{{{9|}}}}}&lt;!--
+--&gt;{{span tag/parse|{{{10|}}}}}&lt;!--
+--&gt;}}&gt;{{#if:{{{text|}}}|{{{text}}}&lt;/span&gt;}}&lt;!--
+--&gt;&lt;/includeonly&gt;&lt;noinclude&gt;{{documentation}}&lt;/noinclude&gt;</text>
+      <sha1>mvyb1id2hykse8ovd6cxvhvzq394ao0</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Center</title>
+    <ns>10</ns>
+    <id>82</id>
+    <revision>
+      <id>158</id>
+      <parentid>157</parentid>
+      <timestamp>2026-03-06T04:59:40Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>157</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="364" sha1="sajkpornjefuehvgvmqca73rttwl2dc" xml:space="preserve">{{center/s|nomargin={{{nomargin|false}}}|class={{{class|}}}|width={{{width|}}}|style={{{style|}}}}}
+{{{text|{{{1|}}}}}}
+{{center/e}}{{#if:{{{text|{{{1|}}}}}}||{{category handler
+| 1 = [[Category:Pages using center with no text argument]]
+| main = 1
+| page = 1
+| translation = 1
+| wikisource = 1
+| nocat = {{{nocat|}}}
+}}}}&lt;noinclude&gt;
+{{documentation}}
+&lt;/noinclude&gt;</text>
+      <sha1>sajkpornjefuehvgvmqca73rttwl2dc</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Namespace link</title>
+    <ns>10</ns>
+    <id>5305</id>
+    <revision>
+      <id>10600</id>
+      <timestamp>2026-03-06T09:57:17Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Created page with "&lt;includeonly&gt;{{#switch:{{NAMESPACE}}|{{ns:Index}}|{{ns:Page}}={{{text|{{{1}}}}}}|[[{{{work|{{{3|}}}}}}/{{{subpage|{{{2}}}}}}|{{{text|{{{1}}}}}}]]}}&lt;/includeonly&gt;&lt;noinclude&gt; {{documentation}} &lt;/noinclude&gt;"</comment>
+      <origin>10600</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="203" sha1="sqq5xljlfvqu0bei2rbw225q2wh83p0" xml:space="preserve">&lt;includeonly&gt;{{#switch:{{NAMESPACE}}|{{ns:Index}}|{{ns:Page}}={{{text|{{{1}}}}}}|[[{{{work|{{{3|}}}}}}/{{{subpage|{{{2}}}}}}|{{{text|{{{1}}}}}}]]}}&lt;/includeonly&gt;&lt;noinclude&gt;
+{{documentation}}
+&lt;/noinclude&gt;</text>
+      <sha1>sqq5xljlfvqu0bei2rbw225q2wh83p0</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Dl</title>
+    <ns>10</ns>
+    <id>10465</id>
+    <redirect title="Template:Double link" />
+    <revision>
+      <id>21769</id>
+      <timestamp>2026-06-16T03:26:17Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Pywikibot 11.2.0.dev0</comment>
+      <origin>21769</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="33" sha1="kbnfhr2arlmutr03fozxzqp6113zjl9" xml:space="preserve">#REDIRECT[[Template:Double link]]</text>
+      <sha1>kbnfhr2arlmutr03fozxzqp6113zjl9</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Double link</title>
+    <ns>10</ns>
+    <id>5855</id>
+    <revision>
+      <id>11250</id>
+      <timestamp>2026-03-22T02:00:16Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Pywikibot 11.1.0</comment>
+      <origin>11250</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="121" sha1="lwdvo37etztjld6ffcf2zbgs9zcysm6" xml:space="preserve">[[{{#switch:{{NAMESPACE}}|{{ns:Index}}|{{ns:Page}}={{{1|}}}|{{{2|}}}}}|{{{3|}}}]]&lt;noinclude&gt;{{documentation}}&lt;/noinclude&gt;</text>
+      <sha1>lwdvo37etztjld6ffcf2zbgs9zcysm6</sha1>
+    </revision>
+  </page>
+  <page>
     <title>Module:Error/doc</title>
     <ns>828</ns>
     <id>5535</id>
@@ -15605,6 +15811,1235 @@ End of table row
 {{documentation|Template:X-smaller/doc}}
 &lt;/noinclude&gt;</text>
       <sha1>lsg4si0le8kkjxte0w09k16dd4703bn</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Center/doc</title>
+    <ns>10</ns>
+    <id>110</id>
+    <revision>
+      <id>214</id>
+      <parentid>213</parentid>
+      <timestamp>2026-03-06T04:59:44Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>213</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="3396" sha1="8s8aw8k0ugb4va0jjuz30yl36k3rwpp" xml:space="preserve">{{Documentation subpage}}{{template shortcut|c}}
+{{high-risk|668000}}{{uses TemplateStyles|Template:center/styles.css}}
+{{div-based-template}}
+== Usage ==
+
+This template center-aligns text. For example,
+
+{{doc example|content=
+&lt;pre&gt;
+{{center|'''Example text'''}}
+&lt;/pre&gt;
+{{center|'''Example text'''}}
+}}
+
+=== Other parameters ===
+
+==== style ====
+Where there is a need to specify the style of text for the whole &lt;nowiki&gt;&lt;div&gt;...&lt;/div&gt;&lt;/nowiki&gt; item, an optional {{parameter|style}} parameter can be used.
+
+This can be useful when the body of the template is not a single [[H:DIVSPAN|inline item]] but a multi-paragraph structure. If the formatting in question has a "block" template, you can also nest that inside or outside the &lt;code&gt;&lt;nowiki&gt;{{center}}&lt;/nowiki&gt;&lt;/code&gt; template:
+
+The following solutions are then applicable.
+
+{{flex wrap centre|align=left
+|'''Option 1'''
+&lt;pre&gt;
+{{center|style=font-family:serif;|
+Title of the work
+
+by
+
+Author of the work
+}}
+&lt;/pre&gt;
+yields
+{{center|style=font-family:serif;|
+Title of the work
+
+by
+
+Author of the work
+}}
+|'''Option 2''' (block template)
+&lt;pre&gt;{{center|{{serif block|
+&lt;!--or {{serif block|{{center| --&gt;
+Title of the work
+
+by
+
+Author of the work
+}}}}&lt;/pre&gt;
+yields
+{{center|{{serif block|
+Title of the work
+
+by
+
+Author of the work
+}}}}
+|'''Option 3''' (if block template not available)
+&lt;pre&gt;{{center|
+{{serif|Title of the work}}
+
+{{serif|by}}
+
+{{serif|Author of the work}}
+}}&lt;/pre&gt;
+yields
+{{center|
+{{serif|Title of the work}}
+
+{{serif|by}}
+
+{{serif|Author of the work}}
+}}
+}} &lt;!-- flex wrap centre --&gt;
+
+
+=== Start and end templates ===
+
+Another block method is to use the paired start and end templates &lt;code&gt;{{tl|c/s}}&lt;/code&gt; (center start) and &lt;code&gt;{{tl|c/e}}&lt;/code&gt; (center end):
+
+{{doc example|content=
+&lt;pre&gt;
+{{c/s}}
+{{uc|Title of the work}}
+
+{{sc|Subtitle by Author}}
+{{c/e}}
+&lt;/pre&gt;
+{{c/s}}
+{{uc|Title of the work}}
+
+{{sc|Subtitle by Author}}
+{{c/e}}
+}}
+
+The &lt;code&gt;{{tl|c/s}}&lt;/code&gt; template accepts the same parameters as &lt;code&gt;{{tl|center}}&lt;/code&gt; (e.g., &lt;code&gt;style=font-family: serif;&lt;/code&gt;, &lt;code&gt;width=50%&lt;/code&gt;, &lt;code&gt;nomargin=yes&lt;/code&gt;).
+
+==Redirects==
+*{{tl|c}}
+
+== Tracking categories==
+* [[:Category:Pages using center with no text argument]]—Pages where the template is called with no text or first argument, typically because the content contains an = or otherwise confuses the parser
+
+== See also ==
+* [[Template:Block center]]
+* [[Template:Center block]]
+* [[Template:Center inline]] (span-based version)
+
+===Template data===
+{{TemplateDataHeader}}
+&lt;templatedata&gt;
+{
+	"description": "Align text to the center",
+	"params": {
+		"style": {
+			"label": "style",
+			"description": "Additional CSS styles to apply to the block",
+			"type": "content",
+			"required": false
+		},
+		"text": {
+			"aliases": [
+				"1"
+			],
+			"label": "text",
+			"description": "The text to center, this can be more than one paragraph.",
+			"type": "content",
+			"required": true
+		},
+		"nomargin": {
+			"label": "nomargin",
+			"type": "string",
+			"suggestedvalues": [
+				"yes, no"
+			]
+		},
+		"nocat": {},
+		"class": {
+			"description": "Additional CSS classes to apply."
+		},
+		"width": {}
+	},
+	"paramOrder": [
+		"style",
+		"text",
+		"nomargin",
+		"nocat",
+		"class",
+		"width"
+	],
+	"format": "inline"
+}
+&lt;/templatedata&gt;
+
+&lt;includeonly&gt;
+&lt;!-- CATEGORIES AND INTERWIKIS HERE, THANKS --&gt;
+[[Category:Special effects templates|{{PAGENAME}}]]
+&lt;/includeonly&gt;</text>
+      <sha1>8s8aw8k0ugb4va0jjuz30yl36k3rwpp</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Center/s</title>
+    <ns>10</ns>
+    <id>98</id>
+    <revision>
+      <id>190</id>
+      <parentid>189</parentid>
+      <timestamp>2026-03-06T04:59:41Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>189</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="291" sha1="63lvr94yd95st11iu6bz9b09u8v2ed1" xml:space="preserve">&lt;templatestyles src="center/styles.css" /&gt;&lt;div class="wst-center tiInherit {{yesno|{{{nomargin|false}}}|yes=wst-center-nomargin}} {{#if:{{{class|}}}|{{{class|}}}}}" {{optional style|width={{{width|}}}|style={{{style|}}}}}&gt;&lt;noinclude&gt;
+&lt;/div&gt;
+{{documentation|Template:Center/doc}}
+&lt;/noinclude&gt;</text>
+      <sha1>63lvr94yd95st11iu6bz9b09u8v2ed1</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Center/e</title>
+    <ns>10</ns>
+    <id>99</id>
+    <redirect title="Template:Div end" />
+    <revision>
+      <id>192</id>
+      <parentid>191</parentid>
+      <timestamp>2026-03-06T04:59:41Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>191</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="30" sha1="s7hmu109ak6fmskssps3uvofxnxug6y" xml:space="preserve">#redirect [[Template:Div end]]</text>
+      <sha1>s7hmu109ak6fmskssps3uvofxnxug6y</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Category handler</title>
+    <ns>10</ns>
+    <id>86</id>
+    <revision>
+      <id>166</id>
+      <parentid>165</parentid>
+      <timestamp>2026-03-06T04:59:40Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>165</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="75" sha1="9acxoepywp0cdp5suzz98rj6iwwb0n2" xml:space="preserve">{{#invoke:Category handler|main}}&lt;noinclude&gt;
+{{documentation}}
+&lt;/noinclude&gt;</text>
+      <sha1>9acxoepywp0cdp5suzz98rj6iwwb0n2</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Small-caps</title>
+    <ns>10</ns>
+    <id>85</id>
+    <revision>
+      <id>164</id>
+      <parentid>163</parentid>
+      <timestamp>2026-03-06T04:59:40Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>163</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="117" sha1="t9dimrkv1rz6c6nq1lbz1pkl1ditgpp" xml:space="preserve">&lt;onlyinclude&gt;&lt;span class="smallcaps"  style="font-variant:small-caps;"&gt;{{{1}}}&lt;/span&gt;&lt;/onlyinclude&gt;
+{{documentation}}</text>
+      <sha1>t9dimrkv1rz6c6nq1lbz1pkl1ditgpp</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Module:Category handler/data</title>
+    <ns>828</ns>
+    <id>87</id>
+    <revision>
+      <id>168</id>
+      <parentid>167</parentid>
+      <timestamp>2026-03-06T04:59:40Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>167</origin>
+      <model>Scribunto</model>
+      <format>text/plain</format>
+      <text bytes="631" sha1="k26mwixuaeijisfddb0sxkg82iux8v4" xml:space="preserve">-- This module assembles data to be passed to [[Module:Category handler]] using
+-- mw.loadData. This includes the configuration data and whether the current
+-- page matches the title blacklist.
+
+local data = require('Module:Category handler/config')
+local mShared = require('Module:Category handler/shared')
+local blacklist = require('Module:Category handler/blacklist')
+local title = mw.title.getCurrentTitle()
+
+data.currentTitleMatchesBlacklist = mShared.matchesBlacklist(
+	title.prefixedText,
+	blacklist
+)
+
+data.currentTitleNamespaceParameters = mShared.getNamespaceParameters(
+	title,
+	mShared.getParamMappings()
+)
+
+return data</text>
+      <sha1>k26mwixuaeijisfddb0sxkg82iux8v4</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Uppercase</title>
+    <ns>10</ns>
+    <id>94</id>
+    <revision>
+      <id>182</id>
+      <parentid>181</parentid>
+      <timestamp>2026-03-06T04:59:40Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>181</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="164" sha1="tr4awfssv0kgdz1axw3rkbytlocizcp" xml:space="preserve">&lt;includeonly&gt;&lt;templatestyles src="Template:Uppercase/styles.css" /&gt;&lt;span class="wst-uppercase"&gt;{{{1}}}&lt;/span&gt;&lt;/includeonly&gt;&lt;noinclude&gt;
+{{documentation}}&lt;/noinclude&gt;</text>
+      <sha1>tr4awfssv0kgdz1axw3rkbytlocizcp</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Center/styles.css</title>
+    <ns>10</ns>
+    <id>113</id>
+    <revision>
+      <id>220</id>
+      <parentid>219</parentid>
+      <timestamp>2026-03-06T04:59:44Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>219</origin>
+      <model>sanitized-css</model>
+      <format>text/css</format>
+      <text bytes="377" sha1="adt37czn9vnhyxyv4vo6yqeve7mrja5" xml:space="preserve">/* Basic alignment */
+.wst-center {
+	text-align: center;
+	margin:0 auto;
+}
+
+/*
+ * p-wrapping gives us a hard 7px bottom margin that is undesireable when
+ * trying to align another element just below us (like a horizontal rule).
+ * This is a workaround for that by simply forcing the margin to zero.
+ */
+.wst-center.wst-center-nomargin &gt; p {
+	margin-top: 0;
+	margin-bottom: 0;
+}</text>
+      <sha1>adt37czn9vnhyxyv4vo6yqeve7mrja5</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Ombox</title>
+    <ns>10</ns>
+    <id>95</id>
+    <revision>
+      <id>184</id>
+      <parentid>183</parentid>
+      <timestamp>2026-03-06T04:59:41Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>183</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="146" sha1="1o93yrjvq6v2ylug2k0uaaltljurje2" xml:space="preserve">{{#invoke:Message box|ombox}}&lt;noinclude&gt;
+{{documentation}}
+&lt;!-- Categories go on the /doc subpage, and interwikis go on Wikidata. --&gt;
+&lt;/noinclude&gt;</text>
+      <sha1>1o93yrjvq6v2ylug2k0uaaltljurje2</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:C/s</title>
+    <ns>10</ns>
+    <id>101</id>
+    <redirect title="Template:Center/s" />
+    <revision>
+      <id>196</id>
+      <parentid>195</parentid>
+      <timestamp>2026-03-06T04:59:41Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>195</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="31" sha1="841jqcmbe4dbn0y65xf3mlneqlm6kf4" xml:space="preserve">#REDIRECT [[Template:center/s]]</text>
+      <sha1>841jqcmbe4dbn0y65xf3mlneqlm6kf4</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:C/e</title>
+    <ns>10</ns>
+    <id>100</id>
+    <redirect title="Template:Div end" />
+    <revision>
+      <id>194</id>
+      <parentid>193</parentid>
+      <timestamp>2026-03-06T04:59:41Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>193</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="30" sha1="tnwnc33r87f5zpije5ayy7noubbjhb0" xml:space="preserve">#REDIRECT [[Template:div end]]</text>
+      <sha1>tnwnc33r87f5zpije5ayy7noubbjhb0</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Serif block</title>
+    <ns>10</ns>
+    <id>111</id>
+    <revision>
+      <id>216</id>
+      <parentid>215</parentid>
+      <timestamp>2026-03-06T04:59:44Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>215</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="191" sha1="nadtrp2azbcp9n4mwjaun0bui73g9r2" xml:space="preserve">&lt;includeonly&gt;&lt;div style="font-family:serif;"&gt;
+{{{1}}}
+&lt;/div&gt;&lt;/includeonly&gt;&lt;noinclude&gt;
+{{Documentation}}
+&lt;!-- Categories go on the /doc subpage, and interwikis go on Wikidata. --&gt;
+&lt;/noinclude&gt;</text>
+      <sha1>nadtrp2azbcp9n4mwjaun0bui73g9r2</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Template shortcut</title>
+    <ns>10</ns>
+    <id>97</id>
+    <revision>
+      <id>188</id>
+      <parentid>187</parentid>
+      <timestamp>2026-03-06T04:59:41Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>187</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="1194" sha1="se66tvdzocgjbcra4lzfq7aeqkck0c0" xml:space="preserve">&lt;table class="shortcutbox shortcutbox-template plainlinks noprint" style=" 
+{{#ifeq:{{{float|}}}|left
+| float:left; margin: .3em 1em .3em .3em;
+| float:right; margin: .3em .3em .3em 1em;
+}} 
+border:1px solid #aaa; background:var(--background-color-base, white); color: inherit; padding:3px; text-align:center;"&gt;&lt;tr&gt;&lt;th style="border:none; background:transparent;color: inherit"&gt;&lt;span style="font-size:smaller;"&gt;Shortcut{{#if:{{{2|}}}|s}}:&lt;!--
+--&gt;&lt;br&gt; &amp;#123;&amp;#123;{{{pre|}}}[{{fullurl:Template:{{{1|{{PAGENAME}}}}}|redirect=no}} {{{1|{{PAGENAME}}}}}]&amp;#125;&amp;#125;&lt;!--
+--&gt;{{#if:{{{2|}}}|&lt;br&gt; &amp;#123;&amp;#123;{{{pre2|}}}[{{fullurl:Template:{{{2}}}|redirect=no}} {{{2}}}]&amp;#125;&amp;#125;}}&lt;!--
+--&gt;{{#if:{{{3|}}}|&lt;br&gt; &amp;#123;&amp;#123;{{{pre2|}}}[{{fullurl:Template:{{{3}}}|redirect=no}} {{{3}}}]&amp;#125;&amp;#125;}}&lt;!--
+--&gt;{{#if:{{{4|}}}|&lt;br&gt; &amp;#123;&amp;#123;{{{pre2|}}}[{{fullurl:Template:{{{4}}}|redirect=no}} {{{4}}}]&amp;#125;&amp;#125;}}&lt;!--
+--&gt;{{#if:{{{5|}}}|&lt;br&gt; &amp;#123;&amp;#123;{{{pre2|}}}[{{fullurl:Template:{{{5}}}|redirect=no}} {{{5}}}]&amp;#125;&amp;#125;}}&lt;!--
+--&gt;{{#if:{{{6|}}}|&lt;br&gt; &amp;#123;&amp;#123;{{{pre3|}}}[{{fullurl:Template:{{{6}}}|redirect=no}} {{{6}}}]&amp;#125;&amp;#125;}}&lt;/span&gt;&lt;/table&gt;&lt;noinclude&gt;
+
+{{Documentation}}
+&lt;/noinclude&gt;</text>
+      <sha1>se66tvdzocgjbcra4lzfq7aeqkck0c0</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Div-based-template</title>
+    <ns>10</ns>
+    <id>109</id>
+    <revision>
+      <id>212</id>
+      <parentid>211</parentid>
+      <timestamp>2026-03-06T04:59:42Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>211</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="600" sha1="7r00ci8q9lk0ulhjq3ef0rs81693p3e" xml:space="preserve">{{ombox|type = notice
+| small = yes
+| image = [[File:Paragraph font awesome white.svg|35px]]
+| style = width: 25em; 
+| text = &lt;p&gt;This template uses block elements, ''e.g.'' &lt;code&gt;&amp;lt;div&gt;&lt;/code&gt; or &lt;code&gt;&amp;lt;p&gt;&lt;/code&gt;.&lt;br /&gt;It should not be nested inside an inline element, ''e.g.'' &lt;code&gt;&amp;lt;span&gt;&lt;/code&gt;, or a template that produces such an element.&lt;/p&gt;
+{{#if:{{{class|}}}|{{class notice|class={{{class}}}|classcount={{{classcount|}}}}}}}
+&lt;p&gt;See [[H:DIVSPAN]] for details.&lt;/p&gt;}}&lt;includeonly&gt;{{sandbox other||[[Category:block based templates]]}}&lt;/includeonly&gt;&lt;noinclude&gt;{{documentation}}&lt;/noinclude&gt;</text>
+      <sha1>7r00ci8q9lk0ulhjq3ef0rs81693p3e</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Flex wrap centre</title>
+    <ns>10</ns>
+    <id>106</id>
+    <revision>
+      <id>206</id>
+      <parentid>205</parentid>
+      <timestamp>2026-03-06T04:59:41Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>205</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="1125" sha1="ft985l8eysdxmtek361qjybizm5v8rt" xml:space="preserve">&lt;includeonly&gt;{{flex wrap centre/s
+ | align = {{{align|}}}
+ | max-width = {{{max-width|}}}
+ | align-items = {{{align-items|}}}
+ | align-content = {{{align-items|}}}
+ | class = {{{class|}}}
+ | style = {{{style|}}}
+}}&lt;!--
+
+    --&gt;{{#if:{{{1|}}}|&lt;div class="_flex_child {{{child_class|}}} {{{child_class1|}}}"&lt;!--
+        --&gt;{{#if:{{{child_style1|child_style}}}|style="{{{child_style|}}} {{{child_style1|}}}"}}&gt;
+{{{1}}}
+&lt;/div&gt;}}&lt;!--
+
+    --&gt;{{#if:{{{2|}}}|&lt;div class="_flex_child {{{child_class|}}} {{{child_class2|}}}"&lt;!--
+        --&gt;{{#if:{{{child_style2|child_style}}}|style="{{{child_style|}}} {{{child_style2|}}}"}}&gt;
+{{{2}}}
+&lt;/div&gt;}}&lt;!--
+
+    --&gt;{{#if:{{{3|}}}|&lt;div class="_flex_child {{{child_class|}}} {{{child_class3|}}}"&lt;!--
+        --&gt;{{#if:{{{child_style3|child_style}}}|style="{{{child_style|}}} {{{child_style3|}}}"}}&gt;
+{{{3}}}
+&lt;/div&gt;}}&lt;!--
+
+    --&gt;{{#if:{{{4|}}}|&lt;div class="_flex_child {{{child_class|}}} {{{child_class4|}}}"&lt;!--
+        --&gt;{{#if:{{{child_style4|child_style}}}|style="{{{child_style|}}} {{{child_style4|}}}"}}&gt;
+{{{4}}}
+&lt;/div&gt;}}&lt;!--
+
+--&gt;&lt;/div&gt;&lt;/includeonly&gt;&lt;noinclude&gt;
+{{documentation}}
+&lt;/noinclude&gt;</text>
+      <sha1>ft985l8eysdxmtek361qjybizm5v8rt</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Flex wrap centre/s</title>
+    <ns>10</ns>
+    <id>107</id>
+    <revision>
+      <id>208</id>
+      <parentid>207</parentid>
+      <timestamp>2026-03-06T04:59:41Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>207</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="542" sha1="acrai8gwnt7d6a1z6n6w7gmhgg06x4t" xml:space="preserve">&lt;includeonly&gt;&lt;templatestyles src="Flex wrap centre/styles.css" /&gt;&lt;!--
+
+--&gt;&lt;div class="_flex_wrap_center wst-flex-wrap-center {{{class|}}}" style="&lt;!--
+
+    --&gt;text-align:{{#if:{{{align|}}}|{{{align}}}|center}};&lt;!--
+    --&gt; {{#if:{{{max-width|}}}|max-width:{{{max-width}}};}}&lt;!--
+    --&gt; {{#if:{{{align-items|}}}|align-items:{{{align-items}}};}}&lt;!--
+    --&gt; {{#if:{{{align-content|}}}|align-content:{{{align-content}}};}}&lt;!--
+    --&gt; {{{style|}}}"&gt;&lt;!--
+
+--&gt;&lt;/includeonly&gt;&lt;noinclude&gt;
+{{documentation|Template:Flex wrap centre/doc}}
+&lt;/noinclude&gt;</text>
+      <sha1>acrai8gwnt7d6a1z6n6w7gmhgg06x4t</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Flex wrap centre/styles.css</title>
+    <ns>10</ns>
+    <id>108</id>
+    <revision>
+      <id>210</id>
+      <parentid>209</parentid>
+      <timestamp>2026-03-06T04:59:41Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>209</origin>
+      <model>sanitized-css</model>
+      <format>text/css</format>
+      <text bytes="702" sha1="3p5uoz1q5bstmavukew95qwcoaugxif" xml:space="preserve">/* main container: flex-box with wrapping, align to centre */
+.wst-flex-wrap-center {
+	margin: auto; /* centre in page if width &lt; 100% */
+	display: flex;
+	flex-wrap: wrap;
+    justify-content: center;
+}
+
+/* the direct childen have this class */
+.wst-flex-wrap-center &gt; ._flex_child {
+	/* default: a little padding on each side to separate cells */
+	/* can be overridden on a per-cell basis */
+	margin: 0.5em;
+}
+
+/* utility class if you want to remove child padding (can override without this) */
+.wst-flex-wrap-center &gt; ._flex_child._no_margin {
+	margin: 0;
+}
+
+.wst-flex-wrap-center img {
+	max-width: 100%; /* don't allow the imge to overspill containers */
+	height: auto; /* maintain aspect ratio */
+}</text>
+      <sha1>3p5uoz1q5bstmavukew95qwcoaugxif</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Serif</title>
+    <ns>10</ns>
+    <id>96</id>
+    <revision>
+      <id>186</id>
+      <parentid>185</parentid>
+      <timestamp>2026-03-06T04:59:41Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>185</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="223" sha1="h8fxfazq4fihx3usr2cnrs00jxpo2st" xml:space="preserve">&lt;includeonly&gt;&lt;span class="wst-serif {{{class|}}}" style="font-family:serif;"&gt;{{{1}}}&lt;/span&gt;&lt;/includeonly&gt;&lt;noinclude&gt;
+{{Documentation}}
+
+&lt;!-- Categories go on the /doc subpage, and interwikis go on Wikidata. --&gt;
+&lt;/noinclude&gt;</text>
+      <sha1>h8fxfazq4fihx3usr2cnrs00jxpo2st</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Uc</title>
+    <ns>10</ns>
+    <id>93</id>
+    <redirect title="Template:Uppercase" />
+    <revision>
+      <id>180</id>
+      <parentid>179</parentid>
+      <timestamp>2026-03-06T04:59:40Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>179</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="32" sha1="hajzmy98nxoluw7e8jstzo8emruorxd" xml:space="preserve">#REDIRECT [[Template:Uppercase]]</text>
+      <sha1>hajzmy98nxoluw7e8jstzo8emruorxd</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Uppercase/styles.css</title>
+    <ns>10</ns>
+    <id>114</id>
+    <revision>
+      <id>222</id>
+      <parentid>221</parentid>
+      <timestamp>2026-03-06T04:59:44Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>221</origin>
+      <model>sanitized-css</model>
+      <format>text/css</format>
+      <text bytes="46" sha1="klt7b4k6y2nvpm9ybzatesqggh1u2qo" xml:space="preserve">.wst-uppercase {
+	text-transform: uppercase;
+}</text>
+      <sha1>klt7b4k6y2nvpm9ybzatesqggh1u2qo</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Sc</title>
+    <ns>10</ns>
+    <id>84</id>
+    <redirect title="Template:Small-caps" />
+    <revision>
+      <id>162</id>
+      <parentid>161</parentid>
+      <timestamp>2026-03-06T04:59:40Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>161</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="32" sha1="3rsunug3zff0yo4blqi92q350gbvdf4" xml:space="preserve">#REDIRECT[[Template:Small-caps]]</text>
+      <sha1>3rsunug3zff0yo4blqi92q350gbvdf4</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:TemplateDataHeader</title>
+    <ns>10</ns>
+    <id>102</id>
+    <revision>
+      <id>198</id>
+      <parentid>197</parentid>
+      <timestamp>2026-03-06T04:59:41Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>197</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="513" sha1="6eyzssao96ocd8psrihcwg2r8s4exhv" xml:space="preserve">&lt;div class="templatedata-header"&gt;{{#if:{{{noheader|}}}| |This is the [[w:Wikipedia:TemplateData|TemplateData]] documentation for this template used by [[w:Wikipedia:VisualEditor|VisualEditor]] and other tools.}}
+
+'''{{{1|{{BASEPAGENAME}}}}}'''
+&lt;/div&gt;&lt;includeonly&gt;{{#ifeq:{{SUBPAGENAME}}|sandbox|&lt;!--
+	--&gt;|{{#if:{{IsDocSubpage|false=}}&lt;!--
+		--&gt;|[[Category:TemplateData documentation]]&lt;!--
+		--&gt;|[[Category:Templates using TemplateData]]&lt;!--
+	--&gt;}}&lt;!--
+--&gt;}}&lt;/includeonly&gt;&lt;noinclude&gt;
+{{Documentation}}
+&lt;/noinclude&gt;</text>
+      <sha1>6eyzssao96ocd8psrihcwg2r8s4exhv</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:IsDocSubpage</title>
+    <ns>10</ns>
+    <id>7658</id>
+    <revision>
+      <id>13823</id>
+      <timestamp>2026-06-10T17:33:25Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Pywikibot 11.2.0.dev0</comment>
+      <origin>13823</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="418" sha1="8dk0vfhcgp2nn8zhngl5w3c91lj17le" xml:space="preserve">&lt;onlyinclude&gt;&lt;includeonly&gt;{{#ifexpr: (
+	{{#ifeq:{{lc:{{SUBPAGENAME}}}}|{{lc:{{{override|doc}}}}}|1|0}} or (
+		{{#ifeq:{{lc:{{#titleparts:{{FULLPAGENAME}}|-1|-2}}}}|{{lc:{{{override|doc}}}}}|1|0}}
+		and {{#if:{{#translation:}}|1|0}}
+	)
+)&lt;!--
+	--&gt;|{{{true|1}}}&lt;!--
+	--&gt;|{{{false|}}}&lt;!--
+--&gt;}}&lt;/includeonly&gt;&lt;/onlyinclude&gt;
+{{Documentation}}
+&lt;!-- Add categories to the /doc subpage and interwikis in Wikidata, not here! --&gt;</text>
+      <sha1>8dk0vfhcgp2nn8zhngl5w3c91lj17le</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Module:Category handler/config</title>
+    <ns>828</ns>
+    <id>88</id>
+    <revision>
+      <id>170</id>
+      <parentid>169</parentid>
+      <timestamp>2026-03-06T04:59:40Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>169</origin>
+      <model>Scribunto</model>
+      <format>text/plain</format>
+      <text bytes="5761" sha1="m8k5q9d9n5x70j6xyg17x3o9s9ofn14" xml:space="preserve">--------------------------------------------------------------------------------
+--            [[Module:Category handler]] configuration data                  --
+--       Language-specific parameter names and values can be set here.        --
+--       For blacklist config, see [[Module:Category handler/blacklist]].     --
+--------------------------------------------------------------------------------
+
+local cfg = {} -- Don't edit this line.
+
+--------------------------------------------------------------------------------
+--                       Start configuration data                             --
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+--                              Parameter names                               --
+-- These configuration items specify custom parameter names.                  --
+-- To add one extra name, you can use this format:                            --
+--                                                                            --
+-- foo = 'parameter name',                                                    --
+--                                                                            --
+-- To add multiple names, you can use this format:                            --
+--                                                                            --
+-- foo = {'parameter name 1', 'parameter name 2', 'parameter name 3'},        --
+--------------------------------------------------------------------------------
+
+cfg.parameters = {
+	
+	-- The nocat and categories parameter suppress
+	-- categorisation. They are used with Module:Yesno, and work as follows:
+	--
+	-- cfg.nocat:
+	-- Result of yesno()                        Effect
+	-- true                                     Categorisation is suppressed
+	-- false                                    Categorisation is allowed, and
+	--                                          the blacklist check is skipped
+	-- nil                                      Categorisation is allowed
+	--
+	-- cfg.categories:
+	-- Result of yesno()                        Effect
+	-- true                                     Categorisation is allowed, and
+	--                                          the blacklist check is skipped
+	-- false                                    Categorisation is suppressed
+	-- nil                                      Categorisation is allowed
+	nocat = 'nocat',
+	categories = 'categories',
+	
+	-- The parameter name for the legacy "category2" parameter. This skips the
+	-- blacklist if set to the cfg.category2Yes value, and suppresses
+	-- categorisation if present but equal to anything other than
+	-- cfg.category2Yes or cfg.category2Negative.
+	category2 = 'category2',
+	
+	-- cfg.subpage is the parameter name to specify how to behave on subpages.
+	subpage = 'subpage',
+	
+	-- The parameter for data to return in all namespaces.
+	all = 'all',
+	
+	-- The parameter name for data to return if no data is specified for the
+	-- namespace that is detected.
+	other = 'other',
+	
+	-- The parameter name used to specify a page other than the current page;
+	-- used for testing and demonstration.
+	demopage = 'demopage',
+}
+
+--------------------------------------------------------------------------------
+--                              Parameter values                              --
+-- These are set values that can be used with certain parameters. Only one    --
+-- value can be specified, like this:                                         --
+--                                                                            --
+-- cfg.foo = 'value name'                                                     --                                               --
+--------------------------------------------------------------------------------
+
+-- The following settings are used with the cfg.category2 parameter. Setting
+-- cfg.category2 to cfg.category2Yes skips the blacklist, and if cfg.category2
+-- is present but equal to anything other than cfg.category2Yes or
+-- cfg.category2Negative then it supresses cateogrisation.
+cfg.category2Yes = 'yes'
+cfg.category2Negative = '¬'
+
+-- The following settings are used with the cfg.subpage parameter.
+-- cfg.subpageNo is the value to specify to not categorise on subpages;
+-- cfg.subpageOnly is the value to specify to only categorise on subpages.
+cfg.subpageNo = 'no'
+cfg.subpageOnly = 'only'
+
+--------------------------------------------------------------------------------
+--                           Default namespaces                               --
+-- This is a table of namespaces to categorise by default. The keys are the   --
+-- namespace numbers.                                                         --
+--------------------------------------------------------------------------------
+
+cfg.defaultNamespaces = {
+	[  0] = true, -- main
+	[  6] = true, -- file
+	[ 12] = true, -- help
+	[ 14] = true, -- category
+	[100] = true, -- portal
+	[102] = true, -- author
+}
+
+--------------------------------------------------------------------------------
+--                                Wrappers                                    --
+-- This is a wrapper template or a list of wrapper templates to be passed to  --
+-- [[Module:Arguments]].                                                      --
+--------------------------------------------------------------------------------
+
+cfg.wrappers = 'Template:Category handler'
+
+--------------------------------------------------------------------------------
+--                           End configuration data                           --
+--------------------------------------------------------------------------------
+
+return cfg -- Don't edit this line.</text>
+      <sha1>m8k5q9d9n5x70j6xyg17x3o9s9ofn14</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Module:Category handler/shared</title>
+    <ns>828</ns>
+    <id>89</id>
+    <revision>
+      <id>172</id>
+      <parentid>171</parentid>
+      <timestamp>2026-03-06T04:59:40Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>171</origin>
+      <model>Scribunto</model>
+      <format>text/plain</format>
+      <text bytes="888" sha1="omlsnhudxz6juptvtxz7ns97jutbzc5" xml:space="preserve">-- This module contains shared functions used by [[Module:Category handler]]
+-- and its submodules.
+
+local p = {}
+
+function p.matchesBlacklist(page, blacklist)
+	for i, pattern in ipairs(blacklist) do
+		local match = mw.ustring.match(page, pattern)
+		if match then
+			return true
+		end
+	end
+	return false
+end
+
+function p.getParamMappings(useLoadData)
+	local dataPage = 'Module:Namespace detect/data'
+	if useLoadData then
+		return mw.loadData(dataPage).mappings
+	else
+		return require(dataPage).mappings
+	end
+end
+
+function p.getNamespaceParameters(titleObj, mappings)
+	-- We don't use title.nsText for the namespace name because it adds
+	-- underscores.
+	local mappingsKey
+	if titleObj.isTalkPage then
+		mappingsKey = 'talk'
+	else
+		mappingsKey = mw.site.namespaces[titleObj.namespace].name
+	end
+	mappingsKey = mw.ustring.lower(mappingsKey)
+	return mappings[mappingsKey] or {}
+end
+
+return p</text>
+      <sha1>omlsnhudxz6juptvtxz7ns97jutbzc5</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Module:Category handler/blacklist</title>
+    <ns>828</ns>
+    <id>90</id>
+    <revision>
+      <id>174</id>
+      <parentid>173</parentid>
+      <timestamp>2026-03-06T04:59:40Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>173</origin>
+      <model>Scribunto</model>
+      <format>text/plain</format>
+      <text bytes="772" sha1="3eok90scs2c2o9aru604xtx1gfpjopu" xml:space="preserve">-- This module contains the blacklist used by [[Module:Category handler]].
+-- Pages that match Lua patterns in this list will not be categorised unless
+-- categorisation is explicitly requested.
+
+return {
+    '^Main Page$', -- don't categorise the main page.
+ 
+    -- Don't categorise the following pages or their subpages.
+    -- "%f[/\0]" matches if the next character is "/" or the end of the string.
+    '^Wikisource:Cascade%-protected items%f[/\0]',
+    '^User:UBX%f[/\0]', -- The userbox "template" space.
+    '^User talk:UBX%f[/\0]',
+ 
+    -- Don't categorise subpages of these pages, but allow
+    -- categorisation of the base page.
+    '^Wikisource:Template messages/.*$',
+ 
+    -- Don't categorise archives.
+    '/[aA]rchive%f[/\0]',
+    '/[aA]rchives%f[/\0]'
+}</text>
+      <sha1>3eok90scs2c2o9aru604xtx1gfpjopu</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Module:Namespace detect/data</title>
+    <ns>828</ns>
+    <id>91</id>
+    <revision>
+      <id>176</id>
+      <parentid>175</parentid>
+      <timestamp>2026-03-06T04:59:40Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>175</origin>
+      <model>Scribunto</model>
+      <format>text/plain</format>
+      <text bytes="2571" sha1="a6ap9xtq25pujaijv7a89da6k0dc51e" xml:space="preserve">--------------------------------------------------------------------------------
+--                          Namespace detect data                             --
+-- This module holds data for [[Module:Namespace detect]] to be loaded per    --
+-- page, rather than per #invoke, for performance reasons.                    --
+--------------------------------------------------------------------------------
+
+local cfg = require('Module:Namespace detect/config')
+
+local function addKey(t, key, defaultKey)
+	if key ~= defaultKey then
+		t[#t + 1] = key
+	end
+end
+
+-- Get a table of parameters to query for each default parameter name.
+-- This allows wikis to customise parameter names in the cfg table while
+-- ensuring that default parameter names will always work. The cfg table
+-- values can be added as a string, or as an array of strings.
+
+local defaultKeys = {
+	'main',
+	'talk',
+	'other',
+	'subjectns',
+	'demospace',
+	'demopage'
+}
+
+local argKeys = {}
+for i, defaultKey in ipairs(defaultKeys) do
+	argKeys[defaultKey] = {defaultKey}
+end
+
+for defaultKey, t in pairs(argKeys) do
+	local cfgValue = cfg[defaultKey]
+	local cfgValueType = type(cfgValue)
+	if cfgValueType == 'string' then
+		addKey(t, cfgValue, defaultKey)
+	elseif cfgValueType == 'table' then
+		for i, key in ipairs(cfgValue) do
+			addKey(t, key, defaultKey)
+		end
+	end
+	cfg[defaultKey] = nil -- Free the cfg value as we don't need it any more.
+end
+
+local function getParamMappings()
+	--[[
+	-- Returns a table of how parameter names map to namespace names. The keys
+	-- are the actual namespace names, in lower case, and the values are the
+	-- possible parameter names for that namespace, also in lower case. The
+	-- table entries are structured like this:
+	-- {
+	--   [''] = {'main'},
+	--   ['wikisource'] = {'wikisource', 'project', 'ws'},
+	--   ...
+	-- }
+	--]]
+	local mappings = {}
+	local mainNsName = mw.site.subjectNamespaces[0].name
+	mainNsName = mw.ustring.lower(mainNsName)
+	mappings[mainNsName] = mw.clone(argKeys.main)
+	mappings['talk'] = mw.clone(argKeys.talk)
+	for nsid, ns in pairs(mw.site.subjectNamespaces) do
+		if nsid ~= 0 then -- Exclude main namespace.
+			local nsname = mw.ustring.lower(ns.name)
+			local canonicalName = mw.ustring.lower(ns.canonicalName)
+			mappings[nsname] = {nsname}
+			if canonicalName ~= nsname then
+				table.insert(mappings[nsname], canonicalName)
+			end
+			for _, alias in ipairs(ns.aliases) do
+				table.insert(mappings[nsname], mw.ustring.lower(alias))
+			end
+		end
+	end
+	return mappings
+end
+
+return {
+	argKeys = argKeys,
+	cfg = cfg,
+	mappings = getParamMappings()
+}</text>
+      <sha1>a6ap9xtq25pujaijv7a89da6k0dc51e</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Module:Namespace detect/config</title>
+    <ns>828</ns>
+    <id>92</id>
+    <revision>
+      <id>178</id>
+      <parentid>177</parentid>
+      <timestamp>2026-03-06T04:59:40Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>177</origin>
+      <model>Scribunto</model>
+      <format>text/plain</format>
+      <text bytes="3549" sha1="mlt92g3c1kq66jv01p0l0u25rey5c7m" xml:space="preserve">--------------------------------------------------------------------------------
+--                    Namespace detect configuration data                     --
+--                                                                            --
+-- This module stores configuration data for Module:Namespace detect. Here    --
+-- you can localise the module to your wiki's language.                       --
+--                                                                            --
+-- To activate a configuration item, you need to uncomment it. This means     --
+-- that you need to remove the text "-- " at the start of the line.           --
+--------------------------------------------------------------------------------
+
+local cfg = {} -- Don't edit this line.
+
+--------------------------------------------------------------------------------
+--                              Parameter names                               --
+-- These configuration items specify custom parameter names. Values added     --
+-- here will work in addition to the default English parameter names.         --
+-- To add one extra name, you can use this format:                            --
+--                                                                            --
+-- cfg.foo = 'parameter name'                                                 --
+--                                                                            --
+-- To add multiple names, you can use this format:                            --
+--                                                                            --
+-- cfg.foo = {'parameter name 1', 'parameter name 2', 'parameter name 3'}     --
+--------------------------------------------------------------------------------
+
+---- This parameter displays content for the main namespace:
+-- cfg.main = 'main'
+
+---- This parameter displays in talk namespaces:
+-- cfg.talk = 'talk'
+
+---- This parameter displays content for "other" namespaces (namespaces for which
+---- parameters have not been specified):
+-- cfg.other = 'other'
+
+---- This parameter makes talk pages behave as though they are the corresponding
+---- subject namespace. Note that this parameter is used with [[Module:Yesno]].
+---- Edit that module to change the default values of "yes", "no", etc.
+-- cfg.subjectns = 'subjectns'
+
+---- This parameter sets a demonstration namespace:
+-- cfg.demospace = 'demospace'
+
+---- This parameter sets a specific page to compare:
+cfg.demopage = 'demopage'
+
+--------------------------------------------------------------------------------
+--                           Table configuration                              --
+-- These configuration items allow customisation of the "table" function,     --
+-- used to generate a table of possible parameters in the module              --
+-- documentation.                                                             --
+--------------------------------------------------------------------------------
+
+---- The header for the namespace column in the wikitable containing the list of
+---- possible subject-space parameters.
+-- cfg.wikitableNamespaceHeader = 'Namespace'
+
+---- The header for the wikitable containing the list of possible subject-space
+---- parameters.
+-- cfg.wikitableAliasesHeader = 'Aliases'
+
+--------------------------------------------------------------------------------
+--                        End of configuration data                           --
+--------------------------------------------------------------------------------
+
+return cfg -- Don't edit this line.</text>
+      <sha1>mlt92g3c1kq66jv01p0l0u25rey5c7m</sha1>
     </revision>
   </page>
 </mediawiki>

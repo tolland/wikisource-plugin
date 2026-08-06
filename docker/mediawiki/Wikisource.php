@@ -45,8 +45,11 @@ $wgGroupPermissions['sysop']['importupload'] = true;
 $wgDebugToolbar = true;
 $wgShowExceptionDetails = true;
 $wgScribuntoDefaultEngine = 'luastandalone';
-$wgScribuntoEngineConf['luastandalone']['errorFile'] = '/tmp/scribunto.log';
+// $wgScribuntoEngineConf['luastandalone']['errorFile'] = '/tmp/scribunto.log';
+
+// don't cache pages as we want to see updates immediately
 $wgCachePages = false;
+$wgParserCacheType = CACHE_NONE;
 
 $wgDefaultUserOptions[ 'usecodemirror' ] = true;
 

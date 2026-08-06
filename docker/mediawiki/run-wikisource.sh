@@ -148,7 +148,9 @@ if [ -n "$SEED_DUMPS$SEED_SCANS" ] ; then
     # ProofreadPage's Index: pagination needs the link tables --no-updates left
     # empty.
     printf 'rebuilding link tables\n'
-    php maintenance/run.php rebuildall
+#    php maintenance/run.php rebuildall
+    php maintenance/run.php showJobs
+    php maintenance/run.php runJobs
   fi
 fi
 
