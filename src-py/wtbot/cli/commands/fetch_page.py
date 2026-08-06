@@ -1,4 +1,5 @@
 import typer
+from rich import inspect
 from typer_di import Depends, TyperDI
 
 from wtbot.cli.deps import ApiClient, get_api, get_label
@@ -36,6 +37,8 @@ def fetch_page(
     """
     if ctx.invoked_subcommand is not None:
         return
+
+    inspect(api)
 
     result = api.post(
         "/fetch/",

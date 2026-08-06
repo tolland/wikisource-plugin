@@ -4,20 +4,21 @@ error_reporting( -1 );
 ini_set( 'display_errors', 1 );
 
 // Minimal Wikisource-like configuration for e2e tests.
-define( 'NS_PAGE', 104 );
-define( 'NS_PAGE_TALK', 105 );
-define( 'NS_INDEX', 106 );
-define( 'NS_INDEX_TALK', 107 );
-
-$wgExtraNamespaces[NS_PAGE] = 'Page';
-$wgExtraNamespaces[NS_PAGE_TALK] = 'Page_talk';
-$wgExtraNamespaces[NS_INDEX] = 'Index';
-$wgExtraNamespaces[NS_INDEX_TALK] = 'Index_talk';
-
-$wgProofreadPageNamespaceIds = [
-'page' => NS_PAGE,
-'index' => NS_INDEX,
-];
+//define( 'NS_PAGE', 104 );
+//define( 'NS_PAGE_TALK', 105 );
+//
+//define( 'NS_INDEX', 106 );
+//define( 'NS_INDEX_TALK', 107 );
+//
+//$wgExtraNamespaces[NS_PAGE] = 'Page';
+//$wgExtraNamespaces[NS_PAGE_TALK] = 'Page_talk';
+//$wgExtraNamespaces[NS_INDEX] = 'Index';
+//$wgExtraNamespaces[NS_INDEX_TALK] = 'Index_talk';
+//
+//$wgProofreadPageNamespaceIds = [
+//'page' => NS_PAGE,
+//'index' => NS_INDEX,
+//];
 
 $wgEnableUploads = true;
 $wgGroupPermissions['*']['edit'] = true;
@@ -55,6 +56,7 @@ wfLoadExtension( 'Gadgets' );
 wfLoadExtension( 'JsonConfig' );
 wfLoadExtension( 'LabeledSectionTransclusion' );
 wfLoadExtension( 'ParserFunctions' );
+wfLoadExtension( 'PdfHandler' );
 wfLoadExtension( 'ProofreadPage' );
 wfLoadExtension( 'Scribunto' );
 wfLoadExtension( 'TemplateData' );

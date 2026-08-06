@@ -9,7 +9,7 @@ ARG PROOFREADPAGE_BRANCH=REL1_43
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
-      default-mysql-client git djvulibre-bin netpbm ghostscript; \
+      default-mysql-client git djvulibre-bin netpbm ghostscript imagemagick poppler-utils; \
     rm -rf /var/lib/apt/lists/*; \
     git clone --depth 1 --branch "$PROOFREADPAGE_BRANCH" \
       https://gerrit.wikimedia.org/r/mediawiki/extensions/ProofreadPage \

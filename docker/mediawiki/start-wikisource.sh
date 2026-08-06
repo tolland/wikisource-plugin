@@ -166,6 +166,8 @@ if [ -n "$SEED_DUMPS$SEED_SCANS" ] && ! already_seeded; then
   fi
 fi
 
+chown -R www-data:www-data /var/www/html/images
+
 touch "$READY_MARKER"
 
 exec apache2-foreground
