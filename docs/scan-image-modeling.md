@@ -28,7 +28,7 @@ metadata row, and an endpoint that rewrites one of those URLs:
 | `PageMeta.page_number` | this page's number within the backing file |
 | `IndexMeta.page_count` | total pages per the Index's pagelist |
 | `FileBlob.file_sha1`, `upload_timestamp` | binary identity of a fetched File: — the one real identity handle in the system |
-| `GET /preview/page-image?path=&width=` | serves it, rewriting the `page{N}-{W}px-` token to synthesise a width |
+| `GET /reference-image?path=&width=` | serves it, rewriting the `page{N}-{W}px-` token to synthesise a width |
 | `ScanAnnotation(page_pk, annotation_id, x, y, w, h)` | boxes, keyed to the *page* |
 | `FileMeta.crop_x/y/w/h`, `source_page_number` | crop provenance "in source raster pixels" |
 
@@ -87,7 +87,7 @@ invalid against Wikimedia, which only serves bucketed sizes. Two things keep
 this latent rather than live: the sidecar only ever *asks the API* for two
 renditions — the default ~1280px reference image and a 240px thumb
 (`PAGE_THUMB_WIDTH`, `wtbot/wiki/client.py:35`), both server-blessed — and the
-plugin never passes `width` at all (`VfsBackend.pageImageUrl` has no width
+plugin never passes `width` at all (`VfsBackend.referenceImageUrl` has no width
 parameter). The first zoom control built against upstream is what would find
 it. Worth fixing when renditions get modelled, not before: the fix is to pick
 from a known-valid set rather than to compute a URL.
@@ -167,7 +167,7 @@ door closing, cheapest first.
    staleness *detectable*, which is the property that turns a silent drift
    into a question the client can ask.
 4. **Don't bake "one image per page" into the wire.** `GET
-   /preview/page-image?path=&width=` has no way to say *which* source, and
+   `GET /reference-image?path=&width=` has no way to say *which* source, and
    every client call site currently assumes there is only one. Leaving room
    for an optional `source=` — unused and single-valued today — costs nothing
    now and avoids a breaking change later.

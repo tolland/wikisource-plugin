@@ -19,6 +19,7 @@ from wtbot.api import (
     page_nav,
     pages,
     preview,
+    reference_image,
     sites,
     vfs,
     viewer,
@@ -125,6 +126,7 @@ def create_app(
     app.include_router(file_blob.router)
     app.include_router(namespace.router)
     app.include_router(preview.router)
+    app.include_router(reference_image.router)
     app.include_router(sites.router)
     app.include_router(vfs.router)
     app.include_router(viewer.router)

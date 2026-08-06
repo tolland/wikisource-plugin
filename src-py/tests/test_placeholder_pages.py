@@ -262,7 +262,7 @@ def test_placeholders_listed_with_flag(engine, tmp_path):
         assert by_number["Page:Sparse.pdf/1"]["writable"] is True
         # The scan reference image is known even though the page isn't
         # created yet — transcription can start from the placeholder.
-        assert by_number["Page:Sparse.pdf/1"]["has_page_image"] is True
+        assert by_number["Page:Sparse.pdf/1"]["has_reference_image"] is True
         assert by_number[PAGE_5]["placeholder"] is False
 
         stat = c.get(

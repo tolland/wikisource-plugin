@@ -40,7 +40,7 @@ log = logging.getLogger(__name__)
 #: whatever width the extension chose, and nobody noticed because the warning
 #: is not an error and the response still parsed. The thumbnail width is
 #: PageDisplayHandler's to decide and is not controllable from here; consumers
-#: that need another width rewrite the URL (see /preview/page-image).
+#: that need another width rewrite the URL (see /reference-image).
 IMAGE_FOR_PAGE_PROPS = "filename|size|fullsize"
 
 #: Titles per pageset query. MediaWiki's limit is 50 without apihighlimits,

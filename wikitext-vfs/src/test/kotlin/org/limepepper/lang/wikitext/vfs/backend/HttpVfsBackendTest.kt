@@ -162,22 +162,22 @@ class HttpVfsBackendTest {
         assertNull(r.scriptPath)
     }
 
-    @Test fun `pageImageUrl points at the sidecar with the path url-encoded`() {
-        val url = backend.pageImageUrl(
+    @Test fun `referenceImageUrl points at the sidecar with the path url-encoded`() {
+        val url = backend.referenceImageUrl(
             path = "/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1",
             title = null,
         )
         assertEquals(
-            "http://127.0.0.1:${server.address.port}/preview/page-image" +
+            "http://127.0.0.1:${server.address.port}/reference-image" +
                 "?path=%2Fwikisource%2Fen%2FIndex%3AFoo.djvu%2FPages%2FPage%3AFoo.djvu%2F1",
             url,
         )
     }
 
-    @Test fun `pageImageUrl with bare title`() {
-        val url = backend.pageImageUrl(path = null, title = "Page:Foo.djvu/1")
+    @Test fun `referenceImageUrl with bare title`() {
+        val url = backend.referenceImageUrl(path = null, title = "Page:Foo.djvu/1")
         assertEquals(
-            "http://127.0.0.1:${server.address.port}/preview/page-image?title=Page%3AFoo.djvu%2F1",
+            "http://127.0.0.1:${server.address.port}/reference-image?title=Page%3AFoo.djvu%2F1",
             url,
         )
     }

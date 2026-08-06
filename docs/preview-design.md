@@ -161,8 +161,8 @@ two button sets switched by mode via action `update()` visibility — render:
 toggle/reload; image: toggle/zoom in/out/reset zoom/send-to-OCR stub), and the
 proofread editor half carries `WtPageNavToolbar` across its top with
 previous/next page actions for walking the index and the form/raw toggle. The image URL comes from
-`VfsBackend.pageImageUrl()`, which points at the sidecar's
-`GET /preview/page-image?path=…`. The endpoint serves the real scan raster by
+`VfsBackend.referenceImageUrl()`, which points at the sidecar's
+`GET /reference-image?path=…`. The endpoint serves the real scan raster by
 **proxying** it (a proxy rather than a redirect so a dead upstream URL can
 degrade to the placeholder instead of a broken image in JCEF):
 

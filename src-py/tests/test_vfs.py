@@ -261,17 +261,17 @@ def test_stat_missing(vfs_client):
 
 
 def test_stat_carries_decoration_fields(vfs_client):
-    """quality_level / dirty / has_page_image ride on stat so the tree can
+    """quality_level / dirty / has_reference_image ride on stat so the tree can
     colour-code without extra round trips."""
     r = vfs_client.get("/vfs/stat", params={"path": f"{_PAGES_PATH}/{PAGE_1}"}).json()
     assert r["quality_level"] == 1
     assert r["dirty"] is False
-    assert r["has_page_image"] is True
+    assert r["has_reference_image"] is True
 
     # No PageMeta row for page 2 -- no scan image known (yet).
     r = vfs_client.get("/vfs/stat", params={"path": f"{_PAGES_PATH}/{PAGE_2}"}).json()
     assert r["quality_level"] is None
-    assert r["has_page_image"] is False
+    assert r["has_reference_image"] is False
 
 
 def test_children_carry_decoration_fields(vfs_client):
@@ -280,8 +280,8 @@ def test_children_carry_decoration_fields(vfs_client):
     ]
     by_name = {c["name"]: c for c in children}
     assert by_name[PAGE_1]["quality_level"] == 1
-    assert by_name[PAGE_1]["has_page_image"] is True
-    assert by_name[PAGE_2]["has_page_image"] is False
+    assert by_name[PAGE_1]["has_reference_image"] is True
+    assert by_name[PAGE_2]["has_reference_image"] is False
 
 
 def test_stat_reports_dirty_after_local_save(vfs_client):

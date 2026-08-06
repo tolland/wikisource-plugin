@@ -76,10 +76,10 @@ class Node(BaseModel):
         description="True when uncommitted local edits (EditJournal) exist for "
         "the backing page -- the 'modified vs backend' marker.",
     )
-    has_page_image: bool = Field(
+    has_reference_image: bool = Field(
         False,
         description="True when a scan reference image is known for this page; "
-        "fetch pixels from GET /preview/page-image?path=...&width=...",
+        "fetch pixels from GET /reference-image?path=...&width=...",
     )
     placeholder: bool = Field(
         False,
@@ -101,7 +101,7 @@ class Stat(BaseModel):
     content_model: str | None = None
     quality_level: int | None = None
     dirty: bool = False
-    has_page_image: bool = False
+    has_reference_image: bool = False
     placeholder: bool = False
 
 

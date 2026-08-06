@@ -258,7 +258,7 @@ class PageStore:
         ).all()
         return {row.page_pk: row for row in rows}
 
-    def has_page_image(self, page: Page) -> bool:
+    def has_reference_image(self, page: Page) -> bool:
         """A scan reference image is known once the fetch worker stored a
         thumb/source URL (or the raster cache filled a local path)."""
         meta = self.page_meta(page)

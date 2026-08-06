@@ -58,7 +58,7 @@ internal class WikisourceTreeStructure(
                     contentModel = child.contentModel,
                     qualityLevel = child.qualityLevel,
                     dirty = child.dirty,
-                    hasPageImage = child.hasPageImage,
+                    hasReferenceImage = child.hasReferenceImage,
                     placeholder = child.placeholder,
                     length = child.length,
                     timestamp = child.timestamp,
