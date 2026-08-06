@@ -123,7 +123,7 @@ def show(
 ) -> None:
     """One wiki's registration, as stored."""
     site = api.get(f"/sites/by-label/{label}")
-    for key in ("pk", "label", "family", "code", "api_url", "articlepath", "host"):
+    for key in ("pk", "label", "family", "code", "api_url", "articlepath"):
         typer.echo(f"{key:<16} {site.get(key)}")
     credential = api.get_optional(f"/sites/{site['pk']}/credential")
     typer.echo(
@@ -135,3 +135,37 @@ def show(
             else "none (reads only)"
         )
     )
+
+
+@app.command("delete")
+def delete(
+    label: str = typer.Argument(..., help="Site label"),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Actually delete. Without it, only show what deletion would remove.",
+    ),
+    api: ApiClient = Depends(get_api),
+) -> None:
+    """Delete a wiki and its whole local cache -- pages, revisions, queue, all.
+
+    There is no separate dry run: without --force this *is* the dry run,
+    printing the rows that would go and touching nothing.
+    """
+    site = api.get(f"/sites/by-label/{label}")
+    plan = (
+        api.delete(f"/sites/{site['pk']}")
+        if force
+        else api.get(f"/sites/{site['pk']}/delete-plan")
+    )
+
+    verb = "deleted" if force else "would delete"
+    typer.echo(f"{verb} from {plan['label']} ({plan['family']}:{plan['code']}):")
+    for entry in plan["counts"]:
+        typer.echo(f"  {entry['table']:<20} {entry['rows']:>8}")
+    if not force:
+        typer.secho(
+            f"nothing deleted -- run `wtbot site delete {label} --force` to "
+            f"delete these rows.",
+            fg="yellow",
+        )

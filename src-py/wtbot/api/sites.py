@@ -4,6 +4,7 @@ from sqlmodel import Session, select
 
 from wtbot.deps import get_session
 from wtbot.model import Site, SiteCredential
+from wtbot.site_delete import SiteDeletePlan, execute_site_delete, plan_site_delete
 from wtbot.site_store import require_site, site_by_label
 from wtbot.timeutil import utcnow
 
@@ -28,7 +29,6 @@ class SiteRequest(BaseModel):
         )
     )
     articlepath: str = "/wiki/$1"
-    host: str | None = None
     api_url: str | None = None
 
 
@@ -94,13 +94,42 @@ def update_site(
     site.family = body.family
     site.code = body.code
     site.articlepath = body.articlepath
-    site.host = body.host
     site.api_url = body.api_url
     site.label = body.label
     session.add(site)
     session.commit()
     session.refresh(site)
     return site
+
+
+@router.get("/{site_pk}/delete-plan", response_model=SiteDeletePlan)
+def site_delete_plan(
+    site_pk: int, session: Session = Depends(get_session)
+) -> SiteDeletePlan:
+    """What DELETE /sites/{site_pk} would remove, without removing it.
+
+    Deleting a site takes its whole local cache with it -- pages, revisions,
+    the fetch queue, the edit journal -- so the consequences are enumerable
+    before they are consequences (see `wtbot site delete`, which shows this
+    unless --force is given)."""
+    site = session.get(Site, site_pk)
+    if site is None:
+        raise HTTPException(status_code=404, detail="site not found")
+    return plan_site_delete(session, site)
+
+
+@router.delete("/{site_pk}", response_model=SiteDeletePlan)
+def delete_site(
+    site_pk: int, session: Session = Depends(get_session)
+) -> SiteDeletePlan:
+    """Delete a site and everything that only exists because of it.
+
+    Returns what was deleted -- the same shape the delete-plan endpoint
+    previews. Content rows shared with another site survive."""
+    site = session.get(Site, site_pk)
+    if site is None:
+        raise HTTPException(status_code=404, detail="site not found")
+    return execute_site_delete(session, site)
 
 
 # ---------------------------------------------------------------------------
