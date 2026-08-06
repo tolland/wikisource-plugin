@@ -50,12 +50,15 @@ def add(
     typer.echo(
         f"registered {site['label']} ({site['family']}:{site['code']}) #{site['pk']}"
     )
-    # Said once, at the point it can be acted on. Anonymous reads are not
-    # second-class -- an unauthenticated client with a compliant User-Agent
-    # gets the same 200 req/min as an ordinary account -- but writing back
-    # needs an account, and that is what this wiki cannot do yet.
+    # Said once, at the point it can be acted on. Not scolding: anonymous
+    # reads are a supported configuration and the documented read tier is the
+    # same. But the CDN in front of Wikimedia judges IP ranges as well as
+    # accounts, so unauthenticated traffic from a server can be refused where
+    # the same request from a laptop is not -- and commits need an account
+    # either way.
     typer.echo(
-        f"  no credential yet: reads work anonymously, commits do not. "
+        f"  no credential yet: commits will fail, and anonymous reads depend "
+        f"on how the CDN treats your IP range. "
         f"Add one with `wtbot site-credential add --label {label} ...`"
     )
 

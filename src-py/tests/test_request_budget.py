@@ -20,11 +20,15 @@ also drifted out of date against pywikibot -- so the number they gave was both
 stale and unfalsifiable. The docker harness is a wiki, and answers now.
 """
 
+from collections import Counter
+from urllib.parse import urlsplit
+
 import pytest
 from wiki_harness import PwbHarness, WikiApi
 
+from wtbot.model import Page
 from wtbot.settings import WikiSettings
-from wtbot.wiki.client import PywikibotClient
+from wtbot.wiki.client import FakeWikiClient, PywikibotClient
 from wtbot.wiki.http_tap import clear_exchanges, install_http_tap, recent_exchanges
 from wtbot.wiki.wiki_types import PageNotFound
 
@@ -37,6 +41,29 @@ PER_PAGE_BUDGET = 1
 #: lookup and download). Above one, but nowhere near the two that an existence
 #: check per page used to add.
 PER_PAGE_BUDGET_AMORTISED = 1.6
+
+
+#: One wiki can appear under several loopback spellings: the API endpoint is
+#: configured as 127.0.0.1 while MediaWiki's $wgServer says localhost, so file
+#: URLs come back with the other name.
+_LOOPBACK = frozenset({"localhost", "127.0.0.1", "::1"})
+
+
+def _hostname(host: str) -> str:
+    return host.rsplit(":", 1)[0] if ":" in host else host
+
+
+def _port(host: str) -> int | None:
+    _, sep, port = host.rpartition(":")
+    return int(port) if sep and port.isdigit() else None
+
+
+def _breakdown(exchanges) -> str:
+    """What the requests were, so a budget failure diagnoses itself rather
+    than leaving someone to re-run it under a debugger."""
+    counts = Counter(e.query_summary or e.path for e in exchanges)
+    lines = [f"  {n:4d}  {what}" for what, n in counts.most_common()]
+    return "requests by kind:\n" + "\n".join(lines)
 
 
 def test_the_configured_throttle_stays_inside_the_authenticated_allowance():
@@ -86,14 +113,26 @@ def test_a_real_fan_out_stays_inside_its_per_page_budget(
     with Session(engine) as session:
         pages_fetched = len(session.exec(select(Page)).all())
 
-    requests = len(recent_exchanges())
+    exchanges = recent_exchanges()
     assert pages_fetched > 1, "the fan-out fetched nothing to measure"
-    per_page = requests / pages_fetched
+
+    # The sharp claim first: one body load per page, and no more. This is the
+    # part under our control, and it is what regressed before -- the amortised
+    # ratio below also moves with fixed costs, which it should not be blamed
+    # for.
+    body_loads = [e for e in exchanges if "revisions" in e.query_summary]
+    assert len(body_loads) <= pages_fetched, (
+        f"{len(body_loads)} body loads for {pages_fetched} pages -- a page is "
+        "being asked for more than once"
+    )
+
+    per_page = len(exchanges) / pages_fetched
     assert per_page <= PER_PAGE_BUDGET_AMORTISED, (
-        f"{requests} upstream requests for {pages_fetched} pages "
+        f"{len(exchanges)} upstream requests for {pages_fetched} pages "
         f"({per_page:.2f}/page) exceeds the {PER_PAGE_BUDGET_AMORTISED}/page "
         "budget -- at the configured throttle that is proportionally longer to "
-        "fetch a book and proportionally more of the rate-limit allowance"
+        "fetch a book and proportionally more of the rate-limit allowance.\n"
+        + _breakdown(exchanges)
     )
 
 
@@ -132,9 +171,144 @@ def test_a_fan_out_talks_only_to_the_wiki_it_was_asked_about(
         )
         drain(http)
 
-    expected = {upstream_pwb.endpoint.api_url.split("/")[2]}
+    # One wiki, spelled more than one way: MediaWiki serves file URLs from
+    # $wgServer, which the harness sets to localhost while the API endpoint is
+    # 127.0.0.1. Same host, same port, same wiki -- comparing the strings
+    # would fail on the spelling and say nothing about traffic.
+    expected_port = urlsplit(upstream_pwb.endpoint.api_url).port
     hosts = {exchange.host for exchange in recent_exchanges()}
-    assert hosts <= expected, f"a fan-out reached hosts nobody asked for: {hosts}"
+    elsewhere = {
+        host
+        for host in hosts
+        if _hostname(host) not in _LOOPBACK or _port(host) != expected_port
+    }
+    assert not elsewhere, (
+        f"a fan-out reached hosts nobody asked for: {sorted(elsewhere)} "
+        f"(the wiki under test is loopback:{expected_port})"
+    )
+
+
+class _CountingImageClient(FakeWikiClient):
+    """Counts how the scan-image enrichment was asked for -- one call per
+    page, or one call for all of them."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.single_calls: list[str] = []
+        self.bulk_calls: list[list[str]] = []
+
+    def get_page_images(self, title):
+        self.single_calls.append(title)
+        return super().get_page_images(title)
+
+    def get_page_images_bulk(self, titles):
+        self.bulk_calls.append(list(titles))
+        return super().get_page_images_bulk(titles)
+
+
+def test_a_fan_out_asks_for_its_pages_images_once_not_once_per_page(engine, tmp_path):
+    """The second per-page request, removed.
+
+    Measured over docker, a 25-page fan-out cost 60 requests -- 2.4 per page,
+    where the body needs one. The other was ``prop=imageforpage``, asked per
+    child. It is a pageset module, so the fan-out (which knows every child
+    title before any child is fetched) asks once for fifty.
+    """
+    from sqlmodel import Session, select
+
+    from wtbot.model import FetchRequest, Site
+    from wtbot.queue_runner import drain_queue
+    from wtbot.wiki.wiki_types import RemotePage, RemotePageImages
+
+    index_title = "Index:Budget.djvu"
+    page_titles = [f"Page:Budget.djvu/{n}" for n in range(1, 6)]
+    pages = {
+        index_title: RemotePage(
+            title=index_title,
+            namespace_key=252,
+            namespace_canonical="Index",
+            content_model="proofread-index",
+            text='<pagelist 1to5="1" />',
+            revid=1,
+            page_count=5,
+        )
+    }
+    pages.update(
+        {
+            title: RemotePage(
+                title=title,
+                namespace_key=250,
+                namespace_canonical="Page",
+                content_model="proofread-page",
+                text="body",
+                revid=1,
+            )
+            for title in page_titles
+        }
+    )
+    images = {
+        title: RemotePageImages(thumbnail_url=f"https://wiki.test/{title}.jpg")
+        for title in page_titles
+    }
+    wiki = _CountingImageClient(
+        pages=pages, files={"File:Budget.djvu": b"scan"}, page_images=images
+    )
+
+    with Session(engine) as session:
+        site = Site(family="mywikisource", code="en", label="budget")
+        session.add(site)
+        session.commit()
+        session.refresh(site)
+        session.add(FetchRequest(site_pk=site.pk, title=index_title, depth=1))
+        session.commit()
+
+        drain_queue(session, lambda _site: wiki, blob_root=tmp_path / "blobs", batch=1)
+
+        fetched = {p.title for p in session.exec(select(Page)).all()}
+
+    assert set(page_titles) <= fetched, "the fan-out did not fetch its children"
+    assert wiki.bulk_calls == [page_titles], "children should be asked for in one go"
+    assert wiki.single_calls == [], (
+        "every child asked for its own image despite the bulk prefetch: "
+        f"{wiki.single_calls}"
+    )
+
+
+def test_a_page_fetched_on_its_own_still_gets_its_image(engine, tmp_path):
+    """The fallback. A child drained in a later run than its fan-out has no
+    prefetched entry, and must still end up with its thumbnail."""
+    from sqlmodel import Session
+
+    from wtbot.model import FetchRequest, Site
+    from wtbot.queue_runner import drain_queue
+    from wtbot.wiki.wiki_types import RemotePage, RemotePageImages
+
+    title = "Page:Budget.djvu/1"
+    wiki = _CountingImageClient(
+        pages={
+            title: RemotePage(
+                title=title,
+                namespace_key=250,
+                namespace_canonical="Page",
+                content_model="proofread-page",
+                text="body",
+                revid=1,
+            )
+        },
+        page_images={title: RemotePageImages(thumbnail_url="https://wiki.test/1.jpg")},
+    )
+
+    with Session(engine) as session:
+        site = Site(family="mywikisource", code="en", label="budget")
+        session.add(site)
+        session.commit()
+        session.refresh(site)
+        session.add(FetchRequest(site_pk=site.pk, title=title))
+        session.commit()
+
+        drain_queue(session, lambda _site: wiki, blob_root=tmp_path / "blobs")
+
+    assert wiki.single_calls == [title]
 
 
 # -- the guard -------------------------------------------------------------
@@ -275,3 +449,55 @@ def test_a_missing_page_also_costs_one_request():
         _client(loads, missing=True).get_page("Page:Book.pdf/999")
 
     assert len(loads) == PER_PAGE_BUDGET, f"expected one load, got {loads}"
+
+
+def test_one_wiki_spelled_two_ways_is_still_one_wiki():
+    """Why the host check compares loopback+port rather than strings.
+
+    The harness serves its API on 127.0.0.1 and its file URLs on localhost
+    (MediaWiki's $wgServer), so a literal comparison fails on the spelling and
+    reports traffic that never left the machine.
+    """
+    assert _hostname("localhost:18581") == "localhost"
+    assert _port("localhost:18581") == 18581
+    assert {_hostname(h) for h in ("localhost:18581", "127.0.0.1:18581")} <= _LOOPBACK
+
+
+def test_a_third_party_wiki_is_not_mistaken_for_the_one_under_test():
+    """...and the check still catches what it is for: Commons, Wikidata, or
+    anything else a fetch reached without being asked to."""
+    assert _hostname("commons.wikimedia.org") not in _LOOPBACK
+    assert _port("commons.wikimedia.org") is None
+    # Same host name, different wiki: the harness pair differs only by port.
+    assert _port("127.0.0.1:18582") != 18581
+
+
+def test_the_breakdown_names_the_requests_that_blew_the_budget():
+    """A budget failure has to say what the requests were; the number alone
+    sends someone back to a debugger, which is where this one came from."""
+    from wtbot.wiki.http_tap import HttpExchange
+
+    exchanges = [
+        HttpExchange(
+            "GET", "w", "/api.php", 200, "action=query prop=revisions", 0.1, None, 0.0
+        ),
+        HttpExchange(
+            "GET", "w", "/api.php", 200, "action=query prop=revisions", 0.1, None, 1.0
+        ),
+        HttpExchange(
+            "GET",
+            "w",
+            "/api.php",
+            200,
+            "action=query prop=imageforpage",
+            0.1,
+            None,
+            2.0,
+        ),
+    ]
+
+    report = _breakdown(exchanges)
+
+    assert "prop=revisions" in report
+    assert "2" in report.split("prop=revisions")[0].split("\n")[-1]
+    assert "prop=imageforpage" in report

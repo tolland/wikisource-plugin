@@ -36,6 +36,15 @@ log = logging.getLogger(__name__)
 # other widths on demand by rewriting the thumb URL.
 PAGE_THUMB_WIDTH = 240
 
+#: Titles per pageset query. MediaWiki's limit is 50 without apihighlimits,
+#: which an ordinary account does not have.
+_TITLES_PER_QUERY = 50
+
+
+def _chunks(items: list[str], size: int):
+    for start in range(0, len(items), size):
+        yield items[start : start + size]
+
 
 def _https(url: str | None) -> str | None:
     """Normalise the API's protocol-relative //upload... URLs to https://."""
@@ -56,6 +65,15 @@ class WikiClient(Protocol):
         """ProofreadPage scan image URLs + proofread quality for a Page:
         title, or None when the wiki/page has none (non-ProofreadPage wikis,
         API errors) -- enrichment, never a fetch-failing call."""
+        ...
+
+    def get_page_images_bulk(self, titles: list[str]) -> dict[str, RemotePageImages]:
+        """``get_page_images`` for many titles at once.
+
+        Per-title, this is the second request a page fetch costs -- measured,
+        it doubled the per-page budget. ``prop=imageforpage`` is a pageset
+        module, so fifty titles cost one request instead of fifty. Titles with
+        nothing to report are simply absent from the result."""
         ...
 
     def list_index_pages(self, title: str) -> list[IndexPageEntry] | None:
@@ -164,13 +182,16 @@ class PywikibotClient:
         membership -- which the tiers are drawn from, `bot` most decisively --
         is the closest observable proxy.
 
-        Note what anonymous does *not* cost: an unauthenticated client with a
-        policy-compliant User-Agent gets the same 200 req/min as an
-        authenticated account with few edits. Only an *unidentified* client
-        (no compliant User-Agent either) drops to 10 req/min. So reading a
-        public wiki anonymously is a configuration, not a fault, and this says
-        so at the level it deserves -- the thing genuinely broken by missing
-        credentials is writing back.
+        Anonymous is not simply "the lower tier": the documented read
+        allowance is the same 200 req/min an authenticated account with few
+        edits gets, and only an *unidentified* client (no compliant
+        User-Agent) drops to 10. But the published table is not the whole
+        policy -- Wikimedia's CDN also applies per-IP-block rules, and traffic
+        from cloud ranges is treated far less generously than the same request
+        from a residential connection, with authentication as the way through.
+        So this is INFO rather than a warning about tiers, and it says what is
+        actually true: reads may work, and may not, depending on where you are
+        calling from; commits will not work at all.
 
         Reads only what pywikibot already holds. ``site.userinfo`` is a
         property that *fetches* when cold, so asking would spend a request per
@@ -183,9 +204,10 @@ class PywikibotClient:
             info = getattr(self.site, "_userinfo", None)
             if not self.settings.username:
                 log.info(
-                    "wiki client for %s is anonymous: reads are unaffected "
-                    "(same 200 req/min tier as an ordinary account), commits "
-                    "will fail. Add an account with `wtbot site-credential add`",
+                    "wiki client for %s is anonymous: commits will fail, and "
+                    "reads depend on how the CDN treats this IP range (cloud "
+                    "ranges fare badly). Add an account with "
+                    "`wtbot site-credential add`",
                     self.site,
                 )
                 return
@@ -378,6 +400,37 @@ class PywikibotClient:
                 quality_text=proofread.get("quality_text"),
             )
         return None
+
+    def get_page_images_bulk(self, titles: list[str]) -> dict[str, RemotePageImages]:
+        # MediaWiki caps a pageset at 50 titles for a normal account (500 with
+        # apihighlimits, which we do not assume), so this chunks rather than
+        # asking for a limit we may not have.
+        found: dict[str, RemotePageImages] = {}
+        for chunk in _chunks(titles, _TITLES_PER_QUERY):
+            data = self._api_query(
+                action="query",
+                prop="imageforpage|proofread",
+                titles="|".join(chunk),
+                prppifpprop="filename|size|fullsize",
+                prppifpsize=PAGE_THUMB_WIDTH,
+            )
+            if data is None:
+                continue
+            for pdata in ((data.get("query") or {}).get("pages") or {}).values():
+                title = pdata.get("title")
+                images = pdata.get("imagesforpage") or {}
+                proofread = pdata.get("proofread") or {}
+                if not title or (not images and not proofread):
+                    continue
+                found[title] = RemotePageImages(
+                    thumbnail_url=_https(images.get("thumbnail")),
+                    fullsize_url=_https(images.get("fullsize")),
+                    size=images.get("size"),
+                    filename=images.get("filename"),
+                    quality=proofread.get("quality"),
+                    quality_text=proofread.get("quality_text"),
+                )
+        return found
 
     def list_index_pages(self, title: str) -> list[IndexPageEntry] | None:
         # Same fail-soft rationale as get_page_images: this powers fan-out
@@ -639,6 +692,9 @@ class FakeWikiClient:
 
     def get_page_images(self, title: str) -> RemotePageImages | None:
         return self._page_images.get(title)
+
+    def get_page_images_bulk(self, titles: list[str]) -> dict[str, RemotePageImages]:
+        return {t: self._page_images[t] for t in titles if t in self._page_images}
 
     def list_index_pages(self, title: str) -> list[IndexPageEntry] | None:
         return self._index_pages.get(title)

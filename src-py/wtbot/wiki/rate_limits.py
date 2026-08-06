@@ -19,6 +19,13 @@ above MediaWiki, and the API does not announce them. So the policy here is
 chosen, not discovered, and ``TIER_LIMITS`` exists so the choice can be checked
 against the published numbers instead of remembered.
 
+The table is also not the whole policy. The same CDN applies per-IP-block
+rules that no document enumerates: traffic from cloud provider ranges is
+treated far less generously than the identical request from a residential
+connection, and authenticating is the way through. So "unauthenticated gets
+the same 200 req/min" is true of the published tiers and misleading as
+operational advice -- authenticate for anything that has to keep working.
+
 The defaults target the 200 req/min tier: it is the one an ordinary editing
 account gets, 2000 needs an "established editor" standing we cannot ask for,
 and exemption needs a bot flag, which is granted for automated editing and is

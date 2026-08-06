@@ -109,8 +109,11 @@ def test_site_add_registers_and_says_what_is_missing(api):
     assert payload["api_url"] == "https://wikisource-debian-13.lan/w/api.php"
     # The follow-up an operator needs, at the moment it can be acted on...
     assert "site-credential add" in result.output
-    # ...and accurately: reads do not need it.
-    assert "reads work anonymously" in result.output
+    # ...and accurately. Not "the rate limit is lower" (it is not, by the
+    # published tiers) but what is actually true: commits are broken, and
+    # anonymous reads are at the CDN's discretion for this IP range.
+    assert "commits will fail" in result.output
+    assert "CDN" in result.output
 
 
 def test_credential_add_targets_the_site_by_label(api):

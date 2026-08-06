@@ -96,6 +96,9 @@ def drain_queue(
     passes = 0
     stop = DrainStop.queue_empty
     limiter = _RateLimitWatch()
+    # Shared for the whole drain, so a fan-out's bulk enrichment is still there
+    # when its children are processed a pass or two later.
+    image_cache: dict = {}
 
     while True:
         if max_passes is not None and passes >= max_passes:
@@ -113,6 +116,7 @@ def drain_queue(
             blob_root=blob_root,
             limit=batch,
             on_failure=limiter,
+            image_cache=image_cache,
         )
         passes += 1
         handled += done

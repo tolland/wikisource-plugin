@@ -489,6 +489,13 @@ Our design target is the 200 req/min tier with ≤3 concurrent requests.
 Three defects made a large `Index:` fan-out exceed that budget, and the same
 three made the resulting failures unreadable:
 
+- **A second request per page.** ProofreadPage's ``prop=imageforpage`` (scan
+  thumbnail + quality) was asked per fetched page, so a measured 25-page
+  fan-out cost 60 requests -- 2.4 per page where the body needs one. It is a
+  pageset module, so the Index fan-out, which knows every child title before
+  any child is fetched, now asks once per fifty and shares the answers with
+  its children through the drain (``ProcessContext.image_cache``). A page
+  drained apart from its fan-out still asks for itself.
 - **A client per fetch request.** `client_factory(site)` was called for every
   queued request, and each construction re-detects the site over HTTP (we build
   sites from a URL, so pywikibot uses an `AutoFamily`) and logs in again — the
@@ -514,6 +521,14 @@ three made the resulting failures unreadable:
   and supplies the status back to `wtbot/wiki/failures.py`, which classifies
   the failure; `wtbot/failure_log.py` keeps the short summary on the row and
   writes the traceback plus recent upstream requests to `WTBOT_FAILURE_LOG`.
+
+**Authenticate in practice, whatever the table says.** The published tiers put
+an unauthenticated client with a compliant User-Agent on the same 200 req/min
+as an ordinary account, but the CDN also applies per-IP-block rules that no
+document enumerates -- cloud provider ranges are treated far less generously
+than residential ones, and authenticating is the way through. Anonymous reads
+are supported and fine from a laptop; anything running on a server wants an
+account.
 
 On a 429 the correct response is to **lower the request rate, not to retry**:
 `Retry-After` is parsed and recorded, `max_retries` stays at 0, and a

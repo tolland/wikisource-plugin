@@ -18,11 +18,16 @@ What authentication buys, precisely, so it is asked for on real grounds:
   editor 2,000 req/min against 200 for everyone else -- but "established" is
   not something an account can be given on request, and no API reports which
   tier a request landed in.
+- **Getting through the CDN at all, in practice.** The published tiers say an
+  unauthenticated client with a compliant User-Agent gets the same 200 req/min
+  as a new account -- but the same CDN also judges IP ranges, and cloud
+  provider ranges are treated far less generously than residential ones.
+  Authenticated traffic is the way through. The table is the documented
+  policy; this is the operational one.
 
-What it does not buy is a better read rate today: an unauthenticated client
-with a policy-compliant User-Agent gets the same 200 req/min as a new account.
-Reading a public wiki anonymously is a legitimate configuration, not a
-misconfiguration, which is why nothing here refuses to fetch without it.
+So nothing here refuses to fetch without a credential -- reading a public wiki
+anonymously from a laptop is a legitimate configuration -- but anything that
+has to keep working, from a server, wants an account.
 <https://www.mediawiki.org/wiki/Wikimedia_APIs/Rate_limits>
 
 The password is stored in plaintext in the local SQLite file, as it is for any

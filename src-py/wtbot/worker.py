@@ -56,15 +56,28 @@ def run_pending(
     limit: int = 100,
     blob_root: Path | None = None,
     on_failure: FailureObserver | None = None,
+    image_cache: dict | None = None,
 ) -> int:
-    """Process up to ``limit`` pending requests. Returns how many were handled."""
+    """Process up to ``limit`` pending requests. Returns how many were handled.
+
+    ``image_cache`` is shared enrichment fetched in bulk (see
+    ``page_processors``): an Index fan-out fills it for its children, and each
+    child reads its own entry instead of asking the wiki again. Passing None
+    disables the sharing -- every page then asks for itself, which is correct
+    but costs a request each.
+    """
     handled = 0
     while handled < limit:
         req = _claim_next(session)
         if req is None:
             break
         _process(
-            session, req, client_factory, blob_root=blob_root, on_failure=on_failure
+            session,
+            req,
+            client_factory,
+            blob_root=blob_root,
+            on_failure=on_failure,
+            image_cache=image_cache,
         )
         handled += 1
     return handled
@@ -124,6 +137,7 @@ def _process(
     *,
     blob_root: Path | None = None,
     on_failure: FailureObserver | None = None,
+    image_cache: dict | None = None,
 ) -> None:
     site = _load_site_snapshot(session, req.site_pk)
     status = FetchStatus.error
@@ -144,6 +158,7 @@ def _process(
             client=client,
             request=req,
             blob_root=blob_root,
+            image_cache=image_cache,
         )
         outcome = processor.postprocess(ctx, page, remote)
         status = outcome.status
