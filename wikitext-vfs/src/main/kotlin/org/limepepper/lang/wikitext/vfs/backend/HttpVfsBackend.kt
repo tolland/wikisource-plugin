@@ -76,7 +76,7 @@ class HttpVfsBackend(
                 contentModel = stringOrNull("content_model"),
                 qualityLevel = longOrNull("quality_level")?.toInt(),
                 dirty = boolOrDefault("dirty", false),
-                hasPageImage = boolOrDefault("has_page_image", false),
+                hasReferenceImage = boolOrDefault("has_reference_image", false),
                 placeholder = boolOrDefault("placeholder", false),
             )
         }
@@ -100,7 +100,7 @@ class HttpVfsBackend(
                 contentModel = r.stringOrNull("content_model"),
                 qualityLevel = r.longOrNull("quality_level")?.toInt(),
                 dirty = r.boolOrDefault("dirty", false),
-                hasPageImage = r.boolOrDefault("has_page_image", false),
+                hasReferenceImage = r.boolOrDefault("has_reference_image", false),
                 placeholder = r.boolOrDefault("placeholder", false),
             )
         }
@@ -124,7 +124,7 @@ class HttpVfsBackend(
                         contentModel = child.stringOrNull("content_model"),
                         qualityLevel = child.longOrNull("quality_level")?.toInt(),
                         dirty = child.boolOrDefault("dirty", false),
-                        hasPageImage = child.boolOrDefault("has_page_image", false),
+                        hasReferenceImage = child.boolOrDefault("has_reference_image", false),
                         placeholder = child.boolOrDefault("placeholder", false),
                     )
                 },
@@ -211,14 +211,14 @@ class HttpVfsBackend(
         }
     }
 
-    override fun pageImageUrl(path: String?, title: String?): String {
+    override fun referenceImageUrl(path: String?, title: String?): String {
         val query = listOfNotNull(
             path?.let { "path" to it },
             title?.let { "title" to it },
         ).joinToString("&") { (k, v) ->
             "${URLEncoder.encode(k, "UTF-8")}=${URLEncoder.encode(v, "UTF-8")}"
         }
-        return "$baseUrl/preview/page-image?$query"
+        return "$baseUrl/reference-image?$query"
     }
 
     override fun listAnnotations(path: String): List<PageAnnotation> {

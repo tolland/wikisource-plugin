@@ -42,7 +42,7 @@ class WtVirtualFile(
     val contentModel: String? = null,
     qualityLevel: Int? = null,
     dirty: Boolean = false,
-    hasPageImage: Boolean = false,
+    hasReferenceImage: Boolean = false,
     placeholder: Boolean = false,
     length: Long? = null,
     timestamp: String? = null,
@@ -75,8 +75,8 @@ class WtVirtualFile(
     /** Uncommitted local edits (EditJournal) exist for the backing page. */
     @Volatile var dirty: Boolean = dirty
         private set
-    /** A scan reference image is known; pixels via GET /preview/page-image. */
-    @Volatile var hasPageImage: Boolean = hasPageImage
+    /** A scan reference image is known; pixels via GET /reference-image. */
+    @Volatile var hasReferenceImage: Boolean = hasReferenceImage
         private set
     /** No remote revision backs this file — a missing proofread page's
      * local stub. Opening it starts a new transcription. */
@@ -91,14 +91,14 @@ class WtVirtualFile(
     fun updateMeta(
         qualityLevel: Int?,
         dirty: Boolean,
-        hasPageImage: Boolean,
+        hasReferenceImage: Boolean,
         placeholder: Boolean,
         length: Long? = null,
         timestamp: String? = null,
     ) {
         this.qualityLevel = qualityLevel
         this.dirty = dirty
-        this.hasPageImage = hasPageImage
+        this.hasReferenceImage = hasReferenceImage
         this.placeholder = placeholder
         length?.let { statLength = it }
         timestamp?.toLongOrNull()?.let { statTimestamp = it }
@@ -112,7 +112,7 @@ class WtVirtualFile(
     @Synchronized
     fun invalidateIfStale(stat: StatResult) {
         updateMeta(
-            stat.qualityLevel, stat.dirty, stat.hasPageImage, stat.placeholder,
+            stat.qualityLevel, stat.dirty, stat.hasReferenceImage, stat.placeholder,
             stat.length, stat.timestamp,
         )
         if (stat.revid != revid) {
@@ -154,7 +154,7 @@ class WtVirtualFile(
                 contentModel = child.contentModel,
                 qualityLevel = child.qualityLevel,
                 dirty = child.dirty,
-                hasPageImage = child.hasPageImage,
+                hasReferenceImage = child.hasReferenceImage,
                 placeholder = child.placeholder,
                 length = child.length,
                 timestamp = child.timestamp,
@@ -245,7 +245,7 @@ class WtVirtualFile(
                 contentModel = stat.contentModel,
                 qualityLevel = stat.qualityLevel,
                 dirty = stat.dirty,
-                hasPageImage = stat.hasPageImage,
+                hasReferenceImage = stat.hasReferenceImage,
                 placeholder = stat.placeholder,
                 length = stat.length,
                 timestamp = stat.timestamp,

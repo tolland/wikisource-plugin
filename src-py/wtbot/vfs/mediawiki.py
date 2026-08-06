@@ -113,7 +113,7 @@ class MediaWikiVfs:
             content_model=page.content_model,
             quality_level=resolved.quality_level if resolved is not None else None,
             dirty=page.dirty,
-            has_page_image=meta_has_image(resolved),
+            has_reference_image=meta_has_image(resolved),
             # A page we pushed exists remotely even if its refetch is still
             # queued, so this follows the bridged revid, not the snapshot.
             placeholder=state.placeholder,
@@ -142,7 +142,7 @@ class MediaWikiVfs:
             content_model=page.content_model,
             quality_level=resolved.quality_level if resolved is not None else None,
             dirty=page.dirty,
-            has_page_image=meta_has_image(resolved),
+            has_reference_image=meta_has_image(resolved),
             # A page we pushed exists remotely even if its refetch is still
             # queued, so this follows the bridged revid, not the snapshot.
             placeholder=state.placeholder,

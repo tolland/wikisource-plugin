@@ -212,7 +212,7 @@ internal class WikisourceBrowserToolWindowTab(
             appendLine("contentModel: ${vFile.contentModel ?: "—"}")
             appendLine("quality:   ${vFile.qualityLevel ?: "—"}")
             appendLine("dirty:     ${vFile.dirty}")
-            appendLine("pageImage: ${vFile.hasPageImage}")
+            appendLine("pageImage: ${vFile.hasReferenceImage}")
             appendLine("placeholder: ${vFile.placeholder}")
         }
     }

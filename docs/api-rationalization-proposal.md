@@ -18,7 +18,8 @@ data model (`wtbot/model/`), the VFS tree logic (`wtbot/vfs/`), and the fetch
 |---|---|---|---|
 | `health` | — | `GET /health` | both |
 | `vfs` | `/vfs` | stat, stat/bulk, children, content ×2 | plugin |
-| `preview` | `/preview` | `POST /render`, `GET /page-image` (the only image route) | plugin |
+| `preview` | `/preview` | `POST /render` (HTML from action=parse) | plugin |
+| `reference_image` | `/reference-image` | `GET /reference-image` (the only image route) | plugin |
 | `page_nav` | `/pages` | `GET /pages/nav` | plugin |
 | `annotations` | `/pages` | annotations, text-anchors, box-links (GET/PUT/DELETE ×3) | plugin |
 | `ocr` | *(none)* + `/pages` | `/ocr/backends`, `/ocr/models`, `/ocr/config/{name}`, `/ocr/run`, `/pages/ocr/{backends,models,run}` | plugin + admin |
@@ -34,7 +35,7 @@ data model (`wtbot/model/`), the VFS tree logic (`wtbot/vfs/`), and the fetch
 
 What the plugin actually calls (`HttpVfsBackend.kt`, exhaustive): `/vfs/stat`,
 `/vfs/stat/bulk`, `/vfs/children`, `/vfs/content` (GET+POST), `/preview/render`,
-`/preview/page-image`, `/pages/nav`, `/pages/annotations`, `/pages/text-anchors`,
+`/reference-image`, `/pages/nav`, `/pages/annotations`, `/pages/text-anchors`,
 `/pages/box-links`, `/pages/ocr/{backends,models,run}`. That is **17 of 46
 paths**. Everything else is viewer, tests, or admin — which is the main reason
 the surface is hard to read: three audiences, one flat namespace, no signal
@@ -45,7 +46,7 @@ about which routes are contract and which are conveniences.
 ### 2.1 `/pages` is a five-way shared prefix
 
 `pages`, `page_meta`, `page_nav`, `annotations`, and half of `ocr` all mount
-under `/pages` (`page_image` did too, until the phase-1 cleanup).
+under `/pages` (`reference_image` did too, until the phase-1 cleanup).
 
 To be precise about the mechanism, because "one router masks another" would be
 the wrong description: `include_router()` does not create an isolated
@@ -106,7 +107,7 @@ applies: an id in a path segment should have exactly one meaning per prefix.
 Everything the plugin holds is a `wikisource://` VFS path. Everything the DB
 keys on is a `page_pk`. The API splits along no clear line:
 
-- path-addressed: `/vfs/*`, `/pages/nav`, `/preview/page-image`, `/pages/annotations`,
+- path-addressed: `/vfs/*`, `/pages/nav`, `/reference-image`, `/pages/annotations`,
   `/pages/text-anchors`, `/pages/box-links`, `/pages/ocr/*`, `/preview/*`
 - pk-addressed: `/pages/{pk}/index-meta`, `/page-meta`, `/file-meta`,
   `/commits/{page_pk}`, `/viewer/indexes/{page_pk}`
@@ -121,16 +122,19 @@ short-name data it will.
 ### 2.3 Duplicate endpoints for the same bytes — **fixed**
 
 `GET /pages/image` and `GET /preview/page-image` both served scan renditions
-through the same `serve_scan_image()` helper, differing only in the
-no-image-known case: 404 vs a generated placeholder SVG. `page_image.py`'s
+through the same `serve_reference_image()` helper, differing only in the
+no-image-known case: 404 vs a generated placeholder SVG. `reference_image.py`'s
 docstring called itself "canonical"; the plugin called the other one, and
 `/pages/image` had no caller anywhere — not the plugin, not the viewer app,
 not the tests.
 
-Resolved: `/pages/image` is gone. `page_image.py` keeps `serve_scan_image()`
-as the cache-and-serve engine and no longer defines a router;
-`/preview/page-image` is the single image endpoint. A strict (404-on-miss)
-mode, if wanted again, belongs there as a query flag.
+Resolved: `/pages/image` is gone, and the survivor was renamed. It was
+`GET /preview/page-image` — a picture of a book page, served from a prefix
+whose other route renders wikitext to HTML. It is the *reference image*: the
+scan being transcribed, what ProofreadPage's API calls `imageforpage`, and not
+a preview of anything. It is now `GET /reference-image` with its own router
+(`reference_image.py`), holding both the route and the cache-and-serve engine.
+A strict (404-on-miss) mode, if wanted again, belongs there as a query flag.
 
 Similarly `ocr` carries two parallel surfaces — `/ocr/run` (explicit scope +
 image) and `/pages/ocr/run` (path → scope + image URL) — with the second a
@@ -141,7 +145,7 @@ signposted by the URL structure, and both live in one 366-line module.
 
 `page_nav.py:49`, `annotations.py:106` (`_page_for`), `ocr.py:273`
 (`_page_for` again, different return type) and, until its route was removed,
-`page_image.py` each do `PageStore(session)` → `resolve(store, path)` →
+`reference_image.py` each do `PageStore(session)` → `resolve(store, path)` →
 `isinstance(node, PageLeaf)` → `raise HTTPException(404, "not a proofread
 page: …")`. Two of them are identically-named private helpers in different
 modules.
@@ -266,7 +270,7 @@ The API consequence, which stays here: keep `?path=` addressing on the
 annotation endpoints — it is what the editor holds, and re-addressing them by
 scan id would make every caller do a lookup it cannot do. But the *response*
 should carry the scan identity the boxes belong to, and
-`GET /preview/page-image` should leave room for naming a source, so the wire
+`GET /reference-image` should leave room for naming a source, so the wire
 contract does not bake in "one image per page". Both are additive.
 
 ## 3. Target shape
@@ -380,7 +384,7 @@ Split `api/schemas.py` into a package. Move inline models in. Make
 
 **Phase 3 — `/pages` becomes one package.**
 `api/pages/` with a parent router; no external path changes, so the Kotlin
-client is untouched. Move `/preview/page-image` to `/pages/image` (it is a
+client is untouched. Move `/reference-image` to `/pages/image` (it is a
 page's bytes, not a preview concern) and fold `preview/render` in as
 `/pages/preview`.
 
