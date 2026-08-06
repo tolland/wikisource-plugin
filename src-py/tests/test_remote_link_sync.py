@@ -52,7 +52,6 @@ def _register(session: Session, harness: PwbHarness) -> Site:
         family=f"harness-{harness.endpoint.role}",
         code="en",
         api_url=harness.endpoint.api_url,
-        host=harness.endpoint.base_url,
         label=harness.endpoint.role,
     )
     session.add(site)

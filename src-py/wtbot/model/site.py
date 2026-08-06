@@ -17,8 +17,16 @@ class Site(SQLModel, table=True):
     Sites are created deliberately now (see ``wtbot site add``); nothing
     conjures one from the parameters of a fetch.
 
-    ``host``/``api_url`` are derived/optional, never the key, because
-    pageids/revids from two independent wikis are not comparable.
+    ``api_url`` is derived/optional, never the key, because pageids/revids
+    from two independent wikis are not comparable. (A ``host`` column used to
+    sit beside it; nothing ever read it, so it was dropped.)
+
+    ``family``/``code`` survive the move to generated pywikibot config on
+    purpose. The family is the AutoFamily name for ``api_url`` sites, and it
+    must be operator-chosen: pywikibot's process-global Site cache ignores the
+    port, so two local wikis distinguished only by port would silently share
+    one APISite if the name were derived from the URL (see
+    wtbot.wiki.client). For family-file sites the pair is the whole address.
     """
 
     __table_args__ = (
@@ -34,7 +42,6 @@ class Site(SQLModel, table=True):
 
     # Derived / optional -- handy for the UI and for building API calls, but not
     # part of the identity.
-    host: str | None = None  # 'en.wikisource.org', 'wikisource-debian-13.lan'
     api_url: str | None = None  # full action=... endpoint
     # The operator-facing handle: unique, and what --label resolves against.
     # Nullable only because fixtures build Site rows directly; every creation

@@ -37,7 +37,6 @@ def test_update_site(client):
             "family": "mywikisource",
             "code": "fr",
             "articlepath": "/wiki/$1",
-            "host": "example.test",
             "api_url": "https://example.test/w/api.php",
             "label": "Example",
         },
@@ -46,7 +45,6 @@ def test_update_site(client):
     assert resp.status_code == 200
     updated = resp.json()
     assert updated["code"] == "fr"
-    assert updated["host"] == "example.test"
     assert updated["api_url"] == "https://example.test/w/api.php"
     assert updated["label"] == "Example"
 

@@ -17,7 +17,6 @@ export interface Site {
   family: string;
   code: string;
   articlepath?: string | null;
-  host?: string | null;
   api_url?: string | null;
   label?: string | null;
   created_at?: string | null;
@@ -39,7 +38,6 @@ export interface SitePayload {
   family: string;
   code: string;
   articlepath?: string;
-  host?: string | null;
   api_url?: string | null;
   label?: string | null;
 }

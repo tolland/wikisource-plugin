@@ -66,7 +66,6 @@ def detached_site(site: Site) -> Site:
         family=site.family,
         code=site.code,
         articlepath=site.articlepath,
-        host=site.host,
         api_url=site.api_url,
         label=site.label,
         created_at=site.created_at,

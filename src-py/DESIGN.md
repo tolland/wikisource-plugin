@@ -235,7 +235,7 @@ What was carried across from the old `schema.sql`: the rich `pages` shape (inlin
 remote-identity/conflict columns), `transclusions`, the fetch queue
 (`fetch_requests` → `FetchRequest`), and the outbound `commits` log (→ `Commit`).
 Site identity is the pywikibot `family`/`code` pair (the request vocabulary
-`title:x family:y code:z`); `host`/`api_url` are derived/optional columns, not the
+`title:x family:y code:z`); `api_url` is a derived/optional column, not the
 key. The old standalone `Revision` model was folded into `pages` (inline remote
 state, matching the original schema design) and `upserts.py` was removed as stale.
 

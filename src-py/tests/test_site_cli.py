@@ -22,7 +22,6 @@ SITE = {
     "code": "en",
     "api_url": "https://wikisource-debian-13.lan/w/api.php",
     "articlepath": "/wiki/$1",
-    "host": None,
 }
 CREDENTIAL = {
     "site_pk": 1,
@@ -30,6 +29,17 @@ CREDENTIAL = {
     "bot_name": "wtbot",
     "password": "secret",
     "updated_at": "2026-08-06T12:00:00",
+}
+DELETE_PLAN = {
+    "site_pk": 1,
+    "label": "local",
+    "family": "mywikisource",
+    "code": "en",
+    "counts": [
+        {"table": "revision", "rows": 40},
+        {"table": "page", "rows": 12},
+        {"table": "site", "rows": 1},
+    ],
 }
 
 
@@ -76,7 +86,9 @@ def api(monkeypatch):
 
     def fake_delete(url, timeout=None):
         calls["deleted"].append(url)
-        return httpx.Response(204, request=httpx.Request("DELETE", url))
+        return httpx.Response(
+            200, json=DELETE_PLAN, request=httpx.Request("DELETE", url)
+        )
 
     monkeypatch.setattr(httpx, "get", fake_get)
     monkeypatch.setattr(httpx, "post", fake_post)
@@ -144,6 +156,32 @@ def test_site_add_can_take_the_credential_in_the_same_step(api):
     assert payload["bot_name"] == "wtbot"
     assert "logs in as Admin@wtbot" in result.output
     assert "no credential" not in result.output
+
+
+def test_site_delete_without_force_is_the_dry_run(api):
+    """No --force means show the consequences and touch nothing -- the preview
+    IS the default, not an option someone has to know to ask for."""
+    api["routes"]["/sites/1/delete-plan"] = DELETE_PLAN
+
+    result = runner.invoke(create_app(), ["site", "delete", "local"])
+
+    assert result.exit_code == 0, result.output
+    assert api["deleted"] == [], "no DELETE may be issued without --force"
+    assert "would delete" in result.output
+    assert "revision" in result.output and "40" in result.output
+    assert "nothing deleted" in result.output
+    assert "--force" in result.output
+
+
+def test_site_delete_with_force_deletes_and_reports_what_went(api):
+    result = runner.invoke(create_app(), ["site", "delete", "local", "--force"])
+
+    assert result.exit_code == 0, result.output
+    assert len(api["deleted"]) == 1
+    assert api["deleted"][0].endswith("/sites/1")
+    assert "deleted from local (mywikisource:en)" in result.output
+    assert "page" in result.output and "12" in result.output
+    assert "would delete" not in result.output
 
 
 def test_credential_add_targets_the_site_by_label(api):
