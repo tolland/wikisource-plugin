@@ -19,7 +19,7 @@ router = APIRouter(prefix="/commits", tags=["commits"])
 # longer drains that queue itself. Committing is a write to the wiki; waiting
 # for the throttled read-back is a separate concern with a separate call
 # (POST /fetch/drain). Reads bridge on the Commit body until the refetch lands
-# (see PageStore.effective_body), so the gap between the two is already a
+# (see PageStore.effective_state), so the gap between the two is already a
 # designed-for state rather than a new one.
 
 

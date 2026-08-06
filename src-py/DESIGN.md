@@ -375,9 +375,13 @@ landed":
   `submitted_body` while `Page.revid` still lags its `result_revid` → `Page.text`.
   The pushed body *is* the remote body during that window, and the revid guard
   means a later remote edit (fetched normally) is never shadowed.
-- **`revid` and `placeholder` bridge the same way.** `effective_revid` returns
-  the commit's `result_revid` while it is ahead of `Page.revid`, and
-  `placeholder` follows it. A page we pushed exists remotely from the moment
+- **`revid` and `placeholder` bridge the same way.** `PageStore.effective_state`
+  answers body and revid together -- one rule, one object (`EffectiveState`),
+  so the two cannot disagree about which revision is current. It returns the
+  commit's `result_revid` while that is ahead of `Page.revid`, and
+  `placeholder` follows it. Batched callers pass rows they already loaded to
+  `effective_state_from` rather than restating the rule, which is how the
+  listing and single-stat paths came to give different answers. A page we pushed exists remotely from the moment
   the push succeeds; reporting it as a placeholder until its refetch lands
   would be wrong, and was only survivable while every commit drained its own
   refetch inline. `write` compares `base_revid` against the same effective

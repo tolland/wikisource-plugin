@@ -3,6 +3,7 @@ from pathlib import Path
 
 from sqlmodel import Session, select
 
+from wtbot.db_session import detached_site, read_snapshot, write_batch
 from wtbot.failure_log import FailureContext, record_failure, site_label
 from wtbot.model import (
     FetchRequest,
@@ -70,7 +71,7 @@ def run_pending(
 
 
 def _claim_next(session: Session) -> ClaimedFetchRequest | None:
-    try:
+    with read_snapshot(session):
         req = session.exec(
             select(FetchRequest)
             .where(FetchRequest.status == FetchStatus.pending)
@@ -84,10 +85,6 @@ def _claim_next(session: Session) -> ClaimedFetchRequest | None:
         claimed = _snapshot_request(req)
         session.commit()
         return claimed
-    finally:
-        # The worker must not carry an open transaction into pywikibot
-        # network calls.
-        session.rollback()
 
 
 def _snapshot_request(req: FetchRequest) -> ClaimedFetchRequest:
@@ -107,12 +104,10 @@ def _maybe_sync_namespaces(session: Session, site: Site, client: WikiClient) -> 
     """Sync siteinfo namespaces on first use of a site (no-op on subsequent calls)."""
     from wtbot.model import Namespace
 
-    try:
+    with read_snapshot(session):
         already = session.exec(
             select(Namespace).where(Namespace.site_pk == site.pk)
         ).first()
-    finally:
-        session.rollback()
     if already is not None:
         return
     ns_dict = client.get_namespaces()
@@ -185,22 +180,11 @@ def _process(
 
 
 def _load_site_snapshot(session: Session, site_pk: int) -> Site:
-    try:
+    with read_snapshot(session):
         site = session.get(Site, site_pk)
         if site is None:
             raise RuntimeError(f"fetch request references missing site {site_pk}")
-        return Site(
-            pk=site.pk,
-            family=site.family,
-            code=site.code,
-            articlepath=site.articlepath,
-            host=site.host,
-            api_url=site.api_url,
-            label=site.label,
-            created_at=site.created_at,
-        )
-    finally:
-        session.rollback()
+        return detached_site(site)
 
 
 def _record_fetch_result(
@@ -212,7 +196,7 @@ def _record_fetch_result(
     progress_done: int,
     error_message: str | None,
 ) -> None:
-    try:
+    with write_batch(session):
         db_req = session.get(FetchRequest, req.pk)
         if db_req is None:
             return
@@ -229,13 +213,6 @@ def _record_fetch_result(
             and req.parent_pk is not None
         ):
             _update_parent_progress(session, req.parent_pk)
-
-        session.commit()
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.rollback()
 
 
 def _update_parent_progress(session: Session, parent_pk: int) -> None:
@@ -259,7 +236,7 @@ def _upsert_page(
 ) -> CachedPage:
     """Write the common Page fields from the remote snapshot, then let the
     type-specific processor enrich its own columns, in one transaction."""
-    try:
+    with write_batch(session):
         page = session.exec(
             select(Page).where(Page.site_pk == site.pk, Page.title == remote.title)
         ).first()
@@ -296,17 +273,10 @@ def _upsert_page(
         if processor.enrich_meta(target, remote) and meta is None:
             session.add(target)
 
-        cached = CachedPage(
+        return CachedPage(
             pk=page.pk,
             title=page.title,
             namespace_role=page.namespace_role,
             content_model=page.content_model,
             text=page.text,
         )
-        session.commit()
-        return cached
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.rollback()

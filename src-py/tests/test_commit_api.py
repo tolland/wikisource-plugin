@@ -205,3 +205,45 @@ def test_commit_endpoint_noop_when_nothing_pending(engine):
         resp = c.post("/commits/")
     assert resp.status_code == 200
     assert resp.json()["handled"] == 0
+
+
+def test_bulk_and_single_stat_agree_during_the_push_window(engine):
+    """The batched path must report what the single path reports.
+
+    In the window between a successful push and its refetch, a page can carry
+    both an uncommitted save (which supplies the body) and a commit ahead of
+    the snapshot (which supplies the revid). The bulk path used to restate the
+    bridging rule inline, and loaded commits only for pages *without* local
+    edits -- so precisely this page reported a stale revid in a listing and a
+    current one when stat'ed alone. Both now go through the same rule.
+    """
+    site, page = _setup(engine)
+    fake = FakeWikiClient(
+        pages={
+            TITLE: RemotePage(
+                title=TITLE,
+                namespace_key=0,
+                namespace_canonical="Page",
+                content_model="proofread-page",
+                text="original",
+                revid=100,
+            )
+        }
+    )
+    app = create_app(engine=engine, client_factory=lambda site: fake)
+    with TestClient(app) as c:
+        c.post(
+            "/vfs/content",
+            json={"path": PATH, "content_base64": _b64("pushed"), "base_revid": 100},
+        )
+        assert c.post("/commits/").json()["handled"] == 1
+
+        # A further local save, still in the window: refetch not drained.
+        c.post("/vfs/content", json={"path": PATH, "content_base64": _b64("and more")})
+
+        single = c.get("/vfs/stat", params={"path": PATH}).json()
+        bulk = c.post("/vfs/stat/bulk", json={"paths": [PATH]}).json()["results"][0]
+
+    assert single == bulk
+    assert single["revid"] == 101  # the revision we pushed, not the snapshot's
+    assert single["placeholder"] is False

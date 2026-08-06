@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 from sqlmodel import Session
 
 from wtbot.api.schemas import (
@@ -30,7 +32,11 @@ from wtbot.vfs.nodes import (
     resolve,
 )
 from wtbot.vfs.paths import WikiPath
-from wtbot.vfs.store import PROOFREAD_INDEX_CONTENT_MODEL, PageStore
+from wtbot.vfs.store import (
+    PROOFREAD_INDEX_CONTENT_MODEL,
+    EffectiveState,
+    PageStore,
+)
 
 """wikisource:// overlay — the ProofreadPage-aware VFS service.
 
@@ -136,11 +142,11 @@ class WikisourceVfs:
                 )
             case PageLeaf(path, _, page):
                 meta = self.store.page_meta(page)
-                body = self.store.effective_body(page)
-                if not body:
-                    body = self._placeholder_default(page, meta)
+                state = self._state_with_placeholder_default(
+                    page, self.store.effective_state(page), meta
+                )
                 return self.mw.stat_page(
-                    path.raw, page, name=page.title, body=body, meta=meta
+                    path.raw, page, name=page.title, state=state, meta=meta
                 )
             case StubDir(path, name):
                 return Stat(
@@ -208,36 +214,27 @@ class WikisourceVfs:
             # For every page, not just those without local edits: a page can
             # have an uncommitted save (which supplies the body) *and* an
             # earlier push whose refetch is still queued (which supplies the
-            # revid), and the two are answered independently below.
+            # revid), and those are answered independently.
             pushed = self.store.latest_successful_commits(page_pks)
             for i, raw, page_title in entries:
                 page = pages_by_title.get(page_title)
                 if page is None:
                     results[i] = Stat(path=raw, exists=False)
                     continue
-                # Mirrors effective_body's three-level rule (uncommitted
-                # journal > pushed-not-yet-refetched commit > snapshot).
-                body = uncommitted.get(page.pk)
-                if body is None:
-                    body = self.store.pushed_body_ahead_of_snapshot(
-                        pushed.get(page.pk), page
-                    )
-                if body is None:
-                    body = page.text or ""
-                if not body:
-                    body = self._placeholder_default(page, metas.get(page.pk))
+                # Same rule as the single-page path, over rows already loaded
+                # in bulk -- restating it here is how the two drifted apart.
+                state = self.store.effective_state_from(
+                    page,
+                    uncommitted_body=uncommitted.get(page.pk),
+                    commit=pushed.get(page.pk),
+                )
+                meta = metas.get(page.pk)
                 results[i] = self.mw.stat_page(
                     raw,
                     page,
                     name=page.title,
-                    body=body,
-                    meta=metas.get(page.pk),
-                    # Bridged from the commit already loaded above, so the
-                    # batched path reports the same revid as the single one
-                    # without a per-page query to rediscover it.
-                    revid=self.store.pushed_revid_ahead_of_snapshot(
-                        pushed.get(page.pk), page
-                    ),
+                    state=self._state_with_placeholder_default(page, state, meta),
+                    meta=meta,
                 )
 
         return [results[i] for i in range(len(paths))]
@@ -330,11 +327,11 @@ class WikisourceVfs:
         children: list[Node] = []
         for p in sorted(pages, key=page_number):
             meta = metas.get(p.pk)
-            body = self.store.effective_body(p)
-            if not body:
-                body = self._placeholder_default(p, meta)
+            state = self._state_with_placeholder_default(
+                p, self.store.effective_state(p), meta
+            )
             children.append(
-                self.mw.page_node(f"{parent}/{p.title}", p, meta=meta, body=body)
+                self.mw.page_node(f"{parent}/{p.title}", p, meta=meta, state=state)
             )
         return ListChildrenResponse(parent_path=parent, children=children)
 
@@ -349,6 +346,16 @@ class WikisourceVfs:
                 _blob_node(f"{parent}/blob", self.store.blob(file_page)),
             ],
         )
+
+    def _state_with_placeholder_default(
+        self, page: Page, state: EffectiveState, meta
+    ) -> EffectiveState:
+        """The same state, with the content-model scaffold standing in for an
+        empty body. A ProofreadPage stub with nothing in it should still report
+        the size of what the editor will open, not zero."""
+        if state.body:
+            return state
+        return replace(state, body=self._placeholder_default(page, meta))
 
     def _placeholder_default(self, page: Page, meta) -> str:
         """The opening body a placeholder serves when it has no body of its
@@ -371,7 +378,7 @@ class WikisourceVfs:
                 # (the scan's OCR text layer, stored at Index fan-out time)
                 # when we have it, else the content-model scaffold — either
                 # way a fresh transcription starts well-formed (local edits,
-                # once journalled, take precedence via effective_body).
+                # once journalled, take precedence via effective_state).
                 return self.mw.read_page(
                     path.raw,
                     page,
