@@ -1,7 +1,7 @@
-import os
-
 import typer
-from typer_di import TyperDI
+from typer_di import Depends, TyperDI
+
+from wtbot.cli.deps import ApiClient, get_api
 
 app = TyperDI(
     no_args_is_help=False,
@@ -20,8 +20,6 @@ timeout below is generous for the same reason, and ``--status`` answers "is it
 worth draining" without starting one.
 """
 
-_DEFAULT_TIMEOUT = 3600.0
-
 
 @app.callback(invoke_without_command=True)
 def drain(
@@ -39,37 +37,17 @@ def drain(
             "children mid-drain); this only stops a pathological cycle."
         ),
     ),
-    timeout: float = typer.Option(
-        _DEFAULT_TIMEOUT,
-        help="HTTP timeout in seconds. A large fan-out legitimately takes minutes.",
-    ),
-    base_url: str = typer.Option(
-        lambda: os.environ.get("WTBOT_API_URL", "http://127.0.100.1:8000"),
-        help="wtbot API base URL",
-    ),
+    api: ApiClient = Depends(get_api),
 ) -> None:
     """Fetch everything queued by ``fetch-page`` / ``fetch-refresh``."""
     if ctx.invoked_subcommand is not None:
         return
 
-    import httpx
-
-    root = base_url.rstrip("/")
-
+    _print_queue(api.get("/fetch/queue"))
     if status_only:
-        _print_queue(httpx.get(f"{root}/fetch/queue", timeout=30.0))
         return
 
-    before = httpx.get(f"{root}/fetch/queue", timeout=30.0)
-    _print_queue(before)
-
-    resp = httpx.post(
-        f"{root}/fetch/drain",
-        json={"batch": batch, "max_passes": max_passes},
-        timeout=timeout,
-    )
-    resp.raise_for_status()
-    result = resp.json()
+    result = api.post("/fetch/drain", {"batch": batch, "max_passes": max_passes})
 
     typer.echo(
         f"drained {result['handled']} request(s) in {result['passes']} pass(es); "
@@ -97,9 +75,7 @@ def drain(
         typer.echo("  run again to continue")
 
 
-def _print_queue(resp) -> None:
-    resp.raise_for_status()
-    stats = resp.json()
+def _print_queue(stats: dict) -> None:
     counts = ", ".join(f"{status}={n}" for status, n in sorted(stats["counts"].items()))
     typer.echo(f"queue: {counts or 'empty'}")
     if stats.get("oldest_pending_at"):

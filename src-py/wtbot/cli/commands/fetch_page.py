@@ -1,7 +1,7 @@
-import os
-
 import typer
-from typer_di import TyperDI
+from typer_di import Depends, TyperDI
+
+from wtbot.cli.deps import ApiClient, get_api, get_label
 
 app = TyperDI(
     no_args_is_help=True,
@@ -13,50 +13,50 @@ app = TyperDI(
 def fetch_page(
     ctx: typer.Context,
     title: str = typer.Argument(..., help="e.g. Index:Some_book.djvu"),
-    family: str = typer.Option("wikisource"),
-    code: str = typer.Option("en"),
-    api_url: str | None = typer.Option(None, help="action API URL stored on the Site"),
     depth: int = typer.Option(
         1, help="expansion depth: 0=page only, 1=expand Index/File"
     ),
-    base_url: str = typer.Option(
-        lambda: os.environ.get("WTBOT_API_URL", "http://127.0.100.1:8000"),
-        help="wtbot API base URL",
+    drain: bool = typer.Option(
+        False,
+        "--drain",
+        help="Also work the queue now, instead of leaving it for `wtbot drain`.",
     ),
+    label: str = Depends(get_label),
+    api: ApiClient = Depends(get_api),
 ) -> None:
-    """Enqueue a cache-fill via the wtbot API and report the result.
+    """Queue a cache-fill for one title on a registered site.
 
-    This calls the running wtbot server, which creates a FetchRequest, drains it
-    (the worker makes the pywikibot call), and writes the page back to SQLite.
-    For Index: and File: pages depth=1 (the default) triggers full expansion:
-    blob download + per-page child requests.
+    Enqueues only: fetching is throttled to stay inside the wiki's rate limit,
+    so an Index worth of pages takes minutes and does not belong inside this
+    call. ``wtbot drain`` (or ``--drain``) does the work; ``wtbot drain
+    --status`` shows what is left.
+
+    For Index: and File: titles, depth=1 (the default) expands the work: blob
+    download plus a child request per page.
     """
-
     if ctx.invoked_subcommand is not None:
         return
 
-    import httpx
-
-    payload = {
-        "title": title,
-        "family": family,
-        "code": code,
-        "api_url": api_url,
-        "depth": depth,
-    }
-    resp = httpx.post(f"{base_url.rstrip('/')}/fetch/", json=payload, timeout=120.0)
-    resp.raise_for_status()
-    data = resp.json()
-    req = data["request"]
-    page = data.get("page")
-
-    typer.echo(
-        f"request #{req['pk']}  status={req['status']}  "
-        f"progress={req['progress_done']}/{req['progress_total']}"
+    result = api.post(
+        "/fetch/",
+        {"title": title, "label": label, "depth": depth},
     )
-    if page:
-        typer.echo(f"  {page['title']}")
-        typer.echo(f"  content_model = {page['content_model']}")
-        typer.echo(f"  revid/sha1    = {page['revid']} / {page['sha1']}")
-    if req.get("error_message"):
-        typer.echo(f"  error = {req['error_message']}")
+    request = result["request"]
+    typer.echo(f"queued request #{request['pk']}  {title}  on {label}")
+
+    if not drain:
+        typer.echo("  run `wtbot drain` to fetch it")
+        return
+
+    report = api.post("/fetch/drain")
+    typer.echo(
+        f"drained {report['handled']} request(s); {report['remaining']} remaining"
+    )
+
+    request = api.get(f"/fetch/{request['pk']}")
+    typer.echo(
+        f"request #{request['pk']}  status={request['status']}  "
+        f"progress={request['progress_done']}/{request['progress_total']}"
+    )
+    if request.get("error_message"):
+        typer.echo(f"  error = {request['error_message']}")

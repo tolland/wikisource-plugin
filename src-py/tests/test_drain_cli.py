@@ -34,7 +34,7 @@ def api(monkeypatch):
     """Capture the calls and serve canned replies."""
     calls: dict = {"queue": _QUEUE, "drain": _COMPLETE}
 
-    def fake_get(url, timeout=None):
+    def fake_get(url, params=None, timeout=None):
         calls["get_url"] = url
         return httpx.Response(
             200, json=calls["queue"], request=httpx.Request("GET", url)

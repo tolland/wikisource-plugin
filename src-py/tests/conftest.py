@@ -105,6 +105,28 @@ def drain(client: TestClient, **kwargs) -> dict:
     return resp.json()
 
 
+def register_site(
+    client: TestClient,
+    *,
+    label: str = "test",
+    family: str = "mywikisource",
+    code: str = "en",
+    api_url: str | None = None,
+) -> dict:
+    """Register a site the way an operator does, and return the row.
+
+    Fetching requires a site that already exists: nothing conjures one from a
+    request's parameters any more, precisely so that a typo cannot register a
+    credential-less wiki and read from it. Tests go through the same door.
+    """
+    resp = client.post(
+        "/sites/",
+        json={"label": label, "family": family, "code": code, "api_url": api_url},
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
 def fetch_and_drain(client: TestClient, payload: dict) -> dict:
     """Enqueue a fetch, run it, and report as the old inline endpoint did:
     ``{"request": ..., "page": ...}`` with both read back *after* the drain."""
@@ -116,11 +138,12 @@ def fetch_and_drain(client: TestClient, payload: dict) -> dict:
 
     request = client.get(f"/fetch/{request_pk}")
     request.raise_for_status()
+    site = client.get(f"/sites/by-label/{payload['label']}").json()
     page = client.get(
         "/pages/resolve",
         params={
-            "family": payload["family"],
-            "code": payload["code"],
+            "family": site["family"],
+            "code": site["code"],
             "title": payload["title"],
         },
     )

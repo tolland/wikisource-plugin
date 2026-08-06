@@ -130,7 +130,21 @@ Transaction handling is the driver's normal deferred style — an earlier eager 
 - `src-py/wtbot/main.py` — FastAPI app factory (`create_app`)
 - `src-py/wtbot/db.py` — SQLite engine + WAL/busy-timeout pragma discipline
 - `src-py/wtbot/model/` — SQLModel ORM models, the **single source of truth** for the schema (`Site`, `Namespace`, `Page`, `Transclusion`, `FetchRequest`, `EditJournal`, `Commit`, …)
-- `src-py/wtbot/api/` — FastAPI routers: `fetch` (cache-fill job queue), `vfs` (read/write/list/stat for the plugin's VFS), `commit` (push-back to the wiki), `preview` (server-rendered live preview), `page_nav`/`page_meta`/`page_image` (ProofreadPage navigation/metadata/reference images), `namespace`, `sites`, `edit_journal`, `viewer` (backs the SvelteKit debug app), `health`
+- `src-py/wtbot/api/` — FastAPI routers: `fetch` (cache-fill job queue + `/fetch/drain`), `vfs` (read/write/list/stat for the plugin's VFS), `commit` (push-back to the wiki), `preview` (server-rendered live preview), `page_nav`/`page_meta`/`page_image` (ProofreadPage navigation/metadata/reference images), `namespace`, `sites` (registration + per-site credentials), `edit_journal`, `viewer` (backs the SvelteKit debug app), `health`
+
+A wiki is **registered before anything fetches from it** and addressed by its unique `label` thereafter; nothing creates a Site implicitly. Fetching is also decoupled from enqueueing — `POST /fetch` queues, `POST /fetch/drain` (or `wtbot drain`) does the throttled work:
+
+```bash
+uv run wtbot site add --label local --family mywikisource --code en \
+    --api-url https://wikisource-debian-13.lan/w/api.php
+uv run wtbot site-credential add --label local --username Admin --password ... \
+    [--bot-password-suffix wtbot]
+uv run wtbot fetch-page "Index:Some book.djvu" --label local   # queues
+uv run wtbot drain                                             # fetches
+uv run wtbot drain --status                                    # queue depth
+```
+
+`--label` and `--base-url` are TyperDI dependencies (`src-py/wtbot/cli/deps.py`), so they appear on every command that declares them rather than being dug out of `ctx.parent.params`; `WTBOT_SITE_LABEL` sets the default label for a shell session.
 - `src-py/wtbot/wiki/` — the injectable wiki-access seam: `WikiSettings` (config), `configure_pywikibot()` (programmatic config, no on-disk `user-config.py`), `WikiClient` protocol with `PywikibotClient` (real) and `FakeWikiClient` (in-memory, no pywikibot import) implementations, `dispatch.py` (classifies a fetched title as `FILE`/`PROOFREAD_INDEX`/`PROOFREAD_PAGE`/`WIKITEXT` from namespace role + content_model)
 - `src-py/wtbot/vfs/` — VFS-surface implementation backing the `/vfs` router
 - `src-py/wtbot/worker.py` — the fetch worker (`run_pending`) that drains the `FetchRequest` queue; today invoked inline by `POST /fetch` rather than as a background loop

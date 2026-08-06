@@ -158,13 +158,19 @@ class PywikibotClient:
     def _log_identity(self) -> None:
         """Record who we are on this wiki, once per client, for free.
 
-        Rate limits are per identity: anonymous traffic gets a far smaller
-        allowance than an authenticated account, and "we thought we were
-        logged in but were not" is invisible in every other symptom -- it just
-        looks like the wiki became unreliable. There is no API that reports
-        which rate-limit tier the CDN put us in, so group membership -- which
-        the tiers are drawn from, `bot` most decisively -- is the closest
-        observable proxy.
+        "We thought we were logged in but were not" is invisible in every other
+        symptom -- it surfaces later as a commit that cannot save. There is no
+        API reporting which rate-limit tier the CDN put us in, so group
+        membership -- which the tiers are drawn from, `bot` most decisively --
+        is the closest observable proxy.
+
+        Note what anonymous does *not* cost: an unauthenticated client with a
+        policy-compliant User-Agent gets the same 200 req/min as an
+        authenticated account with few edits. Only an *unidentified* client
+        (no compliant User-Agent either) drops to 10 req/min. So reading a
+        public wiki anonymously is a configuration, not a fault, and this says
+        so at the level it deserves -- the thing genuinely broken by missing
+        credentials is writing back.
 
         Reads only what pywikibot already holds. ``site.userinfo`` is a
         property that *fetches* when cold, so asking would spend a request per
@@ -176,18 +182,21 @@ class PywikibotClient:
         try:
             info = getattr(self.site, "_userinfo", None)
             if not self.settings.username:
-                log.warning(
-                    "wiki client for %s is ANONYMOUS -- the lower rate-limit "
-                    "tier applies; set a SiteCredential to raise it",
+                log.info(
+                    "wiki client for %s is anonymous: reads are unaffected "
+                    "(same 200 req/min tier as an ordinary account), commits "
+                    "will fail. Add an account with `wtbot site-credential add`",
                     self.site,
                 )
                 return
             if not info:
                 # Credentials configured but no userinfo cached: the login did
-                # not complete. Worth saying, because the symptom otherwise is
-                # just "the wiki started rate-limiting us".
+                # not complete. A warning, unlike the branch above -- somebody
+                # asked for an identity and did not get it, and the symptom
+                # otherwise arrives much later as a commit that cannot save.
                 log.warning(
-                    "wiki client for %s has credentials for %s but is not " "logged in",
+                    "wiki client for %s has credentials for %s but is not "
+                    "logged in -- commits will fail",
                     self.site,
                     self.settings.username,
                 )

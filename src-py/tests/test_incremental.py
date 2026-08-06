@@ -23,13 +23,14 @@ PAGE_NS = 104
 INDEX_NS = 106
 
 NOW = datetime(2026, 8, 5, 12, 0, tzinfo=timezone.utc)
+LABEL = "en.wikisource"
 
 
 def _site(session: Session, **kwargs) -> Site:
     """A site with its Page:/Index: namespaces synced, as a fetch would leave
     them. The numbers are en.wikisource's; the point of the role lookup is that
     nothing depends on that."""
-    site = Site(family="wikisource", code="en", **kwargs)
+    site = Site(family="wikisource", code="en", label=LABEL, **kwargs)
     session.add(site)
     session.commit()
     session.refresh(site)
@@ -257,9 +258,7 @@ def test_refresh_endpoint_fetches_only_what_moved(client, engine) -> None:
         for number in (1, 2, 3):
             _page(session, site, _work_page(number))
 
-    response = client.post(
-        "/fetch/refresh", json={"family": "wikisource", "code": "en"}
-    )
+    response = client.post("/fetch/refresh", json={"label": LABEL})
 
     assert response.status_code == 202
     body = response.json()
@@ -293,7 +292,7 @@ def test_a_dry_run_plans_without_fetching_or_advancing(client, engine) -> None:
 
     response = client.post(
         "/fetch/refresh",
-        json={"family": "wikisource", "code": "en", "dry_run": True},
+        json={"label": LABEL, "dry_run": True},
     )
 
     assert response.json()["enqueued"] == 0

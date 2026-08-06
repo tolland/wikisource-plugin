@@ -52,10 +52,8 @@ def test_the_command_posts_what_was_asked_for(posted) -> None:
         create_app(),
         [
             "fetch-refresh",
-            "--family",
-            "mywikisource",
-            "--code",
-            "en",
+            "--label",
+            "local",
             "--title-prefix",
             "Page:Work.djvu/",
             "--base-url",
@@ -65,7 +63,7 @@ def test_the_command_posts_what_was_asked_for(posted) -> None:
 
     assert result.exit_code == 0, result.output
     assert posted["url"] == "http://wtbot:8000/fetch/refresh"
-    assert posted["json"]["family"] == "mywikisource"
+    assert posted["json"]["label"] == "local"
     assert posted["json"]["title_prefix"] == "Page:Work.djvu/"
     assert posted["json"]["dry_run"] is False
     assert "basis=incremental" in result.output
@@ -89,7 +87,9 @@ def test_a_full_basis_reports_its_reason_and_that_nothing_advanced(posted) -> No
         "watermark": None,
     }
 
-    result = runner.invoke(create_app(), ["fetch-refresh", "--base-url", "http://x"])
+    result = runner.invoke(
+        create_app(), ["fetch-refresh", "--label", "local", "--base-url", "http://x"]
+    )
 
     assert result.exit_code == 0, result.output
     assert "basis=full" in result.output
@@ -111,7 +111,8 @@ def test_a_dry_run_says_so_without_claiming_a_watermark(posted) -> None:
     }
 
     result = runner.invoke(
-        create_app(), ["fetch-refresh", "--dry-run", "--base-url", "http://x"]
+        create_app(),
+        ["fetch-refresh", "--label", "local", "--dry-run", "--base-url", "http://x"],
     )
 
     assert result.exit_code == 0, result.output
@@ -125,7 +126,15 @@ def test_a_dry_run_says_so_without_claiming_a_watermark(posted) -> None:
 def test_since_is_sent_as_an_iso_timestamp(posted) -> None:
     runner.invoke(
         create_app(),
-        ["fetch-refresh", "--since", "2026-08-01", "--base-url", "http://x"],
+        [
+            "fetch-refresh",
+            "--label",
+            "local",
+            "--since",
+            "2026-08-01",
+            "--base-url",
+            "http://x",
+        ],
     )
 
     assert posted["json"]["since"].startswith("2026-08-01T00:00:00")
@@ -139,9 +148,7 @@ def test_the_refresh_body_is_documented_in_openapi(client) -> None:
 
     request_schema = spec["components"]["schemas"]["RefreshCreate"]
     assert set(request_schema["properties"]) == {
-        "family",
-        "code",
-        "api_url",
+        "label",
         "since",
         "title_prefix",
         "dry_run",

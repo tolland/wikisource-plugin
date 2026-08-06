@@ -56,7 +56,7 @@ def test_a_real_fan_out_stays_inside_its_per_page_budget(
     this sees the requests pywikibot makes for its own reasons, which are
     exactly the ones easy to forget when reasoning about a budget.
     """
-    from conftest import CANADIAN_PATENT_INDEX, drain
+    from conftest import CANADIAN_PATENT_INDEX, drain, register_site
     from fastapi.testclient import TestClient
     from sqlmodel import Session, select
 
@@ -72,12 +72,12 @@ def test_a_real_fan_out_stays_inside_its_per_page_budget(
         blob_root=tmp_path / "blobs",
     )
     with TestClient(app) as http:
+        register_site(http, label="harness-upstream", family="mywikisource", code="en")
         http.post(
             "/fetch/",
             json={
                 "title": CANADIAN_PATENT_INDEX,
-                "family": "mywikisource",
-                "code": "en",
+                "label": "harness-upstream",
                 "depth": 1,
             },
         )
@@ -107,7 +107,7 @@ def test_a_fan_out_talks_only_to_the_wiki_it_was_asked_about(
     there -- legitimate, but worth knowing rather than discovering. The harness
     wiki hosts its own scan, so anything beyond it is traffic nobody asked for.
     """
-    from conftest import CANADIAN_PATENT_INDEX, drain
+    from conftest import CANADIAN_PATENT_INDEX, drain, register_site
     from fastapi.testclient import TestClient
 
     from wtbot.main import create_app
@@ -121,12 +121,12 @@ def test_a_fan_out_talks_only_to_the_wiki_it_was_asked_about(
         blob_root=tmp_path / "blobs",
     )
     with TestClient(app) as http:
+        register_site(http, label="harness-upstream", family="mywikisource", code="en")
         http.post(
             "/fetch/",
             json={
                 "title": CANADIAN_PATENT_INDEX,
-                "family": "mywikisource",
-                "code": "en",
+                "label": "harness-upstream",
                 "depth": 1,
             },
         )

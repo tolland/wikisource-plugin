@@ -17,7 +17,12 @@ about ``requests`` instead of about wtbot.
 """
 
 import pytest
-from conftest import CANADIAN_PATENT_INDEX, CANADIAN_PATENT_SCAN, drain
+from conftest import (
+    CANADIAN_PATENT_INDEX,
+    CANADIAN_PATENT_SCAN,
+    drain,
+    register_site,
+)
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 from wiki_harness import PwbHarness, WikiApi
@@ -27,6 +32,7 @@ from wtbot.model import FileBlob, IndexMeta, Page
 from wtbot.wiki.wiki_types import PageNotFound
 
 PAGE_1 = "Page:Canadian patent 29537.djvu/1"
+LABEL = "harness-upstream"
 
 
 @pytest.fixture
@@ -96,14 +102,10 @@ def test_fan_out_an_index_end_to_end(engine, tmp_path, wiki_client) -> None:
         blob_root=tmp_path / "blobs",
     )
     with TestClient(app) as http:
+        register_site(http, label=LABEL, family="mywikisource", code="en")
         enqueued = http.post(
             "/fetch/",
-            json={
-                "title": CANADIAN_PATENT_INDEX,
-                "family": "mywikisource",
-                "code": "en",
-                "depth": 1,
-            },
+            json={"title": CANADIAN_PATENT_INDEX, "label": LABEL, "depth": 1},
         )
         assert enqueued.status_code == 202
         report = drain(http)

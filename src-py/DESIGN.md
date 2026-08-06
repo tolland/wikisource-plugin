@@ -65,15 +65,21 @@ progress; pywikibot does the slow work and fans out child requests as it
 discovers structure. This is the "git checkout" path and is **never** invoked
 implicitly by the VFS.
 
-Request identity follows **pywikibot conventions** (this matches the existing
-`Site` model: `family` + `code` + `articlepath`):
+A request names a **registered site by label**, plus the title and how far to
+expand:
 
 ```
 title:  Index:Wittgenstein_-_Tractatus_Logico-Philosophicus,_1922.djvu
-family: mywikisource
-code:   en
+label:  local          # a Site registered beforehand
 depth:  implied        # how aggressively to expand associated assets
 ```
+
+The site's pywikibot identity (`family` + `code` + `articlepath` + `api_url`)
+lives on the `Site` row, set once at registration. It used to travel on every
+fetch request, and an unrecognised pair *created* a site — so a typo registered
+a second wiki, with no credentials, and read from it. Registration is now its
+own step (`POST /sites`, `wtbot site add`), which is also where credentials are
+attached; an unknown label is a 404 listing the labels that do exist.
 
 ---
 
@@ -140,8 +146,14 @@ plugin can watch aggregate progress on the one request it submitted.
 ### 4.1 Cache-fill API (async, surface B)
 
 ```
+POST /sites
+  body: { label, family, code, api_url? }   # registration, done once
+  → 201 { pk, label, ... }
+PUT  /sites/{pk}/credential                 # the account it logs in as
+GET  /sites/by-label/{label}
+
 POST /fetch
-  body: { title, family, code, depth }
+  body: { title, label, depth }
   → 202 { request_id, status: "pending" }
 
 GET  /fetch/{request_id}
