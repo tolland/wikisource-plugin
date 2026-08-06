@@ -26,6 +26,7 @@ def create_app() -> typer.Typer:
         no_args_is_help=True,
         pretty_exceptions_enable=False,
         pretty_exceptions_short=False,
+        rich_markup_mode=None,
         # @TODO according to doc, this should work. but does not
         # <https://typer.tiangolo.com/tutorial/commands/callback/#adding-a-callback-on-creation>
         # callback=callback,

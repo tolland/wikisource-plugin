@@ -83,12 +83,12 @@ services:
       MW_DB_USER: mediawiki
       MW_LANG: en
       MW_SCRIPT_PATH: ""
-      MW_SERVER: "http://localhost:${WIKISOURCE_PORT:-18581}"
+      MW_SERVER: "http://localhost:${WIKISOURCE_PORT:-18571}"
       MW_SITE_NAME: "${WIKISOURCE_SITE_NAME:-Test Wikisource}"
       <<: *seed-env
       SEED_REVID_BURN: "0"
     ports:
-      - "${WIKISOURCE_PORT:-18581}:80"
+      - "${WIKISOURCE_PORT:-18571}:80"
 
 
   seed-restore-local:
@@ -128,7 +128,7 @@ services:
       MW_DB_USER: mediawiki
       MW_LANG: en
       MW_SCRIPT_PATH: ""
-      MW_SERVER: "http://localhost:${WIKISOURCE_LOCAL_PORT:-18582}"
+      MW_SERVER: "http://localhost:${WIKISOURCE_LOCAL_PORT:-18572}"
       MW_SITE_NAME: "${WIKISOURCE_LOCAL_SITE_NAME:-Test Wikisource (local)}"
       <<: *seed-env
       # The one deliberate asymmetry, and it is not content: throwaway
@@ -136,7 +136,7 @@ services:
       # pages. See the burn loop in start-wikisource.sh.
       SEED_REVID_BURN: "${SEED_REVID_BURN-7}"
     ports:
-      - "${WIKISOURCE_LOCAL_PORT:-18582}:80"
+      - "${WIKISOURCE_LOCAL_PORT:-18572}:80"
 
   wikimedia-ocr:
     profiles: ["ocr"]
@@ -144,7 +144,7 @@ services:
       context: .
       dockerfile: docker/wikimedia-ocr/Dockerfile
     ports:
-      - "${WIKIMEDIA_OCR_PORT:-18585}:80"
+      - "${WIKIMEDIA_OCR_PORT:-18575}:80"
 
 volumes:
   mediawiki-db:

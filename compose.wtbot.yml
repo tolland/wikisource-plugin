@@ -44,7 +44,7 @@ services:
       WTBOT_RESET_DB: "${WTBOT_RESET_DB-0}"
       WTBOT_LOG_LEVEL: "${WTBOT_LOG_LEVEL-INFO}"
     ports:
-      - "${WTBOT_PORT:-18583}:8000"
+      - "${WTBOT_PORT:-18574}:8000"
     volumes:
       - wtbot-data:/data
     healthcheck:
@@ -75,7 +75,7 @@ services:
       # the Compose network rather than trying to reach wtbot via localhost.
       WTBOT_API_URL: "http://wtbot:8000"
     ports:
-      - "${WTBOT_VIEWER_PORT:-18584}:5173"
+      - "${WTBOT_VIEWER_PORT:-18573}:5173"
     volumes:
       # Keep application edits hot-reloadable without hiding the dependencies
       # installed in the image at /app/node_modules.

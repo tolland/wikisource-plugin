@@ -37,18 +37,18 @@ We currently have a convention for the services in a cluster of services:
 
 For starting a cluster with single or pair of mediawiki instances
 
-- 18581 The port for the primary mediawiki instance
-- 18582 For a "local" instance of mediawiki for syncing scenarios (optional to start via profile "pair")
-- 18583 The wtbot fastapi service
-- 18584 Svelte viewer app
-- 18585 Instance of wikimedia ocr
+- 18571 The port for the primary mediawiki instance
+- 18572 For a "local" instance of mediawiki for syncing scenarios (optional to start via profile "pair")
+- 18573 Svelte viewer app
+- 18574 The wtbot fastapi service
+- 18575 Instance of wikimedia ocr
 
 ### Ports for tests
 
-To avoid a running docker instance, we should use the following conventional ports for test. @TODO this needs to be done, as the tests currently conflict with any docker instance running.
+To avoid conflicting with running docker instance, we should use the following conventional ports for test. @TODO this needs to be done, as the tests currently conflict with any docker instance running.
 
-- 18571 Primary mediawiki instance
-- 18572 Alternate instance for syncing
-- 18573 The wtbot fastapi service
-- 18574 Svelte viewer app
-- 18575 Instance of wikimedia ocr
+- 18581 Primary mediawiki instance
+- 18582 Alternate instance for syncing
+- 18583 Svelte viewer app
+- 18584 The wtbot fastapi service
+- 18585 Instance of wikimedia ocr
