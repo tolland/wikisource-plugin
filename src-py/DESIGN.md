@@ -418,12 +418,59 @@ seam (`wtbot/wiki/`):
   (`from_site`). Reads are anonymous; `username` is only for write-back.
 - **`configure_pywikibot()`** (`wtbot/wiki/config.py`) — applies settings
   *programmatically*: `PYWIKIBOT_NO_USER_CONFIG=1` (no file on disk), an ephemeral
-  `PYWIKIBOT_DIR`, `REQUESTS_CA_BUNDLE` for a self-signed `.lan` cert, and
+  `PYWIKIBOT_DIR` (one per process, not one per client — see §7.1.1),
+  `REQUESTS_CA_BUNDLE` for a self-signed `.lan` cert, throttle/User-Agent
+  policy (§7.1.1), and
   `Site(url=...)` (AutoFamily) so **no family file is needed**. pywikibot is
   imported lazily, after the env is set.
 - **`WikiClient`** Protocol (`wtbot/wiki/client.py`) — `get_page` +
   `download_file`. `PywikibotClient` is the real impl; `FakeWikiClient` is the
   in-memory one tests/CLI use, so the fake path never imports pywikibot.
+
+### 7.1.1 Rate limits, client reuse, and failure visibility (implemented)
+
+Wikimedia enforces per-identity request budgets
+([rate limits](https://www.mediawiki.org/wiki/Wikimedia_APIs/Rate_limits)):
+10 req/min unidentified, 200 req/min for a compliant unauthenticated client or
+an authenticated account with few edits, 2,000 req/min for established editors,
+exempt for accounts with a bot flag. There is **no API that reports which tier
+you were placed in** — the closest observable proxies are `userinfo.groups`
+(`bot` most decisively) and the global edit count, so `PywikibotClient` logs
+identity and groups once per client and warns loudly when it is anonymous.
+Our design target is the 200 req/min tier with ≤3 concurrent requests.
+
+Three defects made a large `Index:` fan-out exceed that budget, and the same
+three made the resulting failures unreadable:
+
+- **A client per fetch request.** `client_factory(site)` was called for every
+  queued request, and each construction re-detects the site over HTTP (we build
+  sites from a URL, so pywikibot uses an `AutoFamily`) and logs in again — the
+  ephemeral `mkdtemp` config dir meant no cookie jar survived. A page that
+  should cost one or two requests cost seven or eight, nearly all of it setup.
+  Clients are now cached per (site, credential) in
+  `wtbot/wiki/client_registry.py`, and the pywikibot config dir is created once
+  per process so cookies and `throttle.ctrl` persist.
+- **Reads were never throttled.** We set `put_throttle`, which governs *edits*;
+  reads are governed by `config.minthrottle`, left at its 0.1s default — 600
+  req/min, three times the allowance, and a fan-out is almost entirely reads.
+  `WikiSettings.read_throttle` (default 0.35s ≈ 170 req/min) now sets it. Three
+  ProofreadPage enrichment queries per page additionally bypassed pywikibot as
+  bare `requests.get` calls: unthrottled, *anonymous even when logged in*, and
+  carrying a User-Agent without the contact information the policy requires.
+  They go through `site.simple_request` now.
+- **The evidence was discarded.** pywikibot converts *any* non-JSON API
+  response into `SiteDefinitionError: Invalid AutoFamily(...)` when the site is
+  an AutoFamily — and a CDN rate-limit page is exactly that, an HTML body where
+  JSON was expected. The status code goes to `pywikibot.debug()` and no
+  further, so a 429 reached `FetchRequest.error_message` disguised as a
+  misconfigured site. `wtbot/wiki/http_tap.py` observes pywikibot's own session
+  and supplies the status back to `wtbot/wiki/failures.py`, which classifies
+  the failure; `wtbot/failure_log.py` keeps the short summary on the row and
+  writes the traceback plus recent upstream requests to `WTBOT_FAILURE_LOG`.
+
+On a 429 the correct response is to **lower the request rate, not to retry**:
+`Retry-After` is parsed and recorded, `max_retries` stays at 0, and a
+rate-limited failure is reported rather than hidden behind backoff.
 
 ### 7.2 Dispatch: trust content_model, special-case File (implemented)
 

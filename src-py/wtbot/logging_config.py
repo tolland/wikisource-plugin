@@ -25,12 +25,25 @@ class LoggingConfig:
     trace_all_debug_routes: bool = False
     trace_debug_route_tags: Iterable[str] = field(default_factory=frozenset)
     body_limit_bytes: int = 131072
+    # Detailed worker-failure log (traceback + upstream HTTP history). Off
+    # unless a path is given: it is a debugging aid, not part of normal
+    # operation, and it holds more than a status display should.
+    failure_log_path: Path | None = None
+    failure_log_max_bytes: int = 5 * 1024 * 1024
+    failure_log_backups: int = 3
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "LoggingConfig":
         e = env if env is not None else os.environ
         default = cls()
         return cls(
+            failure_log_path=_get_path(e.get("WTBOT_FAILURE_LOG")),
+            failure_log_max_bytes=_get_int(
+                e.get("WTBOT_FAILURE_LOG_MAX_BYTES"), default.failure_log_max_bytes
+            ),
+            failure_log_backups=_get_int(
+                e.get("WTBOT_FAILURE_LOG_BACKUPS"), default.failure_log_backups
+            ),
             root_level=_get_log_level(e.get("WTBOT_LOG_LEVEL"), default.root_level),
             sqlalchemy_echo=_get_sqlalchemy_echo(
                 e.get("WTBOT_SQLALCHEMY_ECHO"), default.sqlalchemy_echo
@@ -85,6 +98,12 @@ def _get_tags(value: str | None) -> frozenset[str]:
     return frozenset(tag.strip() for tag in value.split(",") if tag.strip())
 
 
+def _get_path(value: str | None) -> Path | None:
+    if value is None or not value.strip():
+        return None
+    return Path(value.strip()).expanduser()
+
+
 def _get_int(value: str | None, default: int) -> int:
     if value is None:
         return default
@@ -102,6 +121,7 @@ def _get_int(value: str | None, default: int) -> int:
 #   - WTBOT_TRACE_DEBUG_ROUTE_TAGS=vfs,preview
 #   - WTBOT_TRACE_ALL_DEBUG_ROUTES=true
 #   - WTBOT_DEBUG_ROUTE_BODY_LIMIT_BYTES=0
+#   - WTBOT_FAILURE_LOG=logs/wtbot-failures.log
 LOGGING_CONFIG = LoggingConfig.from_dotenv()
 
 
@@ -111,6 +131,16 @@ def debug_route_logger_name(tag: str) -> str:
 
 def configure_logging(config: LoggingConfig = LOGGING_CONFIG) -> None:
     install_trace_logging()
+
+    # Imported here rather than at module scope: failure_log pulls in the
+    # wiki package, and logging_config is imported by nearly everything.
+    from wtbot.failure_log import configure_failure_log
+
+    configure_failure_log(
+        config.failure_log_path,
+        max_bytes=config.failure_log_max_bytes,
+        backup_count=config.failure_log_backups,
+    )
 
     root = logging.getLogger()
     if root.handlers:

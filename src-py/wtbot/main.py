@@ -31,7 +31,7 @@ from wtbot.logging_config import LOGGING_CONFIG, LoggingConfig, configure_loggin
 from wtbot.logging_config import sqlalchemy_echo as configured_sqlalchemy_echo
 from wtbot.model import Site, SiteCredential
 from wtbot.settings import WikiSettings
-from wtbot.wiki.client import WikiClient, get_wiki_client
+from wtbot.wiki.client_registry import make_client_factory
 from wtbot.worker import ClientFactory
 
 """wtbot FastAPI application.
@@ -42,11 +42,10 @@ health check and a sites vertical slice are wired up so far.
 """
 
 
-def _make_db_client_factory(engine) -> ClientFactory:
-    """Returns a ClientFactory that looks up SiteCredential from the DB
-    before falling back to an anonymous WikiSettings."""
+def _settings_for_site(engine):
+    """Resolve a Site row to WikiSettings, taking credentials from the DB."""
 
-    def _factory(site: Site) -> WikiClient:
+    def _resolve(site: Site) -> WikiSettings:
         with Session(engine) as session:
             cred = session.exec(
                 select(SiteCredential).where(SiteCredential.site_pk == site.pk)
@@ -58,9 +57,20 @@ def _make_db_client_factory(engine) -> ClientFactory:
                 password=cred.password,
                 bot_name=cred.bot_name,
             )
-        return get_wiki_client(WikiSettings.from_site(site, **overrides))
+        return WikiSettings.from_site(site, **overrides)
 
-    return _factory
+    return _resolve
+
+
+def _make_db_client_factory(engine) -> ClientFactory:
+    """A ClientFactory that reads SiteCredential from the DB and reuses one
+    client per (site, credential) for the life of the process.
+
+    Reuse is the point, not an optimisation: each construction re-detects the
+    site over HTTP and logs in again, so a client per fetch request spent most
+    of our rate-limit allowance on setup. See wtbot.wiki.client_registry.
+    """
+    return make_client_factory(_settings_for_site(engine))
 
 
 def create_app(

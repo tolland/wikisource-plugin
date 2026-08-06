@@ -3,6 +3,7 @@ from pathlib import Path
 
 from sqlmodel import Session, select
 
+from wtbot.failure_log import FailureContext, record_failure, site_label
 from wtbot.model import (
     FetchRequest,
     FetchState,
@@ -20,9 +21,8 @@ from wtbot.page_processors import (
     processor_for,
 )
 from wtbot.revision_store import record_head_revision
-from wtbot.settings import WikiSettings
 from wtbot.timeutil import utcnow
-from wtbot.wiki.client import WikiClient, get_wiki_client
+from wtbot.wiki.client import WikiClient
 from wtbot.wiki.namespaces import sync_namespaces
 from wtbot.wiki.wiki_types import PageNotFound, RemotePage
 
@@ -39,10 +39,6 @@ or a future background loop / ``wtbot worker`` command.
 """
 
 ClientFactory = Callable[[Site], WikiClient]
-
-
-def make_client_for_site(site: Site) -> WikiClient:
-    return get_wiki_client(WikiSettings.from_site(site))
 
 
 def run_pending(
@@ -151,7 +147,20 @@ def _process(
     except PageNotFound:
         error_message = f"page not found: {req.title}"
     except Exception as exc:  # noqa: BLE001 - record any failure on the row
-        error_message = f"{type(exc).__name__}: {exc}"
+        # The row keeps a short summary; the traceback and the upstream HTTP
+        # that preceded the failure go to the detail log (see failure_log).
+        failure = record_failure(
+            FailureContext(
+                component="fetch",
+                title=req.title,
+                request_pk=req.pk,
+                site_pk=req.site_pk,
+                site_label=site_label(site),
+                details={"kind": req.kind.value, "depth": str(req.depth)},
+            ),
+            exc,
+        )
+        error_message = failure.summary
 
     _record_fetch_result(
         session,

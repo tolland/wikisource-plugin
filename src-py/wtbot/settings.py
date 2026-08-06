@@ -31,6 +31,25 @@ class WikiSettings:
     max_retries: int = 0
     retry_wait: float = 1.0
 
+    # Minimum seconds between *read* requests, i.e. pywikibot's
+    # config.minthrottle. Its 0.1s default allows 600 req/min, which is three
+    # times the 200 req/min Wikimedia grants an authenticated account with few
+    # edits -- and reads are almost everything we do, so the write-side
+    # put_throttle we used to set alone governed nothing that mattered.
+    # 0.35s lands at ~170 req/min, inside the limit with headroom for the
+    # requests pywikibot makes on its own behalf.
+    # <https://www.mediawiki.org/wiki/Wikimedia_APIs/Rate_limits>
+    read_throttle: float = 0.35
+    # Minimum seconds between edits (pywikibot config.put_throttle).
+    put_throttle: float = 1.0
+    # Seconds of replication lag we let the wiki absorb before it defers us
+    # (pywikibot config.maxlag); 5 is MediaWiki's recommendation for bots.
+    maxlag: int = 5
+    # Full User-Agent. Wikimedia's policy requires contact information (an
+    # email or a full URL) and throttles non-conforming clients harder, so a
+    # bare product token is not merely impolite -- it costs request budget.
+    user_agent: str = "wtbot/0.1.0 (https://github.com/tolland/wikisource-plugin)"
+
     @classmethod
     def from_env(cls, env: dict[str, str] | None = None) -> "WikiSettings":
         e = env if env is not None else os.environ
@@ -45,6 +64,12 @@ class WikiSettings:
             config_dir=e.get("WTBOT_PWB_DIR") or None,
             max_retries=int(e.get("WTBOT_WIKI_MAX_RETRIES", "0")),
             retry_wait=float(e.get("WTBOT_WIKI_RETRY_WAIT", "1")),
+            read_throttle=float(
+                e.get("WTBOT_WIKI_READ_THROTTLE", str(cls.read_throttle))
+            ),
+            put_throttle=float(e.get("WTBOT_WIKI_PUT_THROTTLE", str(cls.put_throttle))),
+            maxlag=int(e.get("WTBOT_WIKI_MAXLAG", str(cls.maxlag))),
+            user_agent=e.get("WTBOT_WIKI_USER_AGENT") or cls.user_agent,
         )
 
     @classmethod
@@ -66,6 +91,10 @@ class WikiSettings:
             config_dir=env.config_dir,
             max_retries=env.max_retries,
             retry_wait=env.retry_wait,
+            read_throttle=env.read_throttle,
+            put_throttle=env.put_throttle,
+            maxlag=env.maxlag,
+            user_agent=env.user_agent,
         )
         base.update(overrides)
         return cls(**base)

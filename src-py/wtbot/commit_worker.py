@@ -25,6 +25,7 @@ from threading import Lock
 
 from sqlmodel import Session, select
 
+from wtbot.failure_log import FailureContext, record_failure, site_label
 from wtbot.model import (
     Commit,
     CommitStatus,
@@ -286,9 +287,20 @@ def _save_pending_page(
     except EditConflict as exc:
         return _CommitOutcome(status=CommitStatus.conflict, error_message=str(exc))
     except Exception as exc:  # noqa: BLE001 - record any failure on the row
+        failure = record_failure(
+            FailureContext(
+                component="commit",
+                title=pending.title,
+                page_pk=pending.page_pk,
+                site_pk=pending.site.pk,
+                site_label=site_label(pending.site),
+                details={"base_revid": str(pending.base_revid), "force": str(force)},
+            ),
+            exc,
+        )
         return _CommitOutcome(
             status=CommitStatus.error,
-            error_message=f"{type(exc).__name__}: {exc}",
+            error_message=failure.summary,
         )
 
 

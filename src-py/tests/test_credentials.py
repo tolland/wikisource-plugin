@@ -120,7 +120,9 @@ def test_db_client_factory_uses_site_credential(engine):
     import unittest.mock as mock
 
     factory = _make_db_client_factory(engine)
-    with mock.patch("wtbot.main.get_wiki_client", side_effect=fake_get_wiki_client):
+    with mock.patch(
+        "wtbot.wiki.client_registry.get_wiki_client", side_effect=fake_get_wiki_client
+    ):
         factory(site_copy)
 
     assert len(captured) == 1
@@ -154,7 +156,9 @@ def test_db_client_factory_anonymous_when_no_credential(engine):
     import unittest.mock as mock
 
     factory = _make_db_client_factory(engine)
-    with mock.patch("wtbot.main.get_wiki_client", side_effect=fake_get_wiki_client):
+    with mock.patch(
+        "wtbot.wiki.client_registry.get_wiki_client", side_effect=fake_get_wiki_client
+    ):
         factory(site_copy)
 
     assert captured[0].username is None

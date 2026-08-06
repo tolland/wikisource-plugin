@@ -28,7 +28,7 @@ and ``download_file`` are all the fetch path needs. Two implementations:
 """
 
 
-# logging.basicConfig(level=logging.DEBUG)
+log = logging.getLogger(__name__)
 
 # Width requested for the small tree/preview thumbnail. The API's default
 # rendition (no prppifpsize) is ~1280px -- that is ProofreadPage's edit-view
@@ -153,6 +153,69 @@ class PywikibotClient:
             )
             self.site.login()
 
+        self._log_identity()
+
+    def _log_identity(self) -> None:
+        """Record who we are on this wiki, once per client.
+
+        Rate limits are per identity: anonymous traffic gets a far smaller
+        allowance than an authenticated account, and "we thought we were
+        logged in but were not" is invisible in every other symptom -- it just
+        looks like the wiki became unreliable. There is no API that reports
+        which rate-limit tier the CDN put us in, so group membership -- which
+        the tiers are drawn from, `bot` most decisively -- is the closest
+        observable proxy. It rides along on pywikibot's cached userinfo, so
+        this costs at most one request per client, and clients are reused per
+        site.
+        """
+        try:
+            if not self.site.logged_in():
+                log.warning(
+                    "wiki client for %s is ANONYMOUS -- the lower rate-limit "
+                    "tier applies; set a SiteCredential to raise it",
+                    self.site,
+                )
+                return
+            info = self.site.userinfo
+            groups = info.get("groups", [])
+            log.info(
+                "wiki client for %s logged in as %s (groups=%s, bot_flag=%s)",
+                self.site,
+                info.get("name"),
+                ",".join(g for g in groups if g not in ("*", "user")) or "none",
+                "bot" in groups,
+            )
+        except Exception as exc:  # noqa: BLE001 - diagnostics, never fatal
+            log.debug("could not read userinfo for %s: %s", self.site, exc)
+
+    def _api_query(self, **params) -> dict | None:
+        """Run a read-only API query through pywikibot's authenticated session.
+
+        These queries used to go out as bare ``requests.get`` calls to save
+        pywikibot's retry machinery. That traded one problem for a worse one:
+        a bare request carries no session cookie, so every one of them was
+        *anonymous* even when the client was logged in -- billed against the
+        lowest rate-limit tier, with no throttle between them and no
+        policy-compliant User-Agent. Three of them per fetched Page: was most
+        of our request budget, spent in the way most likely to be limited.
+
+        Through the site, they are throttled, authenticated and identified.
+        Fail-soft is preserved by returning None: every caller here is
+        enrichment (thumbnails, pagination hints), never the fetch itself. The
+        retry concern behind the original comment is handled by config
+        max_retries=0 (see wtbot.wiki.config), not by bypassing the session.
+        """
+        try:
+            return self.site.simple_request(**params).submit()
+        except Exception as exc:  # noqa: BLE001 - enrichment only, never fatal
+            log.debug(
+                "api query %s failed on %s: %s",
+                params.get("prop") or params.get("list") or params.get("action"),
+                self.site,
+                exc,
+            )
+            return None
+
     def get_page(self, title: str) -> RemotePage:
         page = self._pwb.Page(self.site, title)
         if not page.exists():
@@ -243,30 +306,16 @@ class PywikibotClient:
     def get_page_images(self, title: str) -> RemotePageImages | None:
         # ProofreadPage's module is prop=imageforpage (prefix prppifp), but
         # the *response* key is "imagesforpage"; prop=proofread rides along
-        # for the quality level. Deliberately a plain GET rather than a
-        # pywikibot api.Request: this is enrichment and must fail fast,
-        # while pywikibot's retry/throttle machinery turns one broken or
-        # unsupported endpoint into minutes of waiting, multiplied per
-        # fetched page. A miss just means no thumbnail until the next fetch.
-        try:
-            import requests
-
-            resp = requests.get(
-                self.site.base_url(self.site.apipath()),
-                params={
-                    "action": "query",
-                    "prop": "imageforpage|proofread",
-                    "titles": title,
-                    "prppifpprop": "filename|size|fullsize",
-                    "prppifpsize": PAGE_THUMB_WIDTH,
-                    "format": "json",
-                },
-                headers={"User-Agent": "wtbot (wikisource-plugin)"},
-                timeout=(5, 15),
-            )
-            data = resp.json()
-        except Exception as exc:  # noqa: BLE001 - enrichment only, never fatal
-            logging.debug("imageforpage query failed for %s: %s", title, exc)
+        # for the quality level. A miss just means no thumbnail until the next
+        # fetch, so this never fails the fetch (see _api_query).
+        data = self._api_query(
+            action="query",
+            prop="imageforpage|proofread",
+            titles=title,
+            prppifpprop="filename|size|fullsize",
+            prppifpsize=PAGE_THUMB_WIDTH,
+        )
+        if data is None:
             return None
         pages = (data.get("query") or {}).get("pages") or {}
         for pdata in pages.values():
@@ -285,28 +334,17 @@ class PywikibotClient:
         return None
 
     def list_index_pages(self, title: str) -> list[IndexPageEntry] | None:
-        # Same plain-GET/fail-soft rationale as get_page_images: this powers
-        # fan-out optimisation and placeholder discovery, not correctness --
-        # a miss just means the page_count fallback path.
-        try:
-            import requests
-
-            resp = requests.get(
-                self.site.base_url(self.site.apipath()),
-                params={
-                    "action": "query",
-                    "list": "proofreadpagesinindex",
-                    "prppiititle": title,
-                    "prppiiprop": "ids|title",
-                    "prppiilimit": 500,
-                    "format": "json",
-                },
-                headers={"User-Agent": "wtbot (wikisource-plugin)"},
-                timeout=(5, 15),
-            )
-            data = resp.json()
-        except Exception as exc:  # noqa: BLE001 - fall back to page_count
-            logging.debug("proofreadpagesinindex failed for %s: %s", title, exc)
+        # Same fail-soft rationale as get_page_images: this powers fan-out
+        # optimisation and placeholder discovery, not correctness -- a miss
+        # just means the page_count fallback path.
+        data = self._api_query(
+            action="query",
+            list="proofreadpagesinindex",
+            prppiititle=title,
+            prppiiprop="ids|title",
+            prppiilimit=500,
+        )
+        if data is None:
             return None
         entries = (data.get("query") or {}).get("proofreadpagesinindex")
         if not isinstance(entries, list):
@@ -325,25 +363,14 @@ class PywikibotClient:
         # ProofreadPage serves the same prepopulated body its own web editor
         # shows on a redlink Page: (pagequality header, the scan's OCR text
         # layer, footer) via prop=defaultcontentforpage — the response value
-        # is one serialized string. Same plain-GET/fail-soft rationale as
+        # is one serialized string. Same fail-soft rationale as
         # get_page_images: a miss just means the scaffold fallback.
-        try:
-            import requests
-
-            resp = requests.get(
-                self.site.base_url(self.site.apipath()),
-                params={
-                    "action": "query",
-                    "prop": "defaultcontentforpage",
-                    "titles": title,
-                    "format": "json",
-                },
-                headers={"User-Agent": "wtbot (wikisource-plugin)"},
-                timeout=(5, 30),
-            )
-            data = resp.json()
-        except Exception as exc:  # noqa: BLE001 - enrichment only, never fatal
-            logging.debug("defaultcontentforpage query failed for %s: %s", title, exc)
+        data = self._api_query(
+            action="query",
+            prop="defaultcontentforpage",
+            titles=title,
+        )
+        if data is None:
             return None
         pages = (data.get("query") or {}).get("pages") or {}
         for pdata in pages.values():

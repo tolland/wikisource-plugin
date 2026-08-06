@@ -113,6 +113,62 @@ class TestConfigInjection:
         assert pwbconfig.max_retries == 3
         assert pwbconfig.retry_wait == 2.5
 
+    def test_configure_throttles_reads_not_only_writes(self, tmp_path):
+        """The bug this pins: we set put_throttle (edits) and left minthrottle
+        at pywikibot's 0.1s default, which permits 600 read req/min against a
+        200 req/min allowance -- and an Index fan-out is almost all reads."""
+        import pywikibot.config as pwbconfig
+
+        from wtbot.wiki.config import configure_pywikibot
+
+        configure_pywikibot(
+            WikiSettings(family="w", code="en", config_dir=str(tmp_path / "t"))
+        )
+        assert pwbconfig.minthrottle == 0.35  # ~170 req/min
+        assert 60 / pwbconfig.minthrottle < 200
+        assert pwbconfig.put_throttle == 1.0
+        assert pwbconfig.maxlag == 5
+
+    def test_throttle_settings_from_env(self):
+        env = {
+            "WTBOT_WIKI_READ_THROTTLE": "1.5",
+            "WTBOT_WIKI_PUT_THROTTLE": "10",
+            "WTBOT_WIKI_MAXLAG": "2",
+        }
+        settings = WikiSettings.from_env(env)
+        assert settings.read_throttle == 1.5
+        assert settings.put_throttle == 10.0
+        assert settings.maxlag == 2
+
+    def test_user_agent_states_contact_information(self, tmp_path):
+        """Wikimedia's policy requires a contact URL or email and throttles
+        non-conforming clients harder, so this costs request budget when wrong.
+        Rendered through pywikibot's own formatter, since that is what ships."""
+        import pywikibot.config as pwbconfig
+        from pywikibot.comms.http import user_agent
+
+        from wtbot.wiki.config import configure_pywikibot
+
+        configure_pywikibot(
+            WikiSettings(family="w", code="en", config_dir=str(tmp_path / "ua"))
+        )
+        rendered = user_agent()
+        assert "wtbot" in rendered
+        assert "https://github.com/tolland/wikisource-plugin" in rendered
+        # A literal template must survive formatting with no placeholders left.
+        assert "{" not in rendered and "}" not in rendered
+        assert pwbconfig.user_agent_format  # not blanked
+
+    def test_config_dir_is_stable_across_clients(self):
+        """A fresh mkdtemp per client threw away the cookie jar and
+        throttle.ctrl, so every client re-authenticated and no concurrency
+        detection ever fired."""
+        from wtbot.wiki.config import configure_pywikibot
+
+        first = configure_pywikibot(WikiSettings(family="w", code="en"))
+        second = configure_pywikibot(WikiSettings(family="w", code="en"))
+        assert first == second
+
     def test_retry_policy_from_env(self):
         env = {"WTBOT_WIKI_MAX_RETRIES": "5", "WTBOT_WIKI_RETRY_WAIT": "0.5"}
         settings = WikiSettings.from_env(env)

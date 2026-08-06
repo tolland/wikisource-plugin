@@ -1,6 +1,8 @@
+import logging
 import os
 import stat
 import tempfile
+import threading
 from pathlib import Path
 
 from wtbot.settings import WikiSettings
@@ -21,9 +23,35 @@ at module import time.
 ``write_password_entry`` is called AFTER the pywikibot Site object is
 constructed, because AutoFamily derives its code from the endpoint at runtime
 -- we can't know the complete 4-tuple discriminator before Site() runs.
+
+The config dir is created once per process and then reused. It used to be a
+fresh ``mkdtemp`` per client, which quietly disabled three things that all
+depend on state persisting across clients: the login cookie jar (so every
+client re-authenticated from scratch), ``throttle.ctrl`` (so concurrent-process
+detection never fired), and the password file. Ephemeral is still the default
+-- the directory is a temp dir, just the *same* temp dir -- and
+``WTBOT_PWB_DIR`` makes it durable across restarts.
 """
 
+log = logging.getLogger(__name__)
+
 _PASSWORD_FILE = "user-password.cfg"
+
+_process_config_dir: str | None = None
+_config_dir_lock = threading.Lock()
+
+
+def _resolve_config_dir(settings: WikiSettings) -> str:
+    """The pywikibot config dir: the configured one, else one temp dir shared
+    by every client in this process."""
+    global _process_config_dir
+    if settings.config_dir:
+        Path(settings.config_dir).mkdir(parents=True, exist_ok=True)
+        return settings.config_dir
+    with _config_dir_lock:
+        if _process_config_dir is None:
+            _process_config_dir = tempfile.mkdtemp(prefix="wtbot-pwb-")
+        return _process_config_dir
 
 
 def configure_pywikibot(settings: WikiSettings) -> str:
@@ -35,28 +63,14 @@ def configure_pywikibot(settings: WikiSettings) -> str:
         # self-signed cert on a local .lan wiki without disabling verification.
         os.environ["REQUESTS_CA_BUNDLE"] = settings.ca_bundle
 
-    if settings.config_dir:
-        Path(settings.config_dir).mkdir(parents=True, exist_ok=True)
-        config_dir = settings.config_dir
-    else:
-        config_dir = tempfile.mkdtemp(prefix="wtbot-pwb-")
+    config_dir = _resolve_config_dir(settings)
     os.environ["PYWIKIBOT_DIR"] = config_dir
 
     import pywikibot.config as pwbconfig
 
     pwbconfig.base_dir = config_dir
 
-    # Retry policy (see WikiSettings): fail fast instead of pywikibot's
-    # default 15 retries with exponential backoff. Every failure mode we have
-    # actually hit -- missing token turning into rate limiting, a VCR cassette
-    # rejecting an unrecorded request, a dead local service -- was a bug that
-    # backoff only hid; a genuinely flaky link can raise these via env.
-    pwbconfig.max_retries = settings.max_retries
-    pwbconfig.retry_wait = settings.retry_wait
-
-    if not hasattr(pwbconfig, "_wtbot_throttle_set"):
-        pwbconfig.put_throttle = 1
-        pwbconfig._wtbot_throttle_set = True
+    _apply_rate_limits(pwbconfig, settings)
 
     # Throttle.checkMultiplicity() reads this file to detect concurrent bots.
     throttle_ctrl = Path(config_dir) / "throttle.ctrl"
@@ -85,6 +99,54 @@ def configure_pywikibot(settings: WikiSettings) -> str:
     _write_user_config(config_dir, settings)
 
     return config_dir
+
+
+def _apply_rate_limits(pwbconfig, settings: WikiSettings) -> None:
+    """Apply the read/write throttle, maxlag and User-Agent to pywikibot.
+
+    ``minthrottle`` is the one that matters and the one we previously left at
+    its 0.1s default while setting only ``put_throttle``: pywikibot throttles
+    reads against ``minthrottle`` (see its ``throttle.Throttle``), and a fetch
+    that fans an Index out into hundreds of Page: children is essentially all
+    reads. At 0.1s that is 600 req/min against a 200 req/min allowance.
+
+    The retry policy (see WikiSettings) fails fast instead of using pywikibot's
+    default 15 retries with exponential backoff. Every failure mode we have
+    actually hit -- missing token turning into rate limiting, a VCR cassette
+    rejecting an unrecorded request, a dead local service -- was a bug that
+    backoff only hid; a genuinely flaky link can raise these via env. Retrying
+    a 429 in particular is the wrong response: it means the throttle above is
+    wrong, and retrying makes it worse.
+
+    Attributes are set defensively -- pywikibot has moved these between
+    releases, and a renamed knob should degrade to "not throttled by us and
+    said so", not to an AttributeError inside client construction.
+    """
+    applied: list[str] = []
+    for name, value in (
+        ("minthrottle", settings.read_throttle),
+        ("put_throttle", settings.put_throttle),
+        ("maxlag", settings.maxlag),
+        ("max_retries", settings.max_retries),
+        ("retry_wait", settings.retry_wait),
+    ):
+        if hasattr(pwbconfig, name):
+            setattr(pwbconfig, name, value)
+            applied.append(f"{name}={value}")
+        else:
+            log.warning(
+                "pywikibot config has no %r attribute; rate limiting for it is "
+                "not being applied",
+                name,
+            )
+
+    # user_agent_format is a str.format template over pywikibot's own fields;
+    # a literal string passes through untouched, which is what we want -- the
+    # contact URL the policy asks for is ours to state, not pywikibot's.
+    pwbconfig.user_agent_format = settings.user_agent.replace("{", "{{").replace(
+        "}", "}}"
+    )
+    log.debug("pywikibot rate limits: %s ua=%r", " ".join(applied), settings.user_agent)
 
 
 def write_password_entry(
