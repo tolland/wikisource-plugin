@@ -134,11 +134,14 @@ Transaction handling is the driver's normal deferred style — an earlier eager 
 
 A wiki is **registered before anything fetches from it** and addressed by its unique `label` thereafter; nothing creates a Site implicitly. Fetching is also decoupled from enqueueing — `POST /fetch` queues, `POST /fetch/drain` (or `wtbot drain`) does the throttled work:
 
+wtbot **authenticates by default**: a site with no credential is refused at fetch time (409) and at client construction. Not because the published rate-limit tiers demand it — a compliant unauthenticated client gets the same 200 req/min — but because this backs an editor (commits need an account) and Wikimedia's CDN refuses unauthenticated traffic unevenly per IP range without documenting it. `WTBOT_ALLOW_ANONYMOUS=1` lifts the requirement for reading a public wiki from a workstation, and logs every use.
+
 ```bash
 uv run wtbot site add --label local --family mywikisource --code en \
-    --api-url https://wikisource-debian-13.lan/w/api.php
-uv run wtbot site-credential add --label local --username Admin --password ... \
-    [--bot-password-suffix wtbot]
+    --api-url https://wikisource-debian-13.lan/w/api.php \
+    --username Admin --password ... [--bot-password-suffix wtbot]
+# or attach the account afterwards:
+uv run wtbot site-credential add --label local --username Admin --password ...
 uv run wtbot fetch-page "Index:Some book.djvu" --label local   # queues
 uv run wtbot drain                                             # fetches
 uv run wtbot drain --status                                    # queue depth

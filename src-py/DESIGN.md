@@ -489,6 +489,11 @@ Our design target is the 200 req/min tier with ≤3 concurrent requests.
 Three defects made a large `Index:` fan-out exceed that budget, and the same
 three made the resulting failures unreadable:
 
+- **A parameter that never existed.** Those same queries sent `prppifpsize`,
+  meaning to ask for a 240px rendition. ProofreadPage's module defines exactly
+  one parameter, `prop`, so every request answered "Unrecognized parameter:
+  prppifpsize" — a warning on a response that still parsed, which is why it
+  went unnoticed. The thumbnail width is the extension's to choose.
 - **A second request per page.** ProofreadPage's ``prop=imageforpage`` (scan
   thumbnail + quality) was asked per fetched page, so a measured 25-page
   fan-out cost 60 requests -- 2.4 per page where the body needs one. It is a
@@ -521,6 +526,11 @@ three made the resulting failures unreadable:
   and supplies the status back to `wtbot/wiki/failures.py`, which classifies
   the failure; `wtbot/failure_log.py` keeps the short summary on the row and
   writes the traceback plus recent upstream requests to `WTBOT_FAILURE_LOG`.
+
+**Authentication is required, not advised.** A site with no credential is
+refused when work is queued (409) and again when a client is built, the latter
+being the check nothing can go around. `WTBOT_ALLOW_ANONYMOUS=1` lifts it for
+reading a public wiki from a workstation and logs every use.
 
 **Authenticate in practice, whatever the table says.** The published tiers put
 an unauthenticated client with a compliant User-Agent on the same 200 req/min

@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from conftest import drain
+from conftest import credential_for, drain
 from sqlmodel import Session, select
 
 from wtbot.incremental import RefreshBasis, plan_refresh
@@ -34,6 +34,7 @@ def _site(session: Session, **kwargs) -> Site:
     session.add(site)
     session.commit()
     session.refresh(site)
+    credential_for(session, site)
 
     for key, role in ((PAGE_NS, NsRole.page), (INDEX_NS, NsRole.index)):
         session.add(

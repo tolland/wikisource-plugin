@@ -31,6 +31,7 @@ from wtbot.logging_config import LOGGING_CONFIG, LoggingConfig, configure_loggin
 from wtbot.logging_config import sqlalchemy_echo as configured_sqlalchemy_echo
 from wtbot.model import Site, SiteCredential
 from wtbot.settings import WikiSettings
+from wtbot.site_store import AnonymousAccessRefused, anonymous_allowed
 from wtbot.wiki.client_registry import make_client_factory
 from wtbot.worker import ClientFactory
 
@@ -43,21 +44,30 @@ health check and a sites vertical slice are wired up so far.
 
 
 def _settings_for_site(engine):
-    """Resolve a Site row to WikiSettings, taking credentials from the DB."""
+    """Resolve a Site row to WikiSettings, taking credentials from the DB.
+
+    Refuses to build anonymous settings unless WTBOT_ALLOW_ANONYMOUS says so.
+    The endpoints check the same thing when work is queued, which is where the
+    error is useful; this is the check that cannot be gone around -- a request
+    queued before a credential was removed, or work reaching the worker by any
+    other route, still stops here rather than going out unauthenticated.
+    """
 
     def _resolve(site: Site) -> WikiSettings:
         with Session(engine) as session:
             cred = session.exec(
                 select(SiteCredential).where(SiteCredential.site_pk == site.pk)
             ).first()
-        overrides: dict = {}
-        if cred:
-            overrides = dict(
-                username=cred.username,
-                password=cred.password,
-                bot_name=cred.bot_name,
-            )
-        return WikiSettings.from_site(site, **overrides)
+        if cred is None:
+            if not anonymous_allowed():
+                raise AnonymousAccessRefused(site.label or f"{site.family}:{site.code}")
+            return WikiSettings.from_site(site)
+        return WikiSettings.from_site(
+            site,
+            username=cred.username,
+            password=cred.password,
+            bot_name=cred.bot_name,
+        )
 
     return _resolve
 

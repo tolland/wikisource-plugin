@@ -9,7 +9,7 @@ nothing.
 """
 
 import pytest
-from conftest import drain
+from conftest import credential_for, drain
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -60,6 +60,7 @@ def seeded(engine):
         session.add(site)
         session.commit()
         session.refresh(site)
+        credential_for(session, site)
         site_pk = site.pk
     return wiki, site_pk
 

@@ -501,3 +501,49 @@ def test_the_breakdown_names_the_requests_that_blew_the_budget():
     assert "prop=revisions" in report
     assert "2" in report.split("prop=revisions")[0].split("\n")[-1]
     assert "prop=imageforpage" in report
+
+
+def test_the_image_query_sends_only_parameters_the_module_accepts():
+    """ProofreadPage's imageforpage module takes exactly one parameter, `prop`.
+
+    We used to also send `prppifpsize`, hoping for a 240px rendition. No such
+    parameter exists, so every request came back with "Unrecognized parameter:
+    prppifpsize" -- a warning, not an error, on a response that still parsed,
+    which is why it survived so long. The thumbnail width is the extension's
+    to choose.
+    """
+    from wtbot.wiki.client import IMAGE_FOR_PAGE_PROPS, PywikibotClient
+
+    sent: list[dict] = []
+
+    client = PywikibotClient.__new__(PywikibotClient)
+    client.site = object()
+    client._api_query = lambda **params: sent.append(params) or None
+
+    client.get_page_images("Page:Book.djvu/1")
+    client.get_page_images_bulk(["Page:Book.djvu/1", "Page:Book.djvu/2"])
+
+    assert sent, "no query was made"
+    for params in sent:
+        assert "prppifpsize" not in params
+        assert params["prppifpprop"] == IMAGE_FOR_PAGE_PROPS
+        # `prop` is the module's whole parameter surface; anything else with
+        # its prefix is a parameter it does not have.
+        assert [k for k in params if k.startswith("prppifp")] == ["prppifpprop"]
+
+
+def test_the_bulk_image_query_chunks_to_the_pageset_limit():
+    """Fifty titles per request: MediaWiki's pageset cap without
+    apihighlimits, which an ordinary account does not have."""
+    from wtbot.wiki.client import PywikibotClient
+
+    sent: list[dict] = []
+    client = PywikibotClient.__new__(PywikibotClient)
+    client.site = object()
+    client._api_query = lambda **params: sent.append(params) or None
+
+    client.get_page_images_bulk([f"Page:Book.djvu/{n}" for n in range(1, 121)])
+
+    assert len(sent) == 3  # 50 + 50 + 20
+    assert len(sent[0]["titles"].split("|")) == 50
+    assert len(sent[-1]["titles"].split("|")) == 20

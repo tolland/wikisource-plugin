@@ -104,6 +104,45 @@ def test_registering_requires_a_label(http):
     assert resp.status_code == 422
 
 
+def test_fetching_a_site_that_cannot_log_in_is_refused(http):
+    """wtbot authenticates by default.
+
+    Not because the published rate-limit table demands it -- it does not -- but
+    because this backs an editor (commits need an account) and because
+    Wikimedia's CDN refuses unauthenticated traffic unevenly and without
+    documenting it, so reads that work now can stop working in ten minutes.
+    Refused at queue time, since the drain that would fail is minutes and
+    hundreds of pages later.
+    """
+    register_site(http, label="anon", family="mywikisource", code="en", username=None)
+
+    resp = http.post("/fetch/", json={"title": "Page:Book.djvu/1", "label": "anon"})
+
+    assert resp.status_code == 409
+    detail = resp.json()["detail"]
+    assert "no credential" in detail
+    assert "site-credential add" in detail
+    assert "WTBOT_ALLOW_ANONYMOUS" in detail
+
+
+def test_the_anonymous_escape_hatch_works_and_is_not_silent(
+    http, engine, monkeypatch, caplog
+):
+    """For the case it exists for -- reading a public wiki from a
+    workstation -- and loud about it, because a rule that can be switched off
+    quietly is not a rule."""
+    import logging
+
+    register_site(http, label="anon", family="mywikisource", code="en", username=None)
+    monkeypatch.setenv("WTBOT_ALLOW_ANONYMOUS", "1")
+
+    with caplog.at_level(logging.WARNING):
+        resp = http.post("/fetch/", json={"title": "Page:Book.djvu/1", "label": "anon"})
+
+    assert resp.status_code == 202
+    assert any("WTBOT_ALLOW_ANONYMOUS" in r.message for r in caplog.records)
+
+
 def test_a_registered_site_can_be_fetched_from(http, engine):
     site = register_site(http, label="local", family="mywikisource", code="en")
 

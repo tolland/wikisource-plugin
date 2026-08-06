@@ -107,13 +107,43 @@ def test_site_add_registers_and_says_what_is_missing(api):
     assert url.endswith("/sites/")
     assert payload["label"] == "local"
     assert payload["api_url"] == "https://wikisource-debian-13.lan/w/api.php"
-    # The follow-up an operator needs, at the moment it can be acted on...
+    # The blocker, stated as a blocker: this wiki is registered but cannot be
+    # used until it can log in.
+    assert "will be refused" in result.output
     assert "site-credential add" in result.output
-    # ...and accurately. Not "the rate limit is lower" (it is not, by the
-    # published tiers) but what is actually true: commits are broken, and
-    # anonymous reads are at the CDN's discretion for this IP range.
-    assert "commits will fail" in result.output
-    assert "CDN" in result.output
+    assert "WTBOT_ALLOW_ANONYMOUS" in result.output
+
+
+def test_site_add_can_take_the_credential_in_the_same_step(api):
+    """Registration and the account are one operation, because a wiki without
+    one is registered and unusable."""
+    result = runner.invoke(
+        create_app(),
+        [
+            "site",
+            "add",
+            "--label",
+            "local",
+            "--family",
+            "mywikisource",
+            "--code",
+            "en",
+            "--username",
+            "Admin",
+            "--password",
+            "changeme",
+            "--bot-password-suffix",
+            "wtbot",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    url, payload = api["put"][0]
+    assert url.endswith("/sites/1/credential")
+    assert payload["username"] == "Admin"
+    assert payload["bot_name"] == "wtbot"
+    assert "logs in as Admin@wtbot" in result.output
+    assert "no credential" not in result.output
 
 
 def test_credential_add_targets_the_site_by_label(api):

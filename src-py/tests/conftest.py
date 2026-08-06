@@ -112,19 +112,49 @@ def register_site(
     family: str = "mywikisource",
     code: str = "en",
     api_url: str | None = None,
+    username: str | None = "Admin",
+    password: str = "harness-password",
+    bot_name: str | None = None,
 ) -> dict:
     """Register a site the way an operator does, and return the row.
 
-    Fetching requires a site that already exists: nothing conjures one from a
-    request's parameters any more, precisely so that a typo cannot register a
-    credential-less wiki and read from it. Tests go through the same door.
+    Credentialed by default, because wtbot is: fetching refuses a site that
+    cannot log in (see site_store.require_credentialed_site), so a test that
+    registered a bare site would be exercising a configuration the product
+    rejects. Pass ``username=None`` for the tests that are *about* that refusal.
+
+    Nothing conjures a site from a fetch request's parameters any more, so
+    tests go through the same door an operator does.
     """
     resp = client.post(
         "/sites/",
         json={"label": label, "family": family, "code": code, "api_url": api_url},
     )
     resp.raise_for_status()
-    return resp.json()
+    site = resp.json()
+
+    if username is not None:
+        credential = client.put(
+            f"/sites/{site['pk']}/credential",
+            json={"username": username, "password": password, "bot_name": bot_name},
+        )
+        credential.raise_for_status()
+    return site
+
+
+def credential_for(session: Session, site) -> None:
+    """Give a directly-built Site row an account.
+
+    The API-level helper above goes through PUT /sites/{pk}/credential;
+    fixtures that build a Site with the ORM need the same, because the fetch
+    endpoints refuse a site that cannot log in.
+    """
+    from wtbot.model import SiteCredential
+
+    session.add(
+        SiteCredential(site_pk=site.pk, username="Admin", password="harness-password")
+    )
+    session.commit()
 
 
 def fetch_and_drain(client: TestClient, payload: dict) -> dict:

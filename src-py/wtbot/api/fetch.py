@@ -14,7 +14,7 @@ from wtbot.queue_runner import (
     drain_queue,
     queue_stats,
 )
-from wtbot.site_store import require_site
+from wtbot.site_store import require_credentialed_site
 
 from .debug_logging_route import DebugLoggingRoute
 
@@ -195,7 +195,7 @@ def create_fetch(payload: FetchCreate, session: Session = Depends(get_session)) 
     first fetch, and a *stale* snapshot on a refetch. It is what we hold, not
     what was just fetched: run a drain and re-read to get that.
     """
-    site = require_site(session, payload.label)
+    site = require_credentialed_site(session, payload.label)
 
     req = FetchRequest(
         site_pk=site.pk,
@@ -277,7 +277,7 @@ def refresh(
     Like ``POST /fetch``, this enqueues without fetching: ``enqueued`` is a
     count of queued work, not of pages written. Drain to make it real.
     """
-    site = require_site(session, payload.label)
+    site = require_credentialed_site(session, payload.label)
     factory = request.app.state.client_factory
     plan = plan_refresh(
         session,

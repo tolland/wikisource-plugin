@@ -30,11 +30,18 @@ and ``download_file`` are all the fetch path needs. Two implementations:
 
 log = logging.getLogger(__name__)
 
-# Width requested for the small tree/preview thumbnail. The API's default
-# rendition (no prppifpsize) is ~1280px -- that is ProofreadPage's edit-view
-# reference image, not a thumbnail; the /preview/page-image endpoint serves
-# other widths on demand by rewriting the thumb URL.
-PAGE_THUMB_WIDTH = 240
+#: The props ``prop=imageforpage`` accepts. This is the *whole* parameter
+#: surface of that module: ``prop`` (as ``prppifpprop``) and nothing else.
+#:
+#: We used to also send ``prppifpsize``, meaning to ask for a 240px rendition.
+#: No such parameter exists -- ProofreadPage's module defines only ``prop`` --
+#: so every one of those requests came back with
+#: "API warning (main): Unrecognized parameter: prppifpsize", was served at
+#: whatever width the extension chose, and nobody noticed because the warning
+#: is not an error and the response still parsed. The thumbnail width is
+#: PageDisplayHandler's to decide and is not controllable from here; consumers
+#: that need another width rewrite the URL (see /preview/page-image).
+IMAGE_FOR_PAGE_PROPS = "filename|size|fullsize"
 
 #: Titles per pageset query. MediaWiki's limit is 50 without apihighlimits,
 #: which an ordinary account does not have.
@@ -380,8 +387,7 @@ class PywikibotClient:
             action="query",
             prop="imageforpage|proofread",
             titles=title,
-            prppifpprop="filename|size|fullsize",
-            prppifpsize=PAGE_THUMB_WIDTH,
+            prppifpprop=IMAGE_FOR_PAGE_PROPS,
         )
         if data is None:
             return None
@@ -411,8 +417,7 @@ class PywikibotClient:
                 action="query",
                 prop="imageforpage|proofread",
                 titles="|".join(chunk),
-                prppifpprop="filename|size|fullsize",
-                prppifpsize=PAGE_THUMB_WIDTH,
+                prppifpprop=IMAGE_FOR_PAGE_PROPS,
             )
             if data is None:
                 continue

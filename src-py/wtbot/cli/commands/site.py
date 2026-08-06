@@ -15,6 +15,11 @@ Registering a wiki is a deliberate step now. It used to happen as a side effect
 of the first fetch that named a family/code, which meant a mistyped code
 registered a second wiki, silently, with no credentials -- and then read from
 it. Nothing about that was visible until a log line mentioned it.
+
+Credentials belong to that same step, which is why ``add`` takes them: a
+registered wiki that cannot log in cannot be fetched from (wtbot authenticates
+by default) and cannot be committed to at all, so leaving it for later leaves
+the wiki unusable in a way that only shows up on the next command.
 """
 
 
@@ -34,9 +39,23 @@ def add(
         ),
     ),
     articlepath: str = typer.Option("/wiki/$1"),
+    username: str | None = typer.Option(
+        None, help="Wiki account to log in as. Without it the site cannot be used."
+    ),
+    password: str | None = typer.Option(
+        None,
+        help="Account password, or the BotPassword secret with --bot-password-suffix.",
+    ),
+    bot_password_suffix: str | None = typer.Option(
+        None,
+        "--bot-password-suffix",
+        help="The name half of a BotPassword ('wtbot' in 'Admin@wtbot').",
+    ),
     api: ApiClient = Depends(get_api),
 ) -> None:
-    """Register a wiki."""
+    """Register a wiki, with the account wtbot should log in as."""
+    if username and not password:
+        password = typer.prompt("password", hide_input=True)
     site = api.post(
         "/sites/",
         {
@@ -50,16 +69,33 @@ def add(
     typer.echo(
         f"registered {site['label']} ({site['family']}:{site['code']}) #{site['pk']}"
     )
-    # Said once, at the point it can be acted on. Not scolding: anonymous
-    # reads are a supported configuration and the documented read tier is the
-    # same. But the CDN in front of Wikimedia judges IP ranges as well as
-    # accounts, so unauthenticated traffic from a server can be refused where
-    # the same request from a laptop is not -- and commits need an account
-    # either way.
+
+    if username:
+        credential = api.put(
+            f"/sites/{site['pk']}/credential",
+            {
+                "username": username,
+                "password": password,
+                "bot_name": bot_password_suffix,
+            },
+        )
+        who = credential["username"]
+        if credential.get("bot_name"):
+            who = f"{who}@{credential['bot_name']}"
+        typer.echo(f"  logs in as {who}")
+        return
+
+    # Said at the point it can be acted on, and stated as the blocker it is:
+    # fetching refuses an uncredentialed site, so this wiki is registered but
+    # unusable until an account is added.
+    typer.secho(
+        f"  no credential: fetches from {label} will be refused, and commits "
+        f"are impossible without one.",
+        fg="yellow",
+    )
     typer.echo(
-        f"  no credential yet: commits will fail, and anonymous reads depend "
-        f"on how the CDN treats your IP range. "
-        f"Add one with `wtbot site-credential add --label {label} ...`"
+        f"  add one with `wtbot site-credential add --label {label} "
+        f"--username ...`, or set WTBOT_ALLOW_ANONYMOUS=1 to read without it"
     )
 
 
