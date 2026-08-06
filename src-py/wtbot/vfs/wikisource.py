@@ -205,9 +205,11 @@ class WikisourceVfs:
             page_pks = [p.pk for p in pages if p.pk is not None]
             uncommitted = self.store.latest_uncommitted_bodies(page_pks)
             metas = self.store.page_metas_by_pks(page_pks)
-            pushed = self.store.latest_successful_commits(
-                [pk for pk in page_pks if pk not in uncommitted]
-            )
+            # For every page, not just those without local edits: a page can
+            # have an uncommitted save (which supplies the body) *and* an
+            # earlier push whose refetch is still queued (which supplies the
+            # revid), and the two are answered independently below.
+            pushed = self.store.latest_successful_commits(page_pks)
             for i, raw, page_title in entries:
                 page = pages_by_title.get(page_title)
                 if page is None:
@@ -230,6 +232,12 @@ class WikisourceVfs:
                     name=page.title,
                     body=body,
                     meta=metas.get(page.pk),
+                    # Bridged from the commit already loaded above, so the
+                    # batched path reports the same revid as the single one
+                    # without a per-page query to rediscover it.
+                    revid=self.store.pushed_revid_ahead_of_snapshot(
+                        pushed.get(page.pk), page
+                    ),
                 )
 
         return [results[i] for i in range(len(paths))]

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import base64
 
+from conftest import drain
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -85,9 +86,20 @@ def test_commit_endpoint_pushes_pending_edits(engine):
         assert resp.status_code == 200
         assert resp.json()["handled"] == 1
 
-        # The endpoint drains the post-push refetch inline, so a read
-        # straight after committing serves the new remote body — never the
-        # stale (or empty, for an ex-placeholder) snapshot.
+        # The push enqueues a refetch rather than performing it: the Page row
+        # is only ever written from fetched remote state, and fetching is a
+        # throttled operation that committing does not wait on. Reads bridge
+        # on the pushed body meanwhile, so this window serves the new content
+        # from the Commit, never the stale (or empty) snapshot.
+        bridged = c.get("/vfs/content", params={"path": PATH}).json()
+        assert base64.b64decode(bridged["content_base64"]).decode() == "edited"
+
+        with Session(engine) as s:
+            assert s.get(Page, page.pk).text == "original"  # snapshot untouched
+
+        drain(c)
+
+        # Once the refetch lands, the snapshot itself is current.
         read = c.get("/vfs/content", params={"path": PATH}).json()
         assert base64.b64decode(read["content_base64"]).decode() == "edited"
         assert read["revid"] == 101

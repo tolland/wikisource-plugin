@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
+from conftest import drain
 from sqlmodel import Session, select
 
 from wtbot.incremental import RefreshBasis, plan_refresh
@@ -265,6 +266,14 @@ def test_refresh_endpoint_fetches_only_what_moved(client, engine) -> None:
     assert body["plan"]["basis"] == "incremental"
     assert body["plan"]["titles"] == [moved]
     assert body["enqueued"] == 1
+
+    # Enqueued, not fetched: the refresh planned the work, the drain does it.
+    with Session(engine) as session:
+        assert session.exec(select(Page).where(Page.title == moved)).one().text != (
+            "refreshed body"
+        )
+
+    drain(client)
 
     with Session(engine) as session:
         page = session.exec(select(Page).where(Page.title == moved)).one()

@@ -294,6 +294,36 @@ class PageStore:
         # Rows are ascending, so the newest commit per page_pk wins.
         return {row.page_pk: row for row in rows}
 
+    def effective_revid(self, page: Page) -> int | None:
+        """The revid read()/stat() should report for [page].
+
+        Same bridge as [effective_body], applied to identity rather than
+        content: while a successful push is ahead of the snapshot, the page's
+        current remote revision is the one *we* created, and the page exists
+        remotely even if the local row still looks like a placeholder. Leaving
+        this on Page.revid alone was survivable only while every commit drained
+        its own refetch inline; with fetching decoupled, an un-bridged revid
+        reports a just-created page as not existing for as long as the queue
+        takes -- and the commit worker already assumes the bridged value when
+        it bases the next push on the last result_revid.
+        """
+        return self.pushed_revid_ahead_of_snapshot(
+            self.latest_successful_commits([page.pk]).get(page.pk), page
+        )
+
+    @staticmethod
+    def pushed_revid_ahead_of_snapshot(commit: Commit | None, page: Page) -> int | None:
+        """[commit]'s result_revid while it is ahead of the Page snapshot,
+        else the snapshot's own revid. Mirrors [pushed_body_ahead_of_snapshot]
+        so body and revid can never disagree about which one is current."""
+        if (
+            commit is not None
+            and commit.result_revid is not None
+            and (page.revid is None or page.revid < commit.result_revid)
+        ):
+            return commit.result_revid
+        return page.revid
+
     @staticmethod
     def pushed_body_ahead_of_snapshot(commit: Commit | None, page: Page) -> str | None:
         """The body of [commit] while it is ahead of the Page snapshot — the

@@ -91,6 +91,45 @@ def client(engine: Engine) -> Iterator[TestClient]:
         yield c
 
 
+def drain(client: TestClient, **kwargs) -> dict:
+    """Work the fetch queue and return the drain report.
+
+    Enqueueing no longer fetches (see wtbot.api.fetch), so a test that wants a
+    page in the database has to ask for the fetch to happen -- exactly as a
+    caller does. Kept as a plain helper rather than an autouse fixture on
+    purpose: which tests drain, and *when* they drain relative to a read, is
+    the thing several of these tests are about.
+    """
+    resp = client.post("/fetch/drain", json=kwargs or None)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def fetch_and_drain(client: TestClient, payload: dict) -> dict:
+    """Enqueue a fetch, run it, and report as the old inline endpoint did:
+    ``{"request": ..., "page": ...}`` with both read back *after* the drain."""
+    enqueued = client.post("/fetch/", json=payload)
+    enqueued.raise_for_status()
+    request_pk = enqueued.json()["request"]["pk"]
+
+    drain(client)
+
+    request = client.get(f"/fetch/{request_pk}")
+    request.raise_for_status()
+    page = client.get(
+        "/pages/resolve",
+        params={
+            "family": payload["family"],
+            "code": payload["code"],
+            "title": payload["title"],
+        },
+    )
+    return {
+        "request": request.json(),
+        "page": page.json() if page.status_code == 200 else None,
+    }
+
+
 # --------------------------------------------------------------------------
 # Two-wiki harness (upstream + local) for cross-wiki sync tests.
 #

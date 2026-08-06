@@ -48,6 +48,17 @@ def test_static_pages_routes_are_registered_before_the_catch_all(engine):
         )
 
 
+def test_fetch_queue_is_registered_before_the_fetch_catch_all(engine):
+    """/fetch has the same hazard on a smaller scale: GET /fetch/{pk} parses
+    an int, so GET /fetch/queue must be declared above it or it 422s."""
+    paths = _paths_in_registration_order(create_app(engine=engine))
+    assert paths.index("/fetch/queue") < paths.index("/fetch/{pk}")
+
+
+def test_fetch_queue_reaches_its_own_handler(client):
+    assert client.get("/fetch/queue").status_code == 200
+
+
 def test_no_pages_route_is_added_after_the_catch_all(engine):
     """Catches shadowing of routes this test does not know about yet."""
     paths = _paths_in_registration_order(create_app(engine=engine))

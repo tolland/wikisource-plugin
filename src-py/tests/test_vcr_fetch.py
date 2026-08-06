@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 
 import pytest
+from conftest import fetch_and_drain
 from vcr_config import FIXTURES_DIR, cassette_exists, make_vcr
 
 from wtbot.model import FetchStatus, FileBlob, IndexMeta, Page
@@ -149,7 +150,7 @@ def test_en_ws_get_page_1():
 
 @_en_fanout
 def test_en_ws_fanout_index(engine, tmp_path):
-    """Full worker integration: POST /fetch with depth=1 fans out all pages.
+    """Full worker integration: enqueue with depth=1, drain, all pages fanned out.
 
     Uses the cassette that covers the index fetch + file info + all page fetches.
     The DjVu binary is stubbed in the cassette; metadata assertions still pass.
@@ -167,9 +168,9 @@ def test_en_ws_fanout_index(engine, tmp_path):
             blob_root=tmp_path / "blobs",
         )
         with TestClient(app) as http:
-            resp = http.post(
-                "/fetch/",
-                json={
+            body = fetch_and_drain(
+                http,
+                {
                     "title": PEIRCE_INDEX,
                     "family": "wikisource",
                     "code": "en",
@@ -177,8 +178,6 @@ def test_en_ws_fanout_index(engine, tmp_path):
                 },
             )
 
-    assert resp.status_code == 202
-    body = resp.json()
     assert body["request"]["status"] == FetchStatus.done.value
 
     index_page = body["page"]
@@ -281,9 +280,9 @@ def test_lan_fanout_index(engine, tmp_path):
             blob_root=tmp_path / "blobs",
         )
         with TestClient(app) as http:
-            resp = http.post(
-                "/fetch/",
-                json={
+            body = fetch_and_drain(
+                http,
+                {
                     "title": PEIRCE_INDEX,
                     "family": "mywikisource",
                     "code": "en",
@@ -292,8 +291,6 @@ def test_lan_fanout_index(engine, tmp_path):
                 },
             )
 
-    assert resp.status_code == 202
-    body = resp.json()
     assert body["request"]["status"] == FetchStatus.done.value
 
     index_page = body["page"]

@@ -151,6 +151,13 @@ GET  /fetch/{request_id}
 
 GET  /fetch?status=pending|in_progress|...      # queue inspection / CLI
 POST /fetch/{request_id}/cancel
+
+POST /fetch/drain                               # do the queued work (slow)
+  body: { batch, max_passes }
+  → { handled, passes, remaining, stop_reason, complete }
+
+GET  /fetch/queue                               # depth, without draining
+  → { counts: {status: n}, pending, total, oldest_pending_at }
 ```
 
 Lifecycle of a request: `pending → in_progress → done | error | cancelled`.
@@ -354,9 +361,13 @@ mark `committed=True` on success.
 A successful push **never mutates the `Page` row**: `Page` is strictly the
 *fetched* remote snapshot, and the fetch worker is its only writer. The push's
 outcome is logged on the `Commit` row (`result_revid`), and the commit worker
-enqueues a high-priority refetch of the page (drained inline by the commit
-endpoints) to true the snapshot up — text, revid, pageid, contributor and all.
-Two consequences of the window between "journal committed" and "refetch
+enqueues a high-priority refetch of the page to true the snapshot up — text,
+revid, pageid, contributor and all. That refetch is *queued*, not performed:
+committing pushes to the wiki, and waiting on a throttled read-back is a
+separate operation (§7). So the window below is now open for as long as the
+queue takes, rather than being closed inside the commit request — which is why
+everything the VFS reports about a page has to bridge it, not just the body.
+Three consequences of the window between "journal committed" and "refetch
 landed":
 
 - **Reads bridge on the Commit log.** `effective_body` is a three-level rule:
@@ -364,6 +375,14 @@ landed":
   `submitted_body` while `Page.revid` still lags its `result_revid` → `Page.text`.
   The pushed body *is* the remote body during that window, and the revid guard
   means a later remote edit (fetched normally) is never shadowed.
+- **`revid` and `placeholder` bridge the same way.** `effective_revid` returns
+  the commit's `result_revid` while it is ahead of `Page.revid`, and
+  `placeholder` follows it. A page we pushed exists remotely from the moment
+  the push succeeds; reporting it as a placeholder until its refetch lands
+  would be wrong, and was only survivable while every commit drained its own
+  refetch inline. `write` compares `base_revid` against the same effective
+  value, so a save based on a revision we ourselves pushed is not rejected as
+  a conflict with our own edit.
 - **A save landing in the window carries a stale `base_revid`** (the client's
   revid is still the old snapshot, though its buffer came from the pushed
   body). The commit worker bumps such a base to our own last `result_revid`
@@ -390,11 +409,23 @@ processing a single title per request and writing the page back. **Next:** the
 index fan-out (step 4) and the File: blob download, which slot into the marked
 point in `worker._process` and are fully testable via `FakeWikiClient`.
 
-**Who runs it.** Today the `POST /fetch` endpoint enqueues the request and then
-calls `run_pending` *inline*, so one HTTP call does enqueue → drain → write-back
-(the CLI's `fetch-page` just calls this endpoint over HTTP; it no longer touches
-pywikibot itself). `run_pending` is deliberately transport-agnostic so the same
-function backs a future background loop / `wtbot worker` command without change.
+**Who runs it.** Enqueueing and draining are separate calls. `POST /fetch` (and
+`POST /fetch/refresh`) create FetchRequest rows and return; `POST /fetch/drain`
+— or `wtbot drain`, or `queue_runner.drain_queue` in-process — works the queue.
+`GET /fetch/queue` reports depth without draining, and `GET /fetch/{pk}` reports
+one request's progress.
+
+They were fused until the rate-limit work (§7.1.1) made the cost explicit: with
+reads throttled to stay inside 200 req/min, fetching an Index means hundreds of
+deliberately-paced requests, so an enqueue call that waits for them holds a
+socket open for minutes and gets *worse* every time we correctly slow down. A
+test can hide this — one mocked title answers instantly — but a book cannot.
+
+`run_pending` remains the primitive (claim up to N, process them);
+`queue_runner.drain_queue` is the policy built on it (keep going until empty,
+since a fan-out enqueues children mid-run) and reports why it stopped. There is
+no background loop yet: something has to call the drain. That is the honest
+state of it, and `wtbot drain` is that something.
 
 Concurrency uses the documented SQLite discipline: WAL and `busy_timeout=5000`
 on every connection. (An earlier rule additionally forced `BEGIN IMMEDIATE` on
