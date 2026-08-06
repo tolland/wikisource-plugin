@@ -6,7 +6,7 @@ x-mediawiki-common: &mediawiki-common
     context: .
     dockerfile: docker/mediawiki/Dockerfile
   volumes:
-    - mediawiki-local-images:/var/www/html/images
+    - mediawiki-local-images:/var/www/html/images:z
     - ./src-py/tests/fixtures:/fixtures:ro,z
     - ./docker/mediawiki/Wikisource.php:/var/www/html/LocalSettings.d/Wikisource.php:z,ro
   healthcheck:

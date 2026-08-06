@@ -1,0 +1,1449 @@
+<mediawiki xmlns="http://www.mediawiki.org/xml/export-0.11/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mediawiki.org/xml/export-0.11/ http://www.mediawiki.org/xml/export-0.11.xsd" version="0.11" xml:lang="en">
+  <siteinfo>
+    <sitename>My WikiSource</sitename>
+    <dbname>wiki</dbname>
+    <base>https://wikisource-debian-13.lan/wiki/Main_Page</base>
+    <generator>MediaWiki 1.43.6</generator>
+    <case>first-letter</case>
+    <namespaces>
+      <namespace key="-2" case="first-letter">Media</namespace>
+      <namespace key="-1" case="first-letter">Special</namespace>
+      <namespace key="0" case="first-letter" />
+      <namespace key="1" case="first-letter">Talk</namespace>
+      <namespace key="2" case="first-letter">User</namespace>
+      <namespace key="3" case="first-letter">User talk</namespace>
+      <namespace key="4" case="first-letter">Project</namespace>
+      <namespace key="5" case="first-letter">Project talk</namespace>
+      <namespace key="6" case="first-letter">File</namespace>
+      <namespace key="7" case="first-letter">File talk</namespace>
+      <namespace key="8" case="first-letter">MediaWiki</namespace>
+      <namespace key="9" case="first-letter">MediaWiki talk</namespace>
+      <namespace key="10" case="first-letter">Template</namespace>
+      <namespace key="11" case="first-letter">Template talk</namespace>
+      <namespace key="12" case="first-letter">Help</namespace>
+      <namespace key="13" case="first-letter">Help talk</namespace>
+      <namespace key="14" case="first-letter">Category</namespace>
+      <namespace key="15" case="first-letter">Category talk</namespace>
+      <namespace key="100" case="first-letter">Portal</namespace>
+      <namespace key="101" case="first-letter">Portal talk</namespace>
+      <namespace key="250" case="first-letter">Page</namespace>
+      <namespace key="251" case="first-letter">Page talk</namespace>
+      <namespace key="252" case="first-letter">Index</namespace>
+      <namespace key="253" case="first-letter">Index talk</namespace>
+      <namespace key="828" case="first-letter">Module</namespace>
+      <namespace key="829" case="first-letter">Module talk</namespace>
+      <namespace key="1198" case="first-letter">Translations</namespace>
+      <namespace key="1199" case="first-letter">Translations talk</namespace>
+      <namespace key="3100" case="first-letter">Book</namespace>
+      <namespace key="3101" case="first-letter">Book talk</namespace>
+      <namespace key="3102" case="first-letter">Author</namespace>
+      <namespace key="3103" case="first-letter">Author talk</namespace>
+    </namespaces>
+  </siteinfo>
+  <page>
+    <title>Module:ISO 639</title>
+    <ns>828</ns>
+    <id>34</id>
+    <revision>
+      <id>60</id>
+      <parentid>59</parentid>
+      <timestamp>2026-03-06T04:25:08Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>59</origin>
+      <model>Scribunto</model>
+      <format>text/plain</format>
+      <text bytes="1731" sha1="3tr0b4bhq6112dvnq0at9vsygu80pd6" xml:space="preserve">require('strict')
+
+local p = {}
+
+local getArgs = require('Module:Arguments').getArgs
+local warn = require('Module:Warning')
+
+local languageNameOverrides = mw.loadData('Module:ISO 639/overrides')
+
+--[=[
+Get the language name, in English, for a given ISO 639 (-1, -2 or -3) code
+
+Returns nil if the language is not in the lookup tables.
+]=]
+function p.language_name(code, failValue)
+	-- Only continue if we get passed a non-empty string for the code param
+	if code == nil or code == '' then
+		warn('No ISO code provided to [[Module:ISO 639]]')
+		return failValue
+	elseif type(code) ~= 'string' then
+		warn('ISO code \"' .. tostring(code) .. '\" is not a string')
+		return failValue
+	end
+	
+	-- If we have a local override, apply it
+	local language = languageNameOverrides[code]
+	
+	-- Otherwise, ask MediaWiki for the language name in English for this code
+	if language == nil or language == '' then
+		language = mw.language.fetchLanguageName(code, 'en')
+	end
+	
+	-- If we got no name from MediaWiki and have no override for this code,
+	-- load the big honkin' local lookup table and check there.
+	if language == nil or language == '' then
+		local localLanguageNames = mw.loadData('Module:ISO 639/local')
+		language = localLanguageNames[code]
+	end
+	
+	-- If we found a non-empty lang name we return it.
+	if language ~= nil and language ~= '' then
+		return language
+	end
+	
+	-- otherwise we return the failure value
+	warn('ISO code \"' .. code .. '\" not recognized by [[Module:ISO 639]]')
+	return failValue
+end
+
+--[=[
+Implements [[Template:ISO 639 name]]
+]=]
+
+function p.ISO_639_name(frame)
+	local args = getArgs(frame)
+	
+	return p.language_name(args[1] or args.code, '[[Category:' .. 'ISO 639 name template errors' .. ']]')
+end
+
+return p</text>
+      <sha1>3tr0b4bhq6112dvnq0at9vsygu80pd6</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Module:ISO 639/overrides</title>
+    <ns>828</ns>
+    <id>41</id>
+    <revision>
+      <id>76</id>
+      <parentid>75</parentid>
+      <timestamp>2026-03-06T04:25:08Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>75</origin>
+      <model>Scribunto</model>
+      <format>text/plain</format>
+      <text bytes="971" sha1="thn706ro24wcxcx8wd6f0rlhfux9u0q" xml:space="preserve">return {
+	["ab"] = "Abkhaz",
+	["acm"] = "Mesopotamian Arabic",
+	["als"] = "Tosk Albanian",
+	["bn"] = "Bengali",
+	["bpy"] = "Bishnupriya Manipuri",
+	["cdo"] = "Min Dong",
+	["cu"] = "Church Slavonic",
+	["dga"] = "Southern Dagaare",
+	["diq"] = "Dimli",
+	["dv"] = "Dhivehi",
+	["fiu-vro"] = "Võro",
+	["frp"] = "Franco-Provençal",
+	["gcr"] = "Guianese Creole",
+	["gur"] = "Farefare",
+	["ii"] = "Nuosu",
+	["kaa"] = "Karakalpak",
+	["kj"] = "Kwanyama",
+	["krj"] = "Karay-a",
+	["kus"] = "Kusaal",
+	["lad"] = "Judaeo-Spanish",
+	["lg"] = "Luganda",
+	["map-bms"] = "Banyumasan",
+	["nah"] = "Nahuatl",
+	["nan"] = "Southern Min",
+	["new"] = "Newar",
+	["nit"] = "Naiki",
+	["nqo"] = "N'Ko",
+	["nrm"] = "Narom",
+	["ny"] = "Chewa",
+	["nys"] = "Noongar",
+	["pi"] = "Pāli",
+	["pih"] = "Pitkern",
+	["rif"] = "Tmazight",
+	["rki"] = "Rakhine",
+	["st"] = "Sotho",
+	["tay"] = "Atayal",
+	["trv"] = "Seediq",
+	["vmf"] = "East Franconian",
+	["wal"] = "Wolaitta",
+	["zh-min-nan"] = "Southern Min"
+}</text>
+      <sha1>thn706ro24wcxcx8wd6f0rlhfux9u0q</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Module:Error</title>
+    <ns>828</ns>
+    <id>29</id>
+    <revision>
+      <id>50</id>
+      <parentid>49</parentid>
+      <timestamp>2026-03-06T04:25:07Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>49</origin>
+      <model>Scribunto</model>
+      <format>text/plain</format>
+      <text bytes="991" sha1="a1gea716qmg6nkngecd84mcx7lrtpgc" xml:space="preserve">local p = {}
+
+local function _error(args)
+	local tag = mw.ustring.lower(tostring(args.tag or 'strong'))
+	
+	-- Work out what html tag we should use.
+	if not (tag == 'p' or tag == 'span' or tag == 'div') then
+		tag = 'strong'
+	end
+	
+	-- Generate the html.
+	return tostring(mw.html.create(tag)
+		:addClass('error')
+		:wikitext(tostring(args.message or args[1] or error('no message specified', 2)))
+	)
+end
+
+function p.error(frame)
+	local args
+	if type(frame.args) == 'table' then
+		--[=[
+			We're being called via #invoke.
+			The args are passed through to the module from the template page,
+			so use the args that were passed into the template.
+		]=]
+		args = frame.args
+	else
+		--[=[
+			We're being called from another module or from the debug console,
+			so assume the args are passed in directly.
+		]=]
+		args = frame
+	end
+	--[=[
+		If the message parameter is present but blank, change it to nil.
+	]=]
+	if args.message == '' then
+		args.message = nil
+	end
+	return _error(args)
+end
+
+return p</text>
+      <sha1>a1gea716qmg6nkngecd84mcx7lrtpgc</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Module:Category handler</title>
+    <ns>828</ns>
+    <id>17</id>
+    <revision>
+      <id>26</id>
+      <parentid>25</parentid>
+      <timestamp>2026-03-06T04:25:06Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>25</origin>
+      <model>Scribunto</model>
+      <format>text/plain</format>
+      <text bytes="7871" sha1="letwavu3yvlayfzew66uuwixmwebq5b" xml:space="preserve">--------------------------------------------------------------------------------
+--                                                                            --
+--                              CATEGORY HANDLER                              --
+--                                                                            --
+--      This module implements the {{category handler}} template in Lua,      --
+--      with a few improvements: all namespaces and all namespace aliases     --
+--      are supported, and namespace names are detected automatically for     --
+--      the local wiki. This module requires [[Module:Namespace detect]]      --
+--      and [[Module:Yesno]] to be available on the local wiki. It can be     --
+--      configured for different wikis by altering the values in              --
+--      [[Module:Category handler/config]], and pages can be blacklisted      --
+--      from categorisation by using [[Module:Category handler/blacklist]].   --
+--                                                                            --
+--------------------------------------------------------------------------------
+
+-- Load required modules
+local yesno = require('Module:Yesno')
+
+-- Lazily load things we don't always need
+local mShared, mappings
+
+local p = {}
+
+--------------------------------------------------------------------------------
+-- Helper functions
+--------------------------------------------------------------------------------
+
+local function trimWhitespace(s, removeBlanks)
+	if type(s) ~= 'string' then
+		return s
+	end
+	s = s:match('^%s*(.-)%s*$')
+	if removeBlanks then
+		if s ~= '' then
+			return s
+		else
+			return nil
+		end
+	else
+		return s
+	end
+end
+
+--------------------------------------------------------------------------------
+-- CategoryHandler class
+--------------------------------------------------------------------------------
+
+local CategoryHandler = {}
+CategoryHandler.__index = CategoryHandler
+
+function CategoryHandler.new(data, args)
+	local obj = setmetatable({ _data = data, _args = args }, CategoryHandler)
+	
+	-- Set the title object
+	do
+		local pagename = obj:parameter('demopage')
+		local success, titleObj
+		if pagename then
+			success, titleObj = pcall(mw.title.new, pagename)
+		end
+		if success and titleObj then
+			obj.title = titleObj
+			if titleObj == mw.title.getCurrentTitle() then
+				obj._usesCurrentTitle = true
+			end
+		else
+			obj.title = mw.title.getCurrentTitle()
+			obj._usesCurrentTitle = true
+		end
+	end
+
+	-- Set suppression parameter values
+	for _, key in ipairs{'nocat', 'categories'} do
+		local value = obj:parameter(key)
+		value = trimWhitespace(value, true)
+		obj['_' .. key] = yesno(value)
+	end
+	do
+		local subpage = obj:parameter('subpage')
+		local category2 = obj:parameter('category2')
+		if type(subpage) == 'string' then
+			subpage = mw.ustring.lower(subpage)
+		end
+		if type(category2) == 'string' then
+			subpage = mw.ustring.lower(category2)
+		end
+		obj._subpage = trimWhitespace(subpage, true)
+		obj._category2 = trimWhitespace(category2) -- don't remove blank values
+	end
+	return obj
+end
+
+function CategoryHandler:parameter(key)
+	local parameterNames = self._data.parameters[key]
+	local pntype = type(parameterNames)
+	if pntype == 'string' or pntype == 'number' then
+		return self._args[parameterNames]
+	elseif pntype == 'table' then
+		for _, name in ipairs(parameterNames) do
+			local value = self._args[name]
+			if value ~= nil then
+				return value
+			end
+		end
+		return nil
+	else
+		error(string.format(
+			'invalid config key "%s"',
+			tostring(key)
+		), 2)
+	end
+end
+
+function CategoryHandler:isSuppressedByArguments()
+	return
+		-- See if a category suppression argument has been set.
+		self._nocat == true
+		or self._categories == false
+		or (
+			self._category2
+			and self._category2 ~= self._data.category2Yes
+			and self._category2 ~= self._data.category2Negative
+		)
+
+		-- Check whether we are on a subpage, and see if categories are
+		-- suppressed based on our subpage status.
+		or self._subpage == self._data.subpageNo and self.title.isSubpage
+		or self._subpage == self._data.subpageOnly and not self.title.isSubpage
+end
+
+function CategoryHandler:shouldSkipBlacklistCheck()
+	-- Check whether the category suppression arguments indicate we
+	-- should skip the blacklist check.
+	return self._nocat == false
+		or self._categories == true
+		or self._category2 == self._data.category2Yes
+end
+
+function CategoryHandler:matchesBlacklist()
+	if self._usesCurrentTitle then
+		return self._data.currentTitleMatchesBlacklist
+	else
+		mShared = mShared or require('Module:Category handler/shared')
+		return mShared.matchesBlacklist(
+			self.title.prefixedText,
+			mw.loadData('Module:Category handler/blacklist')
+		)
+	end
+end
+
+function CategoryHandler:isSuppressed()
+	-- Find if categories are suppressed by either the arguments or by
+	-- matching the blacklist.
+	return self:isSuppressedByArguments()
+		or not self:shouldSkipBlacklistCheck() and self:matchesBlacklist()
+end
+
+function CategoryHandler:getNamespaceParameters()
+	if self._usesCurrentTitle then
+		return self._data.currentTitleNamespaceParameters
+	else
+		if not mappings then
+			mShared = mShared or require('Module:Category handler/shared')
+			mappings = mShared.getParamMappings(true) -- gets mappings with mw.loadData
+		end
+		return mShared.getNamespaceParameters(
+			self.title,
+			mappings
+		)
+	end
+end
+
+function CategoryHandler:namespaceParametersExist()
+	-- Find whether any namespace parameters have been specified.
+	-- We use the order "all" --&gt; namespace params --&gt; "other" as this is what
+	-- the old template did.
+	if self:parameter('all') then
+		return true
+	end
+	if not mappings then
+		mShared = mShared or require('Module:Category handler/shared')
+		mappings = mShared.getParamMappings(true) -- gets mappings with mw.loadData
+	end
+	for ns, params in pairs(mappings) do
+		for i, param in ipairs(params) do
+			if self._args[param] then
+				return true
+			end
+		end
+	end
+	if self:parameter('other') then
+		return true
+	end
+	return false
+end
+
+function CategoryHandler:getCategories()
+	local params = self:getNamespaceParameters()
+	local nsCategory
+	for i, param in ipairs(params) do
+		local value = self._args[param]
+		if value ~= nil then
+			nsCategory = value
+			break
+		end
+	end
+	if nsCategory ~= nil or self:namespaceParametersExist() then
+		-- Namespace parameters exist - advanced usage.
+		if nsCategory == nil then
+			nsCategory = self:parameter('other')
+		end
+		local ret = {self:parameter('all')}
+		local numParam = tonumber(nsCategory)
+		if numParam and numParam &gt;= 1 and math.floor(numParam) == numParam then
+			-- nsCategory is an integer
+			ret[#ret + 1] = self._args[numParam]
+		else
+			ret[#ret + 1] = nsCategory
+		end
+		if #ret &lt; 1 then
+			return nil
+		else
+			return table.concat(ret)
+		end
+	elseif self._data.defaultNamespaces[self.title.namespace] then
+		-- Namespace parameters don't exist, simple usage.
+		return self._args[1]
+	end
+	return nil
+end
+
+--------------------------------------------------------------------------------
+-- Exports
+--------------------------------------------------------------------------------
+
+local p = {}
+
+function p._exportClasses()
+	-- Used for testing purposes.
+	return {
+		CategoryHandler = CategoryHandler
+	}
+end
+
+function p._main(args, data)
+	data = data or mw.loadData('Module:Category handler/data')
+	local handler = CategoryHandler.new(data, args)
+	if handler:isSuppressed() then
+		return nil
+	end
+	return handler:getCategories()
+end
+
+function p.main(frame, data)
+	data = data or mw.loadData('Module:Category handler/data')
+	local args = require('Module:Arguments').getArgs(frame, {
+		wrappers = data.wrappers,
+		valueFunc = function (k, v)
+			v = trimWhitespace(v)
+			if type(k) == 'number' then
+				if v ~= '' then
+					return v
+				else
+					return nil
+				end
+			else
+				return v
+			end
+		end
+	})
+	return p._main(args, data)
+end
+
+return p</text>
+      <sha1>letwavu3yvlayfzew66uuwixmwebq5b</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Module:Proofreadpage index template/config</title>
+    <ns>828</ns>
+    <id>37</id>
+    <revision>
+      <id>68</id>
+      <parentid>67</parentid>
+      <timestamp>2026-03-06T04:25:08Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>67</origin>
+      <model>Scribunto</model>
+      <format>text/plain</format>
+      <text bytes="9492" sha1="tl27c7dnpnsq1ju5yccb8dqwwywiug4" xml:space="preserve">local function any_case(str)
+	return str:gsub('.', function (chr)
+		if chr:match('%a') then -- letters
+			return '[' .. chr:lower() .. chr:upper() .. ']'
+		else
+			return chr -- leave as-is
+		end
+	end)
+end
+return {
+	['defaults'] = {
+		['Source'] = '_empty_',
+	},
+	['pagelist'] =  {
+		['pages'] = {
+			['txt'] = 'Pages'
+		},
+		['legend'] = {
+			['txt'] = '(key to [[Help:Page Status|Page Status]])'
+		}
+	},
+	['cover'] = {
+		['width'] = '250px',
+		['image'] = 'File:Placeholder book.svg'
+	},
+	['missing_heading_id'] = function (id)
+		return 'Can\'t find heading for ID: ' .. id
+	end,
+	['headings'] = {
+		['title'] = {
+			['txt'] = 'Title'
+		},
+		['progress'] = {
+			['txt'] = 'Progress'
+		},
+		['transclusion'] = {
+			['txt'] = 'Transclusion'
+		},
+		['validation_date'] = {
+			['txt'] = 'Validated in'
+		},
+		['source'] = {
+			['txt'] = 'Source'
+		},
+		['place'] = {
+			['txt'] = 'Location'
+		},
+		['year'] = {
+			['txt'] = 'Year'
+		},
+		['publisher'] = {
+			['txt'] = 'Publisher'
+		},
+		['author'] = {
+			['txt'] = 'Author'
+		},
+		['editor'] = {
+			['txt'] = 'Editor'
+		},
+		['translator'] = {
+			['txt'] = 'Translator'
+		},
+		['illustrator'] = {
+			['txt'] = 'Illustrator'
+		},
+		['volumes'] = {
+			['txt'] = 'Volumes'
+		},
+		['isbn'] = {
+			['txt'] = 'ISBN'
+		},
+		['oclc'] = {
+			['txt'] = 'OCLC'
+		},
+		['lccn'] = {
+			['txt'] = 'LCCN'
+		},
+		['ark'] = {
+			['txt'] = 'ARK'
+		},
+		--[=[
+		['National Archives'] = {
+			['txt'] = 'National Archives'
+		},
+		]=]
+		['doi'] = {
+			['txt'] = 'DOI'
+		}
+	},
+	['status'] = {
+		['T'] = {
+			['cat'] = 'Index Validated',
+			['txt'] = 'Done—All pages of the work proper are validated',
+		},
+		['V'] = {
+			['cat'] = 'Index Proofread',
+			['txt'] = 'Proofread—All pages of the work proper are proofread, but not all are validated',
+		},
+		['C'] = {
+			['cat'] = 'Index Not-Proofread',
+			['txt'] = 'To be proofread',
+		},
+		['MS'] = {
+			['cat'] = 'Index - Ready for Match and Split',
+			['txt'] = 'Ready for Match and Split',
+		},
+		['OCR'] = {
+			['cat'] = 'Index - Text Layer Requested',
+			['txt'] = 'Source file needs an OCR text layer',
+		},
+		['L'] = {
+			['cat'] = 'Index - File to fix',
+			['txt'] = 'Source file must be fixed before proofreading',
+			['error'] = true,
+		},
+		['X'] = {
+			['cat'] = 'Index - File to check',
+			['txt'] = 'Create a pagelist for the source file before commencing proofreading (to verify file is correct)',
+			['error'] = true
+		},
+		['_missing'] = {
+			['cat'] = 'Index - Unknown progress',
+			['txt'] = 'Missing progress (template error)',
+			['error'] = true,
+		},
+		['_default'] = {
+			['cat'] = 'Index - Unknown progress',
+			['txt'] = function (index_status)
+				return 'Unknown progress: ' .. index_status .. ' (template error)'
+			end,
+			['error'] = true,
+		}
+	},
+	['transclusion'] = {
+		['yes'] = {
+			['cat'] = 'Fully transcluded',
+			['txt'] = 'Fully transcluded',
+			['help'] = 'The work is fully transcluded, including front and end matter and images'
+		},
+		['notimg'] = {
+			['cat'] = 'Images not fully transcluded',
+			['txt'] = 'Images not fully transcluded',
+			['help'] = 'The work is fully transcluded, but that some images are still missing or need improvement',
+		},
+		['notadv'] = {
+			['cat'] = 'Advertising not transcluded',
+			['txt'] = 'Advertising not transcluded',
+			['help'] = 'The main body of the work is properly transcluded, though front- or end-matter advertising material is not'
+		},
+		['held'] = {
+			['cat'] = 'Transclusion on hold',
+			['txt'] = 'Transclusion on hold',
+			['help'] = 'There is a problem with transcluding the work (which should be explained on the talk page)'
+		},
+		['check'] = {
+			['cat'] = 'Transclusion check required',
+			['txt'] = 'Transclusion check required',
+			['help'] = 'The transclusion of the work is incomplete or needs checking'
+		},
+		['no'] = {
+			['cat'] = 'Index not transcluded',
+			['txt'] = 'Index not transcluded or unreviewed',
+			['help'] = 'This work is not transcluded or has not been reviewed for transclusion'
+		},
+		['_missing'] = {
+			['cat'] = 'Index not transcluded',
+			['txt'] = 'Missing transclusion status (template error)',
+			['error'] = true,
+		},
+		['_default'] = {
+			['cat'] = 'Index not transcluded',
+			['txt'] = function (index_status)
+				return 'Unknown transclusion status: ' .. index_status .. ' (template error)'
+			end,
+			['error'] = true,
+		}
+	},
+	['language_cats'] = {
+		['single'] = function(lang)
+			return 'Index pages of works originally in ' .. (lang or 'an unknown language')
+		end,
+		['multi'] = 'Index pages of works originally in multiple languages'
+	},
+	['cover_cats'] = {
+		['file_types'] = {
+			['jpg'] = 'image',
+			['png'] = 'image',
+			['gif'] = 'image',
+			['tif'] = 'image',
+			['ogg'] = 'audiovisual',
+			['ogv'] = 'audiovisual',
+			['webm'] = 'audiovisual',
+			['_empty_'] = 'unknown',
+			['pdf'] = 'multipage',
+			['djvu'] = 'multipage'
+		},
+		['image'] = 'Image based indexes',
+		['audiovisual'] = 'Audio-visual based indexes',
+		['unknown'] = 'Indexes of unknown type',
+		['missing'] = 'Indexes with missing files',
+		['fullspec'] = 'Non-image-based indexes with fully-specified cover image'
+	},
+	['validation_cats'] = {
+		['dated'] = function(vdate)
+			return 'Indexes validated in ' .. vdate
+		end,
+		['undated'] = 'Indexes validated with no date'
+	},
+	['indicators'] = {
+		['pagegame'] = {
+			['name'] = 'WS Page Game',
+			['image'] = 'File:OOjs UI icon page number.svg',
+			['link'] = function(args)
+				return tostring(mw.uri.fullUrl('toolforge:ws-page-game', {['wikisource'] = 'en', ['index'] = mw.uri.encode(args.fileTitle.rootText), ['lang'] = 'en'}))
+			end,
+			['caption'] = 'Wikisource Page Game (step-by-step pagelist builder)'
+		},
+		['purge'] = {
+			['name'] = 'purge file',
+			['image'] = 'File:OOjs UI icon reload.svg',
+			['link'] = function(args)
+				return tostring(mw.uri.fullUrl('commons:File:' .. args.fileTitle.rootText, {['action'] = 'purge'}))
+			end,
+			['caption'] = 'Purge file'
+		},
+		['book2scroll'] = {
+			['name'] = 'book2scroll',
+			['image'] = 'File:Library-logo.svg',
+			['link'] = function(args)
+				return tostring(mw.uri.fullUrl('toolforge:book2scroll', {['lang'] = 'en', ['file'] = mw.uri.encode(args.fileTitle.rootText)}))
+			end,
+			['caption'] = 'Open in Book2Scroll'
+		},
+		['bookreader'] = {
+			['name'] = 'bookreader',
+			['image'] = 'File:BookReader-favicon.svg',
+			['link'] = function(args)
+				return tostring(mw.uri.fullUrl('toolforge:bookreader/en/' .. mw.uri.encode(args.fileTitle.rootText)))
+			end,
+			['caption'] = 'Open file in BookReader'
+		},
+		['validated'] = {
+			['name'] = 'validated-index-date',
+			['image'] = 'File:Yes Check Circle.svg',
+			['link'] = function (args)
+				local vdate = args['Validation_date']
+				return vdate and tostring(mw.uri.fullUrl('Category:Indexes validated in ' .. vdate)) or ''
+			end,
+			['caption'] = function (args)
+				local vdate = args['Validation_date']
+				return vdate and 'Validated in ' .. vdate or nil
+			end,
+			['alt'] = 'Validated index page.',
+			['width'] = '15px',
+			['include'] = function (args)
+				return args['Validation_date'] ~= nil
+			end
+		}
+	},
+	['indicator_defaults'] = {
+		['width'] = '20px',
+		['include'] = function (args)
+			return true
+		end
+	},
+	['url_gens'] = {
+		['isbn'] = function(id, text)
+			return require('Module:ISBN')._ISBN({id})
+		end,
+		['oclc'] = function(id, text)
+			return '[https://www.worldcat.org/oclc/' .. mw.uri.encode(id, 'PATH') .. ' ' .. text .. ']'
+		end,
+		['ark'] = function(id, text)
+			return '[https://n2t.net/' .. mw.uri.encode(id, 'QUERY') .. ' ' .. text .. ']'
+		end,
+		['doi'] = function(id, text)
+			return '[https://doi.org/' .. mw.uri.encode(id, 'PATH') .. ' ' .. text .. ']'
+		end
+	},
+	['talkremarks'] = {
+		['text'] = function(args)
+			return 'Formatting guidelines specific to this work may have already been established. Please check this [[' .. args.talkPageTitle.prefixedText .. '|Index\'s discussion page]] and follow any such conventions.'
+		end,
+		['cat'] = 'Pages using index talk remarks with notes parameter',
+		['keywords'] = {
+			{
+				['pattern'] = any_case('notes?'),
+				['alone'] = true
+			},
+			{
+				['pattern'] = any_case('quick notes?'),
+				['alone'] = false
+			},
+			{
+				['pattern'] = any_case('proofr?e?a?d?ing notes?'), -- proofreading notes, proofing note, &amp;c
+				['alone'] = false
+			},
+			{
+				['pattern'] = any_case('style notes?'),
+				['alone'] = false
+			},
+			{
+				['pattern'] = any_case('layout notes?'),
+				['alone'] = false
+			},
+			{
+				['pattern'] = any_case('formatting conventions?'),
+				['alone'] = false
+			},
+			{
+				['pattern'] = any_case('formatt?i?n?g?'), -- formatting, format
+				['alone'] = true
+			},
+			{
+				['pattern'] = any_case('conventions?'),
+				['alone'] = true
+			},
+			{
+				['pattern'] = any_case('layouts?'),
+				['alone'] = true
+			},
+			{
+				['pattern'] = any_case('quotes'),
+				['alone'] = true
+			},
+			{
+				['pattern'] = any_case('quotation marks'),
+				['alone'] = false
+			},
+			{
+				['pattern'] = any_case('typography'),
+				['alone'] = false
+			},
+			{
+				['pattern'] = any_case('spelling'),
+				['alone'] = false
+			},
+			{
+				['pattern'] = any_case('style guide'),
+				['alone'] = false
+			},
+			{
+				['pattern'] = any_case('guidelines?'),
+				['alone'] = false
+			},
+			{
+				['pattern'] = any_case('missing pages?'),
+				['alone'] = true
+			},
+			{
+				['pattern'] = any_case('long[ %-]s'), -- of course
+				['alone'] = true
+			},
+		},
+		['timestamp'] = {
+			['pattern'] = '%(UTC%)',
+			['text'] = '(UTC)'
+		}
+	}
+}</text>
+      <sha1>tl27c7dnpnsq1ju5yccb8dqwwywiug4</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Module:Header/attribution data</title>
+    <ns>828</ns>
+    <id>42</id>
+    <revision>
+      <id>78</id>
+      <parentid>77</parentid>
+      <timestamp>2026-03-06T04:25:08Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>77</origin>
+      <model>Scribunto</model>
+      <format>text/plain</format>
+      <text bytes="2405" sha1="kzp83yz3wocvt12zr5er7cmq3w7ojlz" xml:space="preserve">require('strict')
+
+local function anon(text)
+	text = text or 'Anonymous'
+	local cat = ''
+	if mw.title.getCurrentTitle():inNamespaces(0, 114) then
+		cat = '[[Category:' .. 'Works by unknown authors' .. ']]'
+	end
+	return '[[Portal:Anonymous texts|' .. text .. ']]' .. cat
+end
+
+local function anon_nocat(text)
+	return '[[Portal:Anonymous texts|' .. (text or 'Anonymous') .. ']]'
+end
+
+local contrib_types = {
+	{noun = 'author', prefix = 'by'},
+	{noun = 'attributed to', prefix = 'attributed to', special_cases = {}},
+	{noun = 'adapter', prefix = 'adapted by'},
+	{noun = 'abridger', prefix = 'abridged by'},
+	{noun = 'illustrator', prefix = 'illustrated by'},
+	{noun = 'director', prefix = 'directed by'},
+	{noun = 'lyricist', prefix = 'lyrics by'},
+	{noun = 'librettist', prefix = 'libretto by'},
+	{
+		noun = 'book by',
+		prefix = 'book by',
+		special_cases = {
+			['?'] = 'unknown author',
+			['unknown'] = 'unknown author',
+			['not mentioned'] = 'unknown author',
+			['anon'] = anon,
+			['anonymous'] = anon,
+			['various'] = 'various authors'
+		}
+	},
+	{noun = 'composer', prefix = 'composed by'},
+	{noun = 'arranger', prefix = 'arranged by'},
+	{
+		noun = 'translator',
+		prefix = 'translated by',
+		language_prefix = function(language_name)
+			return 'translated from ' .. language_name .. ' by'
+		end,
+		special_cases = {
+			['?'] = 'unknown translator',
+			['unknown'] = 'unknown translator',
+			['not mentioned'] = 'unknown translator',
+			['anon'] = anon,
+			['anonymous'] = anon,
+			['various'] = 'various translators',
+			['wikisource'] = '[[Wikisource:Translations|Wikisource]]'
+		}
+	},
+	{
+		noun = 'editor',
+		prefix = 'edited by',
+		special_cases = {
+			['?'] = 'unknown editor',
+			['unknown'] = 'unknown editor',
+			['not mentioned'] = 'unknown editor',
+			['anon'] = anon_nocat,
+			['anonymous'] = anon_nocat,
+			['various'] = 'various editors'
+		}
+	},
+	{noun = 'compiler', prefix = 'compiled by'}
+}
+
+for i = 1, #contrib_types do
+	local noun = contrib_types[i]['noun']
+	contrib_types[i]['param_name'] = contrib_types[i]['param_name'] or string.gsub(noun, ' ', '-')
+	contrib_types[i]['special_cases'] = contrib_types[i]['special_cases'] or {
+		['?'] = 'unknown ' .. noun,
+		['unknown'] = 'unknown ' .. noun,
+		['not mentioned'] = 'unknown ' .. noun,
+		['anon'] = anon,
+		['anonymous'] = anon,
+		['various'] = 'various ' .. noun .. 's'
+	}
+	contrib_types[i]['index'] = i
+end
+
+return contrib_types</text>
+      <sha1>kzp83yz3wocvt12zr5er7cmq3w7ojlz</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>MediaWiki:Proofreadpage index data config.json</title>
+    <ns>8</ns>
+    <id>200</id>
+    <revision>
+      <id>1019</id>
+      <parentid>391</parentid>
+      <timestamp>2026-03-06T09:27:36Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <origin>1019</origin>
+      <model>json</model>
+      <format>application/json</format>
+      <text bytes="7751" sha1="nl693wfnyzhx38xoyt13zagqi6rxsm8" xml:space="preserve">{
+	"Type": {
+		"type": "string",
+		"size": 1,
+		"default": "",
+		"label": "Type",
+		"header": true,
+		"values": {
+			"book": "Book",
+			"journal": "Journal",
+			"collection": "Collection",
+			"phdthesis": "Thesis",
+			"dictionary": "Dictionary",
+			"film": "Film"
+		},
+		"help": "Type of the book",
+		"data": "type"
+	},
+	"Title": {
+		"type": "page",
+		"size": 1,
+		"default": "",
+		"label": "Title",
+		"header": true,
+		"data": "title",
+		"help": "The title of the work. Link to the top-level mainspace page (even if this is a sub-volume)"
+	},
+	"Language": {
+		"type": "langcode",
+		"size": 1,
+		"default": "en",
+		"header": false,
+		"data": "language",
+		"help": "The original languages of the work, separated by commas. Use the ISO 639 codes for the languages. For example, en, fr, de, it, la. Middle English is enm, Old English is ang, Classical Greek is grc"
+	},
+	"Volume": {
+		"type": "string",
+		"size": 1,
+		"default": "",
+		"label": "Volume",
+		"header": false,
+		"help": "The volume of the book if this is part of a multi-volume series. Should link to the volume in mainspace."
+	},
+	"Author": {
+		"type": "page",
+		"size": 1,
+		"default": "",
+		"label": "Author",
+		"header": true,
+		"data": "author",
+		"delimiter": ";",
+		"help": ""
+	},
+	"Translator": {
+		"type": "page",
+		"size": 1,
+		"default": "",
+		"label": "Translator",
+		"header": true,
+		"data": "translator",
+		"delimiter": ";",
+		"help": ""
+	},
+	"Editor": {
+		"type": "string",
+		"size": 1,
+		"default": "",
+		"label": "Editor",
+		"header": true,
+		"data": "editor",
+		"delimiter": ";",
+		"help": ""
+	},
+	"Illustrator": {
+		"type": "page",
+		"size": 1,
+		"default": "",
+		"label": "Illustrator",
+		"header": true,
+		"data": "illustrator",
+		"delimiter": ";",
+		"help": ""
+	},
+	"School": {
+		"type": "string",
+		"size": 1,
+		"default": "",
+		"label": "School",
+		"header": false,
+		"data": "school",
+		"help": ""
+	},
+	"Publisher": {
+		"type": "string",
+		"size": 1,
+		"default": "",
+		"label": "Publisher",
+		"header": true,
+		"data": "publisher",
+		"help": "The publisher of the book",
+		"delimiter": [
+			";",
+			"asn"
+		]
+	},
+	"Address": {
+		"type": "string",
+		"size": 1,
+		"default": "",
+		"label": "Location",
+		"header": true,
+		"data": "place",
+		"delimiter": ";",
+		"help": "Location of the publisher, usually a city."
+	},
+	"Year": {
+		"type": "string",
+		"size": 1,
+		"default": "",
+		"label": "Year of publication",
+		"header": true,
+		"data": "year",
+		"help": "The year of publication of THIS edition (not the first edition of the work in general)"
+	},
+	"Key": {
+		"type": "string",
+		"size": 1,
+		"default": "",
+		"label": "Sort key",
+		"header": false,
+		"help": ""
+	},
+	"ISBN": {
+		"type": "isbn",
+		"size": 1,
+		"default": "",
+		"label": "International Standard Book Number",
+		"header": false,
+		"data": "identifier",
+		"help": ""
+	},
+	"OCLC": {
+		"type": "oclc",
+		"size": 1,
+		"default": "",
+		"label": "OCLC",
+		"header": false,
+		"data": "identifier",
+		"help": ""
+	},
+	"LCCN": {
+		"type": "lccn",
+		"size": 1,
+		"default": "",
+		"label": "LCCN",
+		"header": false,
+		"data": "identifier",
+		"help": ""
+	},
+	"BNF_ARK": {
+		"type": "ark",
+		"size": 1,
+		"default": "",
+		"label": "ARK from BNF",
+		"header": false,
+		"data": "identifier",
+		"naan": 12148,
+		"help": ""
+	},
+	"ARC": {
+		"type": "arc",
+		"size": 1,
+		"default": "",
+		"label": "National Archives identifier",
+		"header": false,
+		"data": "identifier",
+		"help": ""
+	},
+	"DOI": {
+		"type": "doi",
+		"size": 1,
+		"default": "",
+		"label": "DOI",
+		"header": false,
+		"data": "identifier",
+		"help": "Digital Object Identifier"
+	},
+	"Source": {
+		"type": "string",
+		"size": 1,
+		"default": "",
+		"label": "Scans",
+		"header": false,
+		"help": "",
+		"values": {
+			"_empty_": "other",
+			"djvu": "djvu",
+			"pdf": "pdf",
+			"jpg": "jpg",
+			"png": "png",
+			"gif": "gif",
+			"tif": "tif",
+			"ogg": "ogg",
+			"ogv": "ogv",
+			"webm": "webm"
+		}
+	},
+	"Image": {
+		"type": "string",
+		"size": 1,
+		"default": "1",
+		"label": "Cover image",
+		"header": false,
+		"help": "The number of the page to use as the image on this page"
+	},
+	"Progress": {
+		"type": "string",
+		"size": 1,
+		"default": "X",
+		"label": "Progress",
+		"header": false,
+		"values": {
+			"T": "Done (all validated)",
+			"V": "To be validated",
+			"C": "To be proofread",
+			"MS": "Ready for Match \u0026 Split",
+			"OCR": "Source file needs an OCR text layer",
+			"L": "Source file is incorrect (missing pages, unordered pages, etc)",
+			"X": "Pagelist needed (to verify file is complete and correct before commencing proofreading)"
+		},
+		"data": "progress",
+		"help": "The proofreading status of this book (this refers to the status within the Page namespace)",
+		"js": true
+	},
+	"Transclusion": {
+		"type": "string",
+		"size": 1,
+		"default": "no",
+		"label": "Tranclusion status",
+		"header": false,
+		"values": {
+			"no": "Not yet transcluded",
+			"check": "Needs checking and/or fixing",
+			"yes": "Fully transcluded",
+			"notadv": "Advertising not transcluded",
+			"notimg": "Images not fully transcluded",
+			"held": "Transclusion on hold - explain on talk page"
+		},
+		"js": true
+	},
+	"Validation_date": {
+		"type": "string",
+		"size": 1,
+		"label": "Validation date",
+		"header": false,
+		"help": "The date of final validation of this book, in the form \"January 2020\""
+	},
+	"Pages": {
+		"type": "string/line",
+		"size": 15,
+		"default": "\u003Cpagelist /\u003E",
+		"label": "Pages",
+		"header": false,
+		"help": "",
+		"data": "pagelist"
+	},
+	"Volumes": {
+		"type": "string/line",
+		"size": 5,
+		"default": "",
+		"label": "",
+		"header": false,
+		"help": ""
+	},
+	"Remarks": {
+		"type": "string/line",
+		"size": 15,
+		"default": "",
+		"label": "Table of Contents",
+		"header": true,
+		"help": ""
+	},
+	"Width": {
+		"type": "number",
+		"size": 1,
+		"default": "",
+		"label": "Scan resolution in edit mode",
+		"header": false,
+		"help": ""
+	},
+	"Header": {
+		"type": "string",
+		"size": 1,
+		"default": "",
+		"label": "Header",
+		"header": true,
+		"help": "",
+		"js": true
+	},
+	"Footer": {
+		"type": "string",
+		"size": 1,
+		"default": "\n",
+		"label": "Footer",
+		"header": true,
+		"help": "",
+		"js": true
+	},
+	"Notes": {
+		"type": "string/line",
+		"hidden": true,
+		"header": true
+	},
+	"wikidata": {
+		"type": "wikibase-itemid",
+		"size": 1,
+		"default": "",
+		"label": "Wikidata ID",
+		"help": "The ID of the edition entity at Wikidata matching this file",
+		"header": true,
+		"data": "wikibase-itemid",
+		"hidden": true
+	},
+	"wikipedia": {
+		"type": "string",
+		"hidden": true,
+		"header": true
+	},
+	"commons": {
+		"type": "string",
+		"hidden": true,
+		"header": true
+	},
+	"commonscat": {
+		"type": "string",
+		"hidden": true,
+		"header": true
+	},
+	"wikiquote": {
+		"type": "string",
+		"hidden": true,
+		"header": true
+	},
+	"wikinews": {
+		"type": "string",
+		"hidden": true,
+		"header": true
+	},
+	"wiktionary": {
+		"type": "string",
+		"hidden": true,
+		"header": true
+	},
+	"wikibooks": {
+		"type": "string",
+		"hidden": true,
+		"header": true
+	},
+	"wikiversity": {
+		"type": "string",
+		"hidden": true,
+		"header": true
+	},
+	"wikispecies": {
+		"type": "string",
+		"hidden": true,
+		"header": true
+	},
+	"meta": {
+		"type": "string",
+		"hidden": true,
+		"header": true
+	},
+	"portal": {
+		"type": "string",
+		"hidden": true,
+		"header": true
+	},
+	"tmplver": {
+		"type": "string",
+		"label": "Template version",
+		"header": false,
+		"help": "Technical switch used for migration. Do not use."
+	},
+	"section-year": {
+		"type": "string",
+		"hidden": true,
+		"header": true
+	},
+	"section-illustrator": {
+		"type": "string",
+		"hidden": true,
+		"header": true
+	},
+	"section-translator": {
+		"type": "string",
+		"hidden": true,
+		"header": true
+	},
+	"section-author": {
+		"type": "string",
+		"hidden": true,
+		"header": true
+	}
+}</text>
+      <sha1>nl693wfnyzhx38xoyt13zagqi6rxsm8</sha1>
+    </revision>
+  </page>
+</mediawiki>

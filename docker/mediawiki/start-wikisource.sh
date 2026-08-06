@@ -116,19 +116,8 @@ printf "running maintenance update\n"
 
 php maintenance/run.php update --quick
 
-for module in ISO_639 Message_box Yesno Proofreadpage_index_template Warning; do
-  php maintenance/run.php edit \
-    -u "$MW_ADMIN_USER" \
-    -s "Install Wikisource modules" \
-    "Module:${module}" \
-    < "/bootstrap/modules/${module}.lua"
-done
-
-php maintenance/run.php edit \
-  -u "$MW_ADMIN_USER" \
-  -s "Install ProofreadPage configuration" \
-  "MediaWiki:Proofreadpage_index_data_config.json" \
-  < /bootstrap/mediawiki/Proofreadpage_index_data_config.json
+php maintenance/run.php importDump \
+    < "/bootstrap/modules/wikisource_modules_minimal.xml"
 
 # Content seeding. Guarded on the database so a warm volume restarts fast and,
 # more importantly, so a restart cannot stack extra revisions onto pages whose
