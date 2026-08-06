@@ -71,7 +71,10 @@ def configure_pywikibot(settings: WikiSettings) -> str:
             {settings.family, "*"} if settings.api_url else {settings.family}
         ):
             fam = pwbconfig.usernames.setdefault(fam_key, {})
-            fam.setdefault("*", settings.username)
+            # pywikibot config is process-global, so a previous client/test may
+            # already have populated this wildcard.  The current settings are
+            # authoritative and must replace that stale username.
+            fam["*"] = settings.username
             fam[settings.code] = settings.username
 
         # Point pywikibot at the password file even though it may be empty or

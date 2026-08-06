@@ -1,3 +1,4 @@
+import logging
 import os
 import subprocess
 import time
@@ -33,6 +34,32 @@ COMPOSE_FILE = REPO_ROOT / "compose.seeded.yml"
 __all__ = ["CANADIAN_PATENT_INDEX", "CANADIAN_PATENT_SCAN"]
 
 
+def pytest_addoption(parser: pytest.Parser) -> None:
+    logging.getLogger("alembic.runtime.migration").setLevel(logging.WARNING)
+    parser.addoption(
+        "--reuse-wikisource",
+        action="store_true",
+        help="Keep and reuse the docker-compose Wikisource stack between test runs.",
+    )
+    parser.addoption(
+        "--runslow", action="store_true", default=False, help="run slow tests"
+    )
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "slow: mark test as slow to run")
+
+
+def pytest_collection_modifyitems(config, items):
+    if config.getoption("--runslow"):
+        # --runslow given in cli: do not skip slow tests
+        return
+    skip_slow = pytest.mark.skip(reason="need --runslow option to run")
+    for item in items:
+        if "slow" in item.keywords:
+            item.add_marker(skip_slow)
+
+
 @dataclass(frozen=True)
 class WikisourceInstance:
     base_url: str
@@ -62,14 +89,6 @@ def client(engine: Engine) -> Iterator[TestClient]:
     app = create_app(engine=engine)
     with TestClient(app) as c:
         yield c
-
-
-def pytest_addoption(parser: pytest.Parser) -> None:
-    parser.addoption(
-        "--reuse-wikisource",
-        action="store_true",
-        help="Keep and reuse the docker-compose Wikisource stack between test runs.",
-    )
 
 
 # --------------------------------------------------------------------------

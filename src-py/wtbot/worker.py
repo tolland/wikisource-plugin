@@ -131,6 +131,7 @@ def _process(
     try:
         client = client_factory(site)
         _maybe_sync_namespaces(session, site, client)
+        # with vcr.use_cassette("fixtures/vcr_cassettes/fetch-worker.yaml"):
         remote = client.get_page(req.title)
 
         # Drive behaviour from what was actually fetched, not from req.kind.

@@ -67,3 +67,4 @@ __pycache__/
 /editorStateDump-*.txt
 /apicache/
 /throttle.ctrl
+/fixtures/vcr_cassettes/

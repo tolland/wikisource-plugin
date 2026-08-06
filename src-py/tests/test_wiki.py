@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 import pytest
 
 from wtbot.model import NsRole
@@ -208,11 +210,17 @@ class TestConfigInjection:
         ]
         assert len(lines) == 1  # second call is a no-op
 
-    def test_configure_api_url_registers_wildcard_username(self, tmp_path):
+    def test_configure_api_url_replaces_wildcard_username(self, tmp_path, monkeypatch):
         import pywikibot.config as pwbconfig
 
         from wtbot.wiki.config import configure_pywikibot
 
+        # Reproduce an earlier client/test having configured another account.
+        monkeypatch.setattr(
+            pwbconfig,
+            "usernames",
+            defaultdict(dict, {"*": {"*": "Admin", "en": "Admin"}}),
+        )
         settings = WikiSettings(
             family="mywikisource",
             code="en",

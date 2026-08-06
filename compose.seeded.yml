@@ -144,7 +144,7 @@ services:
       context: .
       dockerfile: docker/wikimedia-ocr/Dockerfile
     ports:
-      - "${WIKIMEDIA_OCR_PORT:-8090}:80"
+      - "${WIKIMEDIA_OCR_PORT:-18585}:80"
 
 volumes:
   mediawiki-db:

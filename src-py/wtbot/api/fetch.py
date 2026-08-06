@@ -1,11 +1,3 @@
-"""Cache-fill endpoint (surface B).
-
-The plugin/CLI POST a fetch request; we upsert the Site, enqueue a FetchRequest,
-then drain the queue (inline for now) so the worker makes the wiki call and
-writes the page back to SQLite. The response carries the request row plus the
-resulting cached page.
-"""
-
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -17,7 +9,21 @@ from wtbot.incremental import RefreshBasis, RefreshPlan, plan_refresh
 from wtbot.model import FetchKind, FetchRequest, Page, Site
 from wtbot.worker import run_pending
 
-router = APIRouter(prefix="/fetch", tags=["fetch"])
+from .debug_logging_route import DebugLoggingRoute
+
+"""Cache-fill endpoint (surface B).
+
+The plugin/CLI POST a fetch request; we upsert the Site, enqueue a FetchRequest,
+then drain the queue (inline for now) so the worker makes the wiki call and
+writes the page back to SQLite. The response carries the request row plus the
+resulting cached page.
+"""
+
+router = APIRouter(
+    prefix="/fetch",
+    tags=["fetch"],
+    route_class=DebugLoggingRoute,
+)
 
 
 class RefreshCreate(BaseModel):
