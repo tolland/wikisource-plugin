@@ -1,0 +1,158 @@
+---
+
+x-mediawiki-common: &mediawiki-common
+  command: run-wikisource
+  build:
+    context: .
+    dockerfile: docker/mediawiki/Dockerfile
+  volumes:
+    - mediawiki-local-images:/var/www/html/images:z
+    - ./src-py/tests/fixtures:/fixtures:ro,z
+    - ./docker/mediawiki/Wikisource.php:/var/www/html/LocalSettings.d/Wikisource.php:z,ro
+    # shim in the start scripts to avoid havhng to rebuild
+    - ./docker/mediawiki/start-wikisource.sh:/usr/local/bin/start-wikisource:ro,z
+    - ./docker/mediawiki/run-wikisource.sh:/usr/local/bin/run-wikisource:ro,z
+  healthcheck:
+    # The marker is written by start-wikisource *after* seeding and removed at
+    # the top of every start, so `up --wait` cannot return while an import is
+    # still running. Without it the extension check goes green as soon as
+    # Wikisource.php exists and tests race the import.
+    test:
+      [
+        "CMD-SHELL",
+        "test -f /var/www/html/images/.harness-ready && php /var/www/html/maintenance/run.php eval 'exit(ExtensionRegistry::getInstance()->isLoaded(\"ProofreadPage\") ? 0 : 1);'",
+      ]
+    interval: 10s
+    timeout: 10s
+    # A cold start installs MediaWiki, imports a scan and a dump, then runs
+    # rebuildall -- minutes, not seconds. A warm volume skips all of it.
+    retries: 60
+    start_period: 30s
+
+# Content, as distinct from services. Both wikis reference this one anchor, so
+# they hold the same works because they are configured identically rather than
+# because something remembered to seed both. Blank it to get bare wikis:
+#   SEED_DUMPS= SEED_SCANS= docker compose --profile pair up -d --wait
+x-seed-env: &seed-env
+  SEED_SCANS: "${SEED_SCANS-djvu}"
+  SEED_DUMPS: "${SEED_DUMPS-Canadian_patent_29537_all.xml}"
+
+x-db-common: &db-common
+  image: mariadb:11.4
+  healthcheck:
+    test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+    interval: 5s
+    timeout: 5s
+    retries: 24
+
+x-db-env: &db-env
+  MARIADB_DATABASE: mediawiki
+  MARIADB_USER: mediawiki
+  MARIADB_PASSWORD: mediawiki
+  MARIADB_ROOT_PASSWORD: mediawiki-root
+
+services:
+  seed-restore:
+    image: alpine:3.20
+    volumes:
+      - wikisource_mediawiki-db-seed:/from:ro,z
+      - mediawiki-db:/to:z
+    command: >
+      sh -c "
+      rm -rf /to/*;
+      cp -a /from/. /to/;
+      "
+
+  db:
+    <<: *db-common
+    environment: *db-env
+    depends_on:
+      seed-restore:
+        condition: service_completed_successfully
+    volumes:
+      - mediawiki-db:/var/lib/mysql
+
+  mediawiki:
+    <<: *mediawiki-common
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      MW_ADMIN_PASSWORD: "${MW_ADMIN_PASSWORD:-AdminPassword123!}"
+      MW_ADMIN_USER: "${MW_ADMIN_USER:-Admin}"
+      MW_DB_HOST: db
+      MW_DB_NAME: mediawiki
+      MW_DB_PASSWORD: mediawiki
+      MW_DB_USER: mediawiki
+      MW_LANG: en
+      MW_SCRIPT_PATH: ""
+      MW_SERVER: "http://localhost:${WIKISOURCE_PORT:-18571}"
+      MW_SITE_NAME: "${WIKISOURCE_SITE_NAME:-Test Wikisource}"
+      <<: *seed-env
+      SEED_REVID_BURN: "0"
+    ports:
+      - "${WIKISOURCE_PORT:-18571}:80"
+
+
+  seed-restore-local:
+    profiles: ["pair"]
+    image: alpine:3.20
+    volumes:
+      - wikisource_mediawiki-db-seed:/from:ro,z
+      - mediawiki-local-db:/to:z
+    command: >
+      sh -c "
+      rm -rf /to/*;
+      cp -a /from/. /to/;
+      "
+
+  db-local:
+    <<: *db-common
+    profiles: ["pair"]
+    environment: *db-env
+    volumes:
+      - mediawiki-local-db:/var/lib/mysql
+    depends_on:
+      seed-restore-local:
+        condition: service_completed_successfully
+
+  mediawiki-local:
+    <<: *mediawiki-common
+    profiles: ["pair"]
+    depends_on:
+      db-local:
+        condition: service_healthy
+    environment:
+      MW_ADMIN_PASSWORD: "${MW_ADMIN_PASSWORD:-AdminPassword123!}"
+      MW_ADMIN_USER: "${MW_ADMIN_USER:-Admin}"
+      MW_DB_HOST: db-local
+      MW_DB_NAME: mediawiki
+      MW_DB_PASSWORD: mediawiki
+      MW_DB_USER: mediawiki
+      MW_LANG: en
+      MW_SCRIPT_PATH: ""
+      MW_SERVER: "http://localhost:${WIKISOURCE_LOCAL_PORT:-18572}"
+      MW_SITE_NAME: "${WIKISOURCE_LOCAL_SITE_NAME:-Test Wikisource (local)}"
+      <<: *seed-env
+      # The one deliberate asymmetry, and it is not content: throwaway
+      # revisions so the two wikis do not assign the same revids to the same
+      # pages. See the burn loop in start-wikisource.sh.
+      SEED_REVID_BURN: "${SEED_REVID_BURN-7}"
+    ports:
+      - "${WIKISOURCE_LOCAL_PORT:-18572}:80"
+
+  wikimedia-ocr:
+    profiles: ["ocr"]
+    build:
+      context: .
+      dockerfile: docker/wikimedia-ocr/Dockerfile
+    ports:
+      - "${WIKIMEDIA_OCR_PORT:-18575}:80"
+
+volumes:
+  mediawiki-db:
+  mediawiki-images:
+  mediawiki-local-db:
+  mediawiki-local-images:
+  wikisource_mediawiki-db-seed:
+    external: true   # populated by compose.build-snapshot.yml, read-only here

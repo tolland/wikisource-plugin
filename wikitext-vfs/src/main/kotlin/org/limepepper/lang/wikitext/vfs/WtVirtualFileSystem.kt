@@ -1,15 +1,19 @@
 package org.limepepper.lang.wikitext.vfs
 
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileListener
 import com.intellij.openapi.vfs.VirtualFileSystem
 import org.limepepper.lang.wikitext.vfs.backend.NodeKind
+import org.limepepper.lang.wikitext.vfs.backend.RebindOutcome
 import org.limepepper.lang.wikitext.vfs.backend.VfsBackendException
 import org.limepepper.lang.wikitext.vfs.backend.WtVfsService
 import java.io.IOException
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
+
+private val LOG = Logger.getInstance(WtVirtualFileSystem::class.java)
 
 /**
  * `wikisource://` [VirtualFileSystem] backed by the wtbot FastAPI sidecar.
@@ -49,20 +53,20 @@ class WtVirtualFileSystem : VirtualFileSystem() {
         contentModel: String? = null,
         qualityLevel: Int? = null,
         dirty: Boolean = false,
-        hasPageImage: Boolean = false,
+        hasReferenceImage: Boolean = false,
         placeholder: Boolean = false,
         length: Long? = null,
         timestamp: String? = null,
     ): WtVirtualFile = cache.getOrPut(path) {
         WtVirtualFile(
             this, name, path, isDir, parent, stableId, revid, contentModel,
-            qualityLevel, dirty, hasPageImage, placeholder, length, timestamp,
+            qualityLevel, dirty, hasReferenceImage, placeholder, length, timestamp,
         )
     }.also {
         if (parent != null) it.setParent(parent)
         // Instances are cached by path; every sighting carries the freshest
         // decoration metadata, so re-apply it to the cached instance too.
-        it.updateMeta(qualityLevel, dirty, hasPageImage, placeholder, length, timestamp)
+        it.updateMeta(qualityLevel, dirty, hasReferenceImage, placeholder, length, timestamp)
     }
 
     /** Stat the backend and return a [WtVirtualFile] if the path exists. */
@@ -81,7 +85,7 @@ class WtVirtualFileSystem : VirtualFileSystem() {
                 contentModel = stat.contentModel,
                 qualityLevel = stat.qualityLevel,
                 dirty = stat.dirty,
-                hasPageImage = stat.hasPageImage,
+                hasReferenceImage = stat.hasReferenceImage,
                 placeholder = stat.placeholder,
                 length = stat.length,
                 timestamp = stat.timestamp,
@@ -121,6 +125,52 @@ class WtVirtualFileSystem : VirtualFileSystem() {
     }
 
     override fun refreshAndFindFileByPath(path: String): VirtualFile? = findFileByPath(path)
+
+    /** Every [WtVirtualFile] handed out so far, in no particular order. */
+    fun cachedFiles(): List<WtVirtualFile> = cache.values.toList()
+
+    /**
+     * Drops every cached file's content and children, then re-stats them all
+     * against whatever backend [WtVfsService] currently holds — the rebuild
+     * after the sidecar has been switched underneath us.
+     *
+     * Instances are deliberately *not* evicted wholesale: open editors and the
+     * tool window tree hold them, and the VFS contract requires one instance
+     * per path, so dropping the map would fork identities the moment a path
+     * were looked up again. Only paths the new backend doesn't have are
+     * evicted, so a later [findFileByPath] can mint a fresh valid instance if
+     * one ever reappears.
+     *
+     * Blocking; call off the EDT.
+     */
+    internal fun rebindToCurrentBackend(): RebindOutcome {
+        val files = cache.values.toList()
+        files.forEach { it.dropCaches() }
+        if (files.isEmpty()) return RebindOutcome.EMPTY
+
+        val stats = try {
+            WtVfsService.instance.backend.statBulk(files.map { it.path })
+        } catch (e: VfsBackendException) {
+            // New backend unreachable. Caches are already dropped, so nothing
+            // stale survives; leave the files valid and let the next access
+            // surface the connection error the normal way.
+            LOG.warn("re-stat after backend switch failed; caches dropped, files kept", e)
+            return RebindOutcome(files, emptyList())
+        }
+
+        val surviving = mutableListOf<WtVirtualFile>()
+        val missing = mutableListOf<WtVirtualFile>()
+        for ((file, stat) in files.zip(stats)) {
+            if (stat.exists) {
+                file.invalidateIfStale(stat)
+                surviving += file
+            } else {
+                cache.remove(file.path, file)
+                missing += file
+            }
+        }
+        return RebindOutcome(surviving, missing)
+    }
 
     override fun addVirtualFileListener(listener: VirtualFileListener) {}
     override fun removeVirtualFileListener(listener: VirtualFileListener) {}

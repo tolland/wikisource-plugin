@@ -95,9 +95,8 @@ export function deleteSiteCredential(sitePk: number): Promise<void> {
   return deleteRequest(`/sites/${sitePk}/credential`);
 }
 
-// OCR backend config lives in the standalone ocrapi app (mounted at /ocr,
-// see wtbot.main.create_app) -- it knows nothing about "sites", only a
-// scope string, so the viewer uses the site's family/code as that scope.
+// OCR config routes use a plain scope string, so the viewer maps each site
+// to its family/code scope when calling the main wtbot API.
 function ocrScopeQuery(
   site: Pick<Site, 'family' | 'code'>,
   extra?: Record<string, string>

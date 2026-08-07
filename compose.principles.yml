@@ -1,0 +1,11 @@
+---
+
+services:
+  mediawiki:
+    environment:
+      SEED_DUMPS: "principles_remote.xml"
+      SEED_SCANS: "djvu,pdf"
+  mediawiki-local:
+    environment:
+      SEED_DUMPS: "principles_local.xml"
+      SEED_SCANS: "djvu,pdf"

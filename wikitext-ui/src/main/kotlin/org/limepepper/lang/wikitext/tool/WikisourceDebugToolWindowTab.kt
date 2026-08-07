@@ -5,6 +5,7 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextArea
 import org.limepepper.lang.wikitext.vfs.backend.VfsBackendException
 import org.limepepper.lang.wikitext.vfs.backend.WtVfsService
+import org.limepepper.lang.wikitext.vfs.settings.WtbotAppSettings
 import java.awt.BorderLayout
 import javax.swing.JButton
 import javax.swing.JLabel
@@ -42,6 +43,9 @@ internal class WikisourceDebugToolWindowTab {
 
     private fun checkBackend(label: JLabel, area: JBTextArea) {
         val backend = WtVfsService.instance.backend
+        // Which sidecar this is talking to is the first thing you want to know
+        // when the tree looks wrong after switching backends.
+        val baseUrl = WtbotAppSettings.getInstance().baseUrl
         try {
             val root = backend.stat("/")
             val sites = backend.listChildren("/")
@@ -67,12 +71,12 @@ internal class WikisourceDebugToolWindowTab {
                 }
             }
             SwingUtilities.invokeLater {
-                label.text = "Status: ✓ connected"
+                label.text = "Status: ✓ connected — $baseUrl"
                 area.text = sb.toString()
             }
         } catch (e: VfsBackendException) {
             SwingUtilities.invokeLater {
-                label.text = "Status: ✗ offline — ${e.message}"
+                label.text = "Status: ✗ offline ($baseUrl) — ${e.message}"
                 area.text = ""
             }
         }

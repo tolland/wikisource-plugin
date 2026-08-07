@@ -1,5 +1,7 @@
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+from wtbot.wiki.rate_limits import RateLimitPolicy
 
 
 @dataclass(frozen=True)
@@ -22,14 +24,17 @@ class WikiSettings:
     ca_bundle: str | None = None  # CA cert for a self-signed local wiki (.lan)
     config_dir: str | None = None  # PYWIKIBOT_DIR; ephemeral temp dir if None
 
-    # Retry policy for wiki HTTP requests (applied to pywikibot's global
-    # max_retries/retry_wait). Fail-fast by default: repeated failures against
-    # a wiki are more often our bug (e.g. missing token -> rate limited) than a
-    # flaky network, and sitting in exponential backoff hides that. The knobs
-    # stay configurable (WTBOT_WIKI_MAX_RETRIES / WTBOT_WIKI_RETRY_WAIT) for
-    # genuinely unreliable links or future chaos testing.
-    max_retries: int = 0
-    retry_wait: float = 1.0
+    # How fast we may talk to this wiki: throttles, retry policy, User-Agent.
+    # One object rather than six fields because they only mean anything
+    # together -- see wtbot.wiki.rate_limits for the tiers they are set against.
+    rate_limits: RateLimitPolicy = field(default_factory=RateLimitPolicy)
+
+    @property
+    def read_throttle(self) -> float:
+        """Convenience for the number most often reasoned about. The policy is
+        the source of truth; this saves callers reaching two levels deep for
+        the one field they check against a rate limit."""
+        return self.rate_limits.read_throttle
 
     @classmethod
     def from_env(cls, env: dict[str, str] | None = None) -> "WikiSettings":
@@ -43,8 +48,7 @@ class WikiSettings:
             bot_name=e.get("WTBOT_WIKI_BOTNAME") or None,
             ca_bundle=e.get("WTBOT_WIKI_CA_BUNDLE") or None,
             config_dir=e.get("WTBOT_PWB_DIR") or None,
-            max_retries=int(e.get("WTBOT_WIKI_MAX_RETRIES", "0")),
-            retry_wait=float(e.get("WTBOT_WIKI_RETRY_WAIT", "1")),
+            rate_limits=RateLimitPolicy.from_env(e),
         )
 
     @classmethod
@@ -54,8 +58,9 @@ class WikiSettings:
         Credentials (username/password/bot_name) are NOT sourced from env here:
         the production factory looks them up from the SiteCredential DB table and
         passes them as *overrides*, keeping each site's credentials independent.
-        Non-credential process-env settings (ca_bundle, config_dir) still come
-        from env since those are global/infrastructure, not per-site secrets."""
+        Non-credential process-env settings (ca_bundle, config_dir, the rate
+        limits) still come from env since those are global/infrastructure, not
+        per-site secrets."""
         env = cls.from_env()
         base = dict(
             family=site.family,
@@ -64,8 +69,7 @@ class WikiSettings:
             # No credential fallback to env -- callers pass them as overrides
             ca_bundle=env.ca_bundle,
             config_dir=env.config_dir,
-            max_retries=env.max_retries,
-            retry_wait=env.retry_wait,
+            rate_limits=env.rate_limits,
         )
         base.update(overrides)
         return cls(**base)

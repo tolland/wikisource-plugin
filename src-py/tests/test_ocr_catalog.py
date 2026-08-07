@@ -1,7 +1,7 @@
 import pytest
 
-from ocrapi import catalog
 from wtbot.model.ocr_backend import OcrBackendConfig, OcrBackendKind
+from wtbot.ocrapi import catalog
 
 """Tests for engine/model discovery -- the thing that turns py-ocrapi's
 raw ``/api/models`` dump (hundreds of languages per engine, ~200KB for
@@ -53,7 +53,7 @@ def test_fetch_catalog_prefers_installed_models_over_declared(monkeypatch):
             return FakeResponse({"available_langs": {"en": "English"}})
         return FakeResponse({"available_langs": {}})
 
-    monkeypatch.setattr("ocrapi.catalog.requests.get", fake_get)
+    monkeypatch.setattr("wtbot.ocrapi.catalog.requests.get", fake_get)
     engines = catalog.fetch_catalog("https://ocr.example/")
     assert [e.engine for e in engines] == ["tesseract", "pix2tex"]
     assert engines[0].models == [catalog.OcrModel(code="en", title="English")]
@@ -66,7 +66,7 @@ def test_fetch_catalog_falls_back_to_declared_models(monkeypatch):
             return FakeResponse({"tesseract": {"en": "English", "de": "German"}})
         raise RuntimeError("available_langs is not implemented here")
 
-    monkeypatch.setattr("ocrapi.catalog.requests.get", fake_get)
+    monkeypatch.setattr("wtbot.ocrapi.catalog.requests.get", fake_get)
     [tesseract] = catalog.fetch_catalog("https://ocr.example")
     assert [m.code for m in tesseract.models] == ["de", "en"]  # sorted by code
 

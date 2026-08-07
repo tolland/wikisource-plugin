@@ -101,7 +101,7 @@
         {#each sites as site}
           <li>
             <strong>{site.family}:{site.code}</strong>
-            <span>{site.api_url ?? site.host ?? 'local cache site'}</span>
+            <span>{site.api_url ?? 'local cache site'}</span>
           </li>
         {/each}
       </ul>

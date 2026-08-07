@@ -1,0 +1,22 @@
+# Build contexts are the repo root for every image here, and .venv alone is
+# ~330MB of context shipped to the daemon on each build. Nothing any Dockerfile
+# COPYs lives in these paths -- they copy from docker/, src-py/wtbot, viewer/,
+# pyproject.toml and alembic.ini only.
+#
+# src-py/tests/fixtures is deliberately NOT excluded: the wikis bind-mount it
+# at /fixtures to seed themselves, and keeping it in context leaves the door
+# open to baking it into an image later.
+.git
+.venv
+.gradle
+.gradle-codex
+**/node_modules
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+**/build
+**/out
+*.db
+*.db-wal
+*.db-shm

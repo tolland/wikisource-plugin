@@ -27,7 +27,7 @@ nothing collides with anything else (or with common defaults like 8000/5173):
 | Range | Deployment |
 |-------|-----------|
 | **1856x** | services run on the dev machine alongside IntelliJ (see below) |
-| **1857x** | the persistent seeded docker cluster |
+| **1857x** | the persistent seeded docker cluster (wtbot itself on 18574) |
 | **1858x** | docker clusters spun up by pytest (e.g. 18581 upstream / 18582 local wiki pair, `src-py/tests/conftest.py`) |
 
 Within 1856x:
@@ -46,11 +46,12 @@ the wikis and OCR are remote hosts (`https://wikisource-debian-13.lan`,
 `https://en.wikisource.org`, `https://ocr.wikisource-debian-13.lan`) and only
 wtbot (18564) and optionally the viewer (18563) run on the dev machine.
 
-Where the defaults live: plugin → `WtbotProjectSettings` /
-`WtVfsService` / `HttpVfsBackend` (all 18564, overridable in the plugin's
-project settings); CLI → `WTBOT_API_URL` env or `--base-url`; viewer →
-`viewer/vite.config.ts` (`server.port` 18563, `/api` proxy → 18564). Start the
-sidecar with:
+Where the defaults live: plugin → `WtbotAppSettings.DEFAULT_BASE_URL`
+(18564; changeable at runtime in Settings → Tools → WTBot, or per launch via
+`./gradlew runIde -PwtbotBaseUrl=…` — the docker harness on 18574 is the usual
+alternative); CLI → `wtbot/cli/deps.py` `DEFAULT_BASE_URL` or the
+`WTBOT_API_URL` env var; viewer → `viewer/vite.config.ts` (`server.port`
+18563, `/api` proxy → `WTBOT_API_URL` or 18564). Start the sidecar with:
 
 ```bash
 uv run fastapi dev src-py/wtbot/main.py --port 18564
@@ -94,7 +95,7 @@ that gap: **every error response is logged at default settings**, 4xx at
 WARNING and 5xx at ERROR, unexpected exceptions at ERROR with traceback:
 
 ```
-2026-08-07 12:00:01 ERROR [wtbot.api.errors] GET /preview/page-image?path=… -> 502 [scan-image-fetch-failed] request_id=3f9c21aa: scan image fetch failed: Invalid URL '/images/thumb/…': No scheme supplied. …
+2026-08-07 12:00:01 ERROR [wtbot.api.errors] GET /reference-image?path=… -> 502 [scan-image-fetch-failed] request_id=3f9c21aa: scan image fetch failed: Invalid URL '/images/thumb/…': No scheme supplied. …
 ```
 
 The response body is a defined error object:
@@ -111,13 +112,10 @@ The response body is a defined error object:
 - `request_id` — echo of the client's `X-Request-Id` header (the plugin sends
   one per request), for joining plugin and sidecar log lines
 
-Codes in use today: `scan-image-fetch-failed`, `no-scan-image`,
-`not-a-proofread-page` (page_image); `wiki-parse-failed`, `site-not-found`,
-`no-site-configured`, `path-not-a-page`, `missing-target` (preview);
-`not-found`, `not-a-directory`, `not-a-file`, `blobs-not-implemented` (vfs).
-
-The mounted `/ocr` sub-app (`src-py/ocrapi`) is an independent FastAPI app
-and does not get these handlers; its errors still show only as access lines.
+Codes in use today: `scan-image-fetch-failed`, `missing-target`
+(reference_image); `wiki-parse-failed`, `no-site-configured` (preview);
+`path-not-a-page`, `site-not-found` (targets); `not-found`,
+`not-a-directory`, `not-a-file`, `blobs-not-implemented` (vfs).
 
 ### 1.4 Request/response body tracing: `DebugLoggingRoute`
 
@@ -126,9 +124,9 @@ that logs request and response bodies at `TRACE`, switched per router tag
 (logger `wtbot.api.debug_logging_route.<tag>`; see
 `WTBOT_TRACE_DEBUG_ROUTE_TAGS`). **Every router opts in** — the full tag list
 is `KNOWN_DEBUG_ROUTE_TAGS` in `logging_config.py` (`vfs`, `preview`,
-`page-images`, `page-annotations`, `page-ocr`, `fetch`, `commits`,
-`edit-journal`, `file-blobs`, `namespaces`, `page-meta`, `page-nav`, `pages`,
-`sites`, `viewer`, `health`).
+`reference-image`, `page-annotations`, `ocr`, `fetch`, `commits`,
+`edit-journal`, `file-blobs`, `links`, `namespaces`, `page-meta`, `page-nav`,
+`pages`, `sites`, `viewer`, `health`).
 
 Bodies are pretty-printed when JSON, decoded when text, summarized
 (`<image/jpeg; 52341 bytes; body not logged>`) when binary, and truncated at
@@ -139,7 +137,7 @@ exception propagates to the §1.3 handler; streaming responses log
 ### 1.5 Module loggers and level policy
 
 Best-effort code paths log on their own module logger (`wtbot.api.preview`,
-`wtbot.api.page_image`, `wtbot.wiki.client`), so each can be enabled
+`wtbot.api.reference_image`, `wtbot.wiki.client`), so each can be enabled
 individually. The line between levels:
 
 | Level | Sidecar | Plugin |
@@ -150,9 +148,10 @@ individually. The line between levels:
 | WARNING | degraded results served (placeholder instead of scan), 4xx | expected sidecar errors (one line, no stack) |
 | ERROR | 5xx, unexpected exceptions (with stack) | unexpected exceptions (with stack) |
 
-Notably, a scan-raster fetch that degrades the preview pane to a placeholder
-logs at WARNING (`wtbot.api.preview`) — it is the only server-side
-explanation the user's placeholder has.
+Notably, `GET /reference-image` serving its placeholder instead of a real
+scan logs at WARNING (`wtbot.api.reference_image`): the request *succeeded*,
+so the §1.3 error handlers never see it, and that line is the only
+server-side account of why the pane is blank.
 
 ### 1.6 SQL and pywikibot
 
@@ -192,7 +191,7 @@ production install, enable it there (`#org.limepepper.lang.wikitext`, or
 
 All sidecar traffic goes through `HttpVfsBackend`
 (`wikitext-vfs/.../backend/HttpVfsBackend.kt`) — including scan-image bytes
-(`VfsBackend.fetchPageImage`), which used to be fetched around the backend
+(`VfsBackend.fetchReferenceImage`), which used to be fetched around the backend
 with `ImageIO.read(URL)` and therefore lost the error body. Any non-2xx
 response raises `VfsBackendException` with:
 
@@ -235,7 +234,7 @@ sidecar-backed feature degrades.
    self-describing:
 
    ```bash
-   curl -sS 'http://127.0.100.1:18564/preview/page-image?path=…' | head -c 2000
+   curl -sS 'http://127.0.100.1:18564/reference-image?path=…' | head -c 2000
    ```
 
 3. **Turn up sidecar visibility** (`.env`, then restart — see `.env.example`):
@@ -259,9 +258,6 @@ sidecar-backed feature degrades.
 
 ## 5. Remaining gaps / future work
 
-- The mounted `/ocr` sub-app has neither the error handlers nor body tracing
-  (§1.3); give `ocrapi` the same `register_error_handlers` treatment if its
-  silent errors start costing debugging time.
 - uvicorn's access log and the `wtbot.api.errors` lines are separate loggers
   with separate formats; a single access-log middleware could unify them and
   stamp the request id on successful requests too.

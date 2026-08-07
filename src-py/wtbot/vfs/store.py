@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from sqlalchemy import func
@@ -25,6 +26,25 @@ the edit-journal write discipline.
 """
 
 PROOFREAD_INDEX_CONTENT_MODEL = "proofread-index"
+
+
+@dataclass(frozen=True)
+class EffectiveState:
+    """What the VFS reports for a page, as opposed to what the Page row holds.
+
+    One object rather than two calls because body and revid are answers to the
+    same question -- which revision is current for this page -- and a caller
+    that can get one without the other can report a body from one revision
+    with the identity of another. See [PageStore.effective_state].
+    """
+
+    body: str
+    revid: int | None
+
+    @property
+    def placeholder(self) -> bool:
+        """No revision anywhere: never fetched, and never pushed by us."""
+        return self.revid is None
 
 
 def canonical_title(title: str) -> str:
@@ -238,7 +258,7 @@ class PageStore:
         ).all()
         return {row.page_pk: row for row in rows}
 
-    def has_page_image(self, page: Page) -> bool:
+    def has_reference_image(self, page: Page) -> bool:
         """A scan reference image is known once the fetch worker stored a
         thumb/source URL (or the raster cache filled a local path)."""
         meta = self.page_meta(page)
@@ -251,18 +271,66 @@ class PageStore:
 
     # -- edit journal -----------------------------------------------------------
 
-    def effective_body(self, page: Page) -> str:
-        """The body read()/stat() should report for [page].
+    def effective_state(self, page: Page) -> "EffectiveState":
+        """What read()/stat() should report for [page]: body and revid together.
 
-        Page.text is the cached *remote* body — written only by the fetch
-        worker on refresh from the wiki. Local IDE saves must never touch it,
-        or it stops meaning "what's on the wiki" and a refresh silently loses
-        the diff base. Instead, a save appends an EditJournal row; this reads
-        the most recent uncommitted one back. With nothing uncommitted, a
-        successful push whose refetch hasn't landed yet is bridged from the
-        Commit log (the pushed body *is* the remote body until the fetch
-        worker rewrites the snapshot); otherwise Page.text.
+        Together because they answer the same question and must not disagree.
+        Page.text and Page.revid are the cached *remote* snapshot, written only
+        by the fetch worker; local saves never touch them, or Page stops
+        meaning "what is on the wiki" and a refresh loses the diff base. So the
+        reported values come from a three-level rule:
+
+            latest uncommitted EditJournal row   (a local save)
+            > a successful Commit still ahead of the snapshot
+                                                 (we pushed; refetch pending)
+            > the Page snapshot itself
+
+        The middle level is not an edge case: fetching is decoupled from
+        committing, so every push spends time in it. Reporting a bridged body
+        with an un-bridged revid there would tell a client the new text lives
+        at the old revision -- and the placeholder flag, which follows revid,
+        would call a page we just created non-existent.
         """
+        commit = self.latest_successful_commits([page.pk]).get(page.pk)
+        return self.effective_state_from(
+            page,
+            uncommitted_body=self.latest_uncommitted_body(page),
+            commit=commit,
+        )
+
+    @classmethod
+    def effective_state_from(
+        cls,
+        page: Page,
+        *,
+        uncommitted_body: str | None,
+        commit: "Commit | None",
+    ) -> "EffectiveState":
+        """The same rule, over values a caller already has.
+
+        The batched paths (stat_bulk, listings) load journals and commits for
+        every page in one query each; without this they would either re-query
+        per page or -- as the bulk path used to -- restate the rule inline and
+        drift from it.
+        """
+        body = uncommitted_body
+        if body is None:
+            body = cls.pushed_body_ahead_of_snapshot(commit, page)
+        if body is None:
+            body = page.text or ""
+        return EffectiveState(
+            body=body,
+            revid=cls.pushed_revid_ahead_of_snapshot(commit, page),
+        )
+
+    def effective_body(self, page: Page) -> str:
+        return self.effective_state(page).body
+
+    def effective_revid(self, page: Page) -> int | None:
+        return self.effective_state(page).revid
+
+    def latest_uncommitted_body(self, page: Page) -> str | None:
+        """The most recent local save not yet pushed, if any."""
         latest = self.session.exec(
             select(EditJournal)
             .where(EditJournal.page_pk == page.pk)
@@ -270,19 +338,11 @@ class PageStore:
             .order_by(EditJournal.saved_at.desc())
             .limit(1)
         ).first()
-        if latest is not None:
-            return latest.body
-        pushed = self.pushed_body_ahead_of_snapshot(
-            self.latest_successful_commits([page.pk]).get(page.pk), page
-        )
-        if pushed is not None:
-            return pushed
-        return page.text or ""
+        return latest.body if latest is not None else None
 
     def latest_successful_commits(self, page_pks: list[int]) -> dict[int, Commit]:
         """Batched latest successful Commit per page, feeding the
-        pushed-but-not-refetched read bridge (see [effective_body] /
-        [pushed_body_ahead_of_snapshot])."""
+        pushed-but-not-refetched bridge (see [effective_state])."""
         if not page_pks:
             return {}
         rows = self.session.exec(
@@ -293,6 +353,19 @@ class PageStore:
         ).all()
         # Rows are ascending, so the newest commit per page_pk wins.
         return {row.page_pk: row for row in rows}
+
+    @staticmethod
+    def pushed_revid_ahead_of_snapshot(commit: Commit | None, page: Page) -> int | None:
+        """[commit]'s result_revid while it is ahead of the Page snapshot,
+        else the snapshot's own revid. Mirrors [pushed_body_ahead_of_snapshot]
+        so body and revid can never disagree about which one is current."""
+        if (
+            commit is not None
+            and commit.result_revid is not None
+            and (page.revid is None or page.revid < commit.result_revid)
+        ):
+            return commit.result_revid
+        return page.revid
 
     @staticmethod
     def pushed_body_ahead_of_snapshot(commit: Commit | None, page: Page) -> str | None:

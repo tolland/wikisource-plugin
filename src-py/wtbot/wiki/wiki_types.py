@@ -94,6 +94,26 @@ class IndexPageEntry:
 
 
 @dataclass(frozen=True)
+class RemoteChange:
+    """One entry from ``list=recentchanges``: a page moved, at a time.
+
+    Metadata only, deliberately. A recentchanges entry says a revision was
+    created, **not** that the content changed -- null and touch edits produce
+    entries with identical text (four such in the Canadian patent fixture). It
+    is a planning signal: what to look at, never what diverged. That verdict
+    comes from the content comparison after fetching.
+    """
+
+    title: str
+    timestamp: datetime
+    kind: str  # 'edit' | 'new' | 'log' | ...
+    pageid: int | None = None
+    revid: int | None = None
+    old_revid: int | None = None
+    namespace_key: int | None = None
+
+
+@dataclass(frozen=True)
 class RemotePage:
     """A plain snapshot of a wiki page, decoupled from pywikibot's Page object so
     the rest of the backend (dispatch, worker, tests) never imports pywikibot.

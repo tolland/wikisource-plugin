@@ -8,7 +8,7 @@ import pytest
 import requests
 from wiki_harness import docker_available
 
-from ocrapi.client import OcrError, OcrRequest, WikimediaOcrClient
+from wtbot.ocrapi.client import OcrError, OcrRequest, WikimediaOcrClient
 
 """Integration test against a *real* Wikimedia OCR instance
 (https://gitlab.wikimedia.org/toolforge-repos/ocr), built from
@@ -30,7 +30,7 @@ something on WIKIMEDIA_OCR_PORT.
 """
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-COMPOSE_FILE = REPO_ROOT / "docker-compose.yml"
+COMPOSE_FILE = REPO_ROOT / "compose.yml"
 
 # A small, stable, public test image with real printed text -- Testing
 # Wikimedia Commons' own OCR sandbox page uses similar fixtures, but any
@@ -117,7 +117,7 @@ def _wait_for_ocr_service(base_url: str, timeout_seconds: int = 180) -> None:
     )
 
 
-# @pytest.mark.slow
+@pytest.mark.slow
 def test_wikimedia_ocr_recognizes_sample_image(wikimedia_ocr_url: str) -> None:
     client = WikimediaOcrClient(wikimedia_ocr_url)
     result = client.recognize(

@@ -3,6 +3,8 @@ from pathlib import Path
 
 from sqlmodel import Session, select
 
+from wtbot.db_session import detached_site, read_snapshot, write_batch
+from wtbot.failure_log import FailureContext, record_failure, site_label
 from wtbot.model import (
     FetchRequest,
     FetchState,
@@ -20,9 +22,9 @@ from wtbot.page_processors import (
     processor_for,
 )
 from wtbot.revision_store import record_head_revision
-from wtbot.settings import WikiSettings
 from wtbot.timeutil import utcnow
-from wtbot.wiki.client import WikiClient, get_wiki_client
+from wtbot.wiki.client import WikiClient
+from wtbot.wiki.failures import WikiFailure
 from wtbot.wiki.namespaces import sync_namespaces
 from wtbot.wiki.wiki_types import PageNotFound, RemotePage
 
@@ -34,15 +36,17 @@ bookkeeping. Everything type-specific (blobs, index fan-out, scan-image
 metadata) lives in ``wtbot.page_processors``, one class per page type.
 
 Kept as plain functions over a Session + a client factory so it is fully
-testable with FakeWikiClient and reusable from either the API (inline, today)
-or a future background loop / ``wtbot worker`` command.
+testable with FakeWikiClient and reusable from either the API, the drain
+endpoint, or ``wtbot drain``.
 """
 
 ClientFactory = Callable[[Site], WikiClient]
 
-
-def make_client_for_site(site: Site) -> WikiClient:
-    return get_wiki_client(WikiSettings.from_site(site))
+#: Called with each classified failure as it is recorded. The failure is
+#: already on the row; this exists so a caller draining a whole queue can react
+#: to *why* a request failed -- notably to stop on a rate limit rather than
+#: send the next two hundred requests at a wiki that just refused one.
+FailureObserver = Callable[[WikiFailure], None]
 
 
 def run_pending(
@@ -51,20 +55,36 @@ def run_pending(
     *,
     limit: int = 100,
     blob_root: Path | None = None,
+    on_failure: FailureObserver | None = None,
+    image_cache: dict | None = None,
 ) -> int:
-    """Process up to ``limit`` pending requests. Returns how many were handled."""
+    """Process up to ``limit`` pending requests. Returns how many were handled.
+
+    ``image_cache`` is shared enrichment fetched in bulk (see
+    ``page_processors``): an Index fan-out fills it for its children, and each
+    child reads its own entry instead of asking the wiki again. Passing None
+    disables the sharing -- every page then asks for itself, which is correct
+    but costs a request each.
+    """
     handled = 0
     while handled < limit:
         req = _claim_next(session)
         if req is None:
             break
-        _process(session, req, client_factory, blob_root=blob_root)
+        _process(
+            session,
+            req,
+            client_factory,
+            blob_root=blob_root,
+            on_failure=on_failure,
+            image_cache=image_cache,
+        )
         handled += 1
     return handled
 
 
 def _claim_next(session: Session) -> ClaimedFetchRequest | None:
-    try:
+    with read_snapshot(session):
         req = session.exec(
             select(FetchRequest)
             .where(FetchRequest.status == FetchStatus.pending)
@@ -78,10 +98,6 @@ def _claim_next(session: Session) -> ClaimedFetchRequest | None:
         claimed = _snapshot_request(req)
         session.commit()
         return claimed
-    finally:
-        # The worker must not carry an open transaction into pywikibot
-        # network calls.
-        session.rollback()
 
 
 def _snapshot_request(req: FetchRequest) -> ClaimedFetchRequest:
@@ -101,12 +117,10 @@ def _maybe_sync_namespaces(session: Session, site: Site, client: WikiClient) -> 
     """Sync siteinfo namespaces on first use of a site (no-op on subsequent calls)."""
     from wtbot.model import Namespace
 
-    try:
+    with read_snapshot(session):
         already = session.exec(
             select(Namespace).where(Namespace.site_pk == site.pk)
         ).first()
-    finally:
-        session.rollback()
     if already is not None:
         return
     ns_dict = client.get_namespaces()
@@ -122,6 +136,8 @@ def _process(
     client_factory: ClientFactory,
     *,
     blob_root: Path | None = None,
+    on_failure: FailureObserver | None = None,
+    image_cache: dict | None = None,
 ) -> None:
     site = _load_site_snapshot(session, req.site_pk)
     status = FetchStatus.error
@@ -142,6 +158,7 @@ def _process(
             client=client,
             request=req,
             blob_root=blob_root,
+            image_cache=image_cache,
         )
         outcome = processor.postprocess(ctx, page, remote)
         status = outcome.status
@@ -150,7 +167,22 @@ def _process(
     except PageNotFound:
         error_message = f"page not found: {req.title}"
     except Exception as exc:  # noqa: BLE001 - record any failure on the row
-        error_message = f"{type(exc).__name__}: {exc}"
+        # The row keeps a short summary; the traceback and the upstream HTTP
+        # that preceded the failure go to the detail log (see failure_log).
+        failure = record_failure(
+            FailureContext(
+                component="fetch",
+                title=req.title,
+                request_pk=req.pk,
+                site_pk=req.site_pk,
+                site_label=site_label(site),
+                details={"kind": req.kind.value, "depth": str(req.depth)},
+            ),
+            exc,
+        )
+        error_message = failure.summary
+        if on_failure is not None:
+            on_failure(failure)
 
     _record_fetch_result(
         session,
@@ -163,22 +195,11 @@ def _process(
 
 
 def _load_site_snapshot(session: Session, site_pk: int) -> Site:
-    try:
+    with read_snapshot(session):
         site = session.get(Site, site_pk)
         if site is None:
             raise RuntimeError(f"fetch request references missing site {site_pk}")
-        return Site(
-            pk=site.pk,
-            family=site.family,
-            code=site.code,
-            articlepath=site.articlepath,
-            host=site.host,
-            api_url=site.api_url,
-            label=site.label,
-            created_at=site.created_at,
-        )
-    finally:
-        session.rollback()
+        return detached_site(site)
 
 
 def _record_fetch_result(
@@ -190,7 +211,7 @@ def _record_fetch_result(
     progress_done: int,
     error_message: str | None,
 ) -> None:
-    try:
+    with write_batch(session):
         db_req = session.get(FetchRequest, req.pk)
         if db_req is None:
             return
@@ -207,13 +228,6 @@ def _record_fetch_result(
             and req.parent_pk is not None
         ):
             _update_parent_progress(session, req.parent_pk)
-
-        session.commit()
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.rollback()
 
 
 def _update_parent_progress(session: Session, parent_pk: int) -> None:
@@ -237,7 +251,7 @@ def _upsert_page(
 ) -> CachedPage:
     """Write the common Page fields from the remote snapshot, then let the
     type-specific processor enrich its own columns, in one transaction."""
-    try:
+    with write_batch(session):
         page = session.exec(
             select(Page).where(Page.site_pk == site.pk, Page.title == remote.title)
         ).first()
@@ -274,17 +288,10 @@ def _upsert_page(
         if processor.enrich_meta(target, remote) and meta is None:
             session.add(target)
 
-        cached = CachedPage(
+        return CachedPage(
             pk=page.pk,
             title=page.title,
             namespace_role=page.namespace_role,
             content_model=page.content_model,
             text=page.text,
         )
-        session.commit()
-        return cached
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.rollback()

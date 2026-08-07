@@ -1,9 +1,12 @@
+from collections import defaultdict
+
 import pytest
 
 from wtbot.model import NsRole
 from wtbot.settings import WikiSettings
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.dispatch import Handling, classify, classify_remote
+from wtbot.wiki.rate_limits import TIER_LIMITS, RateLimitPolicy, RateLimitTier
 from wtbot.wiki.wiki_types import PageNotFound, RemotePage
 
 
@@ -65,6 +68,54 @@ class TestFakeClient:
             FakeWikiClient().download_file("File:Nope.djvu", tmp_path / "x")
 
 
+class TestRateLimitPolicy:
+    """The pacing policy, checked against the published tiers.
+
+    Nothing reports which rate-limit bucket a request landed in, so these
+    numbers are chosen rather than discovered. Checking them against the
+    documented limits is the only feedback available short of being refused.
+    """
+
+    def test_the_default_fits_the_tier_it_targets(self):
+        policy = RateLimitPolicy()
+        assert policy.target_tier is RateLimitTier.authenticated_new
+        assert policy.fits_tier()
+        assert policy.reads_per_minute <= TIER_LIMITS[RateLimitTier.authenticated_new]
+
+    def test_pywikibots_own_default_would_not_fit(self):
+        """Why this exists: 0.1s is pywikibot's minthrottle default, and it is
+        three times the allowance for the tier we are in."""
+        assert not RateLimitPolicy(read_throttle=0.1).fits_tier()
+        assert RateLimitPolicy(read_throttle=0.1).reads_per_minute == 600
+
+    def test_the_default_would_fit_an_established_editor_easily(self):
+        assert RateLimitPolicy().fits_tier(RateLimitTier.authenticated_established)
+
+    def test_an_exempt_identity_has_no_ceiling_to_exceed(self):
+        assert RateLimitPolicy(read_throttle=0.001).fits_tier(RateLimitTier.exempt)
+
+    def test_slower_returns_a_new_policy_and_mutates_nothing(self):
+        """A 429 calls for this, but applying it automatically would hide a
+        wrong configuration behind a process that quietly re-paces itself."""
+        policy = RateLimitPolicy()
+        slower = policy.slower()
+        assert slower.read_throttle == policy.read_throttle * 2
+        assert policy.read_throttle == RateLimitPolicy().read_throttle
+
+    def test_a_disabled_throttle_reports_an_infinite_rate_rather_than_dividing_by_zero(
+        self,
+    ):
+        assert RateLimitPolicy(read_throttle=0).reads_per_minute == float("inf")
+        assert not RateLimitPolicy(read_throttle=0).fits_tier()
+
+    def test_the_user_agent_carries_contact_information(self):
+        """Wikimedia's policy requires it, and a client without it is put in
+        the 10 req/min 'unidentified' tier -- twenty times worse than anonymous
+        traffic that identifies itself."""
+        assert "https://" in RateLimitPolicy().user_agent
+        assert TIER_LIMITS[RateLimitTier.unidentified] == 10
+
+
 class TestConfigInjection:
     def test_configure_sets_env_and_dir(self, tmp_path, monkeypatch):
         monkeypatch.delenv("PYWIKIBOT_NO_USER_CONFIG", raising=False)
@@ -104,19 +155,74 @@ class TestConfigInjection:
                 family="w",
                 code="en",
                 config_dir=str(tmp_path / "b"),
-                max_retries=3,
-                retry_wait=2.5,
+                rate_limits=RateLimitPolicy(max_retries=3, retry_wait=2.5),
             )
         )
         assert pwbconfig.max_retries == 3
         assert pwbconfig.retry_wait == 2.5
 
+    def test_configure_throttles_reads_not_only_writes(self, tmp_path):
+        """The bug this pins: we set put_throttle (edits) and left minthrottle
+        at pywikibot's 0.1s default, which permits 600 read req/min against a
+        200 req/min allowance -- and an Index fan-out is almost all reads."""
+        import pywikibot.config as pwbconfig
+
+        from wtbot.wiki.config import configure_pywikibot
+
+        configure_pywikibot(
+            WikiSettings(family="w", code="en", config_dir=str(tmp_path / "t"))
+        )
+        assert pwbconfig.minthrottle == 0.35  # ~170 req/min
+        assert 60 / pwbconfig.minthrottle < 200
+        assert pwbconfig.put_throttle == 1.0
+        assert pwbconfig.maxlag == 5
+
+    def test_throttle_settings_from_env(self):
+        env = {
+            "WTBOT_WIKI_READ_THROTTLE": "1.5",
+            "WTBOT_WIKI_PUT_THROTTLE": "10",
+            "WTBOT_WIKI_MAXLAG": "2",
+        }
+        policy = WikiSettings.from_env(env).rate_limits
+        assert policy.read_throttle == 1.5
+        assert policy.put_throttle == 10.0
+        assert policy.maxlag == 2
+
+    def test_user_agent_states_contact_information(self, tmp_path):
+        """Wikimedia's policy requires a contact URL or email and throttles
+        non-conforming clients harder, so this costs request budget when wrong.
+        Rendered through pywikibot's own formatter, since that is what ships."""
+        import pywikibot.config as pwbconfig
+        from pywikibot.comms.http import user_agent
+
+        from wtbot.wiki.config import configure_pywikibot
+
+        configure_pywikibot(
+            WikiSettings(family="w", code="en", config_dir=str(tmp_path / "ua"))
+        )
+        rendered = user_agent()
+        assert "wtbot" in rendered
+        assert "https://github.com/tolland/wikisource-plugin" in rendered
+        # A literal template must survive formatting with no placeholders left.
+        assert "{" not in rendered and "}" not in rendered
+        assert pwbconfig.user_agent_format  # not blanked
+
+    def test_config_dir_is_stable_across_clients(self):
+        """A fresh mkdtemp per client threw away the cookie jar and
+        throttle.ctrl, so every client re-authenticated and no concurrency
+        detection ever fired."""
+        from wtbot.wiki.config import configure_pywikibot
+
+        first = configure_pywikibot(WikiSettings(family="w", code="en"))
+        second = configure_pywikibot(WikiSettings(family="w", code="en"))
+        assert first == second
+
     def test_retry_policy_from_env(self):
         env = {"WTBOT_WIKI_MAX_RETRIES": "5", "WTBOT_WIKI_RETRY_WAIT": "0.5"}
-        settings = WikiSettings.from_env(env)
-        assert settings.max_retries == 5
-        assert settings.retry_wait == 0.5
-        assert WikiSettings.from_env({}).max_retries == 0
+        policy = WikiSettings.from_env(env).rate_limits
+        assert policy.max_retries == 5
+        assert policy.retry_wait == 0.5
+        assert WikiSettings.from_env({}).rate_limits.max_retries == 0
 
     def test_configure_points_password_file_and_writes_user_config(self, tmp_path):
         import pywikibot.config as pwbconfig
@@ -208,11 +314,17 @@ class TestConfigInjection:
         ]
         assert len(lines) == 1  # second call is a no-op
 
-    def test_configure_api_url_registers_wildcard_username(self, tmp_path):
+    def test_configure_api_url_replaces_wildcard_username(self, tmp_path, monkeypatch):
         import pywikibot.config as pwbconfig
 
         from wtbot.wiki.config import configure_pywikibot
 
+        # Reproduce an earlier client/test having configured another account.
+        monkeypatch.setattr(
+            pwbconfig,
+            "usernames",
+            defaultdict(dict, {"*": {"*": "Admin", "en": "Admin"}}),
+        )
         settings = WikiSettings(
             family="mywikisource",
             code="en",

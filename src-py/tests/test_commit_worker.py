@@ -363,6 +363,13 @@ def test_pending_commit_api_lists_and_pushes_one_page(engine):
         assert list_pending_commits(session=s) == []
 
 
+def updated_snapshot_revid(session, page_pk: int) -> int | None:
+    """The revid actually written on the Page row -- as opposed to the one the
+    VFS reports, which bridges a pushed-but-not-refetched commit."""
+    session.expire_all()
+    return session.get(Page, page_pk).revid
+
+
 def test_pending_commit_api_can_force_overwrite_conflict(engine):
     site, page = _setup(engine)
     fake = FakeWikiClient(
@@ -391,10 +398,14 @@ def test_pending_commit_api_can_force_overwrite_conflict(engine):
         assert commit.base_revid == 100
         assert commit.result_revid == 201
 
-        updated = s.get(Page, page.pk)
-        assert updated.revid == 201
-        assert updated.dirty is False
+        assert updated_snapshot_revid(s, page.pk) == 100  # refetch still queued
+        assert PageStore(s).effective_revid(s.get(Page, page.pk)) == 201
+        assert s.get(Page, page.pk).dirty is False
         assert list_pending_commits(session=s) == []
+
+        # Committing enqueues the refetch; draining it trues the snapshot up.
+        run_pending(s, _client_factory(fake))
+        assert updated_snapshot_revid(s, page.pk) == 201
 
     assert fake._pages[TITLE].text == "my edit"
 

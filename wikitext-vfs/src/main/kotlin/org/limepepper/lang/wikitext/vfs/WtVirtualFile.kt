@@ -42,7 +42,7 @@ class WtVirtualFile(
     val contentModel: String? = null,
     qualityLevel: Int? = null,
     dirty: Boolean = false,
-    hasPageImage: Boolean = false,
+    hasReferenceImage: Boolean = false,
     placeholder: Boolean = false,
     length: Long? = null,
     timestamp: String? = null,
@@ -75,15 +75,42 @@ class WtVirtualFile(
     /** Uncommitted local edits (EditJournal) exist for the backing page. */
     @Volatile var dirty: Boolean = dirty
         private set
-    /** A scan reference image is known; pixels via GET /pages/image. */
-    @Volatile var hasPageImage: Boolean = hasPageImage
+    /** A scan reference image is known; pixels via GET /reference-image. */
+    @Volatile var hasReferenceImage: Boolean = hasReferenceImage
         private set
     /** No remote revision backs this file — a missing proofread page's
      * local stub. Opening it starts a new transcription. */
     @Volatile var placeholder: Boolean = placeholder
         private set
 
+    // Files start valid and only ever go invalid, when a backend switch finds
+    // the path absent from the new sidecar (see WtBackendSwitcher).
+    @Volatile private var valid: Boolean = true
+
     fun setParent(p: WtVirtualFile) { _parent = p }
+
+    /**
+     * Forgets everything fetched from the backend, keeping identity and the
+     * decoration metadata. The next access refetches.
+     */
+    @Synchronized
+    fun dropCaches() {
+        cachedChildren = null
+        cachedContent = null
+    }
+
+    /**
+     * Marks this file gone — the path does not exist on the backend the VFS
+     * has just been switched to. Callers close any editors on it first: an
+     * invalid file cannot be read, and the platform expects nothing to be
+     * showing one.
+     */
+    @Synchronized
+    fun markInvalid() {
+        valid = false
+        cachedChildren = null
+        cachedContent = null
+    }
 
     /** Refresh decoration metadata from a fresh backend sighting. Length and
      * timestamp are only overwritten when the sighting carries them (stats
@@ -91,14 +118,14 @@ class WtVirtualFile(
     fun updateMeta(
         qualityLevel: Int?,
         dirty: Boolean,
-        hasPageImage: Boolean,
+        hasReferenceImage: Boolean,
         placeholder: Boolean,
         length: Long? = null,
         timestamp: String? = null,
     ) {
         this.qualityLevel = qualityLevel
         this.dirty = dirty
-        this.hasPageImage = hasPageImage
+        this.hasReferenceImage = hasReferenceImage
         this.placeholder = placeholder
         length?.let { statLength = it }
         timestamp?.toLongOrNull()?.let { statTimestamp = it }
@@ -112,7 +139,7 @@ class WtVirtualFile(
     @Synchronized
     fun invalidateIfStale(stat: StatResult) {
         updateMeta(
-            stat.qualityLevel, stat.dirty, stat.hasPageImage, stat.placeholder,
+            stat.qualityLevel, stat.dirty, stat.hasReferenceImage, stat.placeholder,
             stat.length, stat.timestamp,
         )
         if (stat.revid != revid) {
@@ -127,7 +154,7 @@ class WtVirtualFile(
     override fun getPath(): String = _path
     override fun isWritable(): Boolean = !isDir
     override fun isDirectory(): Boolean = isDir
-    override fun isValid(): Boolean = true
+    override fun isValid(): Boolean = valid
     override fun getParent(): VirtualFile? = _parent
 
     fun getFileTypeForFile() {
@@ -154,7 +181,7 @@ class WtVirtualFile(
                 contentModel = child.contentModel,
                 qualityLevel = child.qualityLevel,
                 dirty = child.dirty,
-                hasPageImage = child.hasPageImage,
+                hasReferenceImage = child.hasReferenceImage,
                 placeholder = child.placeholder,
                 length = child.length,
                 timestamp = child.timestamp,
@@ -245,7 +272,7 @@ class WtVirtualFile(
                 contentModel = stat.contentModel,
                 qualityLevel = stat.qualityLevel,
                 dirty = stat.dirty,
-                hasPageImage = stat.hasPageImage,
+                hasReferenceImage = stat.hasReferenceImage,
                 placeholder = stat.placeholder,
                 length = stat.length,
                 timestamp = stat.timestamp,

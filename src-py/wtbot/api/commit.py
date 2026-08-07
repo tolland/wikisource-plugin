@@ -12,21 +12,16 @@ from wtbot.api.schemas import (
 from wtbot.commit_worker import run_pending_commit_for_page, run_pending_commits
 from wtbot.deps import get_session
 from wtbot.model import Commit, CommitStatus, EditJournal, Page
-from wtbot.worker import run_pending
 
 router = APIRouter(prefix="/commits", tags=["commits"], route_class=DebugLoggingRoute)
 
-
-def _drain_fetch_queue(request: Request, session: Session) -> None:
-    """A successful push enqueues a refetch of its page (the Page row is only
-    ever written from fetched remote state); drain the queue inline, mirroring
-    POST /fetch, so the snapshot is already trued up when the response
-    returns. Until/unless the refetch lands, reads bridge on the Commit body
-    (see PageStore.effective_body), so a drain failure degrades gracefully."""
-    factory = request.app.state.client_factory
-    blob_root = getattr(request.app.state, "blob_root", None)
-    while run_pending(session, factory, blob_root=blob_root, limit=200) > 0:
-        pass
+# A successful push enqueues a refetch of its page -- the Page row is only ever
+# written from fetched remote state -- and, like POST /fetch, this endpoint no
+# longer drains that queue itself. Committing is a write to the wiki; waiting
+# for the throttled read-back is a separate concern with a separate call
+# (POST /fetch/drain). Reads bridge on the Commit body until the refetch lands
+# (see PageStore.effective_state), so the gap between the two is already a
+# designed-for state rather than a new one.
 
 
 @router.get("/", response_model=list[Commit])
@@ -124,8 +119,6 @@ def run_commits(
         exclude |= failed
         if n == 0:
             break
-    if handled:
-        _drain_fetch_queue(request, session)
     return CommitRunResponse(handled=handled)
 
 
@@ -154,9 +147,7 @@ def run_commit_for_page(
         raise HTTPException(status_code=404, detail="no pending edits for page")
 
     factory = request.app.state.client_factory
-    ok = run_pending_commit_for_page(session, page_pk, factory, force=force)
-    if ok:
-        _drain_fetch_queue(request, session)
+    run_pending_commit_for_page(session, page_pk, factory, force=force)
     commit = session.exec(
         select(Commit)
         .where(Commit.page_pk == page_pk)

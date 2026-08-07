@@ -1,3 +1,4 @@
+import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -12,6 +13,8 @@ from wtbot.timeutil import utcnow
 from wtbot.vfs.store import PageStore
 from wtbot.wiki.client import WikiClient
 from wtbot.wiki.wiki_types import PageNotFound, RemotePage, RemotePageImages
+
+log = logging.getLogger(__name__)
 
 """Per-page-type fetch processing.
 
@@ -65,6 +68,14 @@ class ProcessContext:
     client: WikiClient
     request: ClaimedFetchRequest
     blob_root: Path | None
+    #: Scan-image metadata already fetched in bulk during this drain, by title.
+    #: An Index fan-out knows every child title before any child is processed,
+    #: so it asks once for fifty of them instead of once per child -- the
+    #: second request per page that measurement showed doubling the budget. A
+    #: present key means "already asked", including when the answer was
+    #: nothing; a missing key falls back to a per-page request, which is what
+    #: happens when a child is drained in a later run than its fan-out.
+    image_cache: dict[str, RemotePageImages | None] | None = None
 
 
 @dataclass(frozen=True)
@@ -118,10 +129,41 @@ class ProofreadPageProcessor(PageProcessor):
     def postprocess(
         self, ctx: ProcessContext, cached: CachedPage, remote: RemotePage
     ) -> ProcessOutcome:
-        images = ctx.client.get_page_images(cached.title)
+        images = _page_images(ctx, cached.title)
         if images is not None:
             _store_page_images(ctx.session, cached.pk, images)
         return _DONE
+
+
+def _page_images(ctx: ProcessContext, title: str) -> RemotePageImages | None:
+    """Scan-image metadata for one page, from the drain's bulk prefetch when
+    the fan-out took it, else asked for directly."""
+    if ctx.image_cache is not None and title in ctx.image_cache:
+        return ctx.image_cache[title]
+    return ctx.client.get_page_images(title)
+
+
+def _prefetch_page_images(ctx: ProcessContext, titles: list[str]) -> None:
+    """Ask once for every child's scan image, before the children are fetched.
+
+    Fail-soft like the per-page call it replaces: on any error the cache stays
+    empty and each child asks for itself, which costs requests but loses
+    nothing.
+    """
+    if ctx.image_cache is None or not titles:
+        return
+    wanted = [title for title in titles if title not in ctx.image_cache]
+    if not wanted:
+        return
+    try:
+        found = ctx.client.get_page_images_bulk(wanted)
+    except Exception:  # noqa: BLE001 - enrichment, never fatal
+        log.debug("bulk image prefetch failed for %d titles", len(wanted))
+        return
+    for title in wanted:
+        # Absent titles are cached as None: "asked, nothing there" must not
+        # send every one of them back to ask again individually.
+        ctx.image_cache[title] = found.get(title)
 
 
 class ProofreadIndexProcessor(PageProcessor):
@@ -342,6 +384,13 @@ def _fan_out_index(
     # Network calls, so before the fan-out transaction opens.
     enrichments = _gather_placeholder_enrichment(
         session, ctx.client, req.site_pk, stub_specs
+    )
+    # One question for every child's scan image, asked here because this is
+    # the only point that knows all of them at once. Each child would
+    # otherwise ask for itself when it is fetched -- the second request per
+    # page that a measured fan-out showed doubling the per-page budget.
+    _prefetch_page_images(
+        ctx, [title for title, kind in child_specs if kind is FetchKind.page]
     )
 
     try:

@@ -12,7 +12,7 @@ from wtbot.api.schemas import (
 )
 from wtbot.model import Page, Site
 from wtbot.model.page_meta import PageMeta
-from wtbot.vfs.store import PageStore, meta_has_image
+from wtbot.vfs.store import EffectiveState, PageStore, meta_has_image
 
 """mediawiki:// — the title-addressed layer.
 
@@ -96,25 +96,27 @@ class MediaWikiVfs:
         page: Page,
         name: str | None = None,
         meta: PageMeta | None | object = _UNRESOLVED,
-        body: str | None = None,
+        state: EffectiveState | None = None,
     ) -> Node:
-        if body is None:
-            body = self.store.effective_body(page)
+        state = state or self.store.effective_state(page)
+        body = state.body
         resolved = self._resolve_meta(page, meta)
         return Node(
             path=path,
             name=name if name is not None else page.title,
             kind=NodeKind.file,
             stable_id=page.pageid,
-            revid=page.revid,
+            revid=state.revid,
             timestamp=ts_millis(page.local_modified_at or page.remote_timestamp),
             length=len(body.encode()),
             writable=True,
             content_model=page.content_model,
             quality_level=resolved.quality_level if resolved is not None else None,
             dirty=page.dirty,
-            has_page_image=meta_has_image(resolved),
-            placeholder=page.revid is None,
+            has_reference_image=meta_has_image(resolved),
+            # A page we pushed exists remotely even if its refetch is still
+            # queued, so this follows the bridged revid, not the snapshot.
+            placeholder=state.placeholder,
         )
 
     def stat_page(
@@ -122,11 +124,11 @@ class MediaWikiVfs:
         raw_path: str,
         page: Page,
         name: str,
-        body: str | None = None,
+        state: EffectiveState | None = None,
         meta: PageMeta | None | object = _UNRESOLVED,
     ) -> Stat:
-        if body is None:
-            body = self.store.effective_body(page)
+        state = state or self.store.effective_state(page)
+        body = state.body
         resolved = self._resolve_meta(page, meta)
         return Stat(
             path=raw_path,
@@ -134,14 +136,16 @@ class MediaWikiVfs:
             name=name,
             kind=NodeKind.file,
             stable_id=page.pageid,
-            revid=page.revid,
+            revid=state.revid,
             timestamp=ts_millis(page.local_modified_at or page.remote_timestamp),
             length=len(body.encode()),
             content_model=page.content_model,
             quality_level=resolved.quality_level if resolved is not None else None,
             dirty=page.dirty,
-            has_page_image=meta_has_image(resolved),
-            placeholder=page.revid is None,
+            has_reference_image=meta_has_image(resolved),
+            # A page we pushed exists remotely even if its refetch is still
+            # queued, so this follows the bridged revid, not the snapshot.
+            placeholder=state.placeholder,
         )
 
     def read_page(
@@ -150,38 +154,39 @@ class MediaWikiVfs:
         """`default_body` is served when the page has no body at all (a
         placeholder stub with no local edits) — the overlay passes the
         content-model scaffold so a new transcription opens well-formed."""
-        body = self.store.effective_body(page)
-        if not body and default_body is not None:
-            body = default_body
+        state = self.store.effective_state(page)
+        body = state.body or (default_body or "")
         return ReadContentResponse(
             path=raw_path,
-            revid=page.revid,
+            revid=state.revid,
             content_base64=_b64(body),
         )
 
     def write_page(self, req: WriteContentRequest, page: Page) -> WriteResult:
         """Local save via the edit journal (see PageStore.append_edit and
-        effective_body for the Page.text discipline). A base_revid mismatch
-        against the cached remote revid is an edit conflict, not an error."""
-        if (
-            req.base_revid is not None
-            and page.revid is not None
-            and req.base_revid != page.revid
-        ):
+        effective_state for the Page.text discipline). A base_revid mismatch
+        against the cached remote revid is an edit conflict, not an error.
+
+        The comparison is against the *effective* revid, the same value stat
+        and read report. Against the raw snapshot it would reject a save based
+        on a revision we ourselves pushed but have not refetched yet -- the
+        client would be told it conflicts with our own edit."""
+        revid = self.store.effective_state(page).revid
+        if req.base_revid is not None and revid is not None and req.base_revid != revid:
             return WriteResult(
                 path=req.path,
                 status=WriteStatus.conflict,
-                new_revid=page.revid,
-                message=f"remote revid is {page.revid}, edit was based on {req.base_revid}",
+                new_revid=revid,
+                message=f"remote revid is {revid}, edit was based on {req.base_revid}",
             )
 
         self.store.append_edit(
             page,
             body=base64.b64decode(req.content_base64).decode(),
-            base_revid=req.base_revid if req.base_revid is not None else page.revid,
+            base_revid=req.base_revid if req.base_revid is not None else revid,
             comment=req.comment,
         )
 
         # Local save succeeds without a new remote revid — the page is still
-        # on page.revid until the commit worker pushes it.
-        return WriteResult(path=req.path, status=WriteStatus.ok, new_revid=page.revid)
+        # on that revision until the commit worker pushes it.
+        return WriteResult(path=req.path, status=WriteStatus.ok, new_revid=revid)

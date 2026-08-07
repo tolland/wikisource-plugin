@@ -25,8 +25,8 @@ data class StatResult(
     val qualityLevel: Int? = null,
     /** Uncommitted local edits (EditJournal) exist for the backing page. */
     val dirty: Boolean = false,
-    /** A scan reference image is known; pixels via GET /pages/image?path=&width=. */
-    val hasPageImage: Boolean = false,
+    /** A scan reference image is known; pixels via GET /reference-image?path=&width=. */
+    val hasReferenceImage: Boolean = false,
     /** No remote revision backs this file — a missing proofread page's local stub. */
     val placeholder: Boolean = false,
 )
@@ -43,7 +43,7 @@ data class ChildNode(
     val contentModel: String? = null,
     val qualityLevel: Int? = null,
     val dirty: Boolean = false,
-    val hasPageImage: Boolean = false,
+    val hasReferenceImage: Boolean = false,
     val placeholder: Boolean = false,
 )
 

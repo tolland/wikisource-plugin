@@ -1,6 +1,7 @@
 import pytest
 from alembic import command
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session
 
 from wtbot.db import alembic_config, create_db_engine
@@ -92,6 +93,81 @@ def test_the_chain_still_joins_after_upgrading(populated_engine) -> None:
             )
         ).one()[0]
     assert body == "body"
+
+
+def test_the_migrated_remotelink_rejects_a_reversed_pair(populated_engine) -> None:
+    """The unordered-pair guarantee has to survive the migration path, not just
+    ``create_all``. A schema where a fresh database enforces it and a migrated
+    one does not is worse than neither."""
+    _upgrade(populated_engine, "head")
+
+    with Session(populated_engine) as session:
+        session.exec(
+            text(
+                "INSERT INTO page (pk, site_pk, title, namespace_role, dirty,"
+                " fetch_status) VALUES (2, 1, 'Page:Work.djvu/1 (upstream)',"
+                " 'page', 0, 'done')"
+            )
+        )
+        session.exec(
+            text(
+                "INSERT INTO revision (pk, page_pk, revid, minor, observed_at)"
+                " VALUES (2, 2, 9, 0, CURRENT_TIMESTAMP)"
+            )
+        )
+        session.exec(
+            text(
+                "INSERT INTO remotelink (local_revision_pk, remote_revision_pk,"
+                " origin) VALUES (1, 2, 'copy')"
+            )
+        )
+        session.commit()
+
+        with pytest.raises(IntegrityError, match="uq_remotelink_pair"):
+            session.exec(
+                text(
+                    "INSERT INTO remotelink (local_revision_pk,"
+                    " remote_revision_pk, origin) VALUES (2, 1, 'manual')"
+                )
+            )
+            session.commit()
+
+
+def test_dropping_remotelink_leaves_the_revisions_it_referenced(
+    populated_engine,
+) -> None:
+    """`remotelink` points at `revision`, so its downgrade is the direction
+    that can go wrong: a rebuild of `revision` would fail with `slot` rows
+    referencing it. Seeded after the upgrade because the table does not exist
+    before it."""
+    _upgrade(populated_engine, "head")
+    with Session(populated_engine) as session:
+        session.exec(
+            text(
+                "INSERT INTO page (pk, site_pk, title, namespace_role, dirty,"
+                " fetch_status) VALUES (2, 1, 'Page:Work.djvu/1 (upstream)',"
+                " 'page', 0, 'done')"
+            )
+        )
+        session.exec(
+            text(
+                "INSERT INTO revision (pk, page_pk, revid, minor, observed_at)"
+                " VALUES (2, 2, 9, 0, CURRENT_TIMESTAMP)"
+            )
+        )
+        session.exec(
+            text(
+                "INSERT INTO remotelink (local_revision_pk, remote_revision_pk,"
+                " origin) VALUES (1, 2, 'copy')"
+            )
+        )
+        session.commit()
+
+    _downgrade(populated_engine, REVISION_STORE)
+
+    with Session(populated_engine) as session:
+        assert session.exec(text("SELECT count(*) FROM revision")).one()[0] == 2
+        assert session.exec(text("SELECT count(*) FROM slot")).one()[0] == 1
 
 
 def test_downgrade_also_survives_referenced_rows(populated_engine) -> None:

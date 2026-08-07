@@ -125,7 +125,7 @@ class ReferenceImagePane(
             var failure: String? = null
             val backend = WtVfsService.instance.backend
             val image = try {
-                loadImage(backend.fetchPageImage(
+                loadImage(backend.fetchReferenceImage(
                     vfsPath,
                     if (file is WtVirtualFile) null else file.nameWithoutExtension,
                 ))

@@ -1,0 +1,108 @@
+---
+
+# The wtbot API as a service, to be overlaid on either wiki stack:
+#
+#   docker compose -f compose.seeded.yml -f compose.wtbot.yml \
+#       --profile pair --profile api up -d --wait
+#   docker compose -f compose.yml -f compose.wtbot.yml \
+#       --profile api up -d --wait
+#
+# The viewer is available at http://localhost:18584 by default. Set
+# WTBOT_VIEWER_PORT to publish it on a different host port.
+#
+# A separate file rather than a copy in each base, because the two bases
+# already duplicate the MediaWiki services between them and that is the part
+# that drifts. One definition, composed with whichever base is wanted.
+#
+# Why have it at all: the tests reach into the ASGI app in-process
+# (TestClient), so nothing exercises wtbot over HTTP and nothing outside pytest
+# can see its state. With the API in the stack, `curl`, the `wtbot` CLI, the
+# IntelliJ plugin and the viewer all point at the same running thing.
+
+services:
+  wtbot:
+    # The wtbot needs to be able to see the mediawiki service as a client
+    # sees it in order to retrieve resources such as images on http://localhost:<exposed_port>/some/image.jpg
+    # This avoids having to remap between docker internal and exposed ports
+    network_mode: host
+    profiles: [ "api" ]
+    build:
+      context: .
+      dockerfile: docker/wtbot/Dockerfile
+    depends_on:
+      # `mediawiki` only. `mediawiki-local` exists solely under the `pair`
+      # profile, and depending on a service whose profile is inactive is an
+      # error on older compose versions -- so the dependency is on the wiki
+      # that is always there. wtbot does not need either wiki at boot: sites
+      # are database rows and a fetch is what first calls out.
+      mediawiki:
+        condition: service_healthy
+    environment:
+      # Disposable by design: the database is a cache of wiki content plus the
+      # local edit journal, so everything in it is refetchable or not yet
+      # pushed. `down --volumes` discards it; WTBOT_RESET_DB=1 discards it
+      # without rebuilding the wikis, which are the slow half.
+      WTBOT_DATABASE_URL: "sqlite:////data/wtbot.db"
+      WTBOT_BLOB_ROOT: "/data/blobs"
+      WTBOT_PORT: "${WTBOT_PORT:-18574}"
+      WTBOT_RESET_DB: "${WTBOT_RESET_DB-0}"
+      WTBOT_LOG_LEVEL: "${WTBOT_LOG_LEVEL-DEBUG}"
+      WTBOT_FAILURE_LOG: ./failure.log
+      # ignored in network_mode: host
+    #    ports:
+    #      - "127.0.0.1:${WTBOT_PORT:-18574}:8000"
+    volumes:
+      - wtbot-data:/data
+    healthcheck:
+      # No curl in python:3.13-slim, and adding one for a healthcheck is a
+      # package to keep patched; the interpreter is already here.
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:${WTBOT_PORT:-18574}/health').read()",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  viewer:
+    # The viewer app needs to talk to the wtbot API which is exposed
+    # as network_mode: host, so this must follow that.
+    network_mode: host
+    profiles: [ "api" ]
+    build:
+      context: .
+      dockerfile: docker/viewer/Dockerfile
+    depends_on:
+      wtbot:
+        condition: service_healthy
+    environment:
+      WTBOT_VIEWER_HOST: "${WTBOT_VIEWER_HOST:-127.0.0.1}"
+      WTBOT_VIEWER_PORT: "${WTBOT_VIEWER_PORT:-18573}"
+      # The browser calls the viewer at /api; Vite proxies those requests over
+      # the Compose network rather than trying to reach wtbot via localhost.
+      WTBOT_API_URL: "http://${WTBOT_HOST:-127.0.0.1}:${WTBOT_PORT:-18574}"
+    #    ports:
+    #      - "${WTBOT_VIEWER_PORT:-18573}:${WTBOT_VIEWER_PORT:-18573}"
+    volumes:
+      # Keep application edits hot-reloadable without hiding the dependencies
+      # installed in the image at /app/node_modules.
+      - ./viewer/src:/app/src:ro,z
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:${WTBOT_VIEWER_PORT:-18573}').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+volumes:
+  wtbot-data:

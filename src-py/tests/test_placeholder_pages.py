@@ -1,5 +1,6 @@
 import base64
 
+from conftest import drain
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -261,7 +262,7 @@ def test_placeholders_listed_with_flag(engine, tmp_path):
         assert by_number["Page:Sparse.pdf/1"]["writable"] is True
         # The scan reference image is known even though the page isn't
         # created yet — transcription can start from the placeholder.
-        assert by_number["Page:Sparse.pdf/1"]["has_page_image"] is True
+        assert by_number["Page:Sparse.pdf/1"]["has_reference_image"] is True
         assert by_number[PAGE_5]["placeholder"] is False
 
         stat = c.get(
@@ -338,8 +339,10 @@ def test_committing_placeholder_creates_remote_page(engine, tmp_path):
         resp = c.post("/commits/")
         assert resp.status_code == 200
 
-        # Reading straight back after the commit serves the pushed body —
-        # the regression case where an ex-placeholder read empty.
+        # Reading straight back after the commit -- before any refetch --
+        # serves the pushed body, and reports the page as real rather than a
+        # placeholder. This is the regression case where an ex-placeholder
+        # read empty.
         r = c.get("/vfs/content", params={"path": path}).json()
         assert _unb64(r["content_base64"]) == "fresh transcription"
         stat = c.get("/vfs/stat", params={"path": path}).json()
@@ -350,8 +353,13 @@ def test_committing_placeholder_creates_remote_page(engine, tmp_path):
     created = wiki.get_page("Page:Sparse.pdf/4")
     assert created.text == "fresh transcription"
 
-    # ...and the local row is no longer a placeholder: the post-commit
-    # refetch trued the snapshot up from the wiki.
+    # ...and once the enqueued refetch is drained, the local row is no longer
+    # a placeholder either. Before the drain the VFS already reported it as a
+    # real page (asserted above) by bridging on the successful Commit -- the
+    # push, not the refetch, is what makes the page exist.
+    with TestClient(app) as c:
+        drain(c)
+
     with Session(engine) as s:
         page = s.exec(select(Page).where(Page.title == "Page:Sparse.pdf/4")).one()
         assert page.revid is not None

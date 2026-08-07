@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import base64
 
+from conftest import drain
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -85,9 +86,20 @@ def test_commit_endpoint_pushes_pending_edits(engine):
         assert resp.status_code == 200
         assert resp.json()["handled"] == 1
 
-        # The endpoint drains the post-push refetch inline, so a read
-        # straight after committing serves the new remote body — never the
-        # stale (or empty, for an ex-placeholder) snapshot.
+        # The push enqueues a refetch rather than performing it: the Page row
+        # is only ever written from fetched remote state, and fetching is a
+        # throttled operation that committing does not wait on. Reads bridge
+        # on the pushed body meanwhile, so this window serves the new content
+        # from the Commit, never the stale (or empty) snapshot.
+        bridged = c.get("/vfs/content", params={"path": PATH}).json()
+        assert base64.b64decode(bridged["content_base64"]).decode() == "edited"
+
+        with Session(engine) as s:
+            assert s.get(Page, page.pk).text == "original"  # snapshot untouched
+
+        drain(c)
+
+        # Once the refetch lands, the snapshot itself is current.
         read = c.get("/vfs/content", params={"path": PATH}).json()
         assert base64.b64decode(read["content_base64"]).decode() == "edited"
         assert read["revid"] == 101
@@ -193,3 +205,45 @@ def test_commit_endpoint_noop_when_nothing_pending(engine):
         resp = c.post("/commits/")
     assert resp.status_code == 200
     assert resp.json()["handled"] == 0
+
+
+def test_bulk_and_single_stat_agree_during_the_push_window(engine):
+    """The batched path must report what the single path reports.
+
+    In the window between a successful push and its refetch, a page can carry
+    both an uncommitted save (which supplies the body) and a commit ahead of
+    the snapshot (which supplies the revid). The bulk path used to restate the
+    bridging rule inline, and loaded commits only for pages *without* local
+    edits -- so precisely this page reported a stale revid in a listing and a
+    current one when stat'ed alone. Both now go through the same rule.
+    """
+    site, page = _setup(engine)
+    fake = FakeWikiClient(
+        pages={
+            TITLE: RemotePage(
+                title=TITLE,
+                namespace_key=0,
+                namespace_canonical="Page",
+                content_model="proofread-page",
+                text="original",
+                revid=100,
+            )
+        }
+    )
+    app = create_app(engine=engine, client_factory=lambda site: fake)
+    with TestClient(app) as c:
+        c.post(
+            "/vfs/content",
+            json={"path": PATH, "content_base64": _b64("pushed"), "base_revid": 100},
+        )
+        assert c.post("/commits/").json()["handled"] == 1
+
+        # A further local save, still in the window: refetch not drained.
+        c.post("/vfs/content", json={"path": PATH, "content_base64": _b64("and more")})
+
+        single = c.get("/vfs/stat", params={"path": PATH}).json()
+        bulk = c.post("/vfs/stat/bulk", json={"paths": [PATH]}).json()["results"][0]
+
+    assert single == bulk
+    assert single["revid"] == 101  # the revision we pushed, not the snapshot's
+    assert single["placeholder"] is False

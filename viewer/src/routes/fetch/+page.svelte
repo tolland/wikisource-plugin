@@ -92,7 +92,7 @@
     <div class="site-summary">
       <span>Site</span>
       <strong>{siteLabel(sites[0])}</strong>
-      <small>{sites[0].api_url ?? sites[0].host ?? `${sites[0].family}:${sites[0].code}`}</small>
+      <small>{sites[0].api_url ?? `${sites[0].family}:${sites[0].code}`}</small>
     </div>
   {:else}
     <FormRow>

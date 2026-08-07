@@ -65,15 +65,21 @@ progress; pywikibot does the slow work and fans out child requests as it
 discovers structure. This is the "git checkout" path and is **never** invoked
 implicitly by the VFS.
 
-Request identity follows **pywikibot conventions** (this matches the existing
-`Site` model: `family` + `code` + `articlepath`):
+A request names a **registered site by label**, plus the title and how far to
+expand:
 
 ```
 title:  Index:Wittgenstein_-_Tractatus_Logico-Philosophicus,_1922.djvu
-family: mywikisource
-code:   en
+label:  local          # a Site registered beforehand
 depth:  implied        # how aggressively to expand associated assets
 ```
+
+The site's pywikibot identity (`family` + `code` + `articlepath` + `api_url`)
+lives on the `Site` row, set once at registration. It used to travel on every
+fetch request, and an unrecognised pair *created* a site — so a typo registered
+a second wiki, with no credentials, and read from it. Registration is now its
+own step (`POST /sites`, `wtbot site add`), which is also where credentials are
+attached; an unknown label is a 404 listing the labels that do exist.
 
 ---
 
@@ -140,8 +146,14 @@ plugin can watch aggregate progress on the one request it submitted.
 ### 4.1 Cache-fill API (async, surface B)
 
 ```
+POST /sites
+  body: { label, family, code, api_url? }   # registration, done once
+  → 201 { pk, label, ... }
+PUT  /sites/{pk}/credential                 # the account it logs in as
+GET  /sites/by-label/{label}
+
 POST /fetch
-  body: { title, family, code, depth }
+  body: { title, label, depth }
   → 202 { request_id, status: "pending" }
 
 GET  /fetch/{request_id}
@@ -151,6 +163,13 @@ GET  /fetch/{request_id}
 
 GET  /fetch?status=pending|in_progress|...      # queue inspection / CLI
 POST /fetch/{request_id}/cancel
+
+POST /fetch/drain                               # do the queued work (slow)
+  body: { batch, max_passes }
+  → { handled, passes, remaining, stop_reason, complete }
+
+GET  /fetch/queue                               # depth, without draining
+  → { counts: {status: n}, pending, total, oldest_pending_at }
 ```
 
 Lifecycle of a request: `pending → in_progress → done | error | cancelled`.
@@ -216,7 +235,7 @@ What was carried across from the old `schema.sql`: the rich `pages` shape (inlin
 remote-identity/conflict columns), `transclusions`, the fetch queue
 (`fetch_requests` → `FetchRequest`), and the outbound `commits` log (→ `Commit`).
 Site identity is the pywikibot `family`/`code` pair (the request vocabulary
-`title:x family:y code:z`); `host`/`api_url` are derived/optional columns, not the
+`title:x family:y code:z`); `api_url` is a derived/optional column, not the
 key. The old standalone `Revision` model was folded into `pages` (inline remote
 state, matching the original schema design) and `upserts.py` was removed as stale.
 
@@ -354,9 +373,13 @@ mark `committed=True` on success.
 A successful push **never mutates the `Page` row**: `Page` is strictly the
 *fetched* remote snapshot, and the fetch worker is its only writer. The push's
 outcome is logged on the `Commit` row (`result_revid`), and the commit worker
-enqueues a high-priority refetch of the page (drained inline by the commit
-endpoints) to true the snapshot up — text, revid, pageid, contributor and all.
-Two consequences of the window between "journal committed" and "refetch
+enqueues a high-priority refetch of the page to true the snapshot up — text,
+revid, pageid, contributor and all. That refetch is *queued*, not performed:
+committing pushes to the wiki, and waiting on a throttled read-back is a
+separate operation (§7). So the window below is now open for as long as the
+queue takes, rather than being closed inside the commit request — which is why
+everything the VFS reports about a page has to bridge it, not just the body.
+Three consequences of the window between "journal committed" and "refetch
 landed":
 
 - **Reads bridge on the Commit log.** `effective_body` is a three-level rule:
@@ -364,6 +387,18 @@ landed":
   `submitted_body` while `Page.revid` still lags its `result_revid` → `Page.text`.
   The pushed body *is* the remote body during that window, and the revid guard
   means a later remote edit (fetched normally) is never shadowed.
+- **`revid` and `placeholder` bridge the same way.** `PageStore.effective_state`
+  answers body and revid together -- one rule, one object (`EffectiveState`),
+  so the two cannot disagree about which revision is current. It returns the
+  commit's `result_revid` while that is ahead of `Page.revid`, and
+  `placeholder` follows it. Batched callers pass rows they already loaded to
+  `effective_state_from` rather than restating the rule, which is how the
+  listing and single-stat paths came to give different answers. A page we pushed exists remotely from the moment
+  the push succeeds; reporting it as a placeholder until its refetch lands
+  would be wrong, and was only survivable while every commit drained its own
+  refetch inline. `write` compares `base_revid` against the same effective
+  value, so a save based on a revision we ourselves pushed is not rejected as
+  a conflict with our own edit.
 - **A save landing in the window carries a stale `base_revid`** (the client's
   revid is still the old snapshot, though its buffer came from the pushed
   body). The commit worker bumps such a base to our own last `result_revid`
@@ -390,11 +425,23 @@ processing a single title per request and writing the page back. **Next:** the
 index fan-out (step 4) and the File: blob download, which slot into the marked
 point in `worker._process` and are fully testable via `FakeWikiClient`.
 
-**Who runs it.** Today the `POST /fetch` endpoint enqueues the request and then
-calls `run_pending` *inline*, so one HTTP call does enqueue → drain → write-back
-(the CLI's `fetch-page` just calls this endpoint over HTTP; it no longer touches
-pywikibot itself). `run_pending` is deliberately transport-agnostic so the same
-function backs a future background loop / `wtbot worker` command without change.
+**Who runs it.** Enqueueing and draining are separate calls. `POST /fetch` (and
+`POST /fetch/refresh`) create FetchRequest rows and return; `POST /fetch/drain`
+— or `wtbot drain`, or `queue_runner.drain_queue` in-process — works the queue.
+`GET /fetch/queue` reports depth without draining, and `GET /fetch/{pk}` reports
+one request's progress.
+
+They were fused until the rate-limit work (§7.1.1) made the cost explicit: with
+reads throttled to stay inside 200 req/min, fetching an Index means hundreds of
+deliberately-paced requests, so an enqueue call that waits for them holds a
+socket open for minutes and gets *worse* every time we correctly slow down. A
+test can hide this — one mocked title answers instantly — but a book cannot.
+
+`run_pending` remains the primitive (claim up to N, process them);
+`queue_runner.drain_queue` is the policy built on it (keep going until empty,
+since a fan-out enqueues children mid-run) and reports why it stopped. There is
+no background loop yet: something has to call the drain. That is the honest
+state of it, and `wtbot drain` is that something.
 
 Concurrency uses the documented SQLite discipline: WAL and `busy_timeout=5000`
 on every connection. (An earlier rule additionally forced `BEGIN IMMEDIATE` on
@@ -418,12 +465,84 @@ seam (`wtbot/wiki/`):
   (`from_site`). Reads are anonymous; `username` is only for write-back.
 - **`configure_pywikibot()`** (`wtbot/wiki/config.py`) — applies settings
   *programmatically*: `PYWIKIBOT_NO_USER_CONFIG=1` (no file on disk), an ephemeral
-  `PYWIKIBOT_DIR`, `REQUESTS_CA_BUNDLE` for a self-signed `.lan` cert, and
+  `PYWIKIBOT_DIR` (one per process, not one per client — see §7.1.1),
+  `REQUESTS_CA_BUNDLE` for a self-signed `.lan` cert, throttle/User-Agent
+  policy (§7.1.1), and
   `Site(url=...)` (AutoFamily) so **no family file is needed**. pywikibot is
   imported lazily, after the env is set.
 - **`WikiClient`** Protocol (`wtbot/wiki/client.py`) — `get_page` +
   `download_file`. `PywikibotClient` is the real impl; `FakeWikiClient` is the
   in-memory one tests/CLI use, so the fake path never imports pywikibot.
+
+### 7.1.1 Rate limits, client reuse, and failure visibility (implemented)
+
+Wikimedia enforces per-identity request budgets
+([rate limits](https://www.mediawiki.org/wiki/Wikimedia_APIs/Rate_limits)):
+10 req/min unidentified, 200 req/min for a compliant unauthenticated client or
+an authenticated account with few edits, 2,000 req/min for established editors,
+exempt for accounts with a bot flag. There is **no API that reports which tier
+you were placed in** — the closest observable proxies are `userinfo.groups`
+(`bot` most decisively) and the global edit count, so `PywikibotClient` logs
+identity and groups once per client and warns loudly when it is anonymous.
+Our design target is the 200 req/min tier with ≤3 concurrent requests.
+
+Three defects made a large `Index:` fan-out exceed that budget, and the same
+three made the resulting failures unreadable:
+
+- **A parameter that never existed.** Those same queries sent `prppifpsize`,
+  meaning to ask for a 240px rendition. ProofreadPage's module defines exactly
+  one parameter, `prop`, so every request answered "Unrecognized parameter:
+  prppifpsize" — a warning on a response that still parsed, which is why it
+  went unnoticed. The thumbnail width is the extension's to choose.
+- **A second request per page.** ProofreadPage's ``prop=imageforpage`` (scan
+  thumbnail + quality) was asked per fetched page, so a measured 25-page
+  fan-out cost 60 requests -- 2.4 per page where the body needs one. It is a
+  pageset module, so the Index fan-out, which knows every child title before
+  any child is fetched, now asks once per fifty and shares the answers with
+  its children through the drain (``ProcessContext.image_cache``). A page
+  drained apart from its fan-out still asks for itself.
+- **A client per fetch request.** `client_factory(site)` was called for every
+  queued request, and each construction re-detects the site over HTTP (we build
+  sites from a URL, so pywikibot uses an `AutoFamily`) and logs in again — the
+  ephemeral `mkdtemp` config dir meant no cookie jar survived. A page that
+  should cost one or two requests cost seven or eight, nearly all of it setup.
+  Clients are now cached per (site, credential) in
+  `wtbot/wiki/client_registry.py`, and the pywikibot config dir is created once
+  per process so cookies and `throttle.ctrl` persist.
+- **Reads were never throttled.** We set `put_throttle`, which governs *edits*;
+  reads are governed by `config.minthrottle`, left at its 0.1s default — 600
+  req/min, three times the allowance, and a fan-out is almost entirely reads.
+  `WikiSettings.read_throttle` (default 0.35s ≈ 170 req/min) now sets it. Three
+  ProofreadPage enrichment queries per page additionally bypassed pywikibot as
+  bare `requests.get` calls: unthrottled, *anonymous even when logged in*, and
+  carrying a User-Agent without the contact information the policy requires.
+  They go through `site.simple_request` now.
+- **The evidence was discarded.** pywikibot converts *any* non-JSON API
+  response into `SiteDefinitionError: Invalid AutoFamily(...)` when the site is
+  an AutoFamily — and a CDN rate-limit page is exactly that, an HTML body where
+  JSON was expected. The status code goes to `pywikibot.debug()` and no
+  further, so a 429 reached `FetchRequest.error_message` disguised as a
+  misconfigured site. `wtbot/wiki/http_tap.py` observes pywikibot's own session
+  and supplies the status back to `wtbot/wiki/failures.py`, which classifies
+  the failure; `wtbot/failure_log.py` keeps the short summary on the row and
+  writes the traceback plus recent upstream requests to `WTBOT_FAILURE_LOG`.
+
+**Authentication is required, not advised.** A site with no credential is
+refused when work is queued (409) and again when a client is built, the latter
+being the check nothing can go around. `WTBOT_ALLOW_ANONYMOUS=1` lifts it for
+reading a public wiki from a workstation and logs every use.
+
+**Authenticate in practice, whatever the table says.** The published tiers put
+an unauthenticated client with a compliant User-Agent on the same 200 req/min
+as an ordinary account, but the CDN also applies per-IP-block rules that no
+document enumerates -- cloud provider ranges are treated far less generously
+than residential ones, and authenticating is the way through. Anonymous reads
+are supported and fine from a laptop; anything running on a server wants an
+account.
+
+On a 429 the correct response is to **lower the request rate, not to retry**:
+`Retry-After` is parsed and recorded, `max_retries` stays at 0, and a
+rate-limited failure is reported rather than hidden behind backoff.
 
 ### 7.2 Dispatch: trust content_model, special-case File (implemented)
 

@@ -19,9 +19,12 @@ timestamps, contributors and therefore sha1, which no API-level copy does.
 """
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-COMPOSE_FILE = REPO_ROOT / "docker-compose.yml"
+COMPOSE_FILE = REPO_ROOT / "compose.seeded.yml"
 
-# Container-side mount of src-py/tests/fixtures (see docker-compose.yml).
+# Container-side mount of src-py/tests/fixtures (see compose.yml). The
+# wikis seed *themselves* from here at startup -- importDump and importImages
+# used to be driven from out here, one role at a time, which is exactly how the
+# two sides came to hold different content.
 FIXTURES_MOUNT = "/fixtures"
 
 SERVICE_FOR_ROLE = {"upstream": "mediawiki", "local": "mediawiki-local"}
@@ -56,6 +59,48 @@ class StackConfig:
     username: str = "Admin"
     password: str = "AdminPassword123!"
     with_pair: bool = False
+    with_api: bool = False
+    """Also run the wtbot API (compose.wtbot.yml, `api` profile).
+
+    Off by default. The tests still speak to the app in-process via
+    TestClient, so starting a second copy of it alongside them would be a
+    container nobody talks to -- it is here for standing the whole system up
+    by hand, and for the tests that will eventually go over HTTP."""
+    wtbot_port: int = 18583
+
+
+# Distinct env names from the single-instance fixture's WIKISOURCE_PORT:
+# overriding that one must not silently move the pair onto a colliding port.
+PAIR_PROJECT = "wtbot-sync-pair"
+PAIR_UPSTREAM_PORT = 18581
+PAIR_LOCAL_PORT = 18582
+PAIR_WTBOT_PORT = 18583
+
+# Overlaid on COMPOSE_FILE when the API is wanted; see compose.wtbot.yml for
+# why it is a separate file rather than a copy in each base.
+WTBOT_COMPOSE_FILE = REPO_ROOT / "compose.wtbot.yml"
+
+
+def pair_config() -> StackConfig:
+    """The two-wiki harness's compose project, from the environment.
+
+    Shared by the pytest fixture and ``python -m wiki_harness`` so that standing
+    the pair up by hand and running the tests drive the same containers, volumes
+    and ports. Two definitions of this would mean a hand-run stack the tests
+    then rebuild from scratch -- MW_SERVER is baked into LocalSettings.php at
+    install time, so a volume installed for one port must never be reused on
+    another.
+    """
+    return StackConfig(
+        project_name=os.environ.get("SYNC_COMPOSE_PROJECT_NAME", PAIR_PROJECT),
+        upstream_port=int(os.environ.get("SYNC_UPSTREAM_PORT", PAIR_UPSTREAM_PORT)),
+        local_port=int(os.environ.get("SYNC_LOCAL_PORT", PAIR_LOCAL_PORT)),
+        username=os.environ.get("MW_ADMIN_USER", "Admin"),
+        password=os.environ.get("MW_ADMIN_PASSWORD", "AdminPassword123!"),
+        with_pair=True,
+        with_api=os.environ.get("SYNC_WITH_API", "") not in ("", "0", "false"),
+        wtbot_port=int(os.environ.get("SYNC_WTBOT_PORT", PAIR_WTBOT_PORT)),
+    )
 
 
 class WikiStack:
@@ -95,12 +140,24 @@ class WikiStack:
             "MW_ADMIN_PASSWORD": self.config.password,
             "WIKISOURCE_PORT": str(self.config.upstream_port),
             "WIKISOURCE_LOCAL_PORT": str(self.config.local_port),
+            "WTBOT_PORT": str(self.config.wtbot_port),
         }
+
+    @property
+    def wtbot_url(self) -> str | None:
+        """Where the wtbot API is, if it is running in this stack."""
+        if not self.config.with_api:
+            return None
+        return f"http://127.0.0.1:{self.config.wtbot_port}"
 
     def _compose(self, *args: str) -> list[str]:
         base = ["docker", "compose", "-f", str(COMPOSE_FILE)]
+        if self.config.with_api:
+            base += ["-f", str(WTBOT_COMPOSE_FILE)]
         if self.config.with_pair:
             base += ["--profile", "pair"]
+        if self.config.with_api:
+            base += ["--profile", "api"]
         return [*base, *args]
 
     def up(self) -> None:
@@ -204,47 +261,11 @@ class WikiStack:
         headers = lines[0].split("\t")
         return [dict(zip(headers, ln.split("\t"), strict=False)) for ln in lines[1:]]
 
-    def import_dump(self, role: str, dump_name: str) -> str:
-        """Import an XML dump from the mounted fixtures directory.
-
-        ``--uploads`` is deliberately not passed: the dumps carry page text
-        only, and the backing scan is imported separately by
-        :meth:`import_scan`.
-        """
-        return self.maintenance(
-            role,
-            "importDump",
-            "--no-updates",
-            f"{FIXTURES_MOUNT}/scans/{dump_name}",
-        )
-
     def export_dump(self, role: str) -> str:
         """Export every revision so an import can be checked through the same
         portable XML representation as its source dump.
         """
         return self.maintenance(role, "dumpBackup", "--full")
-
-    def import_scans(self, role: str, extension: str = "djvu") -> str:
-        """Upload every scan of the given extension from the fixtures mount.
-
-        importImages takes a directory, deriving each File: title from the
-        filename (underscores become spaces), so
-        ``Canadian_patent_29537.djvu`` lands as
-        ``File:Canadian patent 29537.djvu`` -- matching the title the dumps
-        reference.
-        """
-        return self.maintenance(
-            role,
-            "importImages",
-            "--comment=harness scan import",
-            f"--extensions={extension}",
-            f"{FIXTURES_MOUNT}/scans",
-        )
-
-    def rebuild_links(self, role: str) -> None:
-        """importDump --no-updates skips link/category tables; ProofreadPage's
-        index pagination needs them populated."""
-        self.maintenance(role, "rebuildall")
 
 
 def wait_for_mediawiki(api_url: str, timeout_seconds: int = 300) -> None:

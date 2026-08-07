@@ -4,14 +4,8 @@ from sqlmodel import Session
 from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.api.errors import ApiError
 from wtbot.api.schemas import (
-    ChangesSinceResponse,
-    CreateChildRequest,
-    DeleteRequest,
     ListChildrenResponse,
-    OperationResult,
-    OperationStatus,
     ReadContentResponse,
-    RenameRequest,
     Stat,
     StatBulkRequest,
     StatBulkResponse,
@@ -44,7 +38,10 @@ Path scheme (all relative to wikisource://):
 All tree/classification logic lives in `wtbot.vfs`; this module only parses
 params, delegates, and maps domain errors to HTTP status codes.
 
-Write / rename / delete and the change feed are stubbed for now.
+Served here: stat (single + bulk), children, read, write. Rename, delete,
+create-child and the change feed are designed but not implemented, and are
+deliberately absent from the routing table rather than present as
+always-"unsupported" answers.
 """
 
 router = APIRouter(prefix="/vfs", tags=["vfs"], route_class=DebugLoggingRoute)
@@ -114,30 +111,9 @@ def write_content(
     return WikisourceVfs(session).write(req)
 
 
-@router.post("/rename", response_model=OperationResult)
-def rename(req: RenameRequest) -> OperationResult:
-    return OperationResult(
-        status=OperationStatus.unsupported, message="rename not yet implemented"
-    )
-
-
-@router.post("/delete", response_model=OperationResult)
-def delete(req: DeleteRequest) -> OperationResult:
-    return OperationResult(
-        status=OperationStatus.unsupported, message="delete not supported"
-    )
-
-
-@router.post("/child", response_model=OperationResult)
-def create_child(req: CreateChildRequest) -> OperationResult:
-    return OperationResult(
-        status=OperationStatus.unsupported, message="create not yet implemented"
-    )
-
-
-@router.get("/changes", response_model=ChangesSinceResponse)
-def changes_since(
-    cursor: str | None = Query(None),
-    limit: int = Query(100, ge=1, le=1000),
-) -> ChangesSinceResponse:
-    return ChangesSinceResponse(changes=[], next_cursor=cursor or "0", has_more=False)
+# Not served: rename, delete, create-child, and the change feed. Each had a
+# route that unconditionally answered "unsupported" (or an empty change
+# list), which put four unimplemented operations in the OpenAPI spec as if
+# they were contract. The request/response schemas survive in
+# wtbot.api.schemas as the design record — see its "Reserved" section, which
+# carries the rename-identity invariant these routes will have to honour.

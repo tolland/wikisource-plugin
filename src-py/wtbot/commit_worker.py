@@ -15,16 +15,17 @@ A successful push never mutates the Page row: Page is strictly the *fetched*
 remote snapshot, written only by the fetch worker. The push's outcome lives on
 the Commit row (result_revid), a refetch of the page is enqueued to true the
 snapshot up (text, revid, pageid, contributor, ...), and until that lands
-reads bridge on the Commit body (see PageStore.effective_body).
+reads bridge on the Commit body (see PageStore.effective_state).
 """
 
 import logging
-from collections.abc import Callable
 from dataclasses import dataclass
 from threading import Lock
 
 from sqlmodel import Session, select
 
+from wtbot.db_session import detached_site, read_snapshot, write_batch
+from wtbot.failure_log import FailureContext, record_failure, site_label
 from wtbot.model import (
     Commit,
     CommitStatus,
@@ -34,10 +35,8 @@ from wtbot.model import (
     Page,
     Site,
 )
-from wtbot.wiki.client import WikiClient
 from wtbot.wiki.wiki_types import EditConflict
-
-ClientFactory = Callable[[Site], WikiClient]
+from wtbot.worker import ClientFactory
 
 _worker_lock = Lock()
 
@@ -146,7 +145,7 @@ def _run_pending_commits_unlocked(
 
 def _claim_next_page(session: Session, *, exclude: set[int]) -> int | None:
     """Return the oldest pending page not already attempted in this run."""
-    try:
+    with read_snapshot(session):
         rows = session.exec(
             select(EditJournal.page_pk)
             .where(EditJournal.committed == False)  # noqa: E712
@@ -156,10 +155,6 @@ def _claim_next_page(session: Session, *, exclude: set[int]) -> int | None:
             if page_pk not in exclude:
                 return page_pk
         return None
-    finally:
-        # End the session's transaction so no state is carried into the
-        # wiki/client work that follows.
-        session.rollback()
 
 
 def _push_page(
@@ -190,11 +185,11 @@ def _load_pending_page_commit(
 ) -> _PendingPageCommit | _OrphanedPendingPage | None:
     """Load and detach the exact local journal batch that will be pushed.
 
-    The session is always rolled back before returning: the push that
-    follows is a slow network call, and it must work from an immutable
-    snapshot rather than live ORM objects attached to an open transaction.
+    The session is always left idle before returning: the push that follows is
+    a slow network call, and it must work from an immutable snapshot rather
+    than live ORM objects attached to an open transaction.
     """
-    try:
+    with read_snapshot(session):
         page = session.get(Page, page_pk)
         if page is None:
             return _OrphanedPendingPage(page_pk)
@@ -224,7 +219,7 @@ def _load_pending_page_commit(
         base_revid = latest.base_revid if latest.base_revid is not None else page.revid
 
         # Saves made after our own successful push but before its refetch
-        # landed were based on the pushed body (effective_body serves it),
+        # landed were based on the pushed body (effective_state serves it),
         # even though the client's revid was still the stale snapshot — bump
         # the base to our own result_revid so we don't conflict against our
         # own edit. A genuinely newer remote revision (someone else's edit)
@@ -243,27 +238,12 @@ def _load_pending_page_commit(
         return _PendingPageCommit(
             page_pk=page_pk,
             title=page.title,
-            site=_copy_site(site),
+            site=detached_site(site),
             journal_pks=journal_pks,
             base_revid=base_revid,
             body=latest.body,
             comment=latest.comment,
         )
-    finally:
-        session.rollback()
-
-
-def _copy_site(site: Site) -> Site:
-    return Site(
-        pk=site.pk,
-        family=site.family,
-        code=site.code,
-        articlepath=site.articlepath,
-        host=site.host,
-        api_url=site.api_url,
-        label=site.label,
-        created_at=site.created_at,
-    )
 
 
 def _save_pending_page(
@@ -286,9 +266,20 @@ def _save_pending_page(
     except EditConflict as exc:
         return _CommitOutcome(status=CommitStatus.conflict, error_message=str(exc))
     except Exception as exc:  # noqa: BLE001 - record any failure on the row
+        failure = record_failure(
+            FailureContext(
+                component="commit",
+                title=pending.title,
+                page_pk=pending.page_pk,
+                site_pk=pending.site.pk,
+                site_label=site_label(pending.site),
+                details={"base_revid": str(pending.base_revid), "force": str(force)},
+            ),
+            exc,
+        )
         return _CommitOutcome(
             status=CommitStatus.error,
-            error_message=f"{type(exc).__name__}: {exc}",
+            error_message=failure.summary,
         )
 
 
@@ -304,7 +295,7 @@ def _record_commit_outcome(
         result_revid=outcome.result_revid,
         error_message=outcome.error_message,
     )
-    try:
+    with write_batch(session):
         if outcome.status == CommitStatus.success:
             page = session.get(Page, pending.page_pk)
             if page is not None:
@@ -331,10 +322,6 @@ def _record_commit_outcome(
                 session.add(row)
 
         session.add(commit)
-        session.commit()
-    except Exception:
-        session.rollback()
-        raise
 
 
 def _has_uncaptured_pending_edits(
@@ -353,7 +340,7 @@ def _has_uncaptured_pending_edits(
 
 
 def _drop_orphaned_journal(session: Session, page_pk: int) -> None:
-    try:
+    with write_batch(session):
         rows = session.exec(
             select(EditJournal).where(
                 EditJournal.page_pk == page_pk,
@@ -363,7 +350,3 @@ def _drop_orphaned_journal(session: Session, page_pk: int) -> None:
         for row in rows:
             row.committed = True
             session.add(row)
-        session.commit()
-    except Exception:
-        session.rollback()
-        raise

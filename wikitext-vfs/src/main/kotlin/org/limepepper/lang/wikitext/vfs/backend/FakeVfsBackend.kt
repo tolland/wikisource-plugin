@@ -287,7 +287,7 @@ class FakeVfsBackend : VfsBackend {
         )
     }
 
-    override fun fetchPageImage(path: String?, title: String?, width: Int?): ByteArray {
+    override fun fetchReferenceImage(path: String?, title: String?, width: Int?): ByteArray {
         // PNG rather than SVG: the scan viewer decodes with ImageIO, which
         // has no SVG support.
         val image = BufferedImage(800, 1200, BufferedImage.TYPE_INT_RGB)

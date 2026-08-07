@@ -1,0 +1,152 @@
+---
+
+# Two independent MediaWiki+ProofreadPage stacks.
+#
+# The `upstream` pair (db, mediawiki) always starts and is what the original
+# single-instance `wikisource` fixture uses. The `local` pair only starts under
+# the `pair` profile, and exists so sync/promotion tests have a real second wiki
+# to copy from and push back to -- FakeWikiClient cannot model revision history,
+# sha1 semantics, createonly or undo.
+#
+#   docker compose up -d                    # upstream only
+#   docker compose --profile pair up -d     # both
+#
+# Run the pair under its own COMPOSE_PROJECT_NAME: MW_SERVER (and therefore the
+# port) is baked into Wikisource.php at install time, so a volume installed
+# for one port must not be reused on another.
+#
+# A third, unrelated service (wikimedia-ocr, under the `ocr` profile) runs a
+# real Wikimedia OCR instance for src-py/tests/test_ocr_wikimedia_docker.py --
+# it needs no wiki at all, just an image URL, so it has no dependency on the
+# services above:
+#
+#   docker compose --profile ocr up -d wikimedia-ocr
+
+x-mediawiki-common: &mediawiki-common
+  build:
+    context: .
+    dockerfile: docker/mediawiki/Dockerfile
+  healthcheck:
+    # The marker is written by start-wikisource *after* seeding and removed at
+    # the top of every start, so `up --wait` cannot return while an import is
+    # still running. Without it the extension check goes green as soon as
+    # Wikisource.php exists and tests race the import.
+    test:
+      [
+        "CMD-SHELL",
+        "test -f /var/www/html/images/.harness-ready && php /var/www/html/maintenance/run.php eval 'exit(ExtensionRegistry::getInstance()->isLoaded(\"ProofreadPage\") ? 0 : 1);'",
+      ]
+    interval: 10s
+    timeout: 10s
+    # A cold start installs MediaWiki, imports a scan and a dump, then runs
+    # rebuildall -- minutes, not seconds. A warm volume skips all of it.
+    retries: 60
+    start_period: 30s
+
+# Content, as distinct from services. Both wikis reference this one anchor, so
+# they hold the same works because they are configured identically rather than
+# because something remembered to seed both. Blank it to get bare wikis:
+#   SEED_DUMPS= SEED_SCANS= docker compose --profile pair up -d --wait
+x-seed-env: &seed-env
+  SEED_SCANS: "${SEED_SCANS-djvu}"
+  SEED_DUMPS: "${SEED_DUMPS-Canadian_patent_29537_all.xml}"
+
+x-db-common: &db-common
+  image: mariadb:11.4
+  healthcheck:
+    test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+    interval: 5s
+    timeout: 5s
+    retries: 24
+
+x-db-env: &db-env
+  MARIADB_DATABASE: mediawiki
+  MARIADB_USER: mediawiki
+  MARIADB_PASSWORD: mediawiki
+  MARIADB_ROOT_PASSWORD: mediawiki-root
+
+services:
+  db:
+    <<: *db-common
+    environment: *db-env
+    volumes:
+      - mediawiki-db:/var/lib/mysql
+
+  mediawiki:
+    <<: *mediawiki-common
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      MW_ADMIN_PASSWORD: "${MW_ADMIN_PASSWORD:-AdminPassword123!}"
+      MW_ADMIN_USER: "${MW_ADMIN_USER:-Admin}"
+      MW_DB_HOST: db
+      MW_DB_NAME: mediawiki
+      MW_DB_PASSWORD: mediawiki
+      MW_DB_USER: mediawiki
+      MW_LANG: en
+      MW_SCRIPT_PATH: ""
+      MW_SERVER: "http://localhost:${WIKISOURCE_PORT:-8080}"
+      MW_SITE_NAME: "${WIKISOURCE_SITE_NAME:-Test Wikisource}"
+      <<: *seed-env
+      SEED_REVID_BURN: "0"
+    ports:
+      - "${WIKISOURCE_PORT:-8080}:80"
+    volumes:
+      - mediawiki-images:/var/www/html/images
+      - ./src-py/tests/fixtures:/fixtures:ro,z
+
+  db-local:
+    <<: *db-common
+    profiles: ["pair"]
+    environment: *db-env
+    volumes:
+      - mediawiki-local-db:/var/lib/mysql
+
+  mediawiki-local:
+    <<: *mediawiki-common
+    profiles: ["pair"]
+    depends_on:
+      db-local:
+        condition: service_healthy
+    environment:
+      MW_ADMIN_PASSWORD: "${MW_ADMIN_PASSWORD:-AdminPassword123!}"
+      MW_ADMIN_USER: "${MW_ADMIN_USER:-Admin}"
+      MW_DB_HOST: db-local
+      MW_DB_NAME: mediawiki
+      MW_DB_PASSWORD: mediawiki
+      MW_DB_USER: mediawiki
+      MW_LANG: en
+      MW_SCRIPT_PATH: ""
+      MW_SERVER: "http://localhost:${WIKISOURCE_LOCAL_PORT:-18582}"
+      MW_SITE_NAME: "${WIKISOURCE_LOCAL_SITE_NAME:-Test Wikisource (local)}"
+      <<: *seed-env
+      # The one deliberate asymmetry, and it is not content: throwaway
+      # revisions so the two wikis do not assign the same revids to the same
+      # pages. See the burn loop in start-wikisource.sh.
+      SEED_REVID_BURN: "${SEED_REVID_BURN-7}"
+    ports:
+      - "${WIKISOURCE_LOCAL_PORT:-18582}:80"
+    volumes:
+      - mediawiki-local-images:/var/www/html/images
+      - ./src-py/tests/fixtures:/fixtures:ro,z
+
+  wikimedia-ocr:
+    profiles: ["ocr"]
+    build:
+      context: .
+      dockerfile: docker/wikimedia-ocr/Dockerfile
+    ports:
+      - "${WIKIMEDIA_OCR_PORT:-8090}:80"
+
+  # pix2tex/LaTeX-OCR used to be a service here, spoken to directly by a
+  # Pix2TexClient of our own. It now sits behind py-ocrapi
+  # (https://github.com/tolland/py-ocrapi) as one more `engine` value on
+  # the same URL+crop+rotate contract as tesseract and Google Vision, so
+  # the container belongs in that project's compose file, not this one.
+
+volumes:
+  mediawiki-db:
+  mediawiki-images:
+  mediawiki-local-db:
+  mediawiki-local-images:

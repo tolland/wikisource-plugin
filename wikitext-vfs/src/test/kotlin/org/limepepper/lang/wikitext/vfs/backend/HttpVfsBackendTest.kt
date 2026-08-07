@@ -162,53 +162,53 @@ class HttpVfsBackendTest {
         assertNull(r.scriptPath)
     }
 
-    @Test fun `fetchPageImage GETs page-image with the path url-encoded and returns the bytes`() {
+    @Test fun `fetchReferenceImage GETs reference-image with the path url-encoded and returns the bytes`() {
         var requestUri: String? = null
         var requestIdHeader: String? = null
         val pixels = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47)
-        server.createContext("/preview/page-image") { ex ->
+        server.createContext("/reference-image") { ex ->
             requestUri = ex.requestURI.toString()
             requestIdHeader = ex.requestHeaders.getFirst("X-Request-Id")
             ex.sendResponseHeaders(200, pixels.size.toLong())
             ex.responseBody.use { it.write(pixels) }
         }
 
-        val bytes = backend.fetchPageImage(
+        val bytes = backend.fetchReferenceImage(
             path = "/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1",
             title = null,
         )
         assertArrayEquals(pixels, bytes)
         assertEquals(
-            "/preview/page-image" +
+            "/reference-image" +
                 "?path=%2Fwikisource%2Fen%2FIndex%3AFoo.djvu%2FPages%2FPage%3AFoo.djvu%2F1",
             requestUri,
         )
         assertNotNull(requestIdHeader)
     }
 
-    @Test fun `fetchPageImage with bare title and width`() {
+    @Test fun `fetchReferenceImage with bare title and width`() {
         var requestUri: String? = null
-        server.createContext("/preview/page-image") { ex ->
+        server.createContext("/reference-image") { ex ->
             requestUri = ex.requestURI.toString()
             ex.sendResponseHeaders(200, 1)
             ex.responseBody.use { it.write(byteArrayOf(1)) }
         }
 
-        backend.fetchPageImage(path = null, title = "Page:Foo.djvu/1", width = 706)
-        assertEquals("/preview/page-image?title=Page%3AFoo.djvu%2F1&width=706", requestUri)
+        backend.fetchReferenceImage(path = null, title = "Page:Foo.djvu/1", width = 706)
+        assertEquals("/reference-image?title=Page%3AFoo.djvu%2F1&width=706", requestUri)
     }
 
-    @Test fun `fetchPageImage surfaces the sidecar error object, not raw bytes`() {
+    @Test fun `fetchReferenceImage surfaces the sidecar error object, not raw bytes`() {
         val error = """{"detail":"scan image fetch failed: No scheme supplied.",
                         "code":"scan-image-fetch-failed","request_id":"abc123"}"""
-        server.createContext("/preview/page-image") { ex ->
+        server.createContext("/reference-image") { ex ->
             val body = error.toByteArray()
             ex.sendResponseHeaders(502, body.size.toLong())
             ex.responseBody.use { it.write(body) }
         }
 
         val e = assertThrows(VfsBackendException::class.java) {
-            backend.fetchPageImage(path = "/wikisource/en/Index:X/Pages/Page:X/7", title = null)
+            backend.fetchReferenceImage(path = "/wikisource/en/Index:X/Pages/Page:X/7", title = null)
         }
         assertEquals(502, e.statusCode)
         assertEquals("scan image fetch failed: No scheme supplied.", e.detail)

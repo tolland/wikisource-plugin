@@ -1,5 +1,6 @@
 import logging
 from dataclasses import replace
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
@@ -8,6 +9,7 @@ from wtbot.wiki.wiki_types import (
     EditConflict,
     IndexPageEntry,
     PageNotFound,
+    RemoteChange,
     RemoteFileInfo,
     RemotePage,
     RemotePageImages,
@@ -26,13 +28,29 @@ and ``download_file`` are all the fetch path needs. Two implementations:
 """
 
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
-# Width requested for the small tree/preview thumbnail. The API's default
-# rendition (no prppifpsize) is ~1280px -- that is ProofreadPage's edit-view
-# reference image, not a thumbnail; the /pages/image endpoint serves other
-# widths on demand by rewriting the thumb URL.
-PAGE_THUMB_WIDTH = 240
+#: The props ``prop=imageforpage`` accepts. This is the *whole* parameter
+#: surface of that module: ``prop`` (as ``prppifpprop``) and nothing else.
+#:
+#: We used to also send ``prppifpsize``, meaning to ask for a 240px rendition.
+#: No such parameter exists -- ProofreadPage's module defines only ``prop`` --
+#: so every one of those requests came back with
+#: "API warning (main): Unrecognized parameter: prppifpsize", was served at
+#: whatever width the extension chose, and nobody noticed because the warning
+#: is not an error and the response still parsed. The thumbnail width is
+#: PageDisplayHandler's to decide and is not controllable from here; consumers
+#: that need another width rewrite the URL (see /reference-image).
+IMAGE_FOR_PAGE_PROPS = "filename|size|fullsize"
+
+#: Titles per pageset query. MediaWiki's limit is 50 without apihighlimits,
+#: which an ordinary account does not have.
+_TITLES_PER_QUERY = 50
+
+
+def _chunks(items: list[str], size: int):
+    for start in range(0, len(items), size):
+        yield items[start : start + size]
 
 
 def _https(url: str | None) -> str | None:
@@ -56,6 +74,15 @@ class WikiClient(Protocol):
         API errors) -- enrichment, never a fetch-failing call."""
         ...
 
+    def get_page_images_bulk(self, titles: list[str]) -> dict[str, RemotePageImages]:
+        """``get_page_images`` for many titles at once.
+
+        Per-title, this is the second request a page fetch costs -- measured,
+        it doubled the per-page budget. ``prop=imageforpage`` is a pageset
+        module, so fifty titles cost one request instead of fifty. Titles with
+        nothing to report are simply absent from the result."""
+        ...
+
     def list_index_pages(self, title: str) -> list[IndexPageEntry] | None:
         """Authoritative pagination of a ProofreadPage index
         (list=proofreadpagesinindex): every slot with its real title, missing
@@ -73,6 +100,24 @@ class WikiClient(Protocol):
     def download_file(self, title: str, dest: Path) -> Path: ...
 
     def get_namespaces(self): ...  # returns pwb NamespacesDict or None
+
+    def recent_changes(
+        self,
+        *,
+        since: datetime,
+        namespace_keys: list[int] | None = None,
+        limit: int = 5000,
+    ) -> list[RemoteChange]: ...
+
+    def oldest_retained_change(self) -> datetime | None:
+        """The oldest entry recentchanges still holds, or None if empty.
+
+        The recentchanges table is pruned (``$wgRCMaxAge``, 90 days by
+        default), so "nothing changed since X" is indistinguishable from "X is
+        older than the wiki remembers" unless you ask. Asking is one request
+        and turns a silent wrong answer into a fallback.
+        """
+        ...
 
     def save_page(
         self,
@@ -133,11 +178,122 @@ class PywikibotClient:
             )
             self.site.login()
 
+        self._log_identity()
+
+    def _log_identity(self) -> None:
+        """Record who we are on this wiki, once per client, for free.
+
+        "We thought we were logged in but were not" is invisible in every other
+        symptom -- it surfaces later as a commit that cannot save. There is no
+        API reporting which rate-limit tier the CDN put us in, so group
+        membership -- which the tiers are drawn from, `bot` most decisively --
+        is the closest observable proxy.
+
+        Anonymous is not simply "the lower tier": the documented read
+        allowance is the same 200 req/min an authenticated account with few
+        edits gets, and only an *unidentified* client (no compliant
+        User-Agent) drops to 10. But the published table is not the whole
+        policy -- Wikimedia's CDN also applies per-IP-block rules, and traffic
+        from cloud ranges is treated far less generously than the same request
+        from a residential connection, with authentication as the way through.
+        So this is INFO rather than a warning about tiers, and it says what is
+        actually true: reads may work, and may not, depending on where you are
+        calling from; commits will not work at all.
+
+        Reads only what pywikibot already holds. ``site.userinfo`` is a
+        property that *fetches* when cold, so asking would spend a request per
+        client to log a line about conserving requests. Site construction and a
+        successful ``login()`` both populate the cache as a side effect of what
+        they were doing anyway, and no credentials means anonymous without
+        having to ask -- so both branches are answerable from memory.
+        """
+        try:
+            info = getattr(self.site, "_userinfo", None)
+            if not self.settings.username:
+                log.info(
+                    "wiki client for %s is anonymous: commits will fail, and "
+                    "reads depend on how the CDN treats this IP range (cloud "
+                    "ranges fare badly). Add an account with "
+                    "`wtbot site-credential add`",
+                    self.site,
+                )
+                return
+            if not info:
+                # Credentials configured but no userinfo cached: the login did
+                # not complete. A warning, unlike the branch above -- somebody
+                # asked for an identity and did not get it, and the symptom
+                # otherwise arrives much later as a commit that cannot save.
+                log.warning(
+                    "wiki client for %s has credentials for %s but is not "
+                    "logged in -- commits will fail",
+                    self.site,
+                    self.settings.username,
+                )
+                return
+            groups = info.get("groups", [])
+            log.info(
+                "wiki client for %s logged in as %s (groups=%s, bot_flag=%s)",
+                self.site,
+                info.get("name"),
+                ",".join(g for g in groups if g not in ("*", "user")) or "none",
+                "bot" in groups,
+            )
+        except Exception as exc:  # noqa: BLE001 - diagnostics, never fatal
+            log.debug("could not read userinfo for %s: %s", self.site, exc)
+
+    def _api_query(self, **params) -> dict | None:
+        """Run a read-only API query through pywikibot's authenticated session.
+
+        These queries used to go out as bare ``requests.get`` calls to save
+        pywikibot's retry machinery. That traded one problem for a worse one:
+        a bare request carries no session cookie, so every one of them was
+        *anonymous* even when the client was logged in -- billed against the
+        lowest rate-limit tier, with no throttle between them and no
+        policy-compliant User-Agent. Three of them per fetched Page: was most
+        of our request budget, spent in the way most likely to be limited.
+
+        Through the site, they are throttled, authenticated and identified.
+        Fail-soft is preserved by returning None: every caller here is
+        enrichment (thumbnails, pagination hints), never the fetch itself. The
+        retry concern behind the original comment is handled by config
+        max_retries=0 (see wtbot.wiki.config), not by bypassing the session.
+        """
+        try:
+            return self.site.simple_request(**params).submit()
+        except Exception as exc:  # noqa: BLE001 - enrichment only, never fatal
+            log.debug(
+                "api query %s failed on %s: %s",
+                params.get("prop") or params.get("list") or params.get("action"),
+                self.site,
+                exc,
+            )
+            return None
+
     def get_page(self, title: str) -> RemotePage:
+        """One page, in one upstream request.
+
+        It used to take two. ``page.exists()`` reads ``pageid``, which triggers
+        ``loadpageinfo`` (prop=info) on its own; the revision load that follows
+        is a second request that carries prop=info anyway and so establishes
+        existence by itself -- a missing page raises NoPageError out of it.
+        Recorded fan-outs show the cost plainly: 26 info-only requests
+        alongside 24 info+revisions requests for one 24-page book, i.e. half
+        of the rate-limit budget spent asking a question the next request
+        answers. Existence now comes from the revision load.
+
+        ``rev.text`` rather than ``page.text``: identical content (the
+        revision was loaded with content=True), but it cannot fall through to
+        another fetch, and a redirect is returned as its own wikitext rather
+        than raising -- which is what the previous ``page.text`` did too.
+        """
         page = self._pwb.Page(self.site, title)
-        if not page.exists():
-            raise PageNotFound(title)
-        rev = page.latest_revision
+        try:
+            rev = page.latest_revision
+        except (
+            self._pwb.exceptions.NoPageError,
+            self._pwb.exceptions.InvalidPageError,
+        ) as exc:
+            raise PageNotFound(title) from exc
         ns = page.namespace()
 
         # For Index pages use IndexPage so we get num_pages from the ProofreadPage
@@ -156,8 +312,10 @@ class PywikibotClient:
             title=page.title(),
             namespace_key=ns.id,
             namespace_canonical=ns.canonical_name or "",
+            # Both are populated by the revision load above (its response
+            # carries prop=info), so neither costs a request of its own.
             content_model=page.content_model,
-            text=page.text,
+            text=rev.text,
             pageid=getattr(page, "pageid", None),
             revid=rev.revid,
             parentid=rev.parentid,
@@ -223,30 +381,15 @@ class PywikibotClient:
     def get_page_images(self, title: str) -> RemotePageImages | None:
         # ProofreadPage's module is prop=imageforpage (prefix prppifp), but
         # the *response* key is "imagesforpage"; prop=proofread rides along
-        # for the quality level. Deliberately a plain GET rather than a
-        # pywikibot api.Request: this is enrichment and must fail fast,
-        # while pywikibot's retry/throttle machinery turns one broken or
-        # unsupported endpoint into minutes of waiting, multiplied per
-        # fetched page. A miss just means no thumbnail until the next fetch.
-        try:
-            import requests
-
-            resp = requests.get(
-                self.site.base_url(self.site.apipath()),
-                params={
-                    "action": "query",
-                    "prop": "imageforpage|proofread",
-                    "titles": title,
-                    "prppifpprop": "filename|size|fullsize",
-                    "prppifpsize": PAGE_THUMB_WIDTH,
-                    "format": "json",
-                },
-                headers={"User-Agent": "wtbot (wikisource-plugin)"},
-                timeout=(5, 15),
-            )
-            data = resp.json()
-        except Exception as exc:  # noqa: BLE001 - enrichment only, never fatal
-            logger.debug("imageforpage query failed for %s: %s", title, exc)
+        # for the quality level. A miss just means no thumbnail until the next
+        # fetch, so this never fails the fetch (see _api_query).
+        data = self._api_query(
+            action="query",
+            prop="imageforpage|proofread",
+            titles=title,
+            prppifpprop=IMAGE_FOR_PAGE_PROPS,
+        )
+        if data is None:
             return None
         pages = (data.get("query") or {}).get("pages") or {}
         for pdata in pages.values():
@@ -264,29 +407,48 @@ class PywikibotClient:
             )
         return None
 
-    def list_index_pages(self, title: str) -> list[IndexPageEntry] | None:
-        # Same plain-GET/fail-soft rationale as get_page_images: this powers
-        # fan-out optimisation and placeholder discovery, not correctness --
-        # a miss just means the page_count fallback path.
-        try:
-            import requests
-
-            resp = requests.get(
-                self.site.base_url(self.site.apipath()),
-                params={
-                    "action": "query",
-                    "list": "proofreadpagesinindex",
-                    "prppiititle": title,
-                    "prppiiprop": "ids|title",
-                    "prppiilimit": 500,
-                    "format": "json",
-                },
-                headers={"User-Agent": "wtbot (wikisource-plugin)"},
-                timeout=(5, 15),
+    def get_page_images_bulk(self, titles: list[str]) -> dict[str, RemotePageImages]:
+        # MediaWiki caps a pageset at 50 titles for a normal account (500 with
+        # apihighlimits, which we do not assume), so this chunks rather than
+        # asking for a limit we may not have.
+        found: dict[str, RemotePageImages] = {}
+        for chunk in _chunks(titles, _TITLES_PER_QUERY):
+            data = self._api_query(
+                action="query",
+                prop="imageforpage|proofread",
+                titles="|".join(chunk),
+                prppifpprop=IMAGE_FOR_PAGE_PROPS,
             )
-            data = resp.json()
-        except Exception as exc:  # noqa: BLE001 - fall back to page_count
-            logger.debug("proofreadpagesinindex failed for %s: %s", title, exc)
+            if data is None:
+                continue
+            for pdata in ((data.get("query") or {}).get("pages") or {}).values():
+                title = pdata.get("title")
+                images = pdata.get("imagesforpage") or {}
+                proofread = pdata.get("proofread") or {}
+                if not title or (not images and not proofread):
+                    continue
+                found[title] = RemotePageImages(
+                    thumbnail_url=_https(images.get("thumbnail")),
+                    fullsize_url=_https(images.get("fullsize")),
+                    size=images.get("size"),
+                    filename=images.get("filename"),
+                    quality=proofread.get("quality"),
+                    quality_text=proofread.get("quality_text"),
+                )
+        return found
+
+    def list_index_pages(self, title: str) -> list[IndexPageEntry] | None:
+        # Same fail-soft rationale as get_page_images: this powers fan-out
+        # optimisation and placeholder discovery, not correctness -- a miss
+        # just means the page_count fallback path.
+        data = self._api_query(
+            action="query",
+            list="proofreadpagesinindex",
+            prppiititle=title,
+            prppiiprop="ids|title",
+            prppiilimit=500,
+        )
+        if data is None:
             return None
         entries = (data.get("query") or {}).get("proofreadpagesinindex")
         if not isinstance(entries, list):
@@ -305,25 +467,14 @@ class PywikibotClient:
         # ProofreadPage serves the same prepopulated body its own web editor
         # shows on a redlink Page: (pagequality header, the scan's OCR text
         # layer, footer) via prop=defaultcontentforpage — the response value
-        # is one serialized string. Same plain-GET/fail-soft rationale as
+        # is one serialized string. Same fail-soft rationale as
         # get_page_images: a miss just means the scaffold fallback.
-        try:
-            import requests
-
-            resp = requests.get(
-                self.site.base_url(self.site.apipath()),
-                params={
-                    "action": "query",
-                    "prop": "defaultcontentforpage",
-                    "titles": title,
-                    "format": "json",
-                },
-                headers={"User-Agent": "wtbot (wikisource-plugin)"},
-                timeout=(5, 30),
-            )
-            data = resp.json()
-        except Exception as exc:  # noqa: BLE001 - enrichment only, never fatal
-            logger.debug("defaultcontentforpage query failed for %s: %s", title, exc)
+        data = self._api_query(
+            action="query",
+            prop="defaultcontentforpage",
+            titles=title,
+        )
+        if data is None:
             return None
         pages = (data.get("query") or {}).get("pages") or {}
         for pdata in pages.values():
@@ -387,6 +538,103 @@ class PywikibotClient:
             script_path=self.site.scriptpath(),
         )
 
+    def recent_changes(
+        self,
+        *,
+        since: datetime,
+        namespace_keys: list[int] | None = None,
+        limit: int = 5000,
+    ) -> list[RemoteChange]:
+        """Entries newer than ``since``, oldest first, following continuation.
+
+        ``rcstart`` is inclusive and we scan forwards, so a caller that stores
+        the newest timestamp seen and passes it back re-reads that instant's
+        entries rather than risking a gap. Refetching a page is idempotent;
+        missing one is not.
+
+        There is no ``rcprefix`` -- ``rctitle`` filters to a single page -- so
+        narrowing to one work is the caller's job, done on titles we already
+        hold. That is a client-side filter over cheap metadata, not a page
+        fetch per candidate.
+        """
+        params: dict[str, str] = {
+            "action": "query",
+            "list": "recentchanges",
+            "rcdir": "newer",
+            "rcstart": _api_timestamp(since),
+            # Deliberately not `log`: moves and deletions are real sync events
+            # (see docs/upstream-sync-discussion.md section 5) but they need
+            # list=logevents to read properly, and half-reading them here would
+            # look like coverage. Edits and creations only.
+            "rctype": "edit|new",
+            "rcprop": "title|ids|timestamp",
+            "rclimit": str(limit),
+        }
+        if namespace_keys:
+            params["rcnamespace"] = "|".join(str(key) for key in sorted(namespace_keys))
+
+        changes: list[RemoteChange] = []
+        while True:
+            data = self.site.simple_request(**params).submit()
+            for entry in data.get("query", {}).get("recentchanges", []):
+                change = _change_from_api(entry)
+                if change is not None:
+                    changes.append(change)
+            cont = data.get("continue", {}).get("rccontinue")
+            if not cont:
+                return changes
+            params["rccontinue"] = cont
+
+    def oldest_retained_change(self) -> datetime | None:
+        data = self.site.simple_request(
+            action="query",
+            list="recentchanges",
+            rcdir="newer",
+            rclimit="1",
+            rcprop="timestamp",
+        ).submit()
+        entries = data.get("query", {}).get("recentchanges", [])
+        if not entries:
+            return None
+        return _parse_api_timestamp(entries[0].get("timestamp"))
+
+
+def _api_timestamp(moment: datetime) -> str:
+    """MediaWiki's ISO-8601-with-Z form, always in UTC.
+
+    A naive datetime is treated as UTC rather than local: every timestamp this
+    codebase stores is UTC (see wtbot.timeutil), and guessing the local zone
+    here would silently shift the window.
+    """
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    return moment.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _parse_api_timestamp(value) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def _change_from_api(entry: dict) -> RemoteChange | None:
+    timestamp = _parse_api_timestamp(entry.get("timestamp"))
+    title = entry.get("title")
+    if timestamp is None or not title:
+        return None
+    return RemoteChange(
+        title=title,
+        timestamp=timestamp,
+        kind=entry.get("type", "edit"),
+        pageid=entry.get("pageid") or None,
+        revid=entry.get("revid") or None,
+        old_revid=entry.get("old_revid") or None,
+        namespace_key=entry.get("ns"),
+    )
+
 
 class FakeWikiClient:
     """Network-free WikiClient backed by in-memory dicts."""
@@ -398,12 +646,21 @@ class FakeWikiClient:
         page_images: dict[str, RemotePageImages] | None = None,
         index_pages: dict[str, list[IndexPageEntry]] | None = None,
         default_contents: dict[str, str] | None = None,
+        changes: list[RemoteChange] | None = None,
+        oldest_change: datetime | None = None,
     ):
         self._pages = dict(pages or {})
         self._files = dict(files or {})
         self._page_images = dict(page_images or {})
         self._index_pages = dict(index_pages or {})
         self._default_contents = dict(default_contents or {})
+        self._changes = sorted(changes or [], key=lambda c: c.timestamp)
+        # The retention horizon is set independently of `changes`, because on a
+        # real wiki the two are unrelated: recentchanges holds every namespace's
+        # entries, while `changes` stands for the handful matching a filter.
+        # Deriving one from the other would make every fixture look pruned.
+        # None means "holds everything", which is the case most tests want.
+        self._oldest_change = oldest_change
 
     def get_page(self, title: str) -> RemotePage:
         try:
@@ -441,6 +698,9 @@ class FakeWikiClient:
     def get_page_images(self, title: str) -> RemotePageImages | None:
         return self._page_images.get(title)
 
+    def get_page_images_bulk(self, titles: list[str]) -> dict[str, RemotePageImages]:
+        return {t: self._page_images[t] for t in titles if t in self._page_images}
+
     def list_index_pages(self, title: str) -> list[IndexPageEntry] | None:
         return self._index_pages.get(title)
 
@@ -459,6 +719,22 @@ class FakeWikiClient:
 
     def get_namespaces(self):
         return None
+
+    def recent_changes(
+        self,
+        *,
+        since: datetime,
+        namespace_keys: list[int] | None = None,
+        limit: int = 5000,
+    ) -> list[RemoteChange]:
+        # `since` inclusive, mirroring rcstart.
+        selected = [c for c in self._changes if c.timestamp >= since]
+        if namespace_keys:
+            selected = [c for c in selected if c.namespace_key in set(namespace_keys)]
+        return selected[:limit]
+
+    def oldest_retained_change(self) -> datetime | None:
+        return self._oldest_change
 
     def save_page(
         self,

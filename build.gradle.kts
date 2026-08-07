@@ -15,6 +15,18 @@ val sandboxPluginDirectories = listOf(
 
 val intellijPlatformVersion = providers.gradleProperty("intellijPlatformVersion").get()
 
+// Which wtbot sidecar the sandbox IDE starts against, e.g.
+//   ./gradlew runIde -PwtbotBaseUrl=http://127.0.0.1:18584
+// Unset means "whatever the sandbox has persisted", which is the plugin's own
+// default (http://127.0.0.1:18564, the workstation dev-convention port —
+// see docs/logging.md) on a fresh sandbox. The property is read at
+// every launch, not just the first: the sandbox keeps its config between runs,
+// so a first-run-only default would be ignored exactly when you're switching
+// between the dev sidecar and the docker harness. It still only seeds the
+// setting — the Settings page can move the IDE to another backend mid-session.
+val wtbotBaseUrl = providers.gradleProperty("wtbotBaseUrl")
+val wtbotTimeoutSeconds = providers.gradleProperty("wtbotTimeoutSeconds")
+
 plugins {
     idea
     id("org.jetbrains.kotlin.jvm")
@@ -155,5 +167,34 @@ tasks {
         }
 
         systemProperty("idea.auto.reload.plugins", "true")
+
+        if (wtbotBaseUrl.isPresent) {
+            systemProperty("wtbot.baseUrl", wtbotBaseUrl.get())
+        }
+        if (wtbotTimeoutSeconds.isPresent) {
+            systemProperty("wtbot.timeoutSeconds", wtbotTimeoutSeconds.get())
+        }
+    }
+}
+
+intellijPlatformTesting {
+    runIde {
+        register("runIdeWtbotLocal") {
+            task {
+                systemProperty(
+                    "wtbot.baseUrl",
+                    "http://127.0.100.1:18564",
+                )
+            }
+        }
+
+        register("runIdeWtbotDocker") {
+            task {
+                systemProperty(
+                    "wtbot.baseUrl",
+                    "http://localhost:18574",
+                )
+            }
+        }
     }
 }

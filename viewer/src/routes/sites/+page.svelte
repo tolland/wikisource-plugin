@@ -64,7 +64,6 @@
       family: 'wikisource',
       code: 'en',
       articlepath: '/wiki/$1',
-      host: '',
       api_url: '',
       label: ''
     };
@@ -96,7 +95,6 @@
       family: siteForm.family.trim(),
       code: siteForm.code.trim(),
       articlepath: siteForm.articlepath?.trim() || '/wiki/$1',
-      host: siteForm.host?.trim() || null,
       api_url: siteForm.api_url?.trim() || null,
       label: siteForm.label?.trim() || null
     };
@@ -128,7 +126,6 @@
       family: site.family,
       code: site.code,
       articlepath: site.articlepath ?? '/wiki/$1',
-      host: site.host ?? '',
       api_url: site.api_url ?? '',
       label: site.label ?? ''
     };
@@ -340,7 +337,7 @@
             onclick={() => selectSite(site)}
           >
             <span>{siteLabel(site)}</span>
-            <small>{site.api_url ?? site.host ?? `${site.family}:${site.code}`}</small>
+            <small>{site.api_url ?? `${site.family}:${site.code}`}</small>
           </button>
         {/each}
       </nav>
@@ -381,7 +378,6 @@
       />
 
       <FormRow>
-        <TextField label="Host" bind:value={siteForm.host} placeholder="en.wikisource.org" />
         <TextField
           label="Article path"
           bind:value={siteForm.articlepath}

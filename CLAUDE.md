@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+@AGENTS.md
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## What this is
@@ -35,6 +37,14 @@ GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew generateLexer generateParser  # 
 GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew check           # build + tests + spotless, run by the pre-commit hook
 ```
 
+The sandbox's wtbot sidecar can be chosen per launch, so a session can be pointed at the docker harness instead of the workstation sidecar without editing settings by hand:
+
+```bash
+GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew runIde -PwtbotBaseUrl=http://127.0.0.1:18584 [-PwtbotTimeoutSeconds=30]
+```
+
+These become the `wtbot.baseUrl` / `wtbot.timeoutSeconds` system properties (`WTBOT_BASE_URL` / `WTBOT_TIMEOUT_SECONDS` env vars work too, for a non-sandbox IDE). They seed the setting at every launch rather than only on a fresh sandbox, and the running IDE can still be moved to another backend from Settings → Tools → WTBot (VFS backend) without restarting.
+
 `runIde` opens a sandbox IDE against `../test-project` (a sibling directory of this repo root, not inside it — create it if it doesn't exist locally). The sandbox config in `sandbox-config/` (editor, look-and-feel, trusted paths, log categories) is copied into the sandbox on every `prepareSandbox` run. The exact target IDE build is pinned in `gradle.properties` (`intellijPlatformVersion`) so Gradle never silently re-resolves a newer RC.
 
 A single test class/method can be run the normal Gradle way, e.g. `GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew :wikitext-core:test --tests "org.limepepper.lang.wikitext.lexer.WtLexerTest.testFooBar"`.
@@ -47,13 +57,28 @@ Dependencies are managed with `uv` (`pyproject.toml` + `uv.lock`).
 uv run fastapi dev src-py/wtbot/main.py --port 18564   # start FastAPI dev server (dev-convention port, see docs/logging.md)
 uv run pytest                              # run Python tests (uses pythonpath=src-py, testpaths=src-py/tests)
 uv run pytest src-py/tests/test_fetch.py -k some_case  # single test
+uv run pytest -m slow                      # incl. the docker-backed harness suites (deselected by default)
+
+# The two-wiki sync harness. Both wikis seed themselves from the same compose
+# anchor (SEED_DUMPS/SEED_SCANS), so the pair starts converged; `--wait` blocks
+# until seeding is done. `up`/`status`/`down` is a convenience wrapper on it.
+docker compose -f compose.seeded.yml --profile pair up -d --wait
+PYTHONPATH=src-py/tests uv run python -m wiki_harness status
+
+# ...plus the wtbot API itself (compose.wtbot.yml overlays either base), so the
+# whole system is reachable over HTTP instead of only from inside pytest.
+# SQLite lives on a disposable volume; WTBOT_RESET_DB=1 empties it without
+# rebuilding the wikis. Served on $WTBOT_PORT (default 18583).
+docker compose -f compose.seeded.yml -f compose.wtbot.yml \
+    --profile pair --profile api up -d --wait
+PYTHONPATH=src-py/tests uv run python -m wiki_harness up --api
 uv run ruff check --fix                    # lint (mirrors the pre-commit hook)
 uv run black .                             # format (mirrors the pre-commit hook)
 ```
 
 `pre-commit` (`.pre-commit-config.yaml`) runs `ruff check --fix` + `black` on pre-commit, and `./gradlew check` on pre-push — both sides of the repo are gated by the same hooks.
 
-Wiki access in tests goes through `vcrpy` cassettes under `src-py/tests/cassettes/` rather than live network calls; see `WikiClient`/`FakeWikiClient` below for the non-cassette fake path.
+Wiki access in tests is either faked in-memory (`FakeWikiClient`, the default — fast, no network) or live-fire against the docker harness wikis (`@pytest.mark.slow`, needs `--runslow` and a docker daemon). There is no recorded-cassette layer: recordings drifted out of date against pywikibot and could only be refreshed from a machine with access to both wikis, so a stale recording failed on requests our code never made.
 
 ### Viewer (SvelteKit, debug UI only)
 
@@ -91,7 +116,9 @@ The lexer uses a frame/state stack to disambiguate context-dependent tokens (e.g
 
 ### Virtual file system (`wikitext-vfs`)
 
-`WtVirtualFileSystem` implements the `wikisource://` protocol and is backed by the `VfsBackend` interface (`wikitext-vfs/.../vfs/backend/VfsBackend.kt`), which talks to the wtbot FastAPI sidecar over HTTP — `HttpVfsBackend` is the real implementation, `FakeVfsBackend` is used for tests/offline. `VfsBackend` covers stat (single + bulk), list, read, write (with `baseRevid` conflict detection), live preview rendering, ProofreadPage page navigation, and reference-scan image URLs. The tool window (`MyToolWindowFactory`, in `wikitext-ui`) follows the DataGrip Database Explorer pattern: a custom tree in a side panel, opening real editor tabs via `FileEditorManager` on double-click, which applies the full PSI/lexer/annotator stack.
+`WtVirtualFileSystem` implements the `wikisource://` protocol and is backed by the `VfsBackend` interface (`wikitext-vfs/.../vfs/backend/VfsBackend.kt`), which talks to the wtbot FastAPI sidecar over HTTP — `HttpVfsBackend` is the real implementation, `FakeVfsBackend` is used for tests/offline.
+
+Which sidecar that is lives in `WtbotAppSettings` (application-scoped: wtbot itself mediates between wikis, so one sidecar serves every project, and the VFS is an app singleton). `WtVfsService` owns the live backend and *replaces* it — `HttpVfsBackend` is immutable — when the settings change, so callers must keep reading `WtVfsService.instance.backend` per operation rather than holding a reference. A base-URL change also runs `WtBackendSwitcher`: prompt about unsaved `wikisource://` documents while the old sidecar is still theirs to save to, drop every cached file's content/children, re-stat them against the new backend, close editors on paths it doesn't have, reload the ones it does, then fire `WtVfsService.BACKEND_SWITCHED` for the tool window. Cached `WtVirtualFile` instances are never evicted wholesale — the VFS contract requires one instance per path, and editors/tree nodes hold them — only paths absent from the new backend are evicted and marked invalid. A timeout-only change just swaps the client. `VfsBackend` covers stat (single + bulk), list, read, write (with `baseRevid` conflict detection), live preview rendering, ProofreadPage page navigation, and reference-scan image URLs. The tool window (`MyToolWindowFactory`, in `wikitext-ui`) follows the DataGrip Database Explorer pattern: a custom tree in a side panel, opening real editor tabs via `FileEditorManager` on double-click, which applies the full PSI/lexer/annotator stack.
 
 ### Split-editor preview (`wikitext-ui/.../preview/`)
 
@@ -113,12 +140,29 @@ Transaction handling is the driver's normal deferred style — an earlier eager 
 - `src-py/wtbot/main.py` — FastAPI app factory (`create_app`)
 - `src-py/wtbot/db.py` — SQLite engine + WAL/busy-timeout pragma discipline
 - `src-py/wtbot/model/` — SQLModel ORM models, the **single source of truth** for the schema (`Site`, `Namespace`, `Page`, `Transclusion`, `FetchRequest`, `EditJournal`, `Commit`, …)
-- `src-py/wtbot/api/` — FastAPI routers: `fetch` (cache-fill job queue), `vfs` (read/write/list/stat for the plugin's VFS), `commit` (push-back to the wiki), `preview` (server-rendered live preview), `page_nav`/`page_meta`/`page_image` (ProofreadPage navigation/metadata/reference images), `namespace`, `sites`, `edit_journal`, `viewer` (backs the SvelteKit debug app), `health`
+- `src-py/wtbot/api/` — FastAPI routers: `fetch` (cache-fill job queue + `/fetch/drain`), `vfs` (read/write/list/stat for the plugin's VFS), `commit` (push-back to the wiki), `preview` (server-rendered live preview: wikitext → HTML), `reference_image` (the scan being transcribed — ProofreadPage's `imageforpage`, served from `/reference-image`), `page_nav`/`page_meta` (ProofreadPage navigation/metadata), `namespace`, `sites` (registration + per-site credentials), `edit_journal`, `viewer` (backs the SvelteKit debug app), `health`
+
+A wiki is **registered before anything fetches from it** and addressed by its unique `label` thereafter; nothing creates a Site implicitly. Fetching is also decoupled from enqueueing — `POST /fetch` queues, `POST /fetch/drain` (or `wtbot drain`) does the throttled work:
+
+wtbot **authenticates by default**: a site with no credential is refused at fetch time (409) and at client construction. Not because the published rate-limit tiers demand it — a compliant unauthenticated client gets the same 200 req/min — but because this backs an editor (commits need an account) and Wikimedia's CDN refuses unauthenticated traffic unevenly per IP range without documenting it. `WTBOT_ALLOW_ANONYMOUS=1` lifts the requirement for reading a public wiki from a workstation, and logs every use.
+
+```bash
+uv run wtbot site add --label local --family mywikisource --code en \
+    --api-url https://wikisource-debian-13.lan/w/api.php \
+    --username Admin --password ... [--bot-password-suffix wtbot]
+# or attach the account afterwards:
+uv run wtbot site-credential add --label local --username Admin --password ...
+uv run wtbot fetch-page "Index:Some book.djvu" --label local   # queues
+uv run wtbot drain                                             # fetches
+uv run wtbot drain --status                                    # queue depth
+```
+
+`--label` and `--base-url` are TyperDI dependencies (`src-py/wtbot/cli/deps.py`), so they appear on every command that declares them rather than being dug out of `ctx.parent.params`; `WTBOT_SITE_LABEL` sets the default label for a shell session.
 - `src-py/wtbot/wiki/` — the injectable wiki-access seam: `WikiSettings` (config), `configure_pywikibot()` (programmatic config, no on-disk `user-config.py`), `WikiClient` protocol with `PywikibotClient` (real) and `FakeWikiClient` (in-memory, no pywikibot import) implementations, `dispatch.py` (classifies a fetched title as `FILE`/`PROOFREAD_INDEX`/`PROOFREAD_PAGE`/`WIKITEXT` from namespace role + content_model)
 - `src-py/wtbot/vfs/` — VFS-surface implementation backing the `/vfs` router
 - `src-py/wtbot/worker.py` — the fetch worker (`run_pending`) that drains the `FetchRequest` queue; today invoked inline by `POST /fetch` rather than as a background loop
 - `src-py/DESIGN.md` — backend operations & data-model design (read this before touching the fetch/VFS/commit contract)
-- `src-py/tests/` — pytest suite (`uv run pytest`); wiki calls are mocked either via `vcrpy` cassettes (`src-py/tests/cassettes/`) or `FakeWikiClient`
+- `src-py/tests/` — pytest suite (`uv run pytest`); wiki calls use `FakeWikiClient` by default, or a real wiki from the docker harness in the `@pytest.mark.slow` suites
 
 ### Tests
 

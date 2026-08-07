@@ -19,9 +19,11 @@ from wtbot.worker import run_pending
 
 """The page -> revision -> slot -> content chain the fetch worker writes.
 
-The property that matters: content is addressed by *our* hash of the bytes the
-API served, so identical text collapses to one row across revisions and across
-sites. That is what turns cross-wiki "is this the same content?" into a join.
+Content is addressed by *our* hash of the bytes the API served, so identical
+text collapses to one row. Within a site that is a reliable identity. Across
+sites it is only a storage convenience -- a proofread-page body embeds a
+site-specific ``pagequality user=``, so equivalent transcriptions routinely hash
+differently; correspondence is asserted via RemoteLink instead.
 """
 
 PROOFREAD = "proofread-page"
@@ -85,9 +87,14 @@ def test_same_text_under_a_different_model_is_a_separate_row(
 
 
 def test_content_dedupes_across_sites(session: Session) -> None:
-    """The join that makes cross-wiki correspondence checkable rather than
-    asserted: two pages on two different wikis holding the same text resolve to
-    one Content row."""
+    """Identical bytes resolve to one row regardless of which site they came
+    from.
+
+    Useful for storage and for the cases where text really does match, but note
+    it is *not* how cross-site correspondence is decided: a proofread-page body
+    embeds a site-specific `pagequality user=`, so equivalent transcriptions
+    routinely differ. Correspondence is asserted via RemoteLink.
+    """
     upstream = _site(session, family="wikisource")
     local = _site(session, family="mywikisource")
     up_page = _page(session, upstream, "Page:Work.djvu/1")

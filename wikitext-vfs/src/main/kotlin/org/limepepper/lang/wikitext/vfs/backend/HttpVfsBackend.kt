@@ -8,9 +8,6 @@ import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
 import java.util.UUID
-import com.intellij.openapi.project.Project
-import org.limepepper.lang.wikitext.vfs.settings.WtbotProjectSettings
-import org.limepepper.lang.wikitext.vfs.settings.WtbotSettingsListener
 
 /**
  * Calls the wtbot FastAPI VFS endpoints over HTTP.
@@ -19,37 +16,20 @@ import org.limepepper.lang.wikitext.vfs.settings.WtbotSettingsListener
  * JSON is parsed with a minimal hand-rolled extractor ([JsonReader]) rather
  * than a full library so the wikitext-vfs module stays dep-light.
  *
- * @param baseUrl  e.g. "http://127.0.100.1:18564" — no trailing slash
+ * Immutable once built. Pointing the plugin at a different sidecar means
+ * constructing a new instance and installing it — [WtVfsService] does that in
+ * response to a settings change, so that switching backends also invalidates
+ * the caches filled from the old one. Mutating `baseUrl` in place would swap
+ * the destination while leaving those caches silently intact.
+ *
+ * @param baseUrl  e.g. "http://127.0.0.1:18574" — no trailing slash
  * @param timeout  per-request timeout
  */
 class HttpVfsBackend(
-    private var baseUrl: String,
-    private var timeout: Duration = Duration.ofSeconds(10),
-    private var client: HttpClient = buildClient(Duration.ofSeconds(10)),
+    private val baseUrl: String,
+    private val timeout: Duration = Duration.ofSeconds(10),
+    private val client: HttpClient = buildClient(timeout),
 ) : VfsBackend {
-
-    constructor() : this(
-        baseUrl = "http://127.0.100.1:18564",
-        timeout = Duration.ofSeconds(10),
-        client = buildClient(Duration.ofSeconds(10))
-    )
-
-    constructor(project: Project) : this(
-        baseUrl = WtbotProjectSettings.getInstance(project).baseUrl,
-        timeout = Duration.ofSeconds(WtbotProjectSettings.getInstance(project).timeoutSeconds.toLong()),
-        client = buildClient(Duration.ofSeconds(WtbotProjectSettings.getInstance(project).timeoutSeconds.toLong()))
-    ) {
-        val settings = WtbotProjectSettings.getInstance(project)
-        project.messageBus.connect().subscribe(WtbotProjectSettings.TOPIC, WtbotSettingsListener { state ->
-            // update baseUrl and timeout on settings change
-            this.baseUrl = "http://${state.host}:${state.port}"
-            val newTimeout = Duration.ofSeconds(state.timeoutSeconds.toLong())
-            if (newTimeout != this.timeout) {
-                this.timeout = newTimeout
-                this.client = buildClient(newTimeout)
-            }
-        })
-    }
 
     companion object {
         private fun buildClient(timeout: Duration): HttpClient =
@@ -77,7 +57,7 @@ class HttpVfsBackend(
                 contentModel = stringOrNull("content_model"),
                 qualityLevel = longOrNull("quality_level")?.toInt(),
                 dirty = boolOrDefault("dirty", false),
-                hasPageImage = boolOrDefault("has_page_image", false),
+                hasReferenceImage = boolOrDefault("has_reference_image", false),
                 placeholder = boolOrDefault("placeholder", false),
             )
         }
@@ -101,7 +81,7 @@ class HttpVfsBackend(
                 contentModel = r.stringOrNull("content_model"),
                 qualityLevel = r.longOrNull("quality_level")?.toInt(),
                 dirty = r.boolOrDefault("dirty", false),
-                hasPageImage = r.boolOrDefault("has_page_image", false),
+                hasReferenceImage = r.boolOrDefault("has_reference_image", false),
                 placeholder = r.boolOrDefault("placeholder", false),
             )
         }
@@ -125,7 +105,7 @@ class HttpVfsBackend(
                         contentModel = child.stringOrNull("content_model"),
                         qualityLevel = child.longOrNull("quality_level")?.toInt(),
                         dirty = child.boolOrDefault("dirty", false),
-                        hasPageImage = child.boolOrDefault("has_page_image", false),
+                        hasReferenceImage = child.boolOrDefault("has_reference_image", false),
                         placeholder = child.boolOrDefault("placeholder", false),
                     )
                 },
@@ -212,13 +192,13 @@ class HttpVfsBackend(
         }
     }
 
-    override fun fetchPageImage(path: String?, title: String?, width: Int?): ByteArray {
+    override fun fetchReferenceImage(path: String?, title: String?, width: Int?): ByteArray {
         val params = listOfNotNull(
             path?.let { "path" to it },
             title?.let { "title" to it },
             width?.let { "width" to it.toString() },
         )
-        return getBytes("/preview/page-image", *params.toTypedArray())
+        return getBytes("/reference-image", *params.toTypedArray())
     }
 
     override fun listAnnotations(path: String): List<PageAnnotation> {

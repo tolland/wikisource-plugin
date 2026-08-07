@@ -19,7 +19,9 @@ def app_client(engine):
 
 
 def _create_site(client: TestClient) -> dict:
-    r = client.post("/sites/", json={"family": "mywikisource", "code": "en"})
+    r = client.post(
+        "/sites/", json={"label": "local", "family": "mywikisource", "code": "en"}
+    )
     assert r.status_code == 201
     return r.json()
 
@@ -120,7 +122,9 @@ def test_db_client_factory_uses_site_credential(engine):
     import unittest.mock as mock
 
     factory = _make_db_client_factory(engine)
-    with mock.patch("wtbot.main.get_wiki_client", side_effect=fake_get_wiki_client):
+    with mock.patch(
+        "wtbot.wiki.client_registry.get_wiki_client", side_effect=fake_get_wiki_client
+    ):
         factory(site_copy)
 
     assert len(captured) == 1
@@ -130,11 +134,44 @@ def test_db_client_factory_uses_site_credential(engine):
     assert s.bot_name == "wtbot"
 
 
-def test_db_client_factory_anonymous_when_no_credential(engine):
-    """Sites with no SiteCredential row get an anonymous WikiSettings."""
+def test_a_site_with_no_credential_is_refused_rather_than_used_anonymously(engine):
+    """The check that cannot be gone around.
+
+    The fetch endpoints refuse an uncredentialed site when work is queued,
+    which is where the error is useful. This is the backstop for everything
+    else -- a request queued before the credential was removed, or work
+    arriving by some other route -- because unauthenticated traffic is refused
+    unpredictably by Wikimedia's CDN and cannot commit at all.
+    """
+    from wtbot.main import _make_db_client_factory
+    from wtbot.site_store import AnonymousAccessRefused
+
+    site_pk: int
+    with Session(engine) as s:
+        site = Site(family="wikisource", code="en", label="uncredentialed")
+        s.add(site)
+        s.commit()
+        site_pk = site.pk
+
+    with Session(engine) as s:
+        site_copy = s.get(Site, site_pk)
+
+    factory = _make_db_client_factory(engine)
+    with pytest.raises(AnonymousAccessRefused) as refused:
+        factory(site_copy)
+
+    assert "uncredentialed" in str(refused.value)
+    assert "site-credential add" in str(refused.value)
+
+
+def test_anonymous_access_is_possible_when_explicitly_allowed(engine, monkeypatch):
+    """The escape hatch, for the case it exists for: reading a public wiki
+    from a workstation. Off by default, and never silent -- site_store logs
+    every use."""
     from wtbot.main import _make_db_client_factory
     from wtbot.settings import WikiSettings
 
+    monkeypatch.setenv("WTBOT_ALLOW_ANONYMOUS", "1")
     captured: list[WikiSettings] = []
 
     def fake_get_wiki_client(settings: WikiSettings):
@@ -143,7 +180,7 @@ def test_db_client_factory_anonymous_when_no_credential(engine):
 
     site_pk: int
     with Session(engine) as s:
-        site = Site(family="wikisource", code="en")
+        site = Site(family="wikisource", code="en", label="public")
         s.add(site)
         s.commit()
         site_pk = site.pk
@@ -154,7 +191,9 @@ def test_db_client_factory_anonymous_when_no_credential(engine):
     import unittest.mock as mock
 
     factory = _make_db_client_factory(engine)
-    with mock.patch("wtbot.main.get_wiki_client", side_effect=fake_get_wiki_client):
+    with mock.patch(
+        "wtbot.wiki.client_registry.get_wiki_client", side_effect=fake_get_wiki_client
+    ):
         factory(site_copy)
 
     assert captured[0].username is None

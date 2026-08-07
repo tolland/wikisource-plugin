@@ -1,894 +1,338 @@
-# Upstream sync — promoting local proofreading to en.wikisource.org
-
-**Status: design / TODO. Nothing here is built yet.**
-
-Taking work done on the local staging wiki (`https://wikisource-debian-13.lan`)
-and pushing it back to `https://en.wikisource.org`, page by page or a whole work
-at a time. Motivating case, and the acceptance test for the whole feature:
-
-| | |
-|---|---|
-| local | `…lan/wiki/Page:The_principles_of_mechanics_presented_in_a_new_form_(Hertz,_1894).pdf/101` |
-| upstream | `…en.wikisource.org/wiki/Page:The_principles_of_mechanics_presented_in_a_new_form_(Hertz,_1894).pdf/101` |
-
-The Hertz work is **already genuinely diverged** — others have made small edits
-upstream, equations were added locally — so it is a real fixture, not a
-synthetic one. Anything that works on Hertz works.
-
-Related: `src-py/DESIGN.md` §9 sketches the `RemoteLink` object from the *pull*
-direction. This is the push direction and the operational detail.
-
----
-
-## 1. What exists, and what is missing
-
-Already built, and reusable as-is: `EditJournal` (local save log) → `Commit`
-(outbound attempt log) → `commit_worker` (per-page push with `base_revid`
-conflict detection, refetch enqueue) → `api/commit.py` → the viewer's staged-edit
-review UI. `Site` is multi-instance by `(family, code)`, `SiteCredential` is
-per-site, `Page` is keyed `(site_pk, title)`, and `Page.sha1` is populated on
-every fetch. Two wikis' worth of pages already coexist in the schema.
-
-Missing:
-
-1. **A parallel model of the target side** to compare against (§3).
-2. **A merge base**, without which divergence can only be overwritten (§4).
-3. **A producer of edits that isn't a human typing in IntelliJ** (§5).
-
-Everything downstream of "an `EditJournal` row exists for the upstream `Page`
-row" is already built. **Promotion should be a producer of journal rows on the
-target site's pages, not a second commit engine.**
-
-## 2. Why the push direction is riskier
-
-Pull is private — worst case we clobber our own staging wiki. Push is public and
-attributable. The edits themselves are presumably fine; the risks are **volume,
-automation optics, and silent systematic error** — a normalisation bug
-replicated across 400 pages is embarrassing in a way one bad edit is not, and it
-draws attention to automation an observer cannot inspect.
-
-It is all revertible, so the goal is not "never err" but **"every mistake
-bounded, visible, and undoable in one action"**. Concretely that means: explicit
-human approval per batch, bounded batch size stated before approval, every edit
-traceable to a batch, and one-click rollback.
-
----
-
-## 3. Materializing the parallel tree
-
-### 3.1 The fan-out already does this
-
-`_fan_out_index` (`src-py/wtbot/page_processors.py`) drives off
-`list=proofreadpagesinindex`, which returns every slot in an index with
-`pageid=None` for the ones that do not exist. Existing slots get a child
-`FetchRequest`; missing ones get `_ensure_placeholder_page` — a `Page` row with
-`revid=None`, which the VFS already reads as `placeholder=True`. **Running an
-`index` fetch against the target site produces the parallel tree with no new
-machinery.**
-
-### 3.2 Known-absent vs unknown
-
-The distinction that matters, currently implicit:
-
-| | meaning | authorizes |
-|---|---|---|
-| `fetch_status=done`, `revid IS NULL` | **known absent** — the index enumerated the slot, the wiki said no | a create |
-| `fetch_status=unfetched` / no row | **unknown** — we never asked | nothing |
-
-`_ensure_placeholder_page` sets `fetch_status=done` deliberately ("*We know the
-remote state: absent. The fetch is complete.*"). But it is an unnamed two-column
-convention, and promotion is the first consumer for which conflating the two is
-*dangerous* rather than untidy: absent authorizes a create, and a create against
-a page that exists is an overwrite.
-
-- [ ] Name it: an `Existence` accessor (`present` / `absent` / `unknown`) derived
-      from those two columns. Derive, don't add a column — but make the fan-out
-      the only writer of `revid=None` rows by construction, and test that.
-- [ ] **Never fabricate placeholders on the target side to fill in the tree.** A
-      local placeholder is authoritative (we made the slot). A target-side
-      placeholder is a *cached negative*, and negative caching is exactly what is
-      unsafe here.
-- [ ] Add `remote_checked_at`. A three-week-old "doesn't exist upstream" is not a
-      fact.
-
-### 3.3 Probe, don't mirror
-
-Today the only way to learn anything about a remote page is a full fetch —
-content, scan enrichment, OCR body, blob. Far too heavy for a mostly-push target
-we don't want to mirror.
-
-- [ ] `WikiClient.probe_pages(titles) -> dict[str, PageProbe]` over
-      `prop=revisions&rvprop=ids|sha1|timestamp|user`, 50 titles per request;
-      missing titles come back in `query.missing`. One `proofreadpagesinindex`
-      call plus `⌈N/50⌉` probes covers a 400-page work in ~9 calls.
-- [ ] **The probe answers "did the revision change?", not "did the content
-      change?"** — see §4.2. `size` is never usable and `sha1` only sometimes:
-      - **`rev_len` is not a byte length at all**, so it can never be compared
-        to the length of text we hold. ProofreadPage overrides `getSize()` to
-        sum its component parts — header + body + footer for a `Page:`, field
-        values for an `Index:` — excluding the `<noinclude>`/`<pagequality>`
-        wrappers and the index template call. An empty `Page:` whose served
-        text is 86 bytes of wrapper reports `content_size` 0. This is by
-        construction, not staleness, and it holds on a wiki synced minutes ago.
-      - **`rev_sha1` *is* over the served bytes** — `getSha1()` is not
-        overridden, so it hashes the serialized form — but only revisions
-        written under the current serialization are self-consistent.
-      So the probe cheaply detects *presence* and *new revids*; content
-      equality comes from a hash we compute. Use it to narrow, never to
-      conclude "unchanged".
-- [ ] Full-fetch where the probe shows a revid we have not seen.
-- [ ] **`sha1` encoding gotcha — verified, and it bites.** MediaWiki reports the
-      same digest in two encodings depending on the surface: the action API
-      (hence pywikibot's `Revision.sha1`, hence `Page.sha1` here) gives 40-char
-      **hex**, while the XML export and the `rev_sha1` column give 31-char
-      **base-36**. Intersecting one against the other matches nothing, so
-      identical pages read as "unrelated histories". `wtbot.wiki.sha1`
-      normalises; everything comparing hashes must go through it.
-- [ ] Second `sha1` gotcha: our promoted body is transformed (§5.2), so hash
-      equality is a sufficient but not necessary same-content test. Use the
-      *transformed* body's hash for no-op detection.
-
-### 3.4 The pairing matrix
-
-Pairing is an **outer join in both directions** on `(index link, page_offset)` —
-not on title, and not an inner join, which would throw away exactly the
-present-on-one-side-unknown-on-the-other rows that matter.
-
-| local | target | action |
-|---|---|---|
-| present | present | compare (§4, §5.1) |
-| present | **absent** | create — with `createonly` (§5.6) |
-| present | **unknown** | probe first, decide nothing |
-| placeholder | present | candidate for *pull*, not push |
-| placeholder | absent | skip |
-| — | present | target has pages we don't model; surface only |
-
-Against the three tree-shape cases:
-
-- **Index and pages created entirely locally.** Correspondence is free — every
-  slot is a create. `Index:Foo.pdf` and `Page:Foo.pdf/101` *can* be created on a
-  target with no `File:Foo.pdf`; ProofreadPage permits it. What is lost:
-  redlinked file/page-image column, no reference image so nobody upstream can
-  proofread or validate it, and `imageforpage` / `defaultcontentforpage` return
-  nothing (our enrichment already degrades to `None` gracefully). The one real
-  cost is that the §3.6 scan-sha1 check has nothing to compare, making the
-  page-offset failure mode *undetectable*. Prominent batch-level warning with an
-  override, not a block.
-- **Page exists on the target, not yet modelled locally.** The `unknown` column.
-  Probe it, fetch if it differs. The anticipated "we fail on comparing
-  `base_revid`" is a symptom of acting on `unknown` — with the tri-state
-  honoured, the planner simply refuses to classify the slot.
-- **Created or edited on the target in parallel.** Not solvable by bookkeeping.
-  Solved at push time (§5.6), not at model time.
-
-- [ ] Build pairing as a persisted, inspectable artifact (`PromotionItem`, §7.1),
-      not a transient computation. "Show me the join" is the first thing anyone
-      wants when a sync looks wrong.
-
-### 3.5 Target page state — the cases that must fail, not merge
-
-Pairing (§3.4) asks "is there a page there?". That is not enough: a title can be
-occupied by something that is not a transcription, and pushing onto it is worse
-than pushing onto a redlink.
-
-- [ ] Classify the target title before any promotion: `normal`, `redirect`,
-      `deleted`, `moved`, `protected`, `missing`. Anything but `normal` (or
-      `missing` for a create) **fails the item and surfaces it for manual
-      handling**. None of these are automatable and guessing is how you get an
-      embarrassing edit.
-- [ ] **`deleted` is not the same as `missing`, and `prop=revisions` cannot tell
-      them apart** — both come back as missing. Distinguishing them needs
-      `list=logevents&letype=delete&letitle=…`. This matters more than it looks:
-      creating a page that was *deliberately* deleted (copyright problem,
-      out-of-scope work, a community decision) is a far worse mistake than
-      creating a genuinely new one, and it is the kind that draws exactly the
-      attention §2 is about. Treat "deleted at some point" as a hard block
-      pending human review.
-- [ ] A `redirect` at the target may be a legitimate merge target or a trap.
-      Never follow it automatically — `redirects=1` on the query would silently
-      retarget the push.
-- [ ] Check `prop=info&inprop=protection` and record it; a protected target
-      fails the item rather than erroring at push time.
-
-### 3.6 The scan-offset check
-
-- [ ] Compare `FileBlob.file_sha1` of the backing `File:` on both sides. A
-      different upload (re-derived DjVu, cropped cover, different page count)
-      means local page 101 is **not** target page 101 and every promotion in the
-      work is silently off by an offset. **Hard block** — this is the worst
-      failure mode available here. Where files differ but page counts match,
-      allow an explicit constant offset confirmed against a side-by-side scan
-      spot-check.
-- [ ] Where the target has no `File:` at all the check cannot run; flag the
-      pairing `correspondence_unverified` and carry it to the review UI.
-
----
-
-## 4. The merge base problem
-
-**This is the crux.** Without a common ancestor there is no merge — only
-overwrite. And the local copy was generally *not* created by a recorded clone,
-so there is no base on file. Worse, the intuition that "only we have commits on
-top of it, so we can just push" fails too: without a base we cannot even tell
-which differences are *ours* versus which are pre-existing differences between
-the two wikis.
-
-The resolution is a **ladder** — try each in order, and record which rung was
-used, because it determines how much the result can be trusted.
-
-### 4.1 Rung 1 — recorded base (clone)
-
-The `wikictl clone` flow from DESIGN.md §9 records `base_revid` / `base_sha1` /
-`base_body` at copy time. Correct by construction. Not available for Hertz, and
-not available for anything staged before the feature exists.
-
-### 4.2 Rung 2 — discovered base (history intersection)
-
-Both sides are real MediaWikis with full revision history and a per-revision
-`sha1`. So compute the merge base the way git does — **intersect the two
-histories and take the latest common revision**:
-
-```
-prop=revisions&rvprop=ids|sha1|timestamp|user&rvlimit=max   # both sides
-base = argmax_timestamp { r in upstream_history : norm(r.sha1) in local_norm_sha1s }
-```
-
-- [ ] This subsumes and replaces the weaker "match the local page's earliest
-      body" idea — a set intersection handles the `Special:Import` case (whole
-      upstream history imported locally, so many revisions match) and the
-      copy-paste case (exactly one match) with the same code.
-Two findings from building the harness change how this must be implemented.
-Both are verified, the second against live en.wikisource.
-
-The complete investigation and synchronization recommendation are recorded in
-[`proofread-page-sha1-discordance.md`](proofread-page-sha1-discordance.md).
-
-- [ ] **Get the sha1 encoding right.** The action API (hence pywikibot, hence
-      `Page.sha1`) returns 40-char hex; the XML export and `rev_sha1` return
-      31-char base-36. Intersecting one against the other matches nothing.
-      Normalise via `wtbot.wiki.sha1`.
-- [ ] **Never intersect on the server's `rev_sha1` — intersect on a hash you
-      compute from the returned content.** For `proofread-page` revisions
-      predating ProofreadPage's 2018 reserialization pass, the stored
-      `rev_sha1` is *not* the hash of the content the API serves for that
-      revision. `Page:Canadian patent 29537.djvu/2` serves three consecutive
-      revisions with **byte-identical text under three different declared
-      hashes**. Measured on en.wikisource: proofread-page 3 of 4 mismatch,
-      proofread-index 11 of 11 match, wikitext 2 of 2 match — so it is specific
-      to `proofread-page`, which is exactly the content model this project
-      cares about most. `content_sha1_base36` is the token to use; pinned by
-      `test_proofread_serialization.py`.
-
-**Is a different export/API surface the answer? No — measured, all five agree.**
-For r1193309 (declared `ti1n0sdo…`), every read surface returns byte-identical
-content hashing to `ber7rim…`:
-
-| surface | bytes | sha1(content) matches stored |
-|---|---|---|
-| `action=query&prop=revisions&rvslots=main` | 1608 | no |
-| same, legacy (no `rvslots`) | 1608 | no |
-| `index.php?action=raw&oldid=` | 1608 | no |
-| REST v1 `/w/rest.php/v1/revision/{id}` | 1608 | no |
-| `action=parse&prop=wikitext` | 1608 | no |
-| `Special:Export` (the checked-in dumps) | 1608 | no |
-
-There is no surface that recovers the bytes the stored hash was taken over, so
-this cannot be worked around by changing how fixtures are extracted.
-
-**MediaWiki's own diff engine agrees with the content, not the hashes.**
-`action=compare` reports an **empty diff** for r1193309→r2650547 and
-r2650547→r7673287 — it considers those revisions identical, exactly as the
-content hashes do, while their stored `rev_sha1` values differ. The stored
-metadata is the stale party. `rev_len` disagrees on all four (1617/1624/1639/1513
-versus 1601/1608/1608/1608 served) **including the one whose `sha1` matches** —
-but that one is not staleness: `getSize()` is overridden to sum component parts
-while `getSha1()` is not overridden and hashes the serialized form, so the two
-measure different things by construction (§3.3). Treat `rev_len` as never
-comparable to a length.
-
-- [ ] **This is an artefact of long-lived upstream history, not of the model in
-      general.** A freshly installed wiki computes `rev_sha1` from the text it
-      is given, so our local staging wiki's hashes *are* content-consistent —
-      `test_import_recomputes_sha1_from_content` asserts exactly that. The
-      hazard is confined to reading old revisions from en.wikisource, which is
-      precisely what rung 2 does.
-- [ ] Mechanism not established. The stored length and hash appear to describe a
-      different serialization of the content than any API serves, and the two
-      fields are independently stale. Worth a note to the ProofreadPage
-      maintainers, but the workaround does not depend on the explanation.
-
-This also corrects an earlier note here claiming ProofreadPage rewrites `user=`
-on every save. It does not — the attribute tracks whoever last *changed the
-level* and survives saves that don't (`Wikisource-bot` re-saves `Page:…/1` with
-the header still crediting `Hesperian`). The real obstacle to rung 2 was never
-the header; it is the stored-hash discrepancy above.
-
-- [ ] A *content*-normalised hash (neutralise `pagequality` `user=`/`level=`,
-      line endings, trailing whitespace) remains worth having for copies that
-      did perturb the text, and it is the same normalisation the comparison
-      protocol in §5.2 needs.
-- [ ] **Consequence for cost:** intersecting on content hashes means the history
-      walk must fetch revision *content*, not just metadata. `rvprop=content`
-      with `rvslots=main` still returns up to 50 revisions per request, so it is
-      one request per page rather than per revision — but it is no longer the
-      cheap metadata-only walk §3.3 describes. Restrict it to pages the probe
-      already says differ.
-- [ ] Cost is one history call per page per side. Restrict the walk to pages the
-      cheap probe (§3.3) already says differ — for a mostly-clean work that is a
-      handful of pages, not 400.
-- [ ] Fetch the base *body* once found (`rvstartid=<base>&rvlimit=1&rvprop=content`)
-      and store it on the link. Historical revisions can later be deleted; a
-      recorded `base_body` cannot.
-
-### 4.3 Rung 3 — patch-based promotion (always available)
-
-If rungs 1 and 2 both fail there is no cross-wiki ancestry. **That does not mean
-no merge is possible** — because the base needed to know *what we changed* is not
-a cross-wiki base at all. It is our own pre-edit snapshot, and that is always
-obtainable:
-
-- **Fast path:** `EditJournal.base_revid` already records, per save, the local
-  revid the edit started from. For pages edited through the plugin we have
-  literally already stored the answer.
-- **General path:** the local wiki's own revision history — the revision
-  immediately before our first edit.
-
-Given `local_base` and `local_head`, our contribution is `diff(local_base,
-local_head)`. Apply that to `target_head` as a three-way merge with
-`base = local_base`. Hunks that apply cleanly land; hunks that don't are
-conflicts. This is `git rebase` / `format-patch | am -3`, and it works **even
-though `local_base` never existed upstream** — we are transplanting a delta, not
-asserting shared ancestry.
-
-**This should probably be the default promotion model, not a fallback**, which is
-a real shift from "push the transformed local body":
-
-- The local wiki is *staging*. What we want to promote is the changes we made,
-  not the state of our wiki. Whole-body promotion silently carries over every
-  incidental difference between the two wikis — template conventions, header
-  differences, other people's local edits — as though it were our work.
-- Others' upstream edits survive by construction: we apply our delta onto their
-  head rather than replacing it with our body.
-- It matches Hertz exactly — small upstream edits, locally added equations.
-  Patch-apply keeps both and conflicts only on genuinely overlapping hunks.
-
-- [ ] Record which rung produced the base on the item, and surface it in the
-      review UI. A rung-3 merge is a weaker claim than a rung-1 merge and the
-      reviewer should know which they are looking at.
-- [ ] The journal body stays a **full body** — the merge *product* — so
-      `commit_worker` needs no change. But it must be recomputed if the target
-      head moves between preflight and push; the `basetimestamp` precondition
-      (§5.6) is what catches that.
-
-### 4.4 Rung 4 — no base at all
-
-Page created from scratch locally, or history unavailable. Base is the empty
-string: every promotion is a create, or an add/add conflict if the target turns
-out to exist. Honest, and correct — two independent transcriptions of one scan
-page genuinely need a human.
-
-- [ ] Represent "no base" explicitly. Do not let it be indistinguishable from
-      "never synced" or from a fabricated base.
-
-### 4.5 The revision store (schema rework)
-
-**`Page` holds a single current snapshot** — `text`, `revid`, `sha1`. Every rung
-above needs history, and there is nowhere to put it. This is the schema change
-the rest of §4 implies.
-
-Upstream is going the same way: **T389026 "Rethink rev_sha1 field"** is resolved
-as *"Proposal 0: Drop rev_sha1 and compute it on the fly from content_sha1"* —
-Wikimedia themselves treat the stored revision hash as redundant and are moving
-to deriving it from content. Our measurements say the same thing from the
-outside. So make it a standing rule:
-
-> **Identity and comparison use hashes we compute over content we have seen.
-> `rev_sha1`, `rev_len` and anything else the wiki reports about its own
-> revisions is informational only, never a key and never a comparison token.**
-
-#### Content-addressed, sparse — not a MediaWiki clone
-
-Mirroring MediaWiki's actual schema (`revision`/`slots`/`content`/`text`, actor
-and comment normalisation) would import a lot of MCR machinery for no benefit,
-and §3.3 already says we don't want a mirror of upstream. Two tables carry it:
-
-```python
-class RevisionContent(SQLModel, table=True):
-    """Body store keyed by OUR hash of the bytes we actually received."""
-    content_sha1: str = Field(primary_key=True)   # base-36, computed locally
-    text: str
-    byte_length: int
-
-
-class Revision(SQLModel, table=True):
-    """One revision of one page on one site, as observed.
-
-    Deliberately SPARSE: rows exist for revisions we fetched, and their absence
-    never means the revision does not exist.
-    """
-    __table_args__ = (UniqueConstraint("page_pk", "revid", name="uq_rev"),)
-    pk: int | None = Field(default=None, primary_key=True)
-    page_pk: int = Field(foreign_key="page.pk", index=True)
-
-    revid: int                       # site-local, not comparable across wikis
-    parent_revid: int | None
-    content_sha1: str = Field(foreign_key="revisioncontent.content_sha1", index=True)
-
-    remote_sha1: str | None = None   # what the wiki claimed -- informational
-    remote_byte_length: int | None = None  # ditto; both are unreliable (§4.2)
-
-    timestamp: datetime
-    contributor: str | None = None
-    comment: str | None = None
-    observed_at: datetime = Field(default_factory=utcnow)
+# Upstream sync — TODO
+
+The immediate work list. Reasoning, rejected approaches and policy live in
+`upstream-sync-discussion.md`; measured ProofreadPage hash behaviour lives in
+`proofread-page-sha1-discordance.md`.
+
+## Built
+
+- **Revision store** — `page → revision → slot → content`, mirroring MediaWiki's
+  schema. `slots` kept because Commons `File:` pages really are multi-slot
+  (`main` + `mediainfo`), including the Hertz scan. Content is addressed by our
+  own hash of the served bytes; `Content.remote_sha1` carries the wiki's for
+  corroboration only.
+- **Fetch worker populates it** on every fetch, recording the head revision.
+  `Page.text`/`revid`/… remain the head denormalisation.
+- **`wtbot.wiki.sha1`** — the two MediaWiki hash encodings (API hex vs
+  dump/database base-36) and a locally computed content hash.
+- **Two-wiki test harness** — `docker compose --profile pair`, upstream + local
+  on 18581/18582, real dumps imported with history, pywikibot bound to each,
+  and direct SQL access to the wikis' own databases.
+- **Content-model-aware comparison** (`wtbot.content_model`) — the replacement
+  for cross-site hashing. A `ProofreadPageDocument` splits a body into header /
+  body / footer / level / user and compares them by what they mean:
+  - header, body and footer are comparable (a running header is a real
+    difference, so the header is compared with the pagequality tag removed
+    rather than ignored wholesale);
+  - `level` is comparable **and directional** — equal words do not make it safe
+    to overwrite, so `quality_delta` and `is_downgrade` are part of the result;
+  - `user` must be present but is never compared — it names an account on one
+    wiki.
+
+  The verdict is a `Significance`, not a boolean: `identical`,
+  `metadata_only` (same transcription, different attribution — the cross-site
+  norm), `metadata_significant` (same words, different proofreading state) or
+  `content`. Tested against the real Canadian patent revisions, including a
+  lossless parse/serialize round-trip over every one of them.
+
+- **Migration discipline** — never `batch_alter_table` on a table something
+  references; `test_migrations.py` runs migrations over populated tables.
+
+- **`RemoteLink`** — the assertion that **two revisions, one per site, are the
+  same content**. Asserted and recorded, never computed from hashes (discussion
+  §3: a `pagequality` header makes cross-site hashes disagree precisely as
+  proofreading progresses).
+
+  ```python
+  class RemoteLink(SQLModel, table=True):
+      __table_args__ = (
+          UniqueConstraint("local_revision_pk", "remote_revision_pk", name="uq_link"),
+      )
+      pk: int | None = Field(default=None, primary_key=True)
+
+      local_revision_pk: int = Field(foreign_key="revision.pk", index=True)
+      remote_revision_pk: int = Field(foreign_key="revision.pk", index=True)
+
+      origin: LinkOrigin          # copy | title_match | manual | reconciled
+  ```
+
+  Four fields from the original sketch were dropped rather than carried
+  unread: `confidence` (a proposal's score belongs to the proposal — a link we
+  are not confident in should not be stored at all), `note`, `asserted_by`, and
+  `asserted_at`. Ordering — which is all "the most recent link is the anchor"
+  actually needs — comes off the monotonic `pk`, and a wall clock would be a
+  second, less reliable answer to the same question. Add any of them back when
+  something reads them.
+
+  **The pair is unordered.** `local`/`remote` record the direction an assertion
+  was made from — which side `origin=copy` copied from, which site the operator
+  was looking at — but neither is privileged, so "A corresponds to B" and "B
+  corresponds to A" must be one row, not two. Two rows would give a page pair
+  two ladders and two anchors that could disagree, and every layer above would
+  inherit the error. Enforced in the database, not only in the store:
+  `uq_remotelink_pair` is unique over `min(local, remote), max(local, remote)`,
+  which SQLite can index because it indexes expressions. Every read matches a
+  pair in either orientation.
+
+  Enforced in `wtbot.remote_link_store`, the only writer: append-only (no
+  update, no retract), cross-site only (within one wiki, revision ancestry
+  already says everything a link would), and idempotent on the unordered pair
+  with the first `origin` winning. Page-level correspondence is *derived* by
+  `corresponding_page` walking `link → revision → page`, in either direction;
+  a target redlink has no link, which is correct — there is nothing to compare,
+  and "local present, target absent" is a pairing question, not a linking one.
+  `origin=reconciled` records the forward re-anchoring of discussion §2.
+
+## Now
+
+Numbered as originally listed; items 1 (`RemoteLink`) and 3
+(content-model-aware comparison) are done and moved to *Built* above.
+
+### 2. Incremental fetch
+
+Refresh a curated subset without refetching everything. Built on
+`list=recentchanges` rather than the `probe_pages` sketch below, and it is
+*planning* only: the titles it produces go to the ordinary fetch queue, so
+there is one fetch mechanism and a shorter list — not a second path.
+
+`POST /fetch/refresh { family, code, title_prefix?, since?, dry_run? }` →
+`wtbot.incremental.plan_refresh`, or `wtbot fetch-refresh` from the CLI. The
+request and response are typed (`RefreshCreate`/`RefreshResult`), so Swagger
+renders described fields and an example rather than an opaque JSON blob, and
+`basis` reaches the caller as an enum rather than a string in a dict.
+
+- [x] **The recentchanges table is pruned** (`$wgRCMaxAge`, 90 days by
+      default). Past that horizon "nothing changed" and "the wiki no longer
+      remembers" are the same empty response — so the oldest retained entry is
+      asked for (one request), and a watermark older than it downgrades the
+      plan to a full pass. The result carries its `basis`
+      (`incremental` | `full`) and the reason: a caller that cannot tell the
+      two apart cannot tell "two pages moved" from "we gave up and listed
+      everything".
+- [x] **The watermark is the newest change seen, not `now`.** An edit saved
+      during the query can carry a timestamp earlier than the moment we
+      finished reading. `rcstart` is inclusive, so passing the observed maximum
+      back re-reads that instant — duplicates, which a fetch absorbs, rather
+      than a gap, which it does not. Stored per site
+      (`Site.changes_seen_through`), advanced only on an incremental plan.
+- [x] **Namespace ids are per-site**, so the `rcnamespace` filter is resolved
+      from this site's `Namespace` rows by role. An unresolved table sends no
+      filter at all: an empty `rcnamespace` matches nothing, which looks
+      exactly like a wiki where nothing ever changes.
+- [x] **A changed revid is not a changed page.** Null and touch edits bump the
+      revid with identical content (four such in the Canadian patent fixture).
+      This produces candidates, never verdicts; "diverged" comes from the
+      content comparison after fetching, or every upstream maintenance run
+      shows up as a false conflict.
+- [x] There is no `rcprefix` — `rctitle` filters to a *single* page — so
+      narrowing to one work is done here, over metadata already paid for. With
+      a prefix, titles we do not yet hold are taken too: that is how a
+      partially transcribed index grows.
+
+Not covered, and deliberately not half-covered:
+
+- [ ] **Moves and deletions.** They are `log` entries needing
+      `list=logevents`, and discussion §5 wants them *classified*
+      (`redirect`/`deleted`/`moved`), not merely noticed. `rctype` stays
+      `edit|new` so the gap is visible rather than apparently handled.
+- [ ] `probe_pages(titles)` over `prop=revisions`, 50 titles per request, as
+      the complement: bounded by the size of the work rather than by wiki
+      activity, and with no retention horizon. Worth having for the "watermark
+      is ancient" path, which currently refetches everything known.
+- [ ] This is for *planning*, not safety. The `baserevid` precondition covers
+      the race between fetch and push; they are complementary.
+
+### 4. `wtctl sync --from Index:X [--to Index:Y]`
+
+The happy path, end to end. `--to` is only needed when the titles or namespaces
+differ.
+
+- [ ] Enumerate both indexes via `list=proofreadpagesinindex` (authoritative
+      pagination, missing slots reported as `pageid` 0).
+- [ ] Run the §6 scan check first — differing backing files means the page
+      offsets do not correspond and nothing below is trustworthy.
+- [ ] Produce a **ladder** per page: the ordered `RemoteLink` rows, and the
+      current anchor. Where a pair cannot be matched, say so and why, rather
+      than guessing.
+- [ ] Output is a report, not an edit. No writes to either wiki.
+
+### 5. RemoteLink proposal endpoint
+
+Built: `wtbot.matching` + `POST /links/propose`, `POST /links`, `GET /links`,
+and `wtbot link propose|add|show`.
+
+- [x] `POST /links/propose { local, remote, index_title, remote_index_title? }`
+      → a proposal per page pair with an outcome, plus counts. Outcomes are
+      `same`, `quality_differs`, `diverged`, `no_counterpart`, `unfetched`,
+      `already_linked` — distinct because the ways a pairing fails need
+      different actions, and a boolean-plus-message loses which.
+- [x] `POST /links` to confirm one pair by title. `DELETE` to retract is still
+      absent, and stays absent while links are append-only.
+- [x] Title normalisation compares namespace *roles* resolved per site, never
+      numeric ids. Pages pair on **page number within the index** rather than
+      title text: `--to` exists because the titles can differ, and the scan
+      offset is what has to line up (§6). Title equality is only a fallback for
+      pages with no number.
+- [x] Never auto-confirm. `propose` writes nothing without `confirm`, and
+      `confirm_proposals` refuses a non-proposable pair rather than skipping it
+      — silently skipping is how "confirm everything that looked fine" creeps
+      back in.
+
+**Only heads are compared, and that is the answer to "which revision do we
+link".** Finding the revision in their history matching ours has no single
+answer: null and touch edits leave runs of byte-identical revisions (four in
+the Canadian patent fixture; en.wikisource ran a whole `Pywikibot touch edit`
+campaign in 2018), so a content match lands anywhere in the run with nothing
+to choose between members. The question is also one §2 already declined —
+remote history is append-only, there is no merge base to discover, the anchor
+is recorded on pull and re-established by hand when it breaks — and our
+revision store is deliberately sparse, so a walk would be bounded by our
+sampling rather than by the wiki's history. Heads have exactly one revision
+per side.
+
+Were a historical base ever wanted, the rule would be **the newest revision of
+a content-equal run**: every member is equally true, so the newest is the
+tightest claim, and an older anchor makes a page look diverged when it is not.
+
+"Same content" is decided by the content-model comparison, not by bytes or
+sha1: a `pagequality user=` names an account on one wiki, so equivalent
+transcriptions routinely differ. `metadata_significant` (same words, different
+level) is proposable but reported separately, because level is directional.
+
+### 6. `Promotion` / `PromotionBatch` schema
+
+The push queue: mutable, reviewable, cancellable — deliberately not a status
+column on an audit log (discussion §12).
+
+- [ ] `PromotionBatch`: source site, target site, index, label, status
+      (`draft → preflight → approved → running → complete | partial | aborted |
+      rolled_back`), approval record.
+- [ ] `Promotion` (one per page): the pairing and preflight result — source
+      revision, target page, base anchor, computed body, check outcomes, and the
+      **pre-push target revid**, which is what rollback targets and must be
+      persisted.
+- [ ] Intent (`create` | `update`) recorded explicitly, not inferred from
+      `base_revid is None`. This is what lets the push set
+      `createonly`/`nocreate` correctly.
+
+### 7. Seeding a work that exists only upstream
+
+The motivating case is `Index:The varieties of religious experience, a study in
+human nature.djvu` — present on en.wikisource, absent locally. Two ways to get
+it, and they are not alternatives:
+
+1. **`pwb transwikiimport`**, then `wtbot fetch-page` the result:
+
+   ```
+   pwb transwikiimport -interwikisource:s \
+       -prefixindex:"Index:The varieties of religious experience, a study in human nature.djvu"
+   uv run wtbot fetch-page --family mywikisource --code en \
+       --api-url https://wikisource-debian-13.lan/w/api.php \
+       "Index:The varieties of religious experience, a study in human nature.djvu"
+   ```
+
+   Works today, and it transfers *history*, which our own push path structurally
+   cannot: every push appends exactly one revision (discussion §2). Keep it as
+   the bulk bootstrap.
+
+2. **Downward promotion through `Promotion`/`PromotionBatch`** — item 6 with
+   source and target swapped. Same preflight chain, same queue, same audit
+   trail. This is what the data model has to support regardless: a set of
+   changes derived from another site is the same object whichever way it points,
+   and building it only for the outbound direction means building it twice.
+
+The gap between them is what to fix first. (1) copies pages *outside* the data
+model, so nothing records that the local revisions came from the upstream ones.
+The first sync run then has to re-derive correspondence by title match — the
+weaker claim, for a fact that was known at the moment of the import.
+
+- [ ] `wtctl adopt --from <site> --to <site> Index:X` — run after an import,
+      match by namespace role + page number, and write `origin=copy` links
+      against both sides' head revisions. Cheap, and it turns a title guess back
+      into a recorded fact.
+- [ ] **Not `EditJournal` + the commit worker.** The two-step (stage, then
+      apply) is right, but the journal is the *local per-save* transaction log;
+      putting cross-site intent in it repeats the overloading discussion §12
+      identifies in `Commit`. Stage in `Promotion`, which is the table that
+      exists for reviewable intent.
+- [ ] Assets are the reason this must not stay a pywikibot shell-out: a work
+      like Wittgenstein's *Tractatus* carries embedded SVG diagrams, and syncing
+      an `Index:` should be able to bring its `File:` dependencies with it.
+      That is discussion §7's local-only-`File:` block in reverse, and it needs
+      the dependency set to be a thing the model can enumerate.
+
+## Next, agreed but not yet scheduled
+
+- [ ] Rename `Commit` → `PushLog` (discussion §12).
+- [ ] Push path: `baserevid` + `createonly`/`nocreate` + error-code mapping +
+      post-push content verification (discussion §8). Worth doing independently
+      of sync — the silent-overwrite-on-create gap exists today.
+- [ ] Normalise the remaining `Page` head columns (`text`, `revid`,
+      `remote_timestamp`, `contributor`, `comment`) behind
+      `head_revision`/`head_content`, so the denormalisation has one writer.
+- [ ] Rollback, before mass promotion ships.
+
+## Testing
+
+**The base state belongs to compose, the deltas to the tests.** Both wikis seed
+themselves at startup from one shared anchor (`SEED_DUMPS`/`SEED_SCANS` in
+`../compose.yml` → `docker/mediawiki/start-wikisource.sh`), so the pair
+starts *converged* — same works, same history, same content — because the two
+services are configured identically, not because a builder remembered to run
+twice. That was a real bug: only upstream was ever seeded, so every "diverged"
+fixture was really "never converged", and the local wiki held a lone `Page:`
+with no `Index:` and no `File:` for the scan check to compare.
+
+```bash
+docker compose -f compose.seeded.yml --profile pair up -d --wait
+
+# ...and the API too, for anything that should speak HTTP rather than reach
+# into the ASGI app in-process:
+docker compose -f compose.seeded.yml -f compose.wtbot.yml \
+    --profile pair --profile api up -d --wait
 ```
 
-Content addressing is what makes correspondence *checkable rather than
-asserted*: two revisions on two different wikis that share a `content_sha1` are
-provably the same text, with no trust in either wiki's metadata and no
-normalisation guesswork. That is exactly the happy case — we copied the page, so
-the contents match — and it now falls out of the schema instead of needing a
-claim.
-
-- [ ] **The sparse/complete distinction is the §3.2 hazard again, one level
-      down.** "We hold revisions 900114, 2650547" must be distinguishable from
-      "the page has exactly those two revisions", or a history walk will find a
-      fork point that is merely the oldest row we happen to have. Record what
-      range of history is known — e.g. `oldest_known_revid` plus a
-      `history_complete_from` marker on `Page` — and have the base search refuse
-      to conclude "no common ancestor" while the walk is incomplete.
-- [ ] Store the *transformed* body's hash alongside, so §5.5 no-op detection and
-      §5.2's comparison protocol share one token.
-- [ ] `RevisionContent` dedupes across sites for free, which is the storage
-      answer to holding partial upstream history for a work.
-
-#### What this does to `RemoteLink`
-
-`RemoteLink` (§4.1) currently records `base_revid` / `base_sha1` / `base_body`
-inline. With a revision store it instead points at two `Revision` rows:
-
-```python
-    base_local_revision_pk: int | None
-    base_remote_revision_pk: int | None
-```
-
-and the invariant that makes the link trustworthy becomes checkable at any time:
-both rows resolve to the **same `content_sha1`**. A clone asserts the link *and*
-can prove it; a title-matched link can be verified or refuted rather than
-believed. `base_body` disappears — it is `RevisionContent.text`.
-
-- [ ] Migration: `Page.text`/`revid`/`sha1` stay as the convenient current-head
-      denormalisation (a great deal of existing code reads them), but become a
-      cache of the head `Revision` rather than the only record.
-- [ ] This is a substantial change to a core model. Worth doing before the
-      promotion pipeline is built on the current shape, not after — but it wants
-      its own review pass, so it is called out as Phase 1 work rather than folded
-      into a promotion commit.
-
----
-
-## 5. The promotion pipeline
-
-### 5.1 State classification
-
-Comparing local body, base, and freshly probed target head:
-
-| local vs base | target vs base | state | action |
-|---|---|---|---|
-| same | same | `in_sync` | nothing |
-| changed | same | `local_ahead` | promotable — clean push |
-| same | changed | `target_ahead` | nothing to promote; offer a pull |
-| changed | changed | `diverged` | merge per §4.3, then review |
-| — | — | `target_missing` | create |
-
-`local_ahead` is the only state eligible for bulk auto-approval.
-
-- [ ] "Local body" must be the **effective** body (`PageStore.effective_body`) —
-      bridging on an uncommitted local commit if the refetch hasn't landed.
-      Promoting a stale snapshot while a newer save sits in the journal is a
-      hard-to-spot bug.
-- [ ] Block promotion while the *local* page has uncommitted journal rows —
-      "commit locally first". Two pending-write concepts on one page is a trap.
-
-### 5.2 Body transformation
-
-The merge product still cannot be pushed verbatim:
-
-- [ ] **`<pagequality>` header** — rewrite `user=` to the account performing the
-      push; the local username may not exist on the target.
-- [ ] **Quality level** — cap promoted levels at 3 (Proofread). Wikisource
-      requires validation be done by a *different* user than the proofreader, so
-      asserting level 4 via automation from a staging wiki is exactly the wrong
-      look. Never downgrade an existing target level.
-- [ ] **Local-only templates / modules** — `{{…}}`, `{{#invoke:…}}` that redlink
-      on the target produce visible breakage across every promoted page. Block.
-- [ ] **Local-only `File:` references** — `IndexMeta.short_name` generates
-      `File:{short_name}_page_101_image_1.jpg` for extracted illustrations. These
-      render as redlinks rather than failing the save; block by default, allow an
-      override, and see §6.3 on uploading them.
-- [ ] **Absolute links to the staging host** — any `wikisource-debian-13.lan`
-      URL is a hard block; broken and mildly disclosive.
-- [ ] Categories missing on the target — warn.
-
-Implement as an ordered list of named `PromotionCheck` / `PromotionTransform`
-classes, each returning `pass` / `warn` / `block` plus (for transforms) the
-rewritten body, so the UI can render the chain and new rules are a class rather
-than a pipeline change.
-
-### 5.3 Execution, and the `EditJournal` revisit
-
-A promotion writes an `EditJournal` row against the **target** `Page` row and
-lets `commit_worker` push it. This is the right pathway — but the journal was
-designed before placeholders existed, and that shows:
-
-**`base_revid=None` currently carries two different meanings.** `commit_worker`
-infers "this is a creation" from `journal.base_revid is None and page.revid is
-None`. That is the same overloading as §3.2, and it is *why* `createonly` cannot
-currently be set correctly: the push path infers intent instead of being told it.
-
-- [ ] Record the intent explicitly on the journal row (`create` vs `update`)
-      rather than inferring it from two nullable columns. This is a prerequisite
-      for §5.6, and it is worth doing for ordinary IDE saves too.
-- [ ] Add provenance:
-
-```python
-class EditSource(str, Enum):
-    ide = "ide"
-    promotion = "promotion"
-
-# EditJournal gains:
-source: EditSource = Field(default=EditSource.ide, index=True)
-intent: EditIntent                      # create | update — no longer inferred
-source_page_pk: int | None = Field(default=None, foreign_key="page.pk")
-source_revid: int | None = None
-base_rung: BaseRung                     # recorded | discovered | patch | none
-batch_pk: int | None = Field(default=None, foreign_key="promotionbatch.pk", index=True)
-```
-
-- [ ] Mirror `batch_pk` onto `Commit` so a batch's outcomes are one query and
-      rollback has an exact `(page, result_revid)` list.
-- [ ] Keep `GET /commits/pending` shape unchanged for the IDE case; filter by
-      `source`.
-
-### 5.4 Summaries and attribution
-
-- [ ] Honest, configurable summary template —
-      `Proofread offline via wikisource-plugin (batch #123, from local staging copy)`.
-      Transparency is the cheapest defence against the "opaque mass edit"
-      objection.
-- [ ] Set the bot flag only if the account actually has it. Using `bot` to hide
-      edits from RecentChanges is precisely the optics failure to avoid.
-- [ ] Respect `{{nobots}}` / `{{bots|deny=…}}`.
-- [ ] Non-zero `put_throttle` and `maxlag` for the upstream site, **not** shared
-      with the local site's settings.
-
-### 5.5 Preflight
-
-- [ ] Re-probe target heads; recompute state; recompute merges.
-- [ ] Run checks/transforms, collect pass/warn/block, compute per-page and batch
-      diff aggregates.
-- [ ] **No-op detection** — drop pages whose transformed body already matches the
-      target head.
-- [ ] **Dry run against a non-public target** as a first-class option. Cheap once
-      the target site is a parameter, and the highest-value safety feature here —
-      the docker ProofreadPage instance (§9) is the natural sink.
-
-### 5.6 Atomic preconditions
-
-The answer to "the remote may have been edited or created in parallel and we
-cannot track creation": **don't track it — make the push conditional and let the
-server enforce it.** The database is a *plan*; the wiki is the authority on
-whether the plan still holds at execution time. This is what makes probe
-staleness tolerable rather than fatal, and it is why §8's TTL question mostly
-dissolves.
-
-None of these are currently used — `grep createonly src-py` returns nothing:
-
-- [ ] **`createonly=1` on every create.** Today `save_page` treats
-      `base_revid=None` as creation and calls `page.save()` with no guard, so a
-      page created on the target since our probe is **silently overwritten**.
-      Requires §5.3's explicit intent to set correctly.
-- [ ] **`nocreate=1` on every update** — don't silently resurrect a page deleted
-      since we looked.
-- [ ] **`baserevid` — not `basetimestamp` — on every update.** This matters more
-      than it looks; both alternatives were measured against a real wiki and
-      both fail open:
-      - **`basetimestamp` has one-second resolution.** `EditPage` (REL1_43,
-        ~line 2310) detects conflicts with `$this->edittime != $timestamp`, and
-        MediaWiki timestamps are accurate only to the second. Two edits landing
-        in the same second are indistinguishable, so the guard passes and the
-        push **overwrites**. A bot pushing quickly is exactly the workload that
-        trips this. Pinned by
-        `test_basetimestamp_cannot_see_a_same_second_edit`.
-      - **`basetimestamp` is also suppressed against your own account.**
-        `EditPage` (~line 2329) calls `userWasLastToEdit` and sets
-        `isConflict = false` — *"Suppress edit conflict with self"*. So a stale
-        base sails through whenever the intervening editor is our own bot,
-        precisely the "a previous batch already touched this page" case.
-      - **`baserevid` escapes both.** It compares revision ids exactly, and
-        `ApiEditPage` only forwards `wpEdittime` when `baserevid` is unset
-        (~line 405), so the self-suppression branch — guarded on
-        `$this->edittime` — never fires. Pinned by
-        `test_baserevid_rejects_an_intervening_edit`.
-- [ ] `PywikibotClient.save_page` currently reads `page.latest_revision.revid`,
-      compares in Python, then saves — a TOCTOU window, after which pywikibot
-      enforces "unchanged since I loaded it 200 ms ago" rather than "unchanged
-      since `base_revid`". Replace with `baserevid` on the request.
-- [ ] Even with `baserevid`, MediaWiki may **auto-merge** rather than conflict:
-      on a detected conflict `EditPage` (~line 2388) tries
-      `mergeChangesIntoContent` and, if the three-way merge succeeds, clears the
-      conflict and saves the merged text. That is a silent content change we did
-      not review, and it is the last place the wiki can substitute its judgement
-      for ours. **Close the loop the same way §4.5 closes every other one:**
-      after each push, fetch the resulting revision and compare *our* hash of
-      its content against the hash of what we submitted. Equal → the push landed
-      as reviewed. Not equal → MediaWiki merged, and the item goes back to
-      review rather than being recorded as a clean success.
-- [ ] Keep `Commit.result_revid` authoritative regardless — as
-      `commit_worker._load_pending_page_commit` already does when it bumps the
-      base past our own last push. The server guard narrows the window; it does
-      not replace our own bookkeeping.
-- [ ] Verify these thread through `Page.save()`; if not, use `site.editpage()` or
-      a raw request. Do not settle for the client-side check.
-- [ ] Map API error codes (`articleexists`, `missingtitle`, `editconflict`,
-      `protectedpage`, `abusefilter-*`, `spamblacklist`) to distinct `Commit`
-      outcomes. Everything non-`EditConflict` currently collapses into
-      `CommitStatus.error` with a stringified exception — too coarse to drive a
-      retry or a UI decision.
-- [ ] `force=True` means "drop the revid precondition" only — never
-      `createonly`/`nocreate`.
-
-### 5.7 A rejected push is a merge trigger
-
-**Never retry harder — reclassify.**
-
-- [ ] `articleexists` on a create → fetch the now-existing target page,
-      reclassify as diverged with an empty base (§4.4).
-- [ ] `editconflict` on an update → refetch, re-merge against the recorded base.
-- [ ] Use a real three-way merge (`merge3`, or shell out to `git merge-file`).
-- [ ] **ProofreadPage-specific win:** a `Page:` body decomposes into
-      `<noinclude>` header / body / `<noinclude>` footer. Merge the three
-      segments *independently*. Most cross-wiki conflicts are header-only
-      (`pagequality` level and user) where resolution is deterministic — take the
-      higher level, take the target's user attribution — so segmenting converts a
-      large fraction of "conflict" into "clean merge" and leaves genuine prose
-      conflicts standing out.
-- [ ] Auto-merged results still require human review. A clean merge lowers review
-      effort; it does not grant approval.
-
----
-
-## 6. Batching, rollback, guardrails
-
-### 6.1 Model
-
-```python
-class PromotionBatchStatus(str, Enum):
-    draft = "draft"; preflight = "preflight"; approved = "approved"
-    running = "running"; complete = "complete"; partial = "partial"
-    aborted = "aborted"; rolled_back = "rolled_back"
-
-class PromotionBatch(SQLModel, table=True):
-    pk: int | None = Field(default=None, primary_key=True)
-    source_site_pk: int = Field(foreign_key="site.pk")
-    target_site_pk: int = Field(foreign_key="site.pk")
-    index_page_pk: int | None = Field(default=None, foreign_key="page.pk")
-    label: str
-    comment_template: str
-    status: PromotionBatchStatus = PromotionBatchStatus.draft
-    created_at: datetime = Field(default_factory=utcnow)
-    approved_at: datetime | None = None
-    approved_by: str | None = None
-```
-
-- [ ] Add `PromotionItem` to hold the pairing and preflight result — check
-      outcomes, base rung, diff stats, and the **pre-push target revid**, which
-      is what rollback targets and therefore must be persisted.
-
-### 6.2 Rollback
-
-- [ ] Per page: restore `PromotionItem.pre_push_revid` via `undo`/`undoafter`
-      rather than pushing a recorded body, so it registers as a proper revert in
-      history.
-- [ ] **Refuse to roll back blind.** If the target head is no longer our
-      `result_revid`, someone edited on top; surface it and require manual
-      handling.
-- [ ] Batch rollback is itself a batch — same machinery, same audit trail.
-      Report partial results honestly ("reverted 380 of 400; 20 have subsequent
-      edits by others").
-
-### 6.3 Guardrails
-
-- [ ] Hard cap per batch (~50), overridable with typed confirmation.
-- [ ] Server-side rate limit per target site, enforced in the worker.
-- [ ] `POST /promotions/{pk}/abort` — a flag check in the already-serialised
-      per-page loop.
-- [ ] `Site.is_public` marking, driving the extra confirmation and the loud UI
-      treatment. The local wiki stays frictionless.
-- [ ] Minimal-grant BotPassword for upstream (edit; not delete, not protect).
-- [ ] **Illustration upload is tractable and worth scoping in.** Inline images
-      created during transcription (e.g. Tractatus diagrams) are own work with
-      clear licensing, and small. Uploading those as part of a batch removes the
-      §5.2 redlink block for the common case. Scan (PDF/DjVu) upload is a
-      separate, case-by-case decision and stays out of scope.
-
----
-
-## 7. API surface (proposed)
-
-```
-POST   /links                          { local_page_pk, upstream:{family,code}, upstream_title }
-POST   /links/propose                  { index_page_pk, upstream_site_pk } -> mappings + confidence
-GET    /links/{local_page_pk}          -> link + three-way state + base rung
-POST   /links/{local_page_pk}/refresh
-POST   /links/{local_page_pk}/find-base   -> run the §4.2 history intersection
-DELETE /links/{local_page_pk}
-
-POST   /promotions                     { source_site_pk, target_site_pk, index_page_pk | page_pks[], label }
-POST   /promotions/{pk}/preflight      -> per-item checks + batch aggregates
-GET    /promotions/{pk}                -> batch + items
-GET    /promotions/{pk}/items/{item}   -> full three-way diff payload
-PATCH  /promotions/{pk}/items/{item}   { included: bool, body_override?: str }
-POST   /promotions/{pk}/approve        { confirm_page_count: int }
-POST   /promotions/{pk}/run
-POST   /promotions/{pk}/abort
-POST   /promotions/{pk}/rollback
-```
-
-- [ ] The echoed `confirm_page_count` is deliberate friction — keep it.
-- [ ] `run` must be resumable and idempotent per item.
-- [ ] `PATCH …/items/{item}` with `body_override` is the seam that lets *either*
-      the viewer or IntelliJ resolve a conflict (§8.5).
-
----
-
-## 8. Viewer (Svelte) UI
-
-Under `viewer/src/routes/promotions/`, reusing `DiffView`, `ActionButton`,
-`Notice`, `PageHeading`, `StagedPageCard` and the existing `commits/` visual
-language. The `commits/` routes stay as they are — IDE-originated staged edits
-are a different thing.
-
-| Route | Purpose |
-|---|---|
-| `/promotions` | batch list + quick rollback |
-| `/promotions/new` | assemble: source site, target site, Index or page list |
-| `/promotions/[pk]` | the review screen |
-| `/promotions/[pk]/[item_pk]` | three-way diff for one page |
-| `/links` | correspondences: proposed / confirmed / base rung |
-
-### 8.1 Review screen
-
-The non-obvious parts:
-
-- **Target banner.** Full-width, red/amber against the warm parchment palette,
-  naming the host: *"Target: en.wikisource.org — public wiki. 42 pages will be
-  edited."* The single most valuable pixel in this feature is the one that stops
-  someone approving against the wrong site.
-- **Include-checkbox defaults carry the policy**: `local_ahead` with no blocks →
-  checked; everything else → unchecked; blocked → disabled. The safe batch is
-  the one you get by not thinking.
-- **Base rung per row**, not just state. A rung-3 patch merge and a rung-1 clean
-  push should not look identical.
-- **Preflight freshness** shown with the timestamp, and approve disabled when
-  stale or when any included item has a blocking check.
-- **Approve states the consequence in words** — *"Push 38 edits to
-  en.wikisource.org as `Username`, ~1 edit / 6 s, ≈4 minutes"* — and requires the
-  echoed page count.
-- Rollback stays available on the batch page forever.
-
-### 8.2 Three-way diff
-
-- Two diffs side by side: `base → local` (what we did) and `base → target head`
-  (what they did). For `local_ahead` the second is empty; for `diverged` this is
-  the entire point of the screen.
-- The **transform chain as steps** — raw local body → after each transform →
-  final submitted body. Reviewers need to see what the tool changed, not only
-  what they wrote.
-- Body-override editor for in-place conflict resolution.
-- `buildLineDiff` (`viewer/src/lib/diff.ts`) is line-based; word-level intra-line
-  diff would help here. Later.
-
-### 8.3 Links screen
-
-- Correspondences by work, with base rung and last probe.
-- Title-match proposal flow: side-by-side titles, confidence, confirm/reject,
-  confirm-all for an index once the scan-sha1 check passes.
-- Loud display of the scan-file comparison — same / different / offset applied.
-  This is where the offset bug gets caught.
-
-### 8.4 Division of labour with IntelliJ
-
-Review and approval stay in the viewer — iteration speed on the IntelliJ SDK is
-much worse, and triaging 40 diffs is a web-shaped task. But **conflict
-resolution is IDE-shaped**: IntelliJ has a real three-way merge UI and
-PSI-level wikitext support, and nothing reasonable built in Svelte will match
-it. Split by task rather than by feature:
-
-- [ ] Viewer: triage, batch assembly, approval, rollback.
-- [ ] IntelliJ (later): open a `diverged` item in the platform merge tool, write
-      the result back through `PATCH …/items/{item}` — the same seam the viewer's
-      override editor uses.
-- [ ] IntelliJ (later): link-state decoration in the tool window; "Promote this
-      page…" creating a single-page batch.
-
----
-
-## 9. Phasing
-
-**Phase 0 — parallel model (§3).** `Existence` tri-state + `remote_checked_at`;
-`probe_pages`; materialize a target work via the existing fan-out; pairing as a
-persisted outer join. No writes, no UI. Independently verifiable against Hertz:
-the output is just "here is the join, here is what we know and don't know".
-
-**Phase 1 — the revision store, then base discovery (§4.5, §4).** `Revision` +
-`RevisionContent` first: history has nowhere to live until they exist, and the
-change is much cheaper before the promotion pipeline is built on the current
-shape. Then `RemoteLink` pointing at revision rows, `find-base`, the
-content-hash history intersection, and local-side base extraction for patch
-mode. **Prototype rung 2 against Hertz before building anything on top of it** —
-whether it finds the fork point there determines how much of §4.3 carries the
-load.
-
-**Phase 2 — single-page promotion.** Explicit journal intent + `createonly` /
-`nocreate` / `basetimestamp` + error-code mapping (§5.6, §5.3) — worth doing
-independently of sync, since the silent-overwrite-on-create gap exists today.
-Then `EditSource`, the check/transform framework, and a single-page promote
-reviewed in the viewer. Target the docker wiki first, then one real Hertz page.
-
-**Phase 3 — batches.** `PromotionBatch` / `PromotionItem`, preflight, approve,
-run, abort, throttle, caps.
-
-**Phase 4 — rollback.** `undo`-based per-item revert with the head-is-still-ours
-check; batch rollback as a reverse batch.
-
-**Phase 5 — divergence at scale.** Segment-wise merge, override editor, IntelliJ
-merge-tool integration.
-
-Do not start Phase 3 before Phase 4 is designed — mass commit without mass
-revert is the exact shape of the risk this document exists to manage.
-
----
-
-## 10. Testing
-
-The new `docker-compose.yml` ProofreadPage instance changes what is possible
-here: **two instances give a complete offline two-wiki fixture**, which is
-exactly what this feature needs and what `FakeWikiClient` cannot simulate
-(revision history, sha1 semantics, `createonly`, `undo`).
-
-- [ ] Stand up a second instance as the "upstream" and build a real diverged
-      fixture: create a page, copy it across, edit both sides, then assert the
-      §4.2 intersection finds the right base.
-- [ ] Pin the sha1 encoding trap in both directions (done — `test_wiki_sha1.py`)
-      and the proofread-page stored-hash discrepancy (done —
-      `test_proofread_serialization.py`, which runs without Docker).
-- [ ] `FakeWikiClient` for the fast unit-level pipeline tests (states, checks,
-      transforms, batch bookkeeping).
+`compose.wtbot.yml` is an overlay rather than a copy in each base, since the
+two bases already duplicate the MediaWiki services and that is the part that
+drifts. wtbot's SQLite sits on its own volume and is disposable by design —
+everything in it is refetchable or not yet pushed — so `WTBOT_RESET_DB=1`
+empties it without rebuilding the wikis, which are the slow half.
+
+`--wait` is only trustworthy because the healthcheck requires a marker written
+after the import; without it the extension check goes green as soon as
+`LocalSettings.php` exists and tests race the import.
+
+Differences are then made by whoever needs them — `copy_page_to_local`,
+`diverge_locally`, `reconcile_to_upstream` in `wiki_harness.scenarios`, one line
+each, no scenario enum to trace. Nothing tears the stack down: `wiki_pair` only
+ensures it is up, so a failed run leaves something to look at.
+
+**The seeded work is read-only; mutating tests use `SCRATCH_PAGE`.** That
+follows from not tearing down — a test that edits an imported page leaves the
+pair diverged, and the next run starts from a base that is no longer the base.
+The scratch pair is removed before creation as well as after, so a run that
+died mid-test cannot hand the next one a page with an unexpected history. A
+stack dirtied before this rule existed needs one
+`python -m wiki_harness up --rebuild`; `test_the_pair_starts_converged` says so
+when it fails.
+
+One deliberate asymmetry, and it is not content: `local` burns a few revision
+ids first (`SEED_REVID_BURN`). Two wikis installed from empty and seeded in the
+same order otherwise assign the *same* revids to the same pages, and a bug
+comparing revids across sites would pass in the fixture while failing against
+real wikis.
+
+- [x] The copied-work fixture: copy a page across, link it, and confirm the two
+      sides read as the same transcription under different attribution.
+- [x] Diverge one side and confirm the anchor falls behind the head — the link
+      stays true, the distance from it is what says work has happened.
+- [ ] Extend from one page to a whole `Index:`, which is where pagination and
+      the scan-offset check (§6) come in.
+- [ ] Build the diverged fixture on the two-wiki harness: copy a work across,
+      edit both sides, assert the pairing reports divergence rather than
+      silently promoting.
 - [ ] Two sites with differing `File:` sha1s must refuse to link children.
 - [ ] A batch targeting an `is_public` site must not run without an approval
       record.
-- [ ] Use the docker instance as the dry-run sink for the whole batch path before
+- [ ] Use the harness as the dry-run sink for the whole batch path before
       anything points at en.wikisource.
-
----
-
-## 11. Open questions
-
-1. **Scan (PDF/DjVu) upload — case by case.** Inline transcription illustrations
-   are own work and scoped in (§6.3); backing scans carry provenance and
-   licensing decisions that differ per work, and per target (Commons vs local).
-   Deferred pending a real case.
-2. **Per-page or per-work approval for routine work?** Per-work approval of clean
-   `local_ahead` pages is the ergonomic goal once trust is established. Start
-   strict, loosen with evidence.
-3. **Protected / semi-protected target pages** — detect and surface; probably
-   block.
-4. **How far back to walk history in §4.2?** `rvlimit=max` is 500 for anonymous
-   requests. Almost certainly enough per page, but an Index page on a busy work
-   could exceed it, and the fork point is likely to be *old* — i.e. exactly the
-   end that gets truncated. Needs a paged walk or a bounded-search heuristic.
-5. **Does patch mode (§4.3) want the local journal replayed per-save, or squashed
-   to one delta?** Squashed is simpler and matches "one wiki edit per page".
-   Per-save would preserve intermediate structure but has no obvious consumer.
-   Squash unless a case appears.
