@@ -175,3 +175,25 @@ tasks {
         }
     }
 }
+
+intellijPlatformTesting {
+    runIde {
+        register("runIdeWtbotLocal") {
+            task {
+                systemProperty(
+                    "wtbot.baseUrl",
+                    "http://127.0.100.1:8000",
+                )
+            }
+        }
+
+        register("runIdeWtbotDocker") {
+            task {
+                systemProperty(
+                    "wtbot.baseUrl",
+                    "http://localhost:18574",
+                )
+            }
+        }
+    }
+}
