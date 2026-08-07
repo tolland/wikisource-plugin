@@ -38,7 +38,11 @@ class WtTemplateWrapExecutor : WtWrapExecutor {
 
         val template = TemplateManager.getInstance(project).createTemplate("", "", templateText)
         template.isToReformat = false
-        template.isToIndent = false
+        // Called rather than assigned: Template exposes only the setter, so
+        // there is no Kotlin property to assign to. Both flags are off because
+        // WtWrapRenderer has already placed the indentation exactly where it
+        // wants it, and letting the template engine re-indent would double it.
+        template.setToIndent(false)
         if (tag.hasVariable) {
             template.addVariable(NAME_VARIABLE, ConstantNode(WtWrapRenderer.DEFAULT_PLACEHOLDER), true)
         }
