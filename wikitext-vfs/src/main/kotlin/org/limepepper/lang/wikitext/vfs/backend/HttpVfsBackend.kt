@@ -7,9 +7,6 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
-import com.intellij.openapi.project.Project
-import org.limepepper.lang.wikitext.vfs.settings.WtbotProjectSettings
-import org.limepepper.lang.wikitext.vfs.settings.WtbotSettingsListener
 
 /**
  * Calls the wtbot FastAPI VFS endpoints over HTTP.
@@ -18,37 +15,20 @@ import org.limepepper.lang.wikitext.vfs.settings.WtbotSettingsListener
  * JSON is parsed with a minimal hand-rolled extractor ([JsonReader]) rather
  * than a full library so the wikitext-vfs module stays dep-light.
  *
- * @param baseUrl  e.g. "http://127.0.100.1:8000" — no trailing slash
+ * Immutable once built. Pointing the plugin at a different sidecar means
+ * constructing a new instance and installing it — [WtVfsService] does that in
+ * response to a settings change, so that switching backends also invalidates
+ * the caches filled from the old one. Mutating `baseUrl` in place would swap
+ * the destination while leaving those caches silently intact.
+ *
+ * @param baseUrl  e.g. "http://127.0.0.1:18574" — no trailing slash
  * @param timeout  per-request timeout
  */
 class HttpVfsBackend(
-    private var baseUrl: String,
-    private var timeout: Duration = Duration.ofSeconds(10),
-    private var client: HttpClient = buildClient(Duration.ofSeconds(10)),
+    private val baseUrl: String,
+    private val timeout: Duration = Duration.ofSeconds(10),
+    private val client: HttpClient = buildClient(timeout),
 ) : VfsBackend {
-
-    constructor() : this(
-        baseUrl = "http://localhost:18574",
-        timeout = Duration.ofSeconds(10),
-        client = buildClient(Duration.ofSeconds(10))
-    )
-
-    constructor(project: Project) : this(
-        baseUrl = WtbotProjectSettings.getInstance(project).baseUrl,
-        timeout = Duration.ofSeconds(WtbotProjectSettings.getInstance(project).timeoutSeconds.toLong()),
-        client = buildClient(Duration.ofSeconds(WtbotProjectSettings.getInstance(project).timeoutSeconds.toLong()))
-    ) {
-        val settings = WtbotProjectSettings.getInstance(project)
-        project.messageBus.connect().subscribe(WtbotProjectSettings.TOPIC, WtbotSettingsListener { state ->
-            // update baseUrl and timeout on settings change
-            this.baseUrl = "http://${state.host}:${state.port}"
-            val newTimeout = Duration.ofSeconds(state.timeoutSeconds.toLong())
-            if (newTimeout != this.timeout) {
-                this.timeout = newTimeout
-                this.client = buildClient(newTimeout)
-            }
-        })
-    }
 
     companion object {
         private fun buildClient(timeout: Duration): HttpClient =

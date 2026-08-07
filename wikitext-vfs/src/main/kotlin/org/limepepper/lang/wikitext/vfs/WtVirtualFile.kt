@@ -83,7 +83,34 @@ class WtVirtualFile(
     @Volatile var placeholder: Boolean = placeholder
         private set
 
+    // Files start valid and only ever go invalid, when a backend switch finds
+    // the path absent from the new sidecar (see WtBackendSwitcher).
+    @Volatile private var valid: Boolean = true
+
     fun setParent(p: WtVirtualFile) { _parent = p }
+
+    /**
+     * Forgets everything fetched from the backend, keeping identity and the
+     * decoration metadata. The next access refetches.
+     */
+    @Synchronized
+    fun dropCaches() {
+        cachedChildren = null
+        cachedContent = null
+    }
+
+    /**
+     * Marks this file gone — the path does not exist on the backend the VFS
+     * has just been switched to. Callers close any editors on it first: an
+     * invalid file cannot be read, and the platform expects nothing to be
+     * showing one.
+     */
+    @Synchronized
+    fun markInvalid() {
+        valid = false
+        cachedChildren = null
+        cachedContent = null
+    }
 
     /** Refresh decoration metadata from a fresh backend sighting. Length and
      * timestamp are only overwritten when the sighting carries them (stats
@@ -127,7 +154,7 @@ class WtVirtualFile(
     override fun getPath(): String = _path
     override fun isWritable(): Boolean = !isDir
     override fun isDirectory(): Boolean = isDir
-    override fun isValid(): Boolean = true
+    override fun isValid(): Boolean = valid
     override fun getParent(): VirtualFile? = _parent
 
     fun getFileTypeForFile() {

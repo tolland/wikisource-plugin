@@ -37,6 +37,14 @@ GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew generateLexer generateParser  # 
 GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew check           # build + tests + spotless, run by the pre-commit hook
 ```
 
+The sandbox's wtbot sidecar can be chosen per launch, so a session can be pointed at the docker harness instead of the workstation sidecar without editing settings by hand:
+
+```bash
+GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew runIde -PwtbotBaseUrl=http://127.0.0.1:18584 [-PwtbotTimeoutSeconds=30]
+```
+
+These become the `wtbot.baseUrl` / `wtbot.timeoutSeconds` system properties (`WTBOT_BASE_URL` / `WTBOT_TIMEOUT_SECONDS` env vars work too, for a non-sandbox IDE). They seed the setting at every launch rather than only on a fresh sandbox, and the running IDE can still be moved to another backend from Settings → Tools → WTBot (VFS backend) without restarting.
+
 `runIde` opens a sandbox IDE against `../test-project` (a sibling directory of this repo root, not inside it — create it if it doesn't exist locally). The sandbox config in `sandbox-config/` (editor, look-and-feel, trusted paths, log categories) is copied into the sandbox on every `prepareSandbox` run. The exact target IDE build is pinned in `gradle.properties` (`intellijPlatformVersion`) so Gradle never silently re-resolves a newer RC.
 
 A single test class/method can be run the normal Gradle way, e.g. `GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew :wikitext-core:test --tests "org.limepepper.lang.wikitext.lexer.WtLexerTest.testFooBar"`.
@@ -108,7 +116,9 @@ The lexer uses a frame/state stack to disambiguate context-dependent tokens (e.g
 
 ### Virtual file system (`wikitext-vfs`)
 
-`WtVirtualFileSystem` implements the `wikisource://` protocol and is backed by the `VfsBackend` interface (`wikitext-vfs/.../vfs/backend/VfsBackend.kt`), which talks to the wtbot FastAPI sidecar over HTTP — `HttpVfsBackend` is the real implementation, `FakeVfsBackend` is used for tests/offline. `VfsBackend` covers stat (single + bulk), list, read, write (with `baseRevid` conflict detection), live preview rendering, ProofreadPage page navigation, and reference-scan image URLs. The tool window (`MyToolWindowFactory`, in `wikitext-ui`) follows the DataGrip Database Explorer pattern: a custom tree in a side panel, opening real editor tabs via `FileEditorManager` on double-click, which applies the full PSI/lexer/annotator stack.
+`WtVirtualFileSystem` implements the `wikisource://` protocol and is backed by the `VfsBackend` interface (`wikitext-vfs/.../vfs/backend/VfsBackend.kt`), which talks to the wtbot FastAPI sidecar over HTTP — `HttpVfsBackend` is the real implementation, `FakeVfsBackend` is used for tests/offline.
+
+Which sidecar that is lives in `WtbotAppSettings` (application-scoped: wtbot itself mediates between wikis, so one sidecar serves every project, and the VFS is an app singleton). `WtVfsService` owns the live backend and *replaces* it — `HttpVfsBackend` is immutable — when the settings change, so callers must keep reading `WtVfsService.instance.backend` per operation rather than holding a reference. A base-URL change also runs `WtBackendSwitcher`: prompt about unsaved `wikisource://` documents while the old sidecar is still theirs to save to, drop every cached file's content/children, re-stat them against the new backend, close editors on paths it doesn't have, reload the ones it does, then fire `WtVfsService.BACKEND_SWITCHED` for the tool window. Cached `WtVirtualFile` instances are never evicted wholesale — the VFS contract requires one instance per path, and editors/tree nodes hold them — only paths absent from the new backend are evicted and marked invalid. A timeout-only change just swaps the client. `VfsBackend` covers stat (single + bulk), list, read, write (with `baseRevid` conflict detection), live preview rendering, ProofreadPage page navigation, and reference-scan image URLs. The tool window (`MyToolWindowFactory`, in `wikitext-ui`) follows the DataGrip Database Explorer pattern: a custom tree in a side panel, opening real editor tabs via `FileEditorManager` on double-click, which applies the full PSI/lexer/annotator stack.
 
 ### Split-editor preview (`wikitext-ui/.../preview/`)
 

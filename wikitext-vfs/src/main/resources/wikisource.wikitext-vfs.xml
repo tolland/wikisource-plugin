@@ -13,10 +13,17 @@
             serviceImplementation="org.limepepper.lang.wikitext.vfs.backend.WtVfsService"
         />
 
-        <projectConfigurable
-            id="org.limepepper.wikitext.wtbot.project"
+        <applicationService
+            serviceImplementation="org.limepepper.lang.wikitext.vfs.settings.WtbotAppSettings"
+        />
+
+        <!-- Application-scoped: wtbot mediates between wikis, so one sidecar
+             serves every project, and the VFS it backs is an app singleton. -->
+        <applicationConfigurable
+            id="org.limepepper.wikitext.wtbot"
+            parentId="tools"
             displayName="WTBot (VFS backend)"
-            instance="org.limepepper.lang.wikitext.vfs.settings.WtbotProjectConfigurable"/>
+            instance="org.limepepper.lang.wikitext.vfs.settings.WtbotConfigurable"/>
 
         <!-- Project-level, but the page edits the application defaults
              instead when the project hasn't opted into its own list, so

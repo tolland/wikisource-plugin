@@ -29,6 +29,7 @@ import org.limepepper.lang.wikitext.vfs.WtVirtualFile
 import org.limepepper.lang.wikitext.vfs.WtVirtualFileSystem
 import org.limepepper.lang.wikitext.vfs.backend.NodeKind
 import org.limepepper.lang.wikitext.vfs.backend.VfsBackendException
+import org.limepepper.lang.wikitext.vfs.backend.WtBackendSwitchedListener
 import org.limepepper.lang.wikitext.vfs.backend.WtVfsService
 import java.awt.BorderLayout
 import java.awt.datatransfer.StringSelection
@@ -130,6 +131,16 @@ internal class WikisourceBrowserToolWindowTab(
                     val file = event.newFile as? WtVirtualFile ?: return
                     showProperties(file, propertiesArea)
                 }
+            },
+        )
+
+        // A different sidecar means a different library: the tree has to be
+        // rebuilt from the new roots rather than left showing the old one's.
+        ApplicationManager.getApplication().messageBus.connect(toolWindow.disposable).subscribe(
+            WtVfsService.BACKEND_SWITCHED,
+            WtBackendSwitchedListener {
+                refreshTreePreservingState(tree, structureModel, fs)
+                propertiesArea.text = "Select a file to see its properties."
             },
         )
 

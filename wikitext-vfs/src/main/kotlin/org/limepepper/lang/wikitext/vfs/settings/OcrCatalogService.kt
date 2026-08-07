@@ -40,6 +40,17 @@ class OcrCatalogService(private val project: Project) {
     fun knownEngines(): List<String> = catalog.get().engines.map { it.engine }
 
     /**
+     * Forgets what was discovered, for when the VFS is switched to a different
+     * sidecar: OCR backends are configured per site on the sidecar, so the old
+     * one's engines and languages say nothing about the new one's. The picker
+     * falls back to free text until an editor rediscovers.
+     */
+    fun clearCache() {
+        catalog.set(OcrCatalog.EMPTY)
+        backends.set(emptyList())
+    }
+
+    /**
      * Blocking discovery for [path], publishing the result for the settings
      * page. Returns what it found so a caller that needs it now (an editor
      * building its menu) does not have to read it back. Call off the EDT.
