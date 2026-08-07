@@ -1,5 +1,28 @@
 # Text-editing features: implementation plan
 
+## Prototyping stance
+
+This is a kitchen-sink exploration, not a settled design. The platform offers
+several interaction styles for each of these features — in-editor popups, live
+templates, modal dialogs, floating toolbars — and which of them are actually
+pleasant to use is not knowable in advance. So the rule for everything below:
+
+- **Every feature has an on/off switch, and every competing interaction style
+  is selectable at runtime.** These are `Registry` keys (`<registryKey>` in
+  `wikisource.wikitext-ui.xml`, read through `WtEditingFlags`), not Settings
+  pages — a Settings checkbox is a promise that an option is supported, and
+  none of this has earned that yet.
+- **Competing implementations share their markup layer.** The pure renderer
+  (`WtWrapRenderer`) is the only thing that decides what text gets produced, so
+  swapping strategies changes the *interaction* and provably nothing else.
+- **Losing implementations get deleted, along with their registry key.** The
+  switches are scaffolding, not a permanent configuration surface.
+
+See also `docs/templatedata-future.md` for the MediaWiki TemplateData work
+these seams should stay compatible with.
+
+## Scope
+
 Scope: Surround With, formatting toggle actions with shortcuts, Generate table,
 and subtree search & replace — for plain `.wt`/`.wiki` files and for
 `wikisource://` files backed by the wtbot VFS.
@@ -39,9 +62,33 @@ New code lives in a new package `org.limepepper.lang.wikitext.editing`
 (actions/UI in `wikitext-ui`; pure text/markup helpers in `wikitext-core` so
 they are unit-testable without the IDE fixture).
 
-## 1. Surround With (Ctrl+Alt+T)
+## 1. Surround With (Ctrl+Alt+T) — implemented
 
-Platform pieces (mirroring `GroovySurroundDescriptor` / the Markdown plugin):
+Shipped shape (differs slightly from the sketch below, which is kept for the
+rationale):
+
+| Class | Module | Role |
+|-------|--------|------|
+| `WtWrapTag` / `WtWrapTagSets` | core | the catalog, plus curated per-surface subsets |
+| `WtWrapRenderer` | core | pure markup rendering; the only place text is produced |
+| `WtEditingFlags` | ui | registry-backed switches and strategy selection |
+| `WtSurroundDescriptor` | ui | the `lang.surroundDescriptor` extension |
+| `WtTagSurrounder` | ui | one popup entry, parameterized by catalog entry |
+| `WtWrapExecutor` | ui | the swap seam — how the markup actually gets inserted |
+| `WtTemplateWrapExecutor` | ui | live-template insertion; mirrors `<section>` names |
+| `WtDocumentWrapExecutor` | ui | plain document edit; optional modal prompt |
+
+Registry keys: `wikitext.editing.surround.enabled`,
+`wikitext.editing.surround.strategy` (`template` | `document`),
+`wikitext.editing.variablePrompt` (`inline` | `dialog` | `none`).
+
+Rather than a separate `WtSectionSurrounder` class, the variable case is a
+property of the catalog entry (`variablePrompt` + a `$NAME$` placeholder
+appearing in both markers) that every executor handles — so a second
+value-taking construct costs one enum entry and no new classes.
+
+Original sketch, retained for the reasoning (mirroring
+`GroovySurroundDescriptor` / the Markdown plugin):
 
 - **`WtSurroundDescriptor : SurroundDescriptor`** — registered via
   `<lang.surroundDescriptor language="Wikitext" .../>` in
