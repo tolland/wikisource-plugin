@@ -117,19 +117,83 @@ Tests: `LightPlatformCodeInsightTestCase`-style data-driven tests
 (`before.wt` + selection markers → `after.wt`) under
 `wikitext-ui/src/test/`, one per catalog entry plus the section-template case.
 
-## 2. Formatting toggle actions and shortcuts (Ctrl+B / Ctrl+I style)
+## 2a. Lexing apostrophe quote markup — implemented
+
+Split out from the toggle actions, and done *first*: with real tokens the
+toggle actions can detect existing formatting from the token stream instead of
+a text scan, so this removes the `WtStyleMarkerScanner` hack the original plan
+was resigned to.
+
+MediaWiki decides quote markup purely by the **length** of a run of
+apostrophes (Help:Wikitext#Text_formatting): 2 = italic, 3 = bold, 5 = both.
+The lexer now maps a run to `TWO_APOS` / `THREE_APOS` / `FIVE_APOS` /
+`SINGLE_APOS` — tokens that were already declared in `Wikitext.bnf` (whose
+`PLAIN_TEXT` regex already excluded `'`), so no token-type changes were
+needed.
+
+**The tokens are named for what was seen, not what it means, and that is the
+whole design.** A run's meaning is not knowable at lexing time, because the
+*closing* run decides how an opening five-run splits:
+
+```
+'''''five''  more '''    ->  italic closes first: <b><i>five</i> more </b>
+'''''five''' more  ''    ->  bold closes first:   <i><b>five</b> more </i>
+```
+
+Identical prefixes, opposite nesting. A lexer cannot see far enough ahead, and
+guessing would bake a wrong answer into the token stream — so it reports the
+run length as a fact and leaves pairing to the parser, the only layer that
+sees both ends. `quoteNestingAmbiguity.wt` pins exactly this: both lines
+produce `FIVE_APOS`, and only the closers differ.
+
+MediaWiki's odd-length quirks are handled in one place (`apostropheRun()`) by
+pushing back the markup portion so the same rule re-runs on it:
+
+| Run | Emitted |
+|-----|---------|
+| 1 | `SINGLE_APOS` (literal — the apostrophe in "don't") |
+| 2 / 3 / 5 | `TWO_APOS` / `THREE_APOS` / `FIVE_APOS` |
+| 4 | `SINGLE_APOS` + `THREE_APOS` (one literal quote, then bold) |
+| 6+ | excess as literal text, then `FIVE_APOS` |
+
+Consequences worth knowing:
+
+- `NOT_DELIM` now excludes `'`, so **`PLAIN_TEXT` runs stop at every
+  apostrophe** — "don't" lexes as three tokens. Unavoidable: JFlex prefers the
+  longest match, so without it `''italic''` would be swallowed whole. This is
+  what `SINGLE_APOS` is for.
+- **Scoped to the `WIKI_TEXT` state only.** `TEMPLATE` / `LINK` / `TABLE` have
+  their own text char classes that still absorb apostrophes, so quotes inside
+  a table cell or link label remain plain text. Converting those is a
+  follow-up, deliberately deferred so the blast radius stayed one state.
+- The parser accepts the four tokens as **inline leaves**, with no bold/italic
+  PSI structure yet. Pair-matching is deferred because unclosed runs are
+  common and legal in real wikitext, and a naive pairing rule would
+  manufacture error elements across ordinary pages.
+- The single-line rule ("formatting works correctly only within a single
+  line") is *not* encoded in the lexer. `NEWLINE` is already its own token, so
+  the eventual pairing pass can refuse to cross one; doing it in the lexer
+  would need state the parser would then have to second-guess.
+
+Test data: `quoteBasics`, `quoteApostrophes`, `quoteNestingAmbiguity`,
+`quoteOddRuns` (lexer). Corpus churn was one line in
+`parsingTestData.parse.txt` — the only apostrophe in the entire test corpus.
+
+## 2b. Formatting toggle actions and shortcuts (Ctrl+B / Ctrl+I style)
 
 - **`WtBaseToggleStyleAction`** — modeled on Markdown's
   `BaseToggleStateAction`: given caret/selection, detect whether it is already
-  wrapped in the marker, then remove or add. Detection must be **text-scan
-  based** for now: the lexer has no `BOLD`/`ITALIC` tokens (`'''`/`''` are
-  currently unstructured text), so a small `WtStyleMarkerScanner` in
-  `wikitext-core` finds enclosing markers on the caret's line. Optionally, add
-  proper quote tokens to the lexer later and switch detection to tokens; don't
-  block the feature on grammar work.
+  wrapped in the marker, then remove or add. Detection can now be
+  **token-based** thanks to 2a — walk the highlighting lexer or PSI leaves on
+  the caret's line looking for the enclosing `TWO_APOS`/`THREE_APOS`/
+  `FIVE_APOS` pair, rather than scanning raw text for quote characters and
+  having to re-derive MediaWiki's length rules a second time.
 - Subclasses: `WtToggleBoldAction` (`'''`), `WtToggleItalicAction` (`''`),
   `WtToggleCodeAction` (`<code>`), `WtToggleNowikiAction` — all thin wrappers
-  over the catalog + scanner.
+  over `WtWrapTagSets.toggleable` + the detector.
+- Toggling a five-run is the interesting case and should be specified before
+  it is written: removing bold from `'''''x'''''` has to leave `''x''`, which
+  means the toggle edits *run lengths*, not whole markers.
 - **Registration and shortcut conflicts**: register in the `<actions>` block
   with `<keyboard-shortcut first-keystroke="control B" keymap="$default"/>`
   etc. `Ctrl+B` is Go to Declaration and `Ctrl+I` is Implement Methods, so two
@@ -228,12 +292,20 @@ ties us to indexing internals. Revisit only if the custom panel proves limiting.
 
 ## Suggested build order
 
-1. `WtWrapTags` catalog + Surround With (descriptor, tag surrounder, section
-   surrounder with template variable) + tests.
-2. Toggle actions + `WtStyleMarkerScanner` + `ActionPromoter` + shortcuts.
+1. ~~`WtWrapTags` catalog + Surround With + tests.~~ **done**
+2. a. ~~Lex apostrophe runs into real quote tokens.~~ **done**
+   b. Toggle actions + token-based detection + `ActionPromoter` + shortcuts.
 3. Generate table (builder + dialog action).
 4. wtbot `/vfs/search` + `VfsBackend.search` + subtree search/replace UI +
    `WtBatchReplacer`.
+
+Known follow-ups left open by the steps above:
+
+- Quote lexing in the `TEMPLATE`/`LINK`/`TABLE` states (2a covered `WIKI_TEXT`).
+- Bold/italic PSI structure, i.e. the pairing pass that resolves the
+  five-run ambiguity and respects the single-line rule.
+- Syntax highlighting for the new quote tokens (`WtSyntaxHighlighter` does not
+  map them yet, so they currently render as plain text).
 
 Each step ships independently; 1–3 are pure-editor features usable on plain
 files and VFS files alike from day one.

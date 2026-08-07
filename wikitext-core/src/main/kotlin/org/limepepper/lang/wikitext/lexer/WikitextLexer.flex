@@ -199,6 +199,51 @@ import org.limepepper.lang.wikitext.psi.WtTypes;
     popFrame();
   }
 
+  // ---- Apostrophe formatting runs ----------------------------------------
+  // MediaWiki's quote markup is decided purely by the LENGTH of a run of
+  // apostrophes (Help:Wikitext#Text_formatting): 2 = italic, 3 = bold,
+  // 5 = bold+italic. Anything else is literal text.
+  //
+  // The tokens are named for what was SEEN (TWO_APOS/THREE_APOS/FIVE_APOS),
+  // not for what it MEANS (italic/bold), and that is deliberate. A run's
+  // meaning is not knowable at lexing time, because the closing run decides
+  // how an opening five-run splits:
+  //
+  //     '''''five''  more '''   -> italic closes first: <b><i>five</i> more </b>
+  //     '''''five''' more ''    -> bold closes first:   <i><b>five</b> more </i>
+  //
+  // Identical prefixes, opposite nesting. A lexer cannot see far enough ahead
+  // to call it, and guessing would bake a wrong answer into the token stream.
+  // So the lexer reports the run length as a fact and leaves the pairing to
+  // the parser, which is the only layer that sees both ends.
+  //
+  // Odd lengths are MediaWiki's own quirks, not ours to invent:
+  //   4  -> one LITERAL apostrophe followed by bold ("''''x''''" is 'x' bolded
+  //         with a stray quote), so emit the literal first and re-scan the 3.
+  //   6+ -> the EXCESS is literal and the trailing five are the markup.
+  // Both are handled by pushing back the markup portion so the very same rule
+  // re-runs on it, rather than by duplicating the length table.
+  //
+  // NOTE: this deliberately does NOT try to enforce MediaWiki's "formatting
+  // works only within a single line" rule. EOL is already its own token, so
+  // the parser can refuse to pair runs across one; encoding it here would
+  // need lexer state that the parser would then have to second-guess.
+  private IElementType apostropheRun() {
+    int n = yylength();
+    switch (n) {
+      case 1: return WtTypes.SINGLE_APOS;
+      case 2: return WtTypes.TWO_APOS;
+      case 3: return WtTypes.THREE_APOS;
+      case 5: return WtTypes.FIVE_APOS;
+      case 4:
+        yypushback(3);            // leave "'''" to be re-lexed as bold
+        return WtTypes.SINGLE_APOS;
+      default:                    // n >= 6
+        yypushback(5);            // leave "'''''" to be re-lexed as bold+italic
+        return n - 5 == 1 ? WtTypes.SINGLE_APOS : WtTypes.PLAIN_TEXT;
+    }
+  }
+
   private IElementType pipeTokenForContext() {
     FrameKind k = currentKind();
     if (k == FrameKind.TEMPLATE || k == FrameKind.TEMPLATE_PARAM) {
@@ -220,8 +265,18 @@ ANY          = [^]
 
 H_START      = "="{1,6}
 
-NOT_DELIM = [^{}\[\]<\r\n=&*#:;]
+// "'" is excluded so a run of apostrophes can never be swallowed into a
+// PLAIN_TEXT run -- JFlex prefers the longest match, so without this
+// exclusion "''italic''" would match PLAIN_TEXT_RUN whole and the quote
+// rules below would never fire. The cost is that an ordinary contraction
+// ("don't") now lexes as PLAIN_TEXT + SINGLE_APOS + PLAIN_TEXT; that is
+// what SINGLE_APOS is for, and the .bnf's PLAIN_TEXT regex already
+// excluded "'" in anticipation of exactly this.
+NOT_DELIM = [^{}\[\]<\r\n=&*#:;']
 PLAIN_TEXT_RUN = {NOT_DELIM}+
+
+// Any run of apostrophes; apostropheRun() maps the LENGTH to a token.
+APOS_RUN = "'"+
 
 // HTML/XML character entity references -- &amp; &#39; &#x27; etc. Matched
 // as their own token (rather than swallowed into PLAIN_TEXT_RUN) since a
@@ -371,6 +426,12 @@ CLOSE_TAG          = "</" {TAG_NAME_CHARS} {WS}* ">"
 
   {CHAR_ENTITY_REF} { return WtTypes.CHAR_ENTITY_REF; }
   {ENTITY_REF}       { return WtTypes.ENTITY_REF; }
+
+  // Quote markup ('' italic, ''' bold, ''''' both). Scoped to WIKI_TEXT for
+  // now: TEMPLATE/LINK/TABLE have their own text char classes that still
+  // absorb apostrophes, so quotes inside a table cell or link label stay
+  // plain text until those states are converted too. See apostropheRun().
+  {APOS_RUN} { return apostropheRun(); }
 
   // Heading close-match: a run of '=' immediately followed by line-end,
   // but ONLY when the HEADING frame is the one on top of the stack (i.e.
