@@ -3263,6 +3263,26 @@ return p</text>
     </revision>
   </page>
   <page>
+    <title>Template:Ne</title>
+    <ns>10</ns>
+    <id>5791</id>
+    <redirect title="Template:Numbered equation" />
+    <revision>
+      <id>11186</id>
+      <timestamp>2026-03-22T01:56:29Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Pywikibot 11.1.0</comment>
+      <origin>11186</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="40" sha1="jbt4luuojoymgkw0frwcea6bmtr6xz6" xml:space="preserve">#REDIRECT [[Template:numbered equation]]</text>
+      <sha1>jbt4luuojoymgkw0frwcea6bmtr6xz6</sha1>
+    </revision>
+  </page>
+  <page>
     <title>Module:Error/doc</title>
     <ns>828</ns>
     <id>5535</id>

@@ -58,3 +58,5 @@ wfLoadExtension( 'TemplateStyles' );
 wfLoadExtension( 'VisualEditor' );
 wfLoadExtension( 'WikiEditor' );
 wfLoadExtension( 'Wikisource' );
+
+$wgUploadBaseUrl = getenv('MW_SERVER');
