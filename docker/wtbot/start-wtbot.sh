@@ -3,8 +3,18 @@ set -euo pipefail
 
 : "${WTBOT_DATABASE_URL:=sqlite:////data/wtbot.db}"
 : "${WTBOT_BLOB_ROOT:=/data/blobs}"
+: "${WTBOT_HOST:=127.0.0.1}"
 : "${WTBOT_PORT:=8000}"
 : "${WTBOT_RESET_DB:=0}"
+
+cat << 'EOF'
+          _   _           _   _ _
+__      _| |_| |__   ___ | |_| | |
+\ \ /\ / / __| '_ \ / _ \| __| | |
+ \ V  V /| |_| |_) | (_) | |_|_|_|
+  \_/\_/  \__|_.__/ \___/ \__(_|_)
+
+EOF
 
 # The database is disposable by design. It holds a *cache* of wiki content plus
 # the local edit journal -- everything in it is either refetchable or was going
@@ -35,4 +45,4 @@ mkdir -p "$WTBOT_BLOB_ROOT"
 
 # Migrations run in the app factory (wtbot.main.create_app -> init_db), so
 # there is no separate migrate step to keep in sync with it.
-exec uvicorn wtbot.main:app --host 0.0.0.0 --port "$WTBOT_PORT"
+exec uvicorn wtbot.main:app --host "$WTBOT_HOST" --port "$WTBOT_PORT"

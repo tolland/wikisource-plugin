@@ -21,7 +21,11 @@
 
 services:
   wtbot:
-    profiles: ["api"]
+    # The wtbot needs to be able to see the mediawiki service as a client
+    # sees it in order to retrieve resources such as images on http://localhost:<exposed_port>/some/image.jpg
+    # This avoids having to remap between docker internal and exposed ports
+    network_mode: host
+    profiles: [ "api" ]
     build:
       context: .
       dockerfile: docker/wtbot/Dockerfile
@@ -40,11 +44,13 @@ services:
       # without rebuilding the wikis, which are the slow half.
       WTBOT_DATABASE_URL: "sqlite:////data/wtbot.db"
       WTBOT_BLOB_ROOT: "/data/blobs"
-      WTBOT_PORT: "8000"
+      WTBOT_PORT: "${WTBOT_PORT:-18574}"
       WTBOT_RESET_DB: "${WTBOT_RESET_DB-0}"
-      WTBOT_LOG_LEVEL: "${WTBOT_LOG_LEVEL-INFO}"
-    ports:
-      - "${WTBOT_PORT:-18574}:8000"
+      WTBOT_LOG_LEVEL: "${WTBOT_LOG_LEVEL-DEBUG}"
+      WTBOT_FAILURE_LOG: ./failure.log
+      # ignored in network_mode: host
+    #    ports:
+    #      - "127.0.0.1:${WTBOT_PORT:-18574}:8000"
     volumes:
       - wtbot-data:/data
     healthcheck:
@@ -55,7 +61,7 @@ services:
           "CMD",
           "python",
           "-c",
-          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()",
+          "import urllib.request; urllib.request.urlopen('http://localhost:${WTBOT_PORT:-18574}/health').read()",
         ]
       interval: 5s
       timeout: 5s
@@ -63,7 +69,10 @@ services:
       start_period: 10s
 
   viewer:
-    profiles: ["api"]
+    # The viewer app needs to talk to the wtbot API which is exposed
+    # as network_mode: host, so this must follow that.
+    network_mode: host
+    profiles: [ "api" ]
     build:
       context: .
       dockerfile: docker/viewer/Dockerfile
@@ -71,11 +80,13 @@ services:
       wtbot:
         condition: service_healthy
     environment:
+      WTBOT_VIEWER_HOST: "${WTBOT_VIEWER_HOST:-127.0.0.1}"
+      WTBOT_VIEWER_PORT: "${WTBOT_VIEWER_PORT:-18573}"
       # The browser calls the viewer at /api; Vite proxies those requests over
       # the Compose network rather than trying to reach wtbot via localhost.
-      WTBOT_API_URL: "http://wtbot:8000"
-    ports:
-      - "${WTBOT_VIEWER_PORT:-18573}:5173"
+      WTBOT_API_URL: "http://${WTBOT_HOST:-127.0.0.1}:${WTBOT_PORT:-18574}"
+    #    ports:
+    #      - "${WTBOT_VIEWER_PORT:-18573}:${WTBOT_VIEWER_PORT:-18573}"
     volumes:
       # Keep application edits hot-reloadable without hiding the dependencies
       # installed in the image at /app/node_modules.
@@ -86,7 +97,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://localhost:5173').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))",
+          "fetch('http://localhost:${WTBOT_VIEWER_PORT:-18573}').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))",
         ]
       interval: 5s
       timeout: 5s

@@ -7,6 +7,9 @@ RUN npm ci
 
 COPY viewer/ ./
 
+COPY docker/viewer/start-viewer.sh /usr/local/bin/start-viewer
+RUN chmod +x /usr/local/bin/start-viewer
+
 EXPOSE 5173
 
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+CMD ["start-viewer"]

@@ -20,5 +20,5 @@ def test_wikisource_api_has_proofreadpage(wikisource) -> None:
 
     assert siteinfo["general"]["sitename"] == "Test Wikisource"
     assert any(ext["name"] == "ProofreadPage" for ext in siteinfo["extensions"])
-    assert siteinfo["namespaces"]["104"]["*"] == "Page"
-    assert siteinfo["namespaces"]["106"]["*"] == "Index"
+    assert siteinfo["namespaces"]["250"]["*"] == "Page"
+    assert siteinfo["namespaces"]["252"]["*"] == "Index"

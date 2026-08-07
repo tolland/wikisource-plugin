@@ -17,8 +17,8 @@ import com.intellij.util.messages.Topic
 class WtbotProjectSettings(private val project: Project) : PersistentStateComponent<WtbotProjectSettings.State> {
 
     data class State(
-        var host: String = "127.0.100.1",
-        var port: Int = 8000,
+        var host: String = "127.0.0.1",
+        var port: Int = 18574,
         var timeoutSeconds: Int = 10
     )
 

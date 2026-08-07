@@ -3217,6 +3217,52 @@ return p</text>
     </revision>
   </page>
   <page>
+    <title>Template:Larger block</title>
+    <ns>10</ns>
+    <id>5436</id>
+    <revision>
+      <id>10825</id>
+      <timestamp>2026-03-21T21:48:23Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Pywikibot 11.1.0</comment>
+      <origin>10825</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="154" sha1="rnfuqkuplyesdrz1lms3k6che5qsqnm" xml:space="preserve">{{larger block/s|class={{{class|}}}|style={{{style|}}}}}
+{{{1}}}
+{{larger block/e}}&lt;noinclude&gt;
+{{documentation|Template:Font size block/doc}}
+&lt;/noinclude&gt;</text>
+      <sha1>rnfuqkuplyesdrz1lms3k6che5qsqnm</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Xxx-larger block</title>
+    <ns>10</ns>
+    <id>5646</id>
+    <revision>
+      <id>11040</id>
+      <timestamp>2026-03-22T00:46:59Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Pywikibot 11.1.0</comment>
+      <origin>11040</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="162" sha1="n3323rfgyfvewmyrlxjau3m9l6jxk5j" xml:space="preserve">{{xxx-larger block/s|class={{{class|}}}|style={{{style|}}}}}
+{{{1}}}
+{{xxx-larger block/e}}&lt;noinclude&gt;
+{{documentation|Template:Font size block/doc}}
+&lt;/noinclude&gt;</text>
+      <sha1>n3323rfgyfvewmyrlxjau3m9l6jxk5j</sha1>
+    </revision>
+  </page>
+  <page>
     <title>Module:Error/doc</title>
     <ns>828</ns>
     <id>5535</id>
@@ -17040,6 +17086,171 @@ cfg.demopage = 'demopage'
 
 return cfg -- Don't edit this line.</text>
       <sha1>mlt92g3c1kq66jv01p0l0u25rey5c7m</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Larger block/s</title>
+    <ns>10</ns>
+    <id>5460</id>
+    <revision>
+      <id>10849</id>
+      <timestamp>2026-03-21T21:59:11Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Pywikibot 11.1.0</comment>
+      <origin>10849</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="186" sha1="o58o4blfe289hj8yc8qcukervhd4rhm" xml:space="preserve">&lt;includeonly&gt;{{Font size block/s|font-size-name=larger|style={{{style|}}}|height={{{height|}}}|class={{{class|}}}}}&lt;/includeonly&gt;&lt;noinclude&gt;{{documentation|Template:Font size block/doc}}</text>
+      <sha1>o58o4blfe289hj8yc8qcukervhd4rhm</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Larger block/e</title>
+    <ns>10</ns>
+    <id>5459</id>
+    <redirect title="Template:Div end" />
+    <revision>
+      <id>10848</id>
+      <timestamp>2026-03-21T21:59:07Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Pywikibot 11.1.0</comment>
+      <origin>10848</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="30" sha1="36dxtqiazrgfwqlgcyibp54icz7teia" xml:space="preserve">#REDIRECT [[Template:Div end]]</text>
+      <sha1>36dxtqiazrgfwqlgcyibp54icz7teia</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Font size block/s</title>
+    <ns>10</ns>
+    <id>5482</id>
+    <revision>
+      <id>10871</id>
+      <timestamp>2026-03-21T22:06:22Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Pywikibot 11.1.0</comment>
+      <origin>10871</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="354" sha1="bar7x74hsqykk8z7vmqmfrnigrxcl07" xml:space="preserve">&lt;includeonly&gt;&lt;templatestyles src="Template:Font size block/styles.css"/&gt;&lt;div class="wst-size-block wst-{{{font-size-name|normal}}} wst-{{{font-size-name|normal}}}-block {{{class|}}}" {{optional style|height={{{height|}}}|font-size={{{font-size|}}}|style={{{style|}}}}}&gt;&lt;/includeonly&gt;&lt;noinclude&gt;
+{{documentation|Template:Font size block/doc}}
+&lt;/noinclude&gt;</text>
+      <sha1>bar7x74hsqykk8z7vmqmfrnigrxcl07</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Font size block/styles.css</title>
+    <ns>10</ns>
+    <id>5484</id>
+    <revision>
+      <id>10873</id>
+      <timestamp>2026-03-21T22:09:29Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Pywikibot 11.1.0</comment>
+      <origin>10873</origin>
+      <model>sanitized-css</model>
+      <format>text/css</format>
+      <text bytes="848" sha1="isjxe4etmnjn90onjdeab5q8k56eoby" xml:space="preserve">.wst-size-block {
+	line-height:1.4;
+}
+
+/* 
+ * NOTE: Works around the mobile skin setting font size for p tags.
+ *
+ * Inside a size block, all p elements should inherit font size, in this case
+ * from the containing div from one of our size templates. And since
+ * TemplateStyles 1) are scoped with an extra .mw-parser-output class and
+ * 2) loaded after (later) than the skin, we get the same specificity (0-2-1)
+ * and win on a tie.
+ */
+.wst-size-block p {
+	font-size: inherit;
+}
+ 
+.wst-xx-smaller {
+	font-size:58%;
+}
+.wst-x-smaller {
+	font-size:69%;
+}
+.wst-smaller {
+	font-size:83%;
+}
+.wst-fine {
+	line-height:1.4;
+	font-size:92%;
+}
+.wst-m-larger {
+	font-size:110%;
+}
+.wst-larger {
+	font-size:120%;
+}
+.wst-x-larger {
+	font-size:144%;
+}
+.wst-xx-larger {
+	font-size:182%;
+}
+.wst-xxx-larger {
+	font-size:207%;
+}
+.wst-xxxx-larger {
+	font-size:249%;
+}</text>
+      <sha1>isjxe4etmnjn90onjdeab5q8k56eoby</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Xxx-larger block/s</title>
+    <ns>10</ns>
+    <id>5647</id>
+    <revision>
+      <id>11041</id>
+      <timestamp>2026-03-22T00:55:09Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Pywikibot 11.1.0</comment>
+      <origin>11041</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="169" sha1="heor18dgfq5q2ofhlbns84g21l0o4je" xml:space="preserve">&lt;includeonly&gt;{{Font size block/s|font-size-name=xxx-larger|style={{{style|}}}|class={{{class|}}}}}&lt;/includeonly&gt;&lt;noinclude&gt;{{documentation|Template:Font size block/doc}}</text>
+      <sha1>heor18dgfq5q2ofhlbns84g21l0o4je</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Xxx-larger block/e</title>
+    <ns>10</ns>
+    <id>5648</id>
+    <redirect title="Template:Div end" />
+    <revision>
+      <id>11042</id>
+      <timestamp>2026-03-22T00:55:14Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Pywikibot 11.1.0</comment>
+      <origin>11042</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="30" sha1="36dxtqiazrgfwqlgcyibp54icz7teia" xml:space="preserve">#REDIRECT [[Template:Div end]]</text>
+      <sha1>36dxtqiazrgfwqlgcyibp54icz7teia</sha1>
     </revision>
   </page>
 </mediawiki>

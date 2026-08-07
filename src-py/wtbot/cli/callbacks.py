@@ -47,17 +47,6 @@ def get_callback() -> Callable[[typer.Context, Optional[bool], Optional[int]], N
                 # hidden=True,
             ),
         ] = None,
-        base_url: Annotated[
-            str,
-            typer.Option(
-                ...,
-                "--base-url",
-                envvar="WTBOT_API_URL",
-                show_default=True,
-                show_envvar=False,
-                help="The url of the API",
-            ),
-        ] = "http://127.0.100.1:8000",
     ):
         # inspect(ctx)
         if ctx.invoked_subcommand is None:

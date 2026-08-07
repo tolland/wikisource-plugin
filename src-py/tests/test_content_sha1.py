@@ -63,7 +63,7 @@ def test_rev_sha1_equals_the_main_slot_content_sha1(
     content_sha1") is acting on. Both are hashes of the *stored* bytes.
     """
     rows = _content_rows(
-        wiki_pair, "upstream", ns=104, title="Canadian_patent_29537.djvu/2"
+        wiki_pair, "upstream", ns=250, title="Canadian_patent_29537.djvu/2"
     )
     assert len(rows) == 4
 
@@ -192,7 +192,7 @@ def test_index_content_model_round_trips(
 ) -> None:
     """The latest proofread-index API serialization matches imported storage."""
     rows = _content_rows(
-        wiki_pair, "upstream", ns=106, title="Canadian_patent_29537.djvu"
+        wiki_pair, "upstream", ns=252, title="Canadian_patent_29537.djvu"
     )
     assert rows
 

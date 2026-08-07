@@ -15,7 +15,7 @@ import com.intellij.openapi.components.Service
 @Service(Service.Level.APP)
 class WtVfsService {
 
-    val backend: VfsBackend = HttpVfsBackend(baseUrl = "http://127.0.100.1:8000")
+    val backend: VfsBackend = HttpVfsBackend(baseUrl = "http://localhost:18574")
 
     companion object {
         @JvmStatic

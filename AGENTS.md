@@ -52,3 +52,51 @@ To avoid conflicting with running docker instance, we should use the following c
 - 18583 Svelte viewer app
 - 18584 The wtbot fastapi service
 - 18585 Instance of wikimedia ocr
+
+## mediawiki namespace IDs
+
+Upstream en.wikisource.org uses some legacy namespace IDs. This can be seen
+here: <https://en.wikisource.org/wiki/Special:NamespaceInfo> using a config 
+like
+
+```php
+define( 'NS_PAGE', 104 );
+define( 'NS_PAGE_TALK', 105 );
+
+define( 'NS_INDEX', 106 );
+define( 'NS_INDEX_TALK', 107 );
+
+$wgExtraNamespaces[NS_PAGE] = 'Page';
+$wgExtraNamespaces[NS_PAGE_TALK] = 'Page_talk';
+$wgExtraNamespaces[NS_INDEX] = 'Index';
+$wgExtraNamespaces[NS_INDEX_TALK] = 'Index_talk';
+
+$wgProofreadPageNamespaceIds = [
+'page' => NS_PAGE,
+'index' => NS_INDEX,
+];
+```
+
+However, due to clashes with other extensions, these namespace IDs have been moved to: 
+
+```php
+define( 'NS_PAGE', 250 );
+define( 'NS_PAGE_TALK', 251 );
+
+define( 'NS_INDEX', 252 );
+define( 'NS_INDEX_TALK', 253 );
+
+$wgExtraNamespaces[NS_PAGE] = 'Page';
+$wgExtraNamespaces[NS_PAGE_TALK] = 'Page_talk';
+$wgExtraNamespaces[NS_INDEX] = 'Index';
+$wgExtraNamespaces[NS_INDEX_TALK] = 'Index_talk';
+
+$wgProofreadPageNamespaceIds = [
+'page' => NS_PAGE,
+'index' => NS_INDEX,
+];
+```
+
+The proofread-page extension when deployed from recent git checkout, we are
+using 1.43 will by default, no configuration required, use the latter namespace
+IDs.
