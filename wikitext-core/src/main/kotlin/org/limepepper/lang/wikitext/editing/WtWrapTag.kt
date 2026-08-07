@@ -1,6 +1,18 @@
 package org.limepepper.lang.wikitext.editing
 
 /**
+ * Placeholder for the value a [WtWrapTag] needs filled in — see
+ * [WtWrapTag.variablePrompt]. Chosen to look like a live-template variable
+ * because one of the surround implementations turns it into exactly that.
+ *
+ * A top-level constant rather than a member of [WtWrapTag.Companion]: enum
+ * entries are constructed before their companion object is initialized, so
+ * [WtWrapTag.SECTION] cannot read it from there. [WtWrapTag.VARIABLE] aliases
+ * it for callers, who should keep using that name.
+ */
+private const val VARIABLE_PLACEHOLDER: String = "\$NAME$"
+
+/**
  * The catalog of constructs a selection can be wrapped in — the single source
  * of truth shared by Surround With, the formatting toggle actions, and (later)
  * intentions/completion, so a construct is described once rather than once per
@@ -76,8 +88,8 @@ enum class WtWrapTag(
     SECTION(
         id = "section",
         title = "<section begin/end>",
-        prefix = "<section begin=\"$VARIABLE\" />",
-        suffix = "<section end=\"$VARIABLE\" />",
+        prefix = "<section begin=\"$VARIABLE_PLACEHOLDER\" />",
+        suffix = "<section end=\"$VARIABLE_PLACEHOLDER\" />",
         block = true,
         variablePrompt = "Section name",
     ),
@@ -87,12 +99,8 @@ enum class WtWrapTag(
     val hasVariable: Boolean get() = variablePrompt != null
 
     companion object {
-        /**
-         * Placeholder for the value described by [variablePrompt]. Chosen to
-         * look like a live-template variable because one of the surround
-         * implementations turns it into exactly that.
-         */
-        const val VARIABLE: String = "\$NAME$"
+        /** Placeholder for the value described by [variablePrompt]. */
+        const val VARIABLE: String = VARIABLE_PLACEHOLDER
 
         fun byId(id: String): WtWrapTag? = entries.firstOrNull { it.id == id }
     }
