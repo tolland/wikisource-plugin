@@ -54,6 +54,20 @@ allprojects {
             }
         }
     }
+
+    // Gradle's Test task inherits the daemon's environment by default, and the
+    // daemon in turn inherits whatever shell started it — so a developer's own
+    // WTBOT_BASE_URL export (e.g. pointed at the docker harness) silently leaks
+    // into every test JVM and defeats WtbotAppSettings' "fresh instance" tests.
+    // Strip wtbot's runtime overrides here so `test` only ever sees the
+    // committed defaults, the same as CI. -PwtbotBaseUrl / runIde are separate
+    // tasks and are untouched.
+    tasks.withType<Test>().configureEach {
+        environment.remove("WTBOT_BASE_URL")
+        environment.remove("WTBOT_TIMEOUT_SECONDS")
+        systemProperties.remove("wtbot.baseUrl")
+        systemProperties.remove("wtbot.timeoutSeconds")
+    }
 }
 
 
