@@ -13,7 +13,7 @@ from ocrapi.api import (
     catalog_out,
 )
 from ocrapi.client import OcrCrop, OcrError, OcrRequest, build_client
-from wtbot.api.debug_loggig_route import DebugLoggingRoute
+from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.deps import get_session
 from wtbot.vfs.nodes import PageLeaf, resolve
 from wtbot.vfs.store import PageStore

@@ -44,7 +44,7 @@ A single test class/method can be run the normal Gradle way, e.g. `GRADLE_USER_H
 Dependencies are managed with `uv` (`pyproject.toml` + `uv.lock`).
 
 ```bash
-uv run fastapi dev src-py/wtbot/main.py   # start FastAPI dev server
+uv run fastapi dev src-py/wtbot/main.py --port 18564   # start FastAPI dev server (dev-convention port, see docs/logging.md)
 uv run pytest                              # run Python tests (uses pythonpath=src-py, testpaths=src-py/tests)
 uv run pytest src-py/tests/test_fetch.py -k some_case  # single test
 uv run ruff check --fix                    # lint (mirrors the pre-commit hook)

@@ -43,7 +43,7 @@ def fetch_page(
         1, help="expansion depth: 0=page only, 1=expand Index/File"
     ),
     base_url: str = typer.Option(
-        lambda: os.environ.get("WTBOT_API_URL", "http://127.0.100.1:8000"),
+        lambda: os.environ.get("WTBOT_API_URL", "http://127.0.100.1:18564"),
         help="wtbot API base URL",
     ),
 ) -> None:

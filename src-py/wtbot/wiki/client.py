@@ -26,7 +26,7 @@ and ``download_file`` are all the fetch path needs. Two implementations:
 """
 
 
-# logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 # Width requested for the small tree/preview thumbnail. The API's default
 # rendition (no prppifpsize) is ~1280px -- that is ProofreadPage's edit-view
@@ -246,7 +246,7 @@ class PywikibotClient:
             )
             data = resp.json()
         except Exception as exc:  # noqa: BLE001 - enrichment only, never fatal
-            logging.debug("imageforpage query failed for %s: %s", title, exc)
+            logger.debug("imageforpage query failed for %s: %s", title, exc)
             return None
         pages = (data.get("query") or {}).get("pages") or {}
         for pdata in pages.values():
@@ -286,7 +286,7 @@ class PywikibotClient:
             )
             data = resp.json()
         except Exception as exc:  # noqa: BLE001 - fall back to page_count
-            logging.debug("proofreadpagesinindex failed for %s: %s", title, exc)
+            logger.debug("proofreadpagesinindex failed for %s: %s", title, exc)
             return None
         entries = (data.get("query") or {}).get("proofreadpagesinindex")
         if not isinstance(entries, list):
@@ -323,7 +323,7 @@ class PywikibotClient:
             )
             data = resp.json()
         except Exception as exc:  # noqa: BLE001 - enrichment only, never fatal
-            logging.debug("defaultcontentforpage query failed for %s: %s", title, exc)
+            logger.debug("defaultcontentforpage query failed for %s: %s", title, exc)
             return None
         pages = (data.get("query") or {}).get("pages") or {}
         for pdata in pages.values():

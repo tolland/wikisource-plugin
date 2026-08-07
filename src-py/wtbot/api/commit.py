@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlmodel import Session, select
 
+from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.api.schemas import (
     CommitRunResponse,
     PendingCommitJournal,
@@ -13,7 +14,7 @@ from wtbot.deps import get_session
 from wtbot.model import Commit, CommitStatus, EditJournal, Page
 from wtbot.worker import run_pending
 
-router = APIRouter(prefix="/commits", tags=["commits"])
+router = APIRouter(prefix="/commits", tags=["commits"], route_class=DebugLoggingRoute)
 
 
 def _drain_fetch_queue(request: Request, session: Session) -> None:

@@ -18,7 +18,7 @@ class WtbotProjectSettings(private val project: Project) : PersistentStateCompon
 
     data class State(
         var host: String = "127.0.100.1",
-        var port: Int = 8000,
+        var port: Int = 18564,
         var timeoutSeconds: Int = 10
     )
 

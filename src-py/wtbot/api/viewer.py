@@ -2,10 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
+from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.deps import get_session
 from wtbot.model import IndexMeta, Page
 
-router = APIRouter(prefix="/viewer", tags=["viewer"])
+router = APIRouter(prefix="/viewer", tags=["viewer"], route_class=DebugLoggingRoute)
 
 PROOFREAD_INDEX_CONTENT_MODEL = "proofread-index"
 

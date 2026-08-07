@@ -3,12 +3,13 @@ import logging
 import threading
 from xml.sax.saxutils import escape
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Request
 from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
-from wtbot.api.debug_loggig_route import DebugLoggingRoute
+from wtbot.api.debug_logging_route import DebugLoggingRoute
+from wtbot.api.errors import ApiError
 from wtbot.api.page_image import serve_scan_image
 from wtbot.deps import get_session
 from wtbot.model import Page, Site
@@ -28,6 +29,8 @@ site, page title and content model from the cache) or a bare title (scratch
 """
 
 router = APIRouter(prefix="/preview", tags=["preview"], route_class=DebugLoggingRoute)
+
+logger = logging.getLogger(__name__)
 
 
 class PreviewRequest(BaseModel):
@@ -58,14 +61,22 @@ def _resolve_target(session: Session, path: str) -> tuple[Site, str, str | None]
     """
     parts = _parse_path(path)
     if len(parts) < 3:
-        raise HTTPException(status_code=422, detail=f"path is not a page: {path}")
+        raise ApiError(
+            status_code=422,
+            detail=f"path is not a page: {path}",
+            code="path-not-a-page",
+        )
 
     family, code, index_title = parts[0], parts[1], parts[2]
     site = session.exec(
         select(Site).where(Site.family == family, Site.code == code)
     ).first()
     if site is None:
-        raise HTTPException(status_code=404, detail=f"site {family}/{code} not found")
+        raise ApiError(
+            status_code=404,
+            detail=f"site {family}/{code} not found",
+            code="site-not-found",
+        )
 
     rest = parts[3:]
     if not rest or rest == ["wikitext"]:
@@ -111,11 +122,17 @@ def render_preview(
         site, title, content_model = _resolve_target(session, body.path)
     else:
         if not body.title:
-            raise HTTPException(status_code=422, detail="need either path or title")
+            raise ApiError(
+                status_code=422,
+                detail="need either path or title",
+                code="missing-target",
+            )
         title = body.title
         site = session.exec(select(Site)).first()
         if site is None:
-            raise HTTPException(status_code=404, detail="no site configured")
+            raise ApiError(
+                status_code=404, detail="no site configured", code="no-site-configured"
+            )
 
     # All reads are done. Release the session now rather than holding it
     # across a multi-second wiki round trip on every debounced keystroke.
@@ -125,7 +142,9 @@ def render_preview(
     try:
         rendered = client.render_preview(title, body.wikitext, content_model)
     except Exception as e:  # wiki/network failures surface as a gateway error
-        raise HTTPException(status_code=502, detail=f"parse failed: {e}") from e
+        raise ApiError(
+            status_code=502, detail=f"parse failed: {e}", code="wiki-parse-failed"
+        ) from e
 
     return PreviewResponse(
         title=rendered.title,
@@ -173,11 +192,13 @@ def _fetch_image(url: str) -> tuple[bytes, str] | None:
             verify=WikiSettings.from_env().ca_bundle or True,
         )
     except Exception as exc:  # noqa: BLE001 - degrade to placeholder
-        logging.debug("page-image fetch failed for %s: %s", url, exc)
+        # WARNING, not DEBUG: the user sees a placeholder instead of the scan,
+        # and this line is the only server-side explanation why.
+        logger.warning("page-image fetch failed for %s: %s", url, exc)
         return None
     content_type = resp.headers.get("content-type", "")
     if resp.status_code != 200 or not content_type.startswith("image/"):
-        logging.debug(
+        logger.warning(
             "page-image fetch for %s: HTTP %s, content-type %r",
             url,
             resp.status_code,
@@ -195,7 +216,7 @@ def _live_page_images(
     try:
         return _client_for(request, site).get_page_images(title)
     except Exception as exc:  # noqa: BLE001 - enrichment only, never fatal
-        logging.debug("live imageforpage lookup failed for %s: %s", title, exc)
+        logger.debug("live imageforpage lookup failed for %s: %s", title, exc)
         return None
 
 
@@ -228,7 +249,9 @@ def page_image(
         resolved_title = title
         page = session.exec(select(Page).where(Page.title == title)).first()
     else:
-        raise HTTPException(status_code=422, detail="need either path or title")
+        raise ApiError(
+            status_code=422, detail="need either path or title", code="missing-target"
+        )
 
     if page is not None:
         response = serve_scan_image(request, background, session, page, width)

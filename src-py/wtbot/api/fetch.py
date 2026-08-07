@@ -10,11 +10,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
+from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.deps import get_session
 from wtbot.model import FetchKind, FetchRequest, Page, Site
 from wtbot.worker import run_pending
 
-router = APIRouter(prefix="/fetch", tags=["fetch"])
+router = APIRouter(prefix="/fetch", tags=["fetch"], route_class=DebugLoggingRoute)
 
 
 class FetchCreate(BaseModel):

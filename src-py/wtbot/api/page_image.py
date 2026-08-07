@@ -8,7 +8,6 @@ from fastapi import (
     APIRouter,
     BackgroundTasks,
     Depends,
-    HTTPException,
     Query,
     Request,
     Response,
@@ -16,6 +15,8 @@ from fastapi import (
 from sqlalchemy import func
 from sqlmodel import Session, select
 
+from wtbot.api.debug_logging_route import DebugLoggingRoute
+from wtbot.api.errors import ApiError
 from wtbot.deps import get_session
 from wtbot.model import Page
 from wtbot.model.page_meta import PageMeta
@@ -41,7 +42,9 @@ Sequential transcription is the normal workflow, so serving page N warms
 page N+1 at the same width in the background (best-effort).
 """
 
-router = APIRouter(prefix="/pages", tags=["page-images"])
+router = APIRouter(prefix="/pages", tags=["page-images"], route_class=DebugLoggingRoute)
+
+logger = logging.getLogger(__name__)
 
 _PX_TOKEN = re.compile(r"(page\d+-)(\d+)(px-)")
 
@@ -96,13 +99,18 @@ def get_page_image(
     store = PageStore(session)
     node = resolve(store, path)
     if not isinstance(node, PageLeaf):
-        raise HTTPException(status_code=404, detail=f"not a proofread page: {path}")
+        raise ApiError(
+            status_code=404,
+            detail=f"not a proofread page: {path}",
+            code="not-a-proofread-page",
+        )
 
     response = serve_scan_image(request, background, session, node.page, width)
     if response is None:
-        raise HTTPException(
+        raise ApiError(
             status_code=404,
             detail=f"no scan image known for {node.page.title} — fetch the page first",
+            code="no-scan-image",
         )
     return response
 
@@ -129,8 +137,10 @@ def serve_scan_image(
         try:
             _fill_cache(cache, url)
         except Exception as exc:  # noqa: BLE001 - surface as bad gateway
-            raise HTTPException(
-                status_code=502, detail=f"scan image fetch failed: {exc}"
+            raise ApiError(
+                status_code=502,
+                detail=f"scan image fetch failed: {exc}",
+                code="scan-image-fetch-failed",
             ) from exc
 
     background.add_task(
@@ -179,4 +189,4 @@ def _warm_next_page(
             return
         _fill_cache(cache, url)
     except Exception as exc:  # noqa: BLE001 - warming must never surface
-        logging.debug("next-page warm failed: %s", exc)
+        logger.debug("next-page warm failed: %s", exc)

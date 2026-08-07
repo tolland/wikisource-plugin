@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlmodel import Session
 
-from wtbot.api.debug_loggig_route import DebugLoggingRoute
+from wtbot.api.debug_logging_route import DebugLoggingRoute
+from wtbot.api.errors import ApiError
 from wtbot.api.schemas import (
     ChangesSinceResponse,
     CreateChildRequest,
@@ -48,18 +49,17 @@ Write / rename / delete and the change feed are stubbed for now.
 
 router = APIRouter(prefix="/vfs", tags=["vfs"], route_class=DebugLoggingRoute)
 
-_ERROR_STATUS: dict[type[VfsError], int] = {
-    NotFound: 404,
-    NotADirectory: 404,
-    NotAFile: 400,
-    BlobsNotImplemented: 501,
+_ERROR_STATUS: dict[type[VfsError], tuple[int, str]] = {
+    NotFound: (404, "not-found"),
+    NotADirectory: (404, "not-a-directory"),
+    NotAFile: (400, "not-a-file"),
+    BlobsNotImplemented: (501, "blobs-not-implemented"),
 }
 
 
-def _http_error(exc: VfsError) -> HTTPException:
-    return HTTPException(
-        status_code=_ERROR_STATUS.get(type(exc), 500), detail=exc.message
-    )
+def _http_error(exc: VfsError) -> ApiError:
+    status, code = _ERROR_STATUS.get(type(exc), (500, "vfs-error"))
+    return ApiError(status_code=status, detail=exc.message, code=code)
 
 
 @router.get("/stat", response_model=Stat)

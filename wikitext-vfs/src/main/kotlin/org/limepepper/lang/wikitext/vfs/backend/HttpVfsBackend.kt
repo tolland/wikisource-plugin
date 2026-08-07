@@ -7,6 +7,7 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
+import java.util.UUID
 import com.intellij.openapi.project.Project
 import org.limepepper.lang.wikitext.vfs.settings.WtbotProjectSettings
 import org.limepepper.lang.wikitext.vfs.settings.WtbotSettingsListener
@@ -18,7 +19,7 @@ import org.limepepper.lang.wikitext.vfs.settings.WtbotSettingsListener
  * JSON is parsed with a minimal hand-rolled extractor ([JsonReader]) rather
  * than a full library so the wikitext-vfs module stays dep-light.
  *
- * @param baseUrl  e.g. "http://127.0.100.1:8000" — no trailing slash
+ * @param baseUrl  e.g. "http://127.0.100.1:18564" — no trailing slash
  * @param timeout  per-request timeout
  */
 class HttpVfsBackend(
@@ -28,7 +29,7 @@ class HttpVfsBackend(
 ) : VfsBackend {
 
     constructor() : this(
-        baseUrl = "http://127.0.100.1:8000",
+        baseUrl = "http://127.0.100.1:18564",
         timeout = Duration.ofSeconds(10),
         client = buildClient(Duration.ofSeconds(10))
     )
@@ -211,14 +212,13 @@ class HttpVfsBackend(
         }
     }
 
-    override fun pageImageUrl(path: String?, title: String?): String {
-        val query = listOfNotNull(
+    override fun fetchPageImage(path: String?, title: String?, width: Int?): ByteArray {
+        val params = listOfNotNull(
             path?.let { "path" to it },
             title?.let { "title" to it },
-        ).joinToString("&") { (k, v) ->
-            "${URLEncoder.encode(k, "UTF-8")}=${URLEncoder.encode(v, "UTF-8")}"
-        }
-        return "$baseUrl/preview/page-image?$query"
+            width?.let { "width" to it.toString() },
+        )
+        return getBytes("/preview/page-image", *params.toTypedArray())
     }
 
     override fun listAnnotations(path: String): List<PageAnnotation> {
@@ -393,70 +393,111 @@ class HttpVfsBackend(
 
     // -------------------------------------------------------------------------
 
-    private fun get(endpoint: String, vararg params: Pair<String, String>): String {
+    private fun queryUri(endpoint: String, vararg params: Pair<String, String>): URI {
         val query = params.joinToString("&") { (k, v) ->
             "${URLEncoder.encode(k, "UTF-8")}=${URLEncoder.encode(v, "UTF-8")}"
         }
-        val uri = URI.create("$baseUrl$endpoint?$query")
-        val req = HttpRequest.newBuilder(uri)
+        return URI.create(if (query.isEmpty()) "$baseUrl$endpoint" else "$baseUrl$endpoint?$query")
+    }
+
+    /**
+     * Every request carries an X-Request-Id the sidecar echoes into its error
+     * object and error-log lines, so a plugin-side failure and the matching
+     * sidecar line join on one id.
+     */
+    private fun requestBuilder(uri: URI, requestId: String): HttpRequest.Builder =
+        HttpRequest.newBuilder(uri)
             .timeout(timeout)
             .version(HttpClient.Version.HTTP_1_1) // avoid upgrade requests
-            .GET()
-            .build()
+            .header("X-Request-Id", requestId)
+
+    private fun newRequestId(): String = UUID.randomUUID().toString().substringBefore('-')
+
+    private fun get(endpoint: String, vararg params: Pair<String, String>): String {
+        val uri = queryUri(endpoint, *params)
+        val requestId = newRequestId()
+        val req = requestBuilder(uri, requestId).GET().build()
         val resp = send(req)
         if (resp.statusCode() !in 200..299) {
-            throw VfsBackendException("HTTP ${resp.statusCode()} from $uri: ${resp.body()}", statusCode = resp.statusCode())
+            throw httpError(uri, resp.statusCode(), resp.body(), requestId)
+        }
+        return resp.body()
+    }
+
+    private fun getBytes(endpoint: String, vararg params: Pair<String, String>): ByteArray {
+        val uri = queryUri(endpoint, *params)
+        val requestId = newRequestId()
+        val req = requestBuilder(uri, requestId).GET().build()
+        val resp = try {
+            client.send(req, HttpResponse.BodyHandlers.ofByteArray())
+        } catch (e: IOException) {
+            throw VfsBackendException("request to $uri failed: ${e.message}", e)
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+            throw VfsBackendException("request to $uri interrupted", e)
+        }
+        if (resp.statusCode() !in 200..299) {
+            throw httpError(uri, resp.statusCode(), resp.body().decodeToString(), requestId)
         }
         return resp.body()
     }
 
     private fun post(endpoint: String, jsonBody: String): String {
-        val uri = URI.create("$baseUrl$endpoint")
-        val req = HttpRequest.newBuilder(uri)
-            .timeout(timeout)
-            .version(HttpClient.Version.HTTP_1_1) // avoid upgrade requests
+        val uri = queryUri(endpoint)
+        val requestId = newRequestId()
+        val req = requestBuilder(uri, requestId)
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
             .build()
         val resp = send(req)
         if (resp.statusCode() !in 200..299) {
-            throw VfsBackendException("HTTP ${resp.statusCode()} from $uri: ${resp.body()}", statusCode = resp.statusCode())
+            throw httpError(uri, resp.statusCode(), resp.body(), requestId)
         }
         return resp.body()
     }
 
     private fun put(endpoint: String, jsonBody: String, vararg params: Pair<String, String>): String {
-        val query = params.joinToString("&") { (k, v) ->
-            "${URLEncoder.encode(k, "UTF-8")}=${URLEncoder.encode(v, "UTF-8")}"
-        }
-        val uri = URI.create("$baseUrl$endpoint?$query")
-        val req = HttpRequest.newBuilder(uri)
-            .timeout(timeout)
-            .version(HttpClient.Version.HTTP_1_1) // avoid upgrade requests
+        val uri = queryUri(endpoint, *params)
+        val requestId = newRequestId()
+        val req = requestBuilder(uri, requestId)
             .header("Content-Type", "application/json")
             .PUT(HttpRequest.BodyPublishers.ofString(jsonBody))
             .build()
         val resp = send(req)
         if (resp.statusCode() !in 200..299) {
-            throw VfsBackendException("HTTP ${resp.statusCode()} from $uri: ${resp.body()}", statusCode = resp.statusCode())
+            throw httpError(uri, resp.statusCode(), resp.body(), requestId)
         }
         return resp.body()
     }
 
     private fun delete(endpoint: String, vararg params: Pair<String, String>) {
-        val query = params.joinToString("&") { (k, v) ->
-            "${URLEncoder.encode(k, "UTF-8")}=${URLEncoder.encode(v, "UTF-8")}"
-        }
-        val uri = URI.create("$baseUrl$endpoint?$query")
-        val req = HttpRequest.newBuilder(uri)
-            .timeout(timeout)
-            .version(HttpClient.Version.HTTP_1_1) // avoid upgrade requests
-            .DELETE()
-            .build()
+        val uri = queryUri(endpoint, *params)
+        val requestId = newRequestId()
+        val req = requestBuilder(uri, requestId).DELETE().build()
         val resp = send(req)
         if (resp.statusCode() !in 200..299) {
-            throw VfsBackendException("HTTP ${resp.statusCode()} from $uri: ${resp.body()}", statusCode = resp.statusCode())
+            throw httpError(uri, resp.statusCode(), resp.body(), requestId)
         }
+    }
+
+    /**
+     * Builds the exception for a non-2xx response, pulling the sidecar's
+     * defined error object ({"detail", "code", "request_id"} — see
+     * src-py/wtbot/api/errors.py) out of the body when present so callers
+     * and log lines get the server's one-line explanation rather than raw
+     * JSON. Non-JSON bodies (a proxy's HTML error page, an empty body) fall
+     * back to the raw text.
+     */
+    private fun httpError(uri: URI, status: Int, body: String, requestId: String): VfsBackendException {
+        val detail = runCatching { JsonReader(body).stringOrNull("detail") }.getOrNull()
+        val errorCode = runCatching { JsonReader(body).stringOrNull("code") }.getOrNull()
+        return VfsBackendException(
+            "HTTP $status from $uri: ${detail ?: body.ifBlank { "<empty body>" }}",
+            statusCode = status,
+            detail = detail,
+            errorCode = errorCode,
+            requestId = requestId,
+        )
     }
 
     /**
@@ -519,4 +560,10 @@ class VfsBackendException(
     cause: Throwable? = null,
     /** HTTP status when the failure was an HTTP error response; null for transport failures. */
     val statusCode: Int? = null,
+    /** The sidecar error object's human-readable "detail", when the body carried one. */
+    val detail: String? = null,
+    /** The sidecar error object's stable "code" (e.g. "scan-image-fetch-failed"). */
+    val errorCode: String? = null,
+    /** The X-Request-Id this client sent — the sidecar logs and echoes it. */
+    val requestId: String? = null,
 ) : IOException(message, cause)

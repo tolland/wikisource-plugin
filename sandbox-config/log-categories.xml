@@ -8,6 +8,10 @@
       {
         "category": "org.limepepper.lang.gdb.docs",
         "level": "TRACE"
+      },
+      {
+        "category": "org.limepepper.lang.wikitext",
+        "level": "DEBUG"
       }
     ]
   }]]></component>

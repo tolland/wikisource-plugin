@@ -10,13 +10,12 @@ import org.limepepper.lang.wikitext.annotation.BoundingBox
 import org.limepepper.lang.wikitext.annotation.BoundingBoxModel
 import org.limepepper.lang.wikitext.annotation.ImageAnnotationPane
 import org.limepepper.lang.wikitext.vfs.WtVirtualFile
+import org.limepepper.lang.wikitext.vfs.backend.VfsBackendException
 import org.limepepper.lang.wikitext.vfs.backend.WtVfsService
 import java.awt.Rectangle
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
 import java.io.IOException
-import java.net.URI
-import java.util.Base64
 import javax.imageio.ImageIO
 import javax.swing.JComponent
 import javax.swing.JPopupMenu
@@ -126,10 +125,17 @@ class ReferenceImagePane(
             var failure: String? = null
             val backend = WtVfsService.instance.backend
             val image = try {
-                loadImage(backend.pageImageUrl(
+                loadImage(backend.fetchPageImage(
                     vfsPath,
                     if (file is WtVirtualFile) null else file.nameWithoutExtension,
                 ))
+            } catch (e: VfsBackendException) {
+                // The sidecar already explained itself (its error object's
+                // detail, e.g. "scan image fetch failed: …") — one warn line,
+                // no stack trace for an expected failure mode.
+                IMAGE_LOG.warn("reference image load failed for ${file.path}: ${e.message}")
+                failure = e.detail ?: e.message
+                null
             } catch (e: Exception) {
                 IMAGE_LOG.warn("reference image load failed for ${file.path}", e)
                 failure = e.message ?: e.javaClass.simpleName
@@ -184,16 +190,9 @@ class ReferenceImagePane(
     /** "Reset" fits the whole scan into the pane, the same as the initial view. */
     fun resetZoom() = annotationPane.resetZoom()
 
-    private fun loadImage(url: String): BufferedImage {
-        // The fake backend hands out data: URLs; java.net can't open those.
-        val decoded = if (url.startsWith("data:")) {
-            val payload = url.substringAfter("base64,", missingDelimiterValue = "")
-            ImageIO.read(ByteArrayInputStream(Base64.getDecoder().decode(payload)))
-        } else {
-            ImageIO.read(URI(url).toURL())
-        }
-        return decoded ?: throw IOException("unsupported image format at $url")
-    }
+    private fun loadImage(bytes: ByteArray): BufferedImage =
+        ImageIO.read(ByteArrayInputStream(bytes))
+            ?: throw IOException("unsupported image format (${bytes.size} bytes)")
 
     override fun dispose() {
         disposed = true

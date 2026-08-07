@@ -9,13 +9,14 @@ import com.intellij.openapi.components.Service
  * Registered in wikisource.wikitext-vfs.xml as an applicationService.
  * Retrieve via [WtVfsService.instance].
  *
- * The base URL is hard-coded to localhost:8000 for now; a persistent
- * settings component can inject it later.
+ * The base URL is hard-coded to the dev-convention wtbot port (18564, see
+ * docs/logging.md) for now; a persistent settings component can inject it
+ * later.
  */
 @Service(Service.Level.APP)
 class WtVfsService {
 
-    val backend: VfsBackend = HttpVfsBackend(baseUrl = "http://127.0.100.1:8000")
+    val backend: VfsBackend = HttpVfsBackend(baseUrl = "http://127.0.100.1:18564")
 
     companion object {
         @JvmStatic
