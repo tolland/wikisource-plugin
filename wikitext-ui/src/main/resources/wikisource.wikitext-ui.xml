@@ -52,6 +52,34 @@
             canCloseContents="true"
         />
 
+        <!-- Text editing: Surround With (Ctrl+Alt+T). Language-scoped, so it
+        covers plain .wt files and wikisource:// files alike — the feature only
+        ever touches the Document. -->
+        <lang.surroundDescriptor
+            language="Wikitext"
+            implementationClass="org.limepepper.lang.wikitext.editing.surround.WtSurroundDescriptor"
+        />
+
+        <!-- Prototype switches for the editing features (see WtEditingFlags).
+        Registry, not Settings: none of these interaction styles has earned a
+        checkbox yet, and each is expected to be deleted along with its losing
+        implementation. Toggle from Help > Find Action > "Registry...". -->
+        <registryKey
+            key="wikitext.editing.surround.enabled"
+            defaultValue="true"
+            description="Wikitext: contribute wikitext tags to Surround With (Ctrl+Alt+T)"
+        />
+        <registryKey
+            key="wikitext.editing.surround.strategy"
+            defaultValue="template"
+            description="Wikitext: how Surround With inserts markup - 'template' (live template, mirrors section names) or 'document' (plain document edit)"
+        />
+        <registryKey
+            key="wikitext.editing.variablePrompt"
+            defaultValue="inline"
+            description="Wikitext: how a tag's value (e.g. a section name) is asked for - 'inline' (type in the editor), 'dialog' (modal input), or 'none' (insert a placeholder)"
+        />
+
         <lang.psiStructureViewFactory
             language="Wikitext"
             implementationClass="org.limepepper.lang.wikitext.structure.WtStructureViewFactory"
