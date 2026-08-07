@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlmodel import Session, select
 
+from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.api.schemas import (
     CommitRunResponse,
     PendingCommitJournal,
@@ -12,7 +13,7 @@ from wtbot.commit_worker import run_pending_commit_for_page, run_pending_commits
 from wtbot.deps import get_session
 from wtbot.model import Commit, CommitStatus, EditJournal, Page
 
-router = APIRouter(prefix="/commits", tags=["commits"])
+router = APIRouter(prefix="/commits", tags=["commits"], route_class=DebugLoggingRoute)
 
 # A successful push enqueues a refetch of its page -- the Page row is only ever
 # written from fetched remote state -- and, like POST /fetch, this endpoint no

@@ -118,7 +118,9 @@ class WtbotAppSettings : PersistentStateComponent<WtbotAppSettings.State> {
         private val LOG = Logger.getInstance(WtbotAppSettings::class.java)
 
         /** The docker-compose default port for the sidecar (see AGENTS.md). */
-        const val DEFAULT_BASE_URL: String = "http://127.0.0.1:18574"
+        // Dev-convention port for a workstation-launched sidecar (docs/logging.md
+        // §0); point at the docker harness per-launch via -PwtbotBaseUrl instead.
+        const val DEFAULT_BASE_URL: String = "http://127.0.0.1:18564"
         const val DEFAULT_TIMEOUT_SECONDS: Int = 10
 
         /** Set by `runIde -PwtbotBaseUrl=…`; also settable on any IDE's VM options. */

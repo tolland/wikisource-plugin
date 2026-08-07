@@ -11,7 +11,30 @@ from wtbot.log_levels import TRACE, install_trace_logging
 DEFAULT_LOG_FORMAT = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
 DEFAULT_LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 DEBUG_ROUTE_LOGGER = "wtbot.api.debug_logging_route"
-KNOWN_DEBUG_ROUTE_TAGS = frozenset({"preview", "vfs"})
+# Every router opts in to DebugLoggingRoute; the tag doubles as the tracing
+# switch (WTBOT_TRACE_DEBUG_ROUTE_TAGS). Keep in sync with the routers'
+# tags=[...] declarations in wtbot/api/*.py.
+KNOWN_DEBUG_ROUTE_TAGS = frozenset(
+    {
+        "commits",
+        "edit-journal",
+        "fetch",
+        "file-blobs",
+        "health",
+        "links",
+        "namespaces",
+        "ocr",
+        "page-annotations",
+        "page-meta",
+        "page-nav",
+        "pages",
+        "preview",
+        "reference-image",
+        "sites",
+        "vfs",
+        "viewer",
+    }
+)
 DOTENV_PATH = Path(".env")
 
 _TRUE_VALUES = frozenset({"1", "true", "yes", "on"})

@@ -47,18 +47,18 @@ interface VfsBackend {
     fun pageNav(path: String): PageNavResult
 
     /**
-     * URL of the reference scan image for a ProofreadPage Page: — the source
-     * the transcription is being proofread against, which ProofreadPage's own
-     * API calls `imageforpage`. Not a preview: the preview endpoint renders
-     * wikitext to HTML, and this returns pixels of a scanned page.
-     *
-     * Building the URL is local and cheap; the image itself is fetched by
-     * whoever renders it (JCEF). The sidecar serves the real scan when it has
-     * one and a labelled placeholder while it does not, so this never has to
-     * be conditional on [StatResult.hasReferenceImage] — that flag is for
-     * deciding what to *offer*, not whether the URL resolves.
+     * Bytes of the reference image for a ProofreadPage Page: — the scan of
+     * the page being transcribed (the sidecar's GET /reference-image). The
+     * sidecar serves the real scan when it has one and a labelled placeholder
+     * while it does not, so this never has to be conditional on
+     * [StatResult.hasReferenceImage] — that flag is for deciding what to
+     * *offer*, not whether the fetch resolves. Fetching through the backend,
+     * rather than handing out a URL for the renderer to open itself, means a
+     * failed request surfaces as a [VfsBackendException] carrying the
+     * sidecar's error detail instead of a bare HTTP status. Blocking; call
+     * off the EDT.
      */
-    fun referenceImageUrl(path: String?, title: String?): String
+    fun fetchReferenceImage(path: String?, title: String?, width: Int? = null): ByteArray
 
     /** Scan annotations (bounding boxes) for a Page: leaf. */
     fun listAnnotations(path: String): List<PageAnnotation>

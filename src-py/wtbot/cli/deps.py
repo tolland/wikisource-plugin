@@ -25,7 +25,7 @@ line). The command receives a built object rather than loose strings.
 There is deliberately no global state and no ctx digging here.
 """
 
-DEFAULT_BASE_URL = "http://127.0.100.1:8000"
+DEFAULT_BASE_URL = "http://127.0.100.1:18564"
 
 #: Generous by default: a drain of a throttled fan-out legitimately runs for
 #: minutes, and a timeout mid-drain looks like a server fault.

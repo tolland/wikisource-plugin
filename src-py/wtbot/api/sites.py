@@ -2,13 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
+from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.deps import get_session
 from wtbot.model import Site, SiteCredential
 from wtbot.site_delete import SiteDeletePlan, execute_site_delete, plan_site_delete
 from wtbot.site_store import require_site, site_by_label
 from wtbot.timeutil import utcnow
 
-router = APIRouter(prefix="/sites", tags=["sites"])
+router = APIRouter(prefix="/sites", tags=["sites"], route_class=DebugLoggingRoute)
 
 """Site registration.
 

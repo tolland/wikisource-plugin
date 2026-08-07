@@ -287,7 +287,7 @@ class FakeVfsBackend : VfsBackend {
         )
     }
 
-    override fun referenceImageUrl(path: String?, title: String?): String {
+    override fun fetchReferenceImage(path: String?, title: String?, width: Int?): ByteArray {
         // PNG rather than SVG: the scan viewer decodes with ImageIO, which
         // has no SVG support.
         val image = BufferedImage(800, 1200, BufferedImage.TYPE_INT_RGB)
@@ -298,7 +298,6 @@ class FakeVfsBackend : VfsBackend {
             drawString("fake page scan${title?.let { ": $it" } ?: ""}", 40, 60)
             dispose()
         }
-        val bytes = ByteArrayOutputStream().also { ImageIO.write(image, "png", it) }.toByteArray()
-        return "data:image/png;base64," + Base64.getEncoder().encodeToString(bytes)
+        return ByteArrayOutputStream().also { ImageIO.write(image, "png", it) }.toByteArray()
     }
 }

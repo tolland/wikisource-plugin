@@ -1,10 +1,11 @@
 import base64
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from wtbot.api.debug_logging_route import DebugLoggingRoute
+from wtbot.api.errors import ApiError
 from wtbot.api.targets import client_for, resolve_target
 from wtbot.deps import get_session
 from wtbot.model import Site
@@ -53,11 +54,17 @@ def render_preview(
         site, title, content_model = resolve_target(session, body.path)
     else:
         if not body.title:
-            raise HTTPException(status_code=422, detail="need either path or title")
+            raise ApiError(
+                status_code=422,
+                detail="need either path or title",
+                code="missing-target",
+            )
         title = body.title
         site = session.exec(select(Site)).first()
         if site is None:
-            raise HTTPException(status_code=404, detail="no site configured")
+            raise ApiError(
+                status_code=404, detail="no site configured", code="no-site-configured"
+            )
 
     # All reads are done. Release the session now rather than holding it
     # across a multi-second wiki round trip on every debounced keystroke.
@@ -67,7 +74,9 @@ def render_preview(
     try:
         rendered = client.render_preview(title, body.wikitext, content_model)
     except Exception as e:  # wiki/network failures surface as a gateway error
-        raise HTTPException(status_code=502, detail=f"parse failed: {e}") from e
+        raise ApiError(
+            status_code=502, detail=f"parse failed: {e}", code="wiki-parse-failed"
+        ) from e
 
     return PreviewResponse(
         title=rendered.title,

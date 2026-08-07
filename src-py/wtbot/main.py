@@ -27,6 +27,7 @@ from wtbot.api import (
 from wtbot.api import (
     commit as commit_api,
 )
+from wtbot.api.errors import register_error_handlers
 from wtbot.db import create_db_engine, init_db
 from wtbot.logging_config import LOGGING_CONFIG, LoggingConfig, configure_logging
 from wtbot.logging_config import sqlalchemy_echo as configured_sqlalchemy_echo
@@ -109,6 +110,8 @@ def create_app(
         version="0.1.0",
         lifespan=lifespan,
     )
+
+    register_error_handlers(app)
 
     app.state.engine = engine
     app.state.client_factory = client_factory or _make_db_client_factory(engine)

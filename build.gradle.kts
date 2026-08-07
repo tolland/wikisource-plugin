@@ -18,7 +18,8 @@ val intellijPlatformVersion = providers.gradleProperty("intellijPlatformVersion"
 // Which wtbot sidecar the sandbox IDE starts against, e.g.
 //   ./gradlew runIde -PwtbotBaseUrl=http://127.0.0.1:18584
 // Unset means "whatever the sandbox has persisted", which is the plugin's own
-// default (http://127.0.0.1:18574) on a fresh sandbox. The property is read at
+// default (http://127.0.0.1:18564, the workstation dev-convention port —
+// see docs/logging.md) on a fresh sandbox. The property is read at
 // every launch, not just the first: the sandbox keeps its config between runs,
 // so a first-run-only default would be ignored exactly when you're switching
 // between the dev sidecar and the docker harness. It still only seeds the
@@ -182,7 +183,7 @@ intellijPlatformTesting {
             task {
                 systemProperty(
                     "wtbot.baseUrl",
-                    "http://127.0.100.1:8000",
+                    "http://127.0.100.1:18564",
                 )
             }
         }

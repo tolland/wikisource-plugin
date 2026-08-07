@@ -1,8 +1,9 @@
 import threading
 
-from fastapi import HTTPException, Request
+from fastapi import Request
 from sqlmodel import Session, select
 
+from wtbot.api.errors import ApiError
 from wtbot.model import Page, Site
 from wtbot.wiki.client import WikiClient
 
@@ -30,14 +31,22 @@ def resolve_target(session: Session, path: str) -> tuple[Site, str, str | None]:
     """
     parts = parse_path(path)
     if len(parts) < 3:
-        raise HTTPException(status_code=422, detail=f"path is not a page: {path}")
+        raise ApiError(
+            status_code=422,
+            detail=f"path is not a page: {path}",
+            code="path-not-a-page",
+        )
 
     family, code, index_title = parts[0], parts[1], parts[2]
     site = session.exec(
         select(Site).where(Site.family == family, Site.code == code)
     ).first()
     if site is None:
-        raise HTTPException(status_code=404, detail=f"site {family}/{code} not found")
+        raise ApiError(
+            status_code=404,
+            detail=f"site {family}/{code} not found",
+            code="site-not-found",
+        )
 
     rest = parts[3:]
     if not rest or rest == ["wikitext"]:

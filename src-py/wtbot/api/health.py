@@ -1,6 +1,8 @@
 from fastapi import APIRouter
 
-router = APIRouter(tags=["health"])
+from wtbot.api.debug_logging_route import DebugLoggingRoute
+
+router = APIRouter(tags=["health"], route_class=DebugLoggingRoute)
 
 
 @router.get("/health")

@@ -5,6 +5,7 @@ from typing import Callable
 
 from fastapi import Request, Response
 from fastapi.routing import APIRoute
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from wtbot.log_levels import TRACE, install_trace_logging
 from wtbot.logging_config import body_limit_bytes
@@ -116,7 +117,20 @@ class DebugLoggingRoute(APIRoute):
                     target,
                 )
 
-            response: Response = await original_route_handler(request)
+            try:
+                response: Response = await original_route_handler(request)
+            except StarletteHTTPException as exc:
+                # The error response is rendered by the app-level handler
+                # (wtbot.api.errors) after this re-raise — trace the detail
+                # here so error rounds are visible in a body trace too.
+                route_logger.trace(
+                    "%s %s response %s error detail: %s",
+                    request.method,
+                    target,
+                    exc.status_code,
+                    exc.detail,
+                )
+                raise
             response_body = getattr(response, "body", None)
             if isinstance(response_body, bytes):
                 route_logger.trace(

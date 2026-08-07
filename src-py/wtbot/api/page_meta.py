@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlmodel import Session
 
+from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.deps import get_session
 from wtbot.model import (
     FileMeta,
@@ -33,7 +34,7 @@ short_name to exist (generated image names) without the client having to
 derive the default itself.
 """
 
-router = APIRouter(prefix="/pages", tags=["page-meta"])
+router = APIRouter(prefix="/pages", tags=["page-meta"], route_class=DebugLoggingRoute)
 
 
 @router.get("/resolve", response_model=Page)

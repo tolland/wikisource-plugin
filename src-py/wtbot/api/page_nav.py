@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlmodel import Session
 
+from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.deps import get_session
 from wtbot.model import Page
 from wtbot.model.page_meta import PageMeta
@@ -18,7 +19,7 @@ VFS paths. Sibling order is the same page_number sort the Pages/ listing
 uses, so toolbar navigation and the tree never disagree.
 """
 
-router = APIRouter(prefix="/pages", tags=["page-nav"])
+router = APIRouter(prefix="/pages", tags=["page-nav"], route_class=DebugLoggingRoute)
 
 
 class PageNavEntry(BaseModel):

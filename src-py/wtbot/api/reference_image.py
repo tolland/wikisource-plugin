@@ -9,7 +9,6 @@ from fastapi import (
     APIRouter,
     BackgroundTasks,
     Depends,
-    HTTPException,
     Request,
     Response,
 )
@@ -17,6 +16,7 @@ from sqlalchemy import func
 from sqlmodel import Session, select
 
 from wtbot.api.debug_logging_route import DebugLoggingRoute
+from wtbot.api.errors import ApiError
 from wtbot.api.targets import resolve_target
 from wtbot.deps import get_session
 from wtbot.model import Page
@@ -57,6 +57,8 @@ page N+1 at the same width in the background (best-effort).
 router = APIRouter(
     prefix="/reference-image", tags=["reference-image"], route_class=DebugLoggingRoute
 )
+
+logger = logging.getLogger(__name__)
 
 _PX_TOKEN = re.compile(r"(page\d+-)(\d+)(px-)")
 
@@ -126,8 +128,10 @@ def serve_reference_image(
         try:
             _fill_cache(cache, url)
         except Exception as exc:  # noqa: BLE001 - surface as bad gateway
-            raise HTTPException(
-                status_code=502, detail=f"scan image fetch failed: {exc}"
+            raise ApiError(
+                status_code=502,
+                detail=f"scan image fetch failed: {exc}",
+                code="scan-image-fetch-failed",
             ) from exc
 
     background.add_task(
@@ -176,7 +180,7 @@ def _warm_next_page(
             return
         _fill_cache(cache, url)
     except Exception as exc:  # noqa: BLE001 - warming must never surface
-        logging.debug("next-page warm failed: %s", exc)
+        logger.debug("next-page warm failed: %s", exc)
 
 
 def _placeholder_svg(title: str) -> str:
@@ -231,13 +235,23 @@ def reference_image(
         resolved_title = title
         page = session.exec(select(Page).where(Page.title == title)).first()
     else:
-        raise HTTPException(status_code=422, detail="need either path or title")
+        raise ApiError(
+            status_code=422, detail="need either path or title", code="missing-target"
+        )
 
     if page is not None:
         response = serve_reference_image(request, background, session, page, width)
         if response is not None:
             return response
 
+    # WARNING, not DEBUG: the pane shows a placeholder instead of the scan, and
+    # this line is the only server-side account of why — the request itself
+    # succeeded, so the error handlers in wtbot.api.errors never see it.
+    logger.warning(
+        "serving placeholder for %s: %s",
+        resolved_title,
+        "page not cached" if page is None else "no scan image URL known",
+    )
     return Response(
         content=_placeholder_svg(resolved_title),
         media_type="image/svg+xml",

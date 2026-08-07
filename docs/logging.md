@@ -1,19 +1,61 @@
 # Logging and tracing
 
-How each component of the project logs today, how to turn the existing knobs
-on, how to trace a request end-to-end, and a consolidation plan for the gaps —
-in particular the class of failure where an endpoint is *reachable* but fails
-to handle the request (an HTTP error response with a JSON `detail` body),
-which today is visible in neither the sidecar's stdout nor the plugin's log
-in a readable form.
+How each component of the project logs, how to turn the knobs on, how to trace
+a request end-to-end, and the dev-port conventions that keep the various ways
+of running the stack from clashing.
 
-Components covered:
+The design goal, after the 2026-08 consolidation: **an endpoint that is
+reachable but fails to handle a request must explain itself in both logs at
+default settings** — one line with the real cause in uvicorn stdout, one line
+(no stack trace) in the plugin's `idea.log`, joinable via a shared request id.
+
+Components:
 
 | Component | Log destination | Framework |
 |-----------|-----------------|-----------|
 | wtbot sidecar (`src-py/wtbot`) | uvicorn stdout | Python `logging` + a custom `TRACE` level |
 | IntelliJ plugin (`wikitext-*` modules) | sandbox `idea.log` | IntelliJ diagnostic `Logger` |
 | Viewer (`viewer/`) | browser devtools console | none (ad-hoc) |
+
+---
+
+## 0. Port conventions
+
+Several deployments of the stack coexist; each gets its own port range so
+nothing collides with anything else (or with common defaults like 8000/5173):
+
+| Range | Deployment |
+|-------|-----------|
+| **1856x** | services run on the dev machine alongside IntelliJ (see below) |
+| **1857x** | the persistent seeded docker cluster (wtbot itself on 18574) |
+| **1858x** | docker clusters spun up by pytest (e.g. 18581 upstream / 18582 local wiki pair, `src-py/tests/conftest.py`) |
+
+Within 1856x:
+
+```
+18561  (reserved) local mediawiki wikisource instance
+18562  (reserved) alternate instance for sync testing
+18563  Svelte viewer app                (vite.config.ts)
+18564  wtbot FastAPI service            (plugin default; CLAUDE.md run command)
+18565  (reserved) wikimedia-ocr instance
+18566+ (reserved)
+```
+
+Only the locally-run pieces bind these ports — in the "production-ish" layout
+the wikis and OCR are remote hosts (`https://wikisource-debian-13.lan`,
+`https://en.wikisource.org`, `https://ocr.wikisource-debian-13.lan`) and only
+wtbot (18564) and optionally the viewer (18563) run on the dev machine.
+
+Where the defaults live: plugin → `WtbotAppSettings.DEFAULT_BASE_URL`
+(18564; changeable at runtime in Settings → Tools → WTBot, or per launch via
+`./gradlew runIde -PwtbotBaseUrl=…` — the docker harness on 18574 is the usual
+alternative); CLI → `wtbot/cli/deps.py` `DEFAULT_BASE_URL` or the
+`WTBOT_API_URL` env var; viewer → `viewer/vite.config.ts` (`server.port`
+18563, `/api` proxy → `WTBOT_API_URL` or 18564). Start the sidecar with:
+
+```bash
+uv run fastapi dev src-py/wtbot/main.py --port 18564
+```
 
 ---
 
@@ -25,141 +67,102 @@ All sidecar logging is configured in one place,
 `src-py/wtbot/logging_config.py`. A frozen `LoggingConfig` dataclass is built
 from the environment (with `.env` in the working directory loaded first, via
 `python-dotenv`) **at module import time** and applied by
-`configure_logging()`, which `create_app()` calls on startup. That means the
-knobs below are read once per process — restart `fastapi dev` / uvicorn after
-changing `.env`.
-
-Environment variables (all optional):
+`configure_logging()`, which `create_app()` calls on startup. The knobs are
+read once per process — restart `fastapi dev` / uvicorn after changing `.env`.
+`.env.example` at the repo root documents every knob:
 
 | Variable | Effect | Default |
 |----------|--------|---------|
 | `WTBOT_LOG_LEVEL` | Root logger level, by name (`DEBUG`, `TRACE`, …) or number | `INFO` |
 | `WTBOT_SQLALCHEMY_ECHO` | `true` → SQL statements at INFO; `debug` → statements + result rows | off |
 | `WTBOT_TRACE_DEBUG_ROUTE_TAGS` | Comma-separated router tags to trace request/response bodies for, e.g. `vfs,preview` | none |
-| `WTBOT_TRACE_ALL_DEBUG_ROUTES` | `true` → body tracing for every router that opts in to `DebugLoggingRoute` | `false` |
+| `WTBOT_TRACE_ALL_DEBUG_ROUTES` | `true` → body tracing for every router | `false` |
 | `WTBOT_DEBUG_ROUTE_BODY_LIMIT_BYTES` | Truncation limit for logged bodies; `0` = unlimited | `131072` |
-
-Example `.env` for a full-visibility debugging session:
-
-```dotenv
-WTBOT_LOG_LEVEL=DEBUG
-WTBOT_SQLALCHEMY_ECHO=true
-WTBOT_TRACE_ALL_DEBUG_ROUTES=true
-WTBOT_DEBUG_ROUTE_BODY_LIMIT_BYTES=0
-```
 
 ### 1.2 The TRACE level
 
 `src-py/wtbot/log_levels.py` registers a custom `TRACE` level (numeric 5,
-below `DEBUG`) and adds `logger.trace(...)`. It exists so that request/response
+below `DEBUG`) and adds `logger.trace(...)`. It exists so request/response
 *body* dumps can be switched on independently of — and below — ordinary
-`DEBUG` chatter. `install_trace_logging()` is idempotent and is called both by
-`configure_logging()` and by the debug route module itself.
+`DEBUG` chatter.
 
-### 1.3 Request/response body tracing: `DebugLoggingRoute`
+### 1.3 Error responses are always logged (`wtbot.api.errors`)
 
-`src-py/wtbot/api/debug_loggig_route.py` (note the historical `loggig` typo —
-the module name and the logger namespace
-`wtbot.api.debug_loggig_route.<tag>` both carry it, consistently, so it
-works; see the consolidation plan for the rename) defines a custom FastAPI
-`APIRoute` subclass. A router opts in with
-`APIRouter(..., route_class=DebugLoggingRoute)`; per-route loggers are named
-after the router's first tag, so tags are the tracing switch granularity.
-
-When the tag's logger is enabled for `TRACE`, every request logs its method,
-target, and body, and every response logs its status and body. Bodies are
-pretty-printed when JSON, decoded when text, summarized
-(`<image/jpeg; 52341 bytes; body not logged>`) when binary, and truncated at
-the configured limit.
-
-Routers currently opted in (tag → module):
-
-| Tag | Router |
-|-----|--------|
-| `vfs` | `wtbot/api/vfs.py` |
-| `preview` | `wtbot/api/preview.py` |
-| `page-annotations` | `wtbot/api/annotations.py` |
-| `page-ocr` | `wtbot/api/ocr.py` |
-
-Routers **not** opted in (no body tracing available today): `fetch`,
-`commit`, `edit_journal`, `file_blob`, `namespace`, `page_image`
-(`/pages/image`), `page_meta`, `page_nav`, `pages`, `sites`, `viewer`,
-`health`, and the mounted `/ocr` app.
-
-Two structural limitations to know about:
-
-1. **Error responses are never traced.** `DebugLoggingRoute` wraps the route
-   handler; when the handler raises `HTTPException`, the exception propagates
-   *out of* the wrapper (FastAPI converts it to a JSON response further up the
-   middleware stack), so the "response body" trace line never runs. Body
-   tracing therefore only shows you successful responses — exactly the wrong
-   way round for debugging failures.
-2. **Streaming responses** log `<streaming or unavailable>` rather than a
-   body.
-
-### 1.4 What is (and isn't) logged on an error response
-
-This is the gap behind the motivating example. A request like
+FastAPI treats `HTTPException` as a handled error and renders it silently; by
+default the only server-side evidence of a 502 was uvicorn's access line. The
+handlers in `src-py/wtbot/api/errors.py` (registered in `create_app()`) close
+that gap: **every error response is logged at default settings**, 4xx at
+WARNING and 5xx at ERROR, unexpected exceptions at ERROR with traceback:
 
 ```
-GET /preview/page-image?path=/local/en/Index:….pdf/Pages/Page:….pdf/7
+2026-08-07 12:00:01 ERROR [wtbot.api.errors] GET /reference-image?path=… -> 502 [scan-image-fetch-failed] request_id=3f9c21aa: scan image fetch failed: Invalid URL '/images/thumb/…': No scheme supplied. …
 ```
 
-can fail inside `serve_scan_image()` (`wtbot/api/page_image.py`) — e.g. when
-a `PageMeta` row holds a scheme-less thumb URL (`/images/thumb/...`), the
-`requests.get` in `fetch_image_bytes()` raises
-`Invalid URL … No scheme supplied`, and the handler wraps it:
-
-```python
-raise HTTPException(status_code=502, detail=f"scan image fetch failed: {exc}")
-```
-
-The client receives a useful JSON body:
+The response body is a defined error object:
 
 ```json
-{"detail": "scan image fetch failed: Invalid URL '/images/thumb/…': No scheme supplied. …"}
+{"detail": "scan image fetch failed: …", "code": "scan-image-fetch-failed", "request_id": "3f9c21aa"}
 ```
 
-but on the server the **only** evidence is uvicorn's access line:
+- `detail` — human-readable cause (unchanged from FastAPI convention)
+- `code` — stable kebab-case failure kind; raise `ApiError(status, detail,
+  code)` instead of a bare `HTTPException` to set it (plain `HTTPException`
+  gets `http-error`, unhandled exceptions `internal-error`, request
+  validation failures log as `validation-error` but keep FastAPI's 422 body)
+- `request_id` — echo of the client's `X-Request-Id` header (the plugin sends
+  one per request), for joining plugin and sidecar log lines
 
-```
-INFO: 127.0.0.1:57682 - "GET /pages/image?path=… HTTP/1.1" 502 Bad Gateway
-```
+Codes in use today: `scan-image-fetch-failed`, `missing-target`
+(reference_image); `wiki-parse-failed`, `no-site-configured` (preview);
+`path-not-a-page`, `site-not-found` (targets); `not-found`,
+`not-a-directory`, `not-a-file`, `blobs-not-implemented` (vfs).
 
-This is FastAPI's default behavior: `HTTPException` is considered a *handled*
-error, so nothing logs its detail — uvicorn's `uvicorn.error` logger only
-prints tracebacks for **unhandled** exceptions (500s). There is currently no
-exception handler or middleware in `create_app()` (`wtbot/main.py`) that logs
-4xx/5xx response bodies. Fixing this is item 1 of the consolidation plan.
+### 1.4 Request/response body tracing: `DebugLoggingRoute`
 
-### 1.5 Ad-hoc `logging.debug` on the root logger
+`src-py/wtbot/api/debug_logging_route.py` defines a custom FastAPI `APIRoute`
+that logs request and response bodies at `TRACE`, switched per router tag
+(logger `wtbot.api.debug_logging_route.<tag>`; see
+`WTBOT_TRACE_DEBUG_ROUTE_TAGS`). **Every router opts in** — the full tag list
+is `KNOWN_DEBUG_ROUTE_TAGS` in `logging_config.py` (`vfs`, `preview`,
+`reference-image`, `page-annotations`, `ocr`, `fetch`, `commits`,
+`edit-journal`, `file-blobs`, `links`, `namespaces`, `page-meta`, `page-nav`,
+`pages`, `sites`, `viewer`, `health`).
 
-Several best-effort code paths log failures at DEBUG **on the root logger**
-(no module logger), so they appear only with `WTBOT_LOG_LEVEL=DEBUG` and
-cannot be enabled per-module:
+Bodies are pretty-printed when JSON, decoded when text, summarized
+(`<image/jpeg; 52341 bytes; body not logged>`) when binary, and truncated at
+the configured limit. Error rounds trace their `detail` line before the
+exception propagates to the §1.3 handler; streaming responses log
+`<streaming or unavailable>`.
 
-- `wtbot/api/page_image.py` — next-page cache-warming failures
-- `wtbot/api/preview.py` — scan-raster fetch failures, `imageforpage` lookup
-  failures (including the HTTP status + content type of a failed image GET —
-  the most direct clue for the scheme-less-URL bug above)
-- `wtbot/wiki/client.py` — `imageforpage`, `proofreadpagesinindex`,
-  `defaultcontentforpage` query failures
+### 1.5 Module loggers and level policy
 
-These are deliberately "never fatal" paths, but at INFO they are completely
-silent, which is why a degraded placeholder image or a 502 appears without
-any server-side explanation.
+Best-effort code paths log on their own module logger (`wtbot.api.preview`,
+`wtbot.api.reference_image`, `wtbot.wiki.client`), so each can be enabled
+individually. The line between levels:
+
+| Level | Sidecar | Plugin |
+|-------|---------|--------|
+| TRACE | request/response bodies | high-volume per-keystroke detail |
+| DEBUG | best-effort noise (cache warming, enrichment lookups) | per-request flow |
+| INFO | lifecycle (startup, migrations), access log | user-visible actions |
+| WARNING | degraded results served (placeholder instead of scan), 4xx | expected sidecar errors (one line, no stack) |
+| ERROR | 5xx, unexpected exceptions (with stack) | unexpected exceptions (with stack) |
+
+Notably, `GET /reference-image` serving its placeholder instead of a real
+scan logs at WARNING (`wtbot.api.reference_image`): the request *succeeded*,
+so the §1.3 error handlers never see it, and that line is the only
+server-side account of why the pane is blank.
 
 ### 1.6 SQL and pywikibot
 
-- **SQLAlchemy**: `WTBOT_SQLALCHEMY_ECHO` (see table above) sets the
-  `sqlalchemy.engine` logger level; `create_db_engine()` also receives it as
-  the `echo` flag.
-- **pywikibot**: configured programmatically in `wtbot/wiki/config.py`; no
-  logging knobs are set there today. pywikibot and `requests`/`urllib3` use
-  standard `logging` namespaces (`pywiki`, `urllib3`), so
-  `WTBOT_LOG_LEVEL=DEBUG` surfaces wire-level detail from both. Retries are
-  configured fail-fast (`max_retries` from `WikiSettings`), so a wiki-side
-  failure surfaces quickly rather than after silent backoff.
+- **SQLAlchemy**: `WTBOT_SQLALCHEMY_ECHO` (§1.1) sets the
+  `sqlalchemy.engine` logger level and the engine's `echo` flag.
+- **pywikibot**: configured programmatically in `wtbot/wiki/config.py`, no
+  logging knobs set. pywikibot and `requests`/`urllib3` use standard
+  `logging` namespaces (`pywiki`, `urllib3`), so `WTBOT_LOG_LEVEL=DEBUG`
+  surfaces wire-level detail. Retries are fail-fast (`max_retries` from
+  `WikiSettings`), so a wiki-side failure surfaces quickly instead of hiding
+  behind backoff.
 
 ---
 
@@ -168,193 +171,95 @@ any server-side explanation.
 ### 2.1 Where the log is
 
 The sandbox IDE (`runIde`) writes IntelliJ's standard `idea.log` under the
-sandbox directory, e.g.
-`build/idea-sandbox/<ide-version>/log/idea.log`. In the sandbox you can also
-open it via **Help → Show Log in Files**.
+sandbox directory, e.g. `build/idea-sandbox/<ide-version>/log/idea.log`; in
+the sandbox, **Help → Show Log in Files**.
 
 ### 2.2 Loggers and categories
 
-The plugin uses IntelliJ's diagnostic `Logger`, one per class, e.g.:
-
-- `org.limepepper.lang.wikitext.editor.prp.ReferenceImagePane` — scan
-  load/annotation failures
-- `org.limepepper.lang.wikitext.editor.prp.WtPageNavToolbar`,
-  `WtAnnotationSync`, `WtBoxLinkSync`, `WtTextRangeSync`, `PrpFileEditor` —
-  ProofreadPage editor chrome
-- `org.limepepper.lang.wikitext.preview.WtRenderPreviewPane`,
-  `…editor.prp.RenderPreviewPane` — live preview
-- `org.limepepper.lang.wikitext.tool.WikisourceTreeStructure` — tool window
-- `org.limepepper.lang.wikitext.vfs.settings.OcrCatalogService`
-
-`LOG.warn(...)`/`LOG.error(...)` always reach `idea.log`; `LOG.debug`/
-`LOG.trace` require the category to be enabled via **Help → Diagnostic Tools →
-Debug Log Settings** (enter e.g. `#org.limepepper.lang.wikitext`, prefix with
-`#` for DEBUG or append `:trace` for TRACE).
-
-For the sandbox this is pre-configurable: `sandbox-config/log-categories.xml`
-is copied into the sandbox on every `prepareSandbox`, so categories added
-there are active on every `runIde` without clicking through the dialog. (It
-currently enables two documentation-related categories only — adding the
-`org.limepepper.lang.wikitext` tree is part of the plan below.)
+One diagnostic `Logger` per class under `org.limepepper.lang.wikitext.…`
+(`ReferenceImagePane`, `WtPageNavToolbar`, `WtRenderPreviewPane`,
+`WikisourceTreeStructure`, the sync classes, …). `warn`/`error` always reach
+`idea.log`; `debug`/`trace` need the category enabled. The sandbox enables
+`org.limepepper.lang.wikitext` at DEBUG out of the box via
+`sandbox-config/log-categories.xml` (copied into the sandbox on every
+`prepareSandbox`), so `runIde` sessions capture plugin DEBUG without
+clicking through **Help → Diagnostic Tools → Debug Log Settings**. For a
+production install, enable it there (`#org.limepepper.lang.wikitext`, or
+`…:trace` for TRACE).
 
 ### 2.3 How sidecar errors surface in the plugin
 
-All contract traffic goes through `HttpVfsBackend`
-(`wikitext-vfs/.../backend/HttpVfsBackend.kt`). Any non-2xx response raises
-`VfsBackendException` whose message includes the status **and the full
-response body** — i.e. the FastAPI `{"detail": ...}` JSON — plus a
-`statusCode` field. Transport failures (sidecar down) surface as the same
-exception type with `statusCode = null`. So for every call routed through the
-backend, the server's explanation *is* available to the caller; whether it is
-shown readably depends on the call site (most catch and `LOG.warn`, some show
-the message in the UI).
+All sidecar traffic goes through `HttpVfsBackend`
+(`wikitext-vfs/.../backend/HttpVfsBackend.kt`) — including scan-image bytes
+(`VfsBackend.fetchReferenceImage`), which used to be fetched around the backend
+with `ImageIO.read(URL)` and therefore lost the error body. Any non-2xx
+response raises `VfsBackendException` with:
 
-**The known exception is image loading.** `ReferenceImagePane.loadImage()`
-does not go through `HttpVfsBackend`: `pageImageUrl()` only *builds* the URL
-(`GET /preview/page-image?...`), and the pane then fetches it with
-`ImageIO.read(URI(url).toURL())`. When the sidecar answers 502 with a JSON
-detail body, `ImageIO` throws
-`IIOException: Can't get input stream from URL!` caused by
-`IOException: Server returned HTTP response code: 502` — the body, the one
-piece of text that explains the failure, is discarded, and `idea.log` gets a
-20-frame stack trace that says nothing beyond "502". Fixing this is item 2 of
-the consolidation plan. (The same applies to any other place that fetches a
-sidecar URL with a raw JDK/ImageIO reader instead of the backend.)
+- `statusCode` — the HTTP status (null for transport failures / sidecar down)
+- `detail` / `errorCode` — parsed from the sidecar's error object (§1.3)
+- `requestId` — the `X-Request-Id` the backend generated and sent, matching
+  the sidecar's `request_id` echo and log line
+- `message` — `HTTP 502 from <uri>: <detail>` (falls back to the raw body
+  when it isn't the error object, e.g. a proxy's HTML page)
+
+Call sites treat a `VfsBackendException` with a status code as an *expected*
+failure: one `LOG.warn` line carrying the server's own explanation, no stack
+trace (see `ReferenceImagePane.ensureLoaded`). Stack traces are reserved for
+genuinely unexpected exceptions.
 
 ---
 
 ## 3. Viewer (SvelteKit debug UI)
 
-The viewer has no logging framework; failures surface in the browser devtools
-console and in the terminal running `npm run dev`. Since it talks to the same
-FastAPI endpoints, the sidecar-side tracing in §1.3 is usually the more
-useful window — the viewer is itself a debugging surface, not a component we
-instrument.
+No logging framework; failures surface in the browser devtools console and
+the `npm run dev` terminal (port 18563, `/api` proxied to wtbot on 18564).
+The viewer is itself a debugging surface — the sidecar-side tracing in §1.4
+is usually the more useful window.
 
 ---
 
 ## 4. Cookbook: tracing a request end-to-end
 
-Scenario: an editor pane shows "Could not load the reference image" or a
-stack trace mentioning a sidecar URL.
+Scenario: an editor pane shows "Could not load the reference image", or any
+sidecar-backed feature degrades.
 
-1. **Reproduce outside the IDE first.** Copy the URL from the plugin log and
-   curl it — FastAPI error bodies are self-describing:
+1. **Read the two default-settings lines first.** The plugin logs
+   `reference image load failed for <path>: HTTP 502 from <url>: <detail>`
+   in `idea.log`; the sidecar logs the matching
+   `GET <target> -> 502 [<code>] request_id=<id>: <detail>` line in uvicorn
+   stdout. The shared request id confirms they are the same request; the
+   detail usually names the real cause outright.
+
+2. **Reproduce outside the IDE** when needed — error bodies are
+   self-describing:
 
    ```bash
-   curl -sS 'http://127.0.100.1:8000/preview/page-image?path=…' | head -c 2000
+   curl -sS 'http://127.0.100.1:18564/reference-image?path=…' | head -c 2000
    ```
 
-   If you get JSON with a `detail` key, the endpoint is reachable but failing
-   to handle the request; the detail usually names the real cause.
-
-2. **Turn on sidecar visibility** (`.env` next to where uvicorn runs, then
-   restart):
+3. **Turn up sidecar visibility** (`.env`, then restart — see `.env.example`):
 
    ```dotenv
-   WTBOT_LOG_LEVEL=DEBUG            # surfaces the ad-hoc logging.debug paths (§1.5)
-   WTBOT_TRACE_DEBUG_ROUTE_TAGS=vfs,preview   # request/response bodies for those routers
-   WTBOT_SQLALCHEMY_ECHO=true       # if the suspect is cached DB state
+   WTBOT_LOG_LEVEL=DEBUG                       # best-effort paths, urllib3/pywiki wire logs
+   WTBOT_TRACE_DEBUG_ROUTE_TAGS=vfs,preview    # request/response bodies for those routers
+   WTBOT_SQLALCHEMY_ECHO=true                  # if the suspect is cached DB state
    ```
 
-   Remember the §1.3 caveat: error responses are not body-traced, but the
-   DEBUG lines from the failing code path (e.g. `page-image fetch failed for
-   <url>: <error>`) will show.
+4. **Plugin DEBUG** is already on in the sandbox (§2.2); watch the sandbox
+   `idea.log`.
 
-3. **Turn on plugin visibility.** Help → Diagnostic Tools → Debug Log
-   Settings → add `#org.limepepper.lang.wikitext` — or add the category to
-   `sandbox-config/log-categories.xml` so every `runIde` has it. Then watch
-   the sandbox `idea.log`.
-
-4. **Check the data, not just the code.** Many "endpoint fails to handle"
-   errors are bad cached rows (e.g. a scheme-less `thumb_url` in `PageMeta`).
-   The viewer (`cd viewer && npm run dev`) or `sqlite3 database.db` shows the
-   row the endpoint resolved.
-
-5. **Wiki-side failures**: `WTBOT_LOG_LEVEL=DEBUG` also enables
-   `urllib3`/`pywiki` wire logging for the pywikibot leg.
+5. **Check the data, not just the code.** Many "endpoint fails to handle"
+   errors are bad cached rows (e.g. a scheme-less `thumb_url` in `PageMeta`
+   — the original `scan-image-fetch-failed` case). The viewer
+   (`cd viewer && npm run dev`) or `sqlite3 database.db` shows the row the
+   endpoint resolved.
 
 ---
 
-## 5. Consolidation plan
+## 5. Remaining gaps / future work
 
-Ordered by pay-off; each step is independently landable.
-
-### 5.1 Log error responses on the sidecar (the 502-with-silent-stdout gap)
-
-Add an app-level exception handler for `HTTPException` (and a catch-all for
-`Exception`) in `create_app()` that logs status + `detail` + method + target
-before delegating to FastAPI's default JSON rendering:
-
-- 5xx → `ERROR`, 4xx → `WARNING`, on a `wtbot.api.errors` logger.
-- This makes every failed request visible in uvicorn stdout at default
-  settings — no `.env` change needed — which is the single biggest
-  observability win available.
-- Optionally also fix `DebugLoggingRoute` to trace error bodies by catching
-  `HTTPException` in the wrapper, logging, and re-raising.
-
-### 5.2 A defined error object, and plugin-side formatting
-
-- Sidecar: standardize error payloads as a typed model —
-  `{"detail": str, "error": {"code": str, "endpoint": str, "request_id": str}}`
-  — instead of bare f-string details. Existing `detail` stays for
-  compatibility; `code` (e.g. `scan-image-fetch-failed`, `site-not-found`,
-  `wiki-parse-failed`) lets clients branch without string matching.
-- Plugin: parse the error body in `HttpVfsBackend` (it already has
-  `JsonReader`) into a typed field on `VfsBackendException`
-  (`detail`, `errorCode`) rather than embedding raw JSON in the message.
-- Plugin: route **all** sidecar fetches through the backend. Add
-  `fetchPageImage(path, width): ByteArray` to `VfsBackend` so
-  `ReferenceImagePane` decodes bytes with
-  `ImageIO.read(ByteArrayInputStream(...))` and a failure produces
-  `LOG.warn("reference image load failed: scan image fetch failed: …")` — the
-  server's own explanation, one line, no stack trace — and the same text in
-  the pane's status label. Expected errors (`VfsBackendException` with a
-  status code) log as `warn` *without* the throwable; only transport-level
-  surprises keep the stack trace.
-
-### 5.3 One logger namespace and level policy on the sidecar
-
-- Replace every root-logger `logging.debug(...)` call (§1.5) with
-  `logging.getLogger(__name__)` module loggers, so `wtbot.api.page_image`
-  etc. can be enabled individually.
-- Promote "we are about to return a degraded/error result" messages from
-  DEBUG to WARNING (placeholder served because the scan fetch failed, warm
-  failed repeatedly). DEBUG stays for expected best-effort noise.
-- Rename `debug_loggig_route.py` → `debug_logging_route.py` and the
-  `DEBUG_ROUTE_LOGGER` constant with it (one mechanical commit; the tag-based
-  env knobs don't change).
-- Opt the remaining routers into `DebugLoggingRoute` (or replace the
-  route-class approach with one ASGI middleware that sees *all* routes,
-  including the mounted `/ocr` app, and error responses — the middleware
-  level is where response bodies of error JSON are actually observable).
-
-Level policy (both sides):
-
-| Level | Sidecar | Plugin |
-|-------|---------|--------|
-| TRACE | request/response bodies | high-volume per-keystroke detail |
-| DEBUG | best-effort path failures, cache decisions | per-request flow |
-| INFO | lifecycle (startup, migrations), access log | user-visible actions |
-| WARNING | degraded results served, 4xx handled errors | expected sidecar errors (with `detail`, no stack) |
-| ERROR | 5xx, unexpected exceptions (with stack) | unexpected exceptions (with stack) |
-
-### 5.4 Cross-component request correlation
-
-Once 5.1–5.3 are in: generate an `X-Request-Id` in `HttpVfsBackend` per
-request, log it in the sidecar's error handler and access middleware, and
-include it in the error object. Then a plugin log line, a uvicorn line, and a
-user report all join on one id — today correlation is by timestamp and URL
-guesswork.
-
-### 5.5 Sandbox defaults
-
-Add to `sandbox-config/log-categories.xml`:
-
-```json
-{ "category": "org.limepepper.lang.wikitext", "level": "DEBUG" }
-```
-
-so `runIde` sessions always capture plugin DEBUG without manual dialog
-clicks, and document a matching `.env.example` at the repo root with the §1.1
-knobs commented out.
+- uvicorn's access log and the `wtbot.api.errors` lines are separate loggers
+  with separate formats; a single access-log middleware could unify them and
+  stamp the request id on successful requests too.
+- The reserved 1856x ports (local mediawiki pair, OCR) are unassigned until
+  those services actually move into the dev-machine layout.

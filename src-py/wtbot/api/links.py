@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
+from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.deps import get_session
 from wtbot.matching import (
     LinkProposal,
@@ -26,7 +27,7 @@ comparison that suggested it, and the design does not auto-confirm guesses
 (TODO item 5). ``POST /links/propose`` therefore writes nothing.
 """
 
-router = APIRouter(prefix="/links", tags=["links"])
+router = APIRouter(prefix="/links", tags=["links"], route_class=DebugLoggingRoute)
 
 
 LOCAL_LABEL = Field(

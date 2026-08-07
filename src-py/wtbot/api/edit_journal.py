@@ -1,10 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlmodel import Session, select
 
+from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.deps import get_session
 from wtbot.model import EditJournal
 
-router = APIRouter(prefix="/edit-journal", tags=["edit-journal"])
+router = APIRouter(
+    prefix="/edit-journal", tags=["edit-journal"], route_class=DebugLoggingRoute
+)
 
 
 @router.get("/", response_model=list[EditJournal])
