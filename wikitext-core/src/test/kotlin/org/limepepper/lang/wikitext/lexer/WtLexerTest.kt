@@ -8,6 +8,9 @@ class WtLexerTest : WtLexerTestCase() {
     // math tag tests
     fun testMathTag() = doTest()
 
+    // testing for bold and italic and both etc
+    fun testFormattedText() = doTest()
+
     // simple
     fun testHeaderOneWithNewline() = doTest()
     fun testHelloWorld() = doTest()
