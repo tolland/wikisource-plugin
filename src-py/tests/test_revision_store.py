@@ -244,13 +244,41 @@ def test_the_fetch_worker_populates_the_store(session: Session) -> None:
     assert content.content_sha1 == content_sha1_base36("fetched body")
 
 
-def test_history_is_sparse_until_a_walk_says_otherwise(session: Session) -> None:
-    """Recording heads never claims a contiguous range: a base search must not
-    read "the oldest row we hold" as "where the histories diverge"."""
+def test_a_head_with_an_unheld_parent_claims_no_contiguous_range(
+    session: Session,
+) -> None:
+    """A base search must not read "the oldest row we hold" as "where the
+    histories diverge". Recording a head whose parent we do not have says
+    nothing about how far back we can see."""
     site = _site(session, family="wikisource")
     page = _page(session, site, "Page:Work.djvu/1")
 
-    record_head_revision(session, page, _remote("v5", revid=5))
+    record_head_revision(session, page, _remote("v5", revid=5, parentid=4))
     session.commit()
 
-    assert page.history_complete_from_revid is None
+    assert page.history_complete_from_revid == 5
+    # The marker names the oldest revision of the contiguous run, which here is
+    # the head itself -- and that run does not reach the beginning, because
+    # revision 4 exists and we do not hold it.
+    head = session.exec(select(Revision).where(Revision.revid == 5)).one()
+    assert head.parent_revid == 4
+
+
+def test_a_head_with_no_parent_is_the_whole_history(session: Session) -> None:
+    """The other half, and the one that matters for the anchor search: a
+    revision with no parent is the page's first, so a page whose head has no
+    parent has exactly one revision and we hold all of it.
+
+    Left unmarked, every never-edited page would report "we did not look far
+    enough back" when there is nowhere further to look -- which turns a real
+    divergence into a fetch that can never help.
+    """
+    site = _site(session, family="wikisource")
+    page = _page(session, site, "Page:Work.djvu/1")
+
+    record_head_revision(session, page, _remote("only", revid=5))
+    session.commit()
+
+    assert page.history_complete_from_revid == 5
+    head = session.exec(select(Revision).where(Revision.revid == 5)).one()
+    assert head.parent_revid is None

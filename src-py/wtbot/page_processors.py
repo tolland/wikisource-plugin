@@ -48,6 +48,7 @@ class ClaimedFetchRequest:
     title: str
     kind: FetchKind
     depth: int
+    revisions: int = 1
 
 
 @dataclass(frozen=True)
@@ -419,6 +420,11 @@ def _fan_out_index(
                 title=title,
                 kind=kind,
                 depth=0,
+                # Children inherit the history depth: an anchor search over a
+                # work needs the same view of every page in it, and a fan-out
+                # that fetched only the index deeply would leave every child
+                # reporting `history_exhausted`.
+                revisions=req.revisions,
             )
             session.add(child)
             child_count += 1

@@ -73,9 +73,13 @@ def add(
 ) -> None:
     """Assert that one page on each site holds the same content.
 
-    Links the two *head* revisions. Refuses a pair whose heads have diverged
-    unless --force: a link states that two revisions are the same content, and
-    asserting that of a diverged pair makes every later comparison lie.
+    Links the newest revision pair that actually matches -- which is not always
+    the two heads: a page imported from an older revision of the other side
+    anchors there, and the edits since are what the anchor is the base for.
+
+    Refuses a pair with no matching revision unless --force: a link states that
+    two revisions are the same content, and asserting that of a diverged pair
+    makes every later comparison lie.
     """
     data = api.post(
         "/links/",
@@ -110,9 +114,13 @@ def propose(
 ) -> None:
     """Walk an index's pages and report what could be linked.
 
-    Compares each pair's head revisions; pages pair on page number within the
-    index, not on title text. Reports only unless --confirm, because a
-    proposal is a guess from a comparison and a link outlives it.
+    For each pair, finds the newest revision pair holding the same content and
+    reports how far each side has moved since -- `local +1` means we have an
+    edit the other side does not. Pages pair on page number within the index,
+    not on title text.
+
+    Reports only unless --confirm, because a proposal is a guess from a
+    comparison and a link outlives it.
     """
     data = api.post(
         "/links/propose",
@@ -138,6 +146,15 @@ def propose(
         )
         if proposal.get("significance"):
             line += f"  [{proposal['significance']}]"
+        # The distance from the anchor is the actionable part: it is what would
+        # replay, and in which direction.
+        ahead = []
+        if proposal.get("local_ahead_by"):
+            ahead.append(f"local +{proposal['local_ahead_by']}")
+        if proposal.get("remote_ahead_by"):
+            ahead.append(f"remote +{proposal['remote_ahead_by']}")
+        if ahead:
+            line += "  (" + ", ".join(ahead) + ")"
         if proposal.get("detail"):
             line += f"  ({proposal['detail']})"
         typer.echo(line)

@@ -64,6 +64,15 @@ def _https(url: str | None) -> str | None:
 class WikiClient(Protocol):
     def get_page(self, title: str) -> RemotePage: ...
 
+    def get_history(self, title: str, *, limit: int) -> list[RemotePage]:
+        """Up to ``limit`` revisions of a page, newest first, with content.
+
+        Content is required, not metadata: the whole point is to compare
+        against the other site, and a revid alone is not comparable across
+        wikis.
+        """
+        ...
+
     def list_index_subpage_titles(self, title: str) -> list[str]: ...
 
     def get_file_info(self, title: str) -> RemoteFileInfo: ...
@@ -538,6 +547,33 @@ class PywikibotClient:
             script_path=self.site.scriptpath(),
         )
 
+    def get_history(self, title: str, *, limit: int) -> list[RemotePage]:
+        page = self._pwb.Page(self.site, title)
+        if not page.exists():
+            raise PageNotFound(title)
+
+        out: list[RemotePage] = []
+        namespace = page.namespace()
+        for rev in page.revisions(total=limit, content=True):
+            out.append(
+                RemotePage(
+                    title=page.title(),
+                    namespace_key=namespace.id,
+                    namespace_canonical=namespace.canonical_name or None,
+                    content_model=page.content_model,
+                    text=rev.text or "",
+                    pageid=page.pageid,
+                    revid=rev.revid,
+                    parentid=rev.parentid or None,
+                    timestamp=rev.timestamp,
+                    user=rev.user,
+                    comment=rev.comment,
+                    sha1=rev.sha1,
+                    size=rev.size,
+                )
+            )
+        return out
+
     def recent_changes(
         self,
         *,
@@ -648,6 +684,7 @@ class FakeWikiClient:
         default_contents: dict[str, str] | None = None,
         changes: list[RemoteChange] | None = None,
         oldest_change: datetime | None = None,
+        history: dict[str, list[RemotePage]] | None = None,
     ):
         self._pages = dict(pages or {})
         self._files = dict(files or {})
@@ -661,6 +698,8 @@ class FakeWikiClient:
         # Deriving one from the other would make every fixture look pruned.
         # None means "holds everything", which is the case most tests want.
         self._oldest_change = oldest_change
+        #: title -> revisions newest first, as get_history returns them.
+        self._history = dict(history or {})
 
     def get_page(self, title: str) -> RemotePage:
         try:
@@ -719,6 +758,13 @@ class FakeWikiClient:
 
     def get_namespaces(self):
         return None
+
+    def get_history(self, title: str, *, limit: int) -> list[RemotePage]:
+        history = self._history.get(title)
+        if history is None:
+            # A page with no recorded history is one revision deep: its head.
+            return [self.get_page(title)]
+        return list(history)[:limit]
 
     def recent_changes(
         self,

@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Callable
 from pathlib import Path
 
@@ -21,7 +22,7 @@ from wtbot.page_processors import (
     ProcessContext,
     processor_for,
 )
-from wtbot.revision_store import record_head_revision
+from wtbot.revision_store import record_head_revision, record_history
 from wtbot.timeutil import utcnow
 from wtbot.wiki.client import WikiClient
 from wtbot.wiki.failures import WikiFailure
@@ -39,6 +40,8 @@ Kept as plain functions over a Session + a client factory so it is fully
 testable with FakeWikiClient and reusable from either the API, the drain
 endpoint, or ``wtbot drain``.
 """
+
+log = logging.getLogger(__name__)
 
 ClientFactory = Callable[[Site], WikiClient]
 
@@ -110,6 +113,7 @@ def _snapshot_request(req: FetchRequest) -> ClaimedFetchRequest:
         title=req.title,
         kind=req.kind,
         depth=req.depth,
+        revisions=req.revisions,
     )
 
 
@@ -160,6 +164,12 @@ def _process(
             blob_root=blob_root,
             image_cache=image_cache,
         )
+        if req.revisions > 1:
+            # After the head is recorded, never instead of it: the processor
+            # and every existing reader work from the head denormalisation, and
+            # a history walk must not change what "current" means.
+            _record_history(session, client, page, req)
+
         outcome = processor.postprocess(ctx, page, remote)
         status = outcome.status
         progress_total = outcome.progress_total
@@ -192,6 +202,23 @@ def _process(
         progress_done=progress_done,
         error_message=error_message,
     )
+
+
+def _record_history(session, client, page, req) -> None:
+    """Fill in revisions behind the head, best effort.
+
+    A failure here does not fail the fetch: the head is what the editor and the
+    VFS need, and history is an enrichment for the anchor search. Losing it
+    downgrades a match to `history_exhausted`, which is a state the caller
+    already has to handle.
+    """
+    try:
+        history = client.get_history(req.title, limit=req.revisions)
+    except Exception as exc:  # noqa: BLE001 - enrichment must not fail a fetch
+        log.warning("history fetch failed for %s: %s", req.title, exc)
+        return
+    head_revid = page.revid
+    record_history(session, page, [rev for rev in history if rev.revid != head_revid])
 
 
 def _load_site_snapshot(session: Session, site_pk: int) -> Site:

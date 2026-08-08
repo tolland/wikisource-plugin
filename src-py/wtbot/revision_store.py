@@ -130,7 +130,92 @@ def record_head_revision(
 
     page.latest_revision_pk = revision.pk
     session.add(page)
+    # A head whose parent we do not hold marks nothing; a head with *no* parent
+    # is the page's only revision, and that is a complete history worth
+    # recording -- otherwise every never-edited page reads as "we did not look
+    # far enough" when there is nowhere further to look.
+    _mark_contiguous_history(session, page)
     return revision
+
+
+def record_history(
+    session: Session, page: Page, remotes: list[RemotePage]
+) -> list[Revision]:
+    """Record older revisions of a page without moving the head.
+
+    The head denormalisation on ``Page`` is owned by ``record_head_revision``;
+    this fills in behind it, so a caller can walk a page's history without the
+    walk deciding what "current" means.
+
+    Sets ``Page.history_complete_from_revid`` to the oldest revid stored *only
+    when the run reaches back from the head contiguously*: without that, a
+    later base search cannot tell "the histories diverge here" from "this is
+    merely the oldest revision we happened to fetch", which is the whole reason
+    the marker exists.
+    """
+    if page.pk is None:
+        return []
+
+    stored: list[Revision] = []
+    for remote in remotes:
+        if remote.revid is None:
+            continue
+        content = upsert_content(
+            session,
+            remote.text,
+            content_model=remote.content_model,
+            remote_sha1=remote.sha1,
+            remote_size=remote.size,
+        )
+        revision = session.exec(
+            select(Revision).where(
+                Revision.page_pk == page.pk, Revision.revid == remote.revid
+            )
+        ).first()
+        if revision is None:
+            revision = Revision(page_pk=page.pk, revid=remote.revid)
+        revision.parent_revid = remote.parentid
+        revision.timestamp = remote.timestamp
+        revision.contributor = remote.user
+        revision.comment = remote.comment
+        session.add(revision)
+        session.flush()
+        _upsert_slot(session, revision, content, role=MAIN_SLOT)
+        stored.append(revision)
+
+    _mark_contiguous_history(session, page)
+    return stored
+
+
+def _mark_contiguous_history(session: Session, page: Page) -> None:
+    """Walk parent_revid back from the head and record how far we can get.
+
+    Following ``parent_revid`` rather than sorting by revid: consecutive revids
+    are not a guarantee of adjacency (another page's edit takes one in
+    between), and the parent pointer is what MediaWiki itself means by "the
+    revision before this one".
+    """
+    head = head_revision(session, page)
+    if head is None:
+        return
+
+    by_revid = {
+        revision.revid: revision
+        for revision in session.exec(
+            select(Revision).where(Revision.page_pk == page.pk)
+        ).all()
+    }
+    current = head
+    while current.parent_revid is not None:
+        parent = by_revid.get(current.parent_revid)
+        if parent is None:
+            break
+        current = parent
+
+    # parent_revid of None means the page's first revision -- the range is then
+    # complete to the beginning, which is still just "from this revid onwards".
+    page.history_complete_from_revid = current.revid
+    session.add(page)
 
 
 def _upsert_slot(

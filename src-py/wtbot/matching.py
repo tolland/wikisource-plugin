@@ -5,9 +5,20 @@ from sqlalchemy import func
 from sqlmodel import Session, select
 
 from wtbot.content_model import Significance, parse_document
-from wtbot.model import LinkOrigin, NsRole, Page, PageMeta, RemoteLink, Site
+from wtbot.model import (
+    MAIN_SLOT,
+    Content,
+    LinkOrigin,
+    NsRole,
+    Page,
+    PageMeta,
+    RemoteLink,
+    Revision,
+    Site,
+    Slot,
+)
 from wtbot.remote_link_store import assert_link, find_link
-from wtbot.revision_store import head_content, head_revision
+from wtbot.revision_store import head_revision
 from wtbot.vfs.store import canonical_title
 
 """Proposing correspondences between two sites' copies of a work.
@@ -21,28 +32,34 @@ unreviewed.
 Two decisions worth stating, because both look like they should go the other
 way:
 
-**Only heads are compared.** Not "find the revision in their history matching
-ours" -- that question has no single answer. Null and touch edits create runs of
-byte-identical revisions (four in the Canadian patent fixture, and en.wikisource
-ran a whole `Pywikibot touch edit` campaign in 2018), so a content match can
-land on any member of a run with nothing to choose between them. It is also a
-question the design already declined: remote history is append-only, there is no
-rebase and no merge base to discover, so the anchor is recorded when a page is
-pulled and re-established by hand when it breaks (discussion section 2). And our
-revision store is *sparse* -- we hold the revisions we happened to fetch -- so a
-history walk would be bounded by our sampling rather than by the wiki's history.
-Heads have exactly one revision per side and no ambiguity.
+**The anchor is searched for in history, not assumed to be the head.** The
+common case is not two heads that agree: it is one side imported at some past
+revision of the other, with edits since. Hertz page 9 is the shape --- a local
+import matching upstream's second-newest revision, with a proofread bump on top
+--- and comparing only heads reports "same words, different level" and offers a
+link asserting sameness of two revisions that are *not* the same. That link
+would also destroy the useful fact, which is that upstream is exactly one edit
+ahead of a base we hold.
 
-Were a historical base ever needed, the rule would be *the newest revision of a
-content-equal run*: every member is an equally true claim, so the newest is the
-tightest one, and an older anchor makes a page look diverged when it is not.
+So each side's head is compared against the other side's stored revisions,
+newest first. Where several match --- a run of null or touch edits, four of
+them in the Canadian patent fixture --- the **newest** wins: every member is an
+equally true claim, so the newest is the tightest, and an older anchor makes a
+page look diverged when it is not.
+
+The search is bounded by what the revision store holds, which is deliberately
+sparse. ``Page.history_complete_from_revid`` says how far back the run is known
+to be contiguous, and a search that reaches that boundary without a match says
+``history_exhausted`` rather than ``diverged``: "we did not look far enough" is
+not "they disagree", and only one of them is fixed by fetching more.
 
 **"Same content" is not byte equality.** A ``proofread-page`` body carries
 ``pagequality user=``, which names an account on one wiki, so the same
-transcription routinely differs across sites -- that is the norm, not an
-exception. Sameness is decided by the content-model comparison, and the
-proofreading *level* is treated as significant because it is directional:
-equal words do not make it safe to overwrite someone's assessment.
+transcription routinely differs across sites --- that is the norm, not an
+exception. Sameness is decided by the content-model comparison, which compares
+header, body and footer and treats the proofreading *level* as significant
+because it is directional: equal words do not make it safe to overwrite
+someone's assessment.
 """
 
 
@@ -56,14 +73,32 @@ class MatchOutcome(str, Enum):
     same = "same"
     """Heads hold the same transcription. Proposable."""
 
+    local_ahead = "local_ahead"
+    """The remote head matches one of our older revisions: we have edits it
+    does not. Proposable -- the matched pair really is the same content, and it
+    is the base those edits replay onto."""
+
+    remote_ahead = "remote_ahead"
+    """Our head matches one of the remote's older revisions: they have edits we
+    do not. Proposable, same reasoning."""
+
     quality_differs = "quality_differs"
-    """Same transcription, different proofreading level. Proposable, but the
-    level is directional -- pushing 2 over someone's 4 discards an assessment
-    -- so it is surfaced rather than folded in with ``same``."""
+    """Same words at the heads, different proofreading level, and no anchor
+    found in the history we hold.
+
+    **Not** proposable: the two revisions are not the same content, and
+    asserting they are would both be false and lose the base. It is almost
+    always one edit apart -- the level bump -- so the fix is usually to fetch
+    more history and let the anchor search find it."""
 
     diverged = "diverged"
-    """The transcriptions differ. Not a link: discussion section 2's forward
-    re-anchoring wants a human to make the two sides identical first."""
+    """Both sides have edits after their common anchor, or the transcriptions
+    simply differ. Not a link: discussion section 2's forward re-anchoring wants
+    a human to make the two sides identical first."""
+
+    history_exhausted = "history_exhausted"
+    """No anchor in the revisions we hold, and we do not hold the full history.
+    A fetch, not a verdict -- distinct from ``diverged``, which is one."""
 
     no_counterpart = "no_counterpart"
     """Nothing on the other site holds this page. A redlink has no link, which
@@ -78,7 +113,15 @@ class MatchOutcome(str, Enum):
     reported rather than proposed again."""
 
 
-PROPOSABLE = (MatchOutcome.same, MatchOutcome.quality_differs)
+PROPOSABLE = (
+    MatchOutcome.same,
+    MatchOutcome.local_ahead,
+    MatchOutcome.remote_ahead,
+)
+"""Outcomes whose matched revision pair really is the same content.
+
+``quality_differs`` is deliberately absent: it names a pair that differs, and a
+link says a pair does not."""
 
 
 @dataclass(frozen=True)
@@ -95,6 +138,13 @@ class LinkProposal:
     remote_revid: int | None = None
     significance: Significance | None = None
     detail: str | None = None
+
+    local_ahead_by: int = 0
+    """Revisions on our side newer than the anchor -- what would replay out."""
+    remote_ahead_by: int = 0
+    """Revisions on their side newer than the anchor -- what would replay in."""
+    anchor_is_heads: bool = False
+    """True when the matched pair is both heads, i.e. nothing to replay."""
 
     @property
     def proposable(self) -> bool:
@@ -186,31 +236,215 @@ def compare_pages(
             **base,
         )
 
-    local_content = head_content(session, local_page)
-    remote_content = head_content(session, remote_page)
-    if local_content is None or remote_content is None:
+    anchor = find_anchor(session, local_page, remote_page)
+    if anchor is None:
         return LinkProposal(
             outcome=MatchOutcome.unfetched,
             detail="a head revision has no main slot content",
             **base,
         )
 
-    comparison = parse_document(
-        local_content.text, local_content.content_model
-    ).compare(parse_document(remote_content.text, remote_content.content_model))
+    base |= {
+        "local_revision_pk": anchor.local_revision.pk,
+        "remote_revision_pk": anchor.remote_revision.pk,
+        "local_revid": anchor.local_revision.revid,
+        "remote_revid": anchor.remote_revision.revid,
+        "significance": anchor.significance,
+        "local_ahead_by": anchor.local_ahead_by,
+        "remote_ahead_by": anchor.remote_ahead_by,
+        "anchor_is_heads": anchor.is_heads,
+    }
 
-    if not comparison.same_transcription:
+    existing = find_link(
+        session,
+        revision_pk=anchor.local_revision.pk,
+        other_revision_pk=anchor.remote_revision.pk,
+    )
+    if existing is not None:
         return LinkProposal(
-            outcome=MatchOutcome.diverged,
-            significance=comparison.significance,
+            outcome=MatchOutcome.already_linked,
+            detail=f"link #{existing.pk}, origin {existing.origin.value}",
             **base,
         )
-    outcome = (
-        MatchOutcome.quality_differs
-        if comparison.significance is Significance.metadata_significant
-        else MatchOutcome.same
+
+    return LinkProposal(outcome=anchor.outcome, detail=anchor.detail, **base)
+
+
+@dataclass(frozen=True)
+class Anchor:
+    """The best correspondence found between two pages, and the distance from
+    it to each side's head."""
+
+    local_revision: Revision
+    remote_revision: Revision
+    outcome: MatchOutcome
+    significance: Significance | None = None
+    local_ahead_by: int = 0
+    remote_ahead_by: int = 0
+    detail: str | None = None
+
+    @property
+    def is_heads(self) -> bool:
+        return self.local_ahead_by == 0 and self.remote_ahead_by == 0
+
+
+def find_anchor(session: Session, local_page: Page, remote_page: Page) -> Anchor | None:
+    """The newest revision pair holding the same content, and what came after.
+
+    Each head is compared against the other side's stored revisions, newest
+    first. Only one side is searched at a time -- a pair where *both* sides
+    moved after the anchor cannot be resolved by a link anyway (that is
+    divergence, and discussion section 2 wants a human), so there is nothing to
+    gain from searching for a deeper common ancestor.
+
+    Returns None only when there is nothing to compare at all.
+    """
+    local_head = head_revision(session, local_page)
+    remote_head = head_revision(session, remote_page)
+    if local_head is None or remote_head is None:
+        return None
+
+    local_content = _content_of(session, local_head)
+    remote_content = _content_of(session, remote_head)
+    if local_content is None or remote_content is None:
+        return None
+
+    heads = _compare(local_content, remote_content)
+    if heads.same_transcription and heads.significance is not (
+        Significance.metadata_significant
+    ):
+        return Anchor(
+            local_revision=local_head,
+            remote_revision=remote_head,
+            outcome=MatchOutcome.same,
+            significance=heads.significance,
+        )
+
+    # Our head against their history: they are ahead.
+    match = _newest_match(session, local_content, remote_page, remote_head)
+    if match is not None:
+        revision, significance, ahead_by = match
+        return Anchor(
+            local_revision=local_head,
+            remote_revision=revision,
+            outcome=MatchOutcome.remote_ahead,
+            significance=significance,
+            remote_ahead_by=ahead_by,
+            detail=f"{ahead_by} revision(s) upstream of the anchor",
+        )
+
+    # Their head against ours: we are ahead.
+    match = _newest_match(session, remote_content, local_page, local_head)
+    if match is not None:
+        revision, significance, ahead_by = match
+        return Anchor(
+            local_revision=revision,
+            remote_revision=remote_head,
+            outcome=MatchOutcome.local_ahead,
+            significance=significance,
+            local_ahead_by=ahead_by,
+            detail=f"{ahead_by} revision(s) local of the anchor",
+        )
+
+    outcome, detail = _no_match_outcome(session, local_page, remote_page, heads)
+    return Anchor(
+        local_revision=local_head,
+        remote_revision=remote_head,
+        outcome=outcome,
+        significance=heads.significance,
+        detail=detail,
     )
-    return LinkProposal(outcome=outcome, significance=comparison.significance, **base)
+
+
+def _no_match_outcome(
+    session: Session, local_page: Page, remote_page: Page, heads
+) -> tuple[MatchOutcome, str | None]:
+    """Nothing matched -- but "they disagree" and "we did not look far enough"
+    are different answers, and only one of them is fixed by fetching."""
+    if heads.significance is Significance.metadata_significant:
+        return (
+            MatchOutcome.quality_differs,
+            "same words, different level, and no anchor in the history held",
+        )
+
+    incomplete = [
+        page
+        for page in (local_page, remote_page)
+        if not _history_is_complete(session, page)
+    ]
+    if incomplete:
+        sides = " and ".join(
+            "local" if page is local_page else "remote" for page in incomplete
+        )
+        return (
+            MatchOutcome.history_exhausted,
+            f"no anchor in the revisions held; {sides} history is incomplete",
+        )
+    return MatchOutcome.diverged, None
+
+
+def _history_is_complete(session: Session, page: Page) -> bool:
+    """Whether we hold this page back to its first revision.
+
+    ``history_complete_from_revid`` marks the oldest revid of a contiguous run
+    from the head; the run reaches the beginning when that revision has no
+    parent.
+    """
+    marker = page.history_complete_from_revid
+    if marker is None:
+        return False
+    oldest = session.exec(
+        select(Revision).where(Revision.page_pk == page.pk, Revision.revid == marker)
+    ).first()
+    return oldest is not None and oldest.parent_revid is None
+
+
+def _newest_match(
+    session: Session,
+    content,
+    other_page: Page,
+    other_head: Revision,
+) -> tuple[Revision, Significance, int] | None:
+    """The newest revision of ``other_page`` holding ``content``'s text.
+
+    Newest first, and the first hit wins: a run of touch edits offers several
+    equally true answers, and the newest is the tightest -- an older anchor
+    would report revisions as unsynced when they carry no change.
+    """
+    revisions = _revisions_newest_first(session, other_page)
+    for offset, revision in enumerate(revisions):
+        if revision.pk == other_head.pk:
+            continue
+        other_content = _content_of(session, revision)
+        if other_content is None:
+            continue
+        comparison = _compare(content, other_content)
+        if comparison.same_transcription and comparison.significance is not (
+            Significance.metadata_significant
+        ):
+            return revision, comparison.significance, offset
+    return None
+
+
+def _revisions_newest_first(session: Session, page: Page) -> list[Revision]:
+    return list(
+        session.exec(
+            select(Revision)
+            .where(Revision.page_pk == page.pk)
+            .order_by(Revision.revid.desc())
+        ).all()
+    )
+
+
+def _content_of(session: Session, revision: Revision) -> Content | None:
+    slot = session.get(Slot, (revision.pk, MAIN_SLOT))
+    return None if slot is None else session.get(Content, slot.content_pk)
+
+
+def _compare(left: Content, right: Content):
+    return parse_document(left.text, left.content_model).compare(
+        parse_document(right.text, right.content_model)
+    )
 
 
 def confirm_proposals(
@@ -225,6 +459,10 @@ def confirm_proposals(
     behalf, because "confirm everything that looked fine" is exactly the
     auto-confirmation the design rules out. A non-proposable proposal is a
     programming error rather than something to skip silently.
+
+    The pair written is the *anchor*, which for ``local_ahead``/``remote_ahead``
+    is not the head pair -- that is the point: the anchor is the base the
+    unsynced revisions replay onto.
     """
     links = []
     for proposal in proposals:

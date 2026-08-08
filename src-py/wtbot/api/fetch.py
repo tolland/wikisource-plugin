@@ -134,6 +134,16 @@ class FetchCreate(BaseModel):
     )
     kind: FetchKind = FetchKind.single
     depth: int = 0
+    revisions: int = Field(
+        default=1,
+        ge=1,
+        description=(
+            "Revisions to store, counting back from the head. 1 is a normal "
+            "fetch; more fills in history for the cross-site anchor search, "
+            "which cannot find a match at the head when one side was imported "
+            "from an older revision of the other."
+        ),
+    )
 
 
 class DrainRequest(BaseModel):
@@ -202,6 +212,7 @@ def create_fetch(payload: FetchCreate, session: Session = Depends(get_session)) 
         title=payload.title,
         kind=payload.kind,
         depth=payload.depth,
+        revisions=payload.revisions,
     )
     session.add(req)
     session.commit()

@@ -178,21 +178,38 @@ and `wtbot link propose|add|show`.
       — silently skipping is how "confirm everything that looked fine" creeps
       back in.
 
-**Only heads are compared, and that is the answer to "which revision do we
-link".** Finding the revision in their history matching ours has no single
-answer: null and touch edits leave runs of byte-identical revisions (four in
-the Canadian patent fixture; en.wikisource ran a whole `Pywikibot touch edit`
-campaign in 2018), so a content match lands anywhere in the run with nothing
-to choose between members. The question is also one §2 already declined —
-remote history is append-only, there is no merge base to discover, the anchor
-is recorded on pull and re-established by hand when it breaks — and our
-revision store is deliberately sparse, so a walk would be bounded by our
-sampling rather than by the wiki's history. Heads have exactly one revision
-per side.
+**The anchor is searched for in history, not assumed to be the head.** The
+common case is not two heads that agree: it is one side imported at some past
+revision of the other, with edits since. Hertz page 9 is the shape — a local
+import matching upstream's second-newest revision, with a proofread bump on top:
 
-Were a historical base ever wanted, the rule would be **the newest revision of
-a content-equal run**: every member is equally true, so the newest is the
-tightest claim, and an older anchor makes a page look diverged when it is not.
+```
+local head r10779  level=1 Admin
+  …
+  r15757193  level=1 Tolland  -> metadata_only        ← the anchor
+  r15757208  level=3 Tolland  -> metadata_significant ← head
+```
+
+Comparing heads alone reports "same words, different level" and offers a link
+asserting sameness of two revisions that are *not* the same — and destroys the
+useful fact, which is that upstream is exactly one edit ahead of a base we hold.
+So `quality_differs` is **not** proposable, and each head is compared against
+the other side's stored revisions, newest first.
+
+Where several revisions match — a run of null or touch edits — the **newest**
+wins: every member is an equally true claim, so the newest is the tightest, and
+an older anchor reports touch edits as unsynced work.
+
+The search is bounded by what the store holds, which is deliberately sparse, so
+the outcomes distinguish **`history_exhausted`** ("no anchor in what we hold,
+and we do not hold it all") from **`diverged`** ("held in full, nothing
+matches"). Only the first is fixed by fetching, and
+`Page.history_complete_from_revid` is what tells them apart — set by walking
+`parent_revid` back from the head, so a head whose parent we lack claims
+nothing while a head with *no* parent is a complete one-revision history.
+
+Feed it with `wtbot fetch-page --revisions N` (`FetchRequest.revisions`, which
+fan-out children inherit).
 
 "Same content" is decided by the content-model comparison, not by bytes or
 sha1: a `pagequality user=` names an account on one wiki, so equivalent

@@ -99,6 +99,16 @@ class ProposalOut(BaseModel):
     significance: str | None = None
     detail: str | None = None
     proposable: bool
+    local_ahead_by: int = Field(
+        default=0, description="Local revisions newer than the anchor."
+    )
+    remote_ahead_by: int = Field(
+        default=0, description="Remote revisions newer than the anchor."
+    )
+    anchor_is_heads: bool = Field(
+        default=False,
+        description="True when the matched pair is both heads: nothing to replay.",
+    )
 
 
 class ProposeResult(BaseModel):
@@ -162,6 +172,9 @@ def _out(proposal: LinkProposal) -> ProposalOut:
         significance=(proposal.significance.value if proposal.significance else None),
         detail=proposal.detail,
         proposable=proposal.proposable,
+        local_ahead_by=proposal.local_ahead_by,
+        remote_ahead_by=proposal.remote_ahead_by,
+        anchor_is_heads=proposal.anchor_is_heads,
     )
 
 
@@ -222,9 +235,10 @@ def create_link(
     if not proposal.proposable and not payload.force:
         raise HTTPException(
             409,
-            f"{proposal.outcome.value}: heads do not hold the same transcription "
-            f"({proposal.significance.value if proposal.significance else 'unknown'}). "
-            "Reconcile the two sides first, or pass force to assert it anyway.",
+            f"{proposal.outcome.value}: no revision pair holding the same content"
+            + (f" -- {proposal.detail}" if proposal.detail else "")
+            + ". Fetch more history, reconcile the two sides, or pass force to "
+            "assert the heads correspond anyway.",
         )
 
     try:

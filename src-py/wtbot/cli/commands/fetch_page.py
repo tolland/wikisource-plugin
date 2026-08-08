@@ -17,6 +17,15 @@ def fetch_page(
     depth: int = typer.Option(
         1, help="expansion depth: 0=page only, 1=expand Index/File"
     ),
+    revisions: int = typer.Option(
+        1,
+        min=1,
+        help=(
+            "Revisions to store, counting back from the head. More than 1 fills "
+            "in history for `wtbot link propose`, which cannot find an anchor at "
+            "the head when one side was imported from an older revision."
+        ),
+    ),
     drain: bool = typer.Option(
         False,
         "--drain",
@@ -42,7 +51,7 @@ def fetch_page(
 
     result = api.post(
         "/fetch/",
-        {"title": title, "label": label, "depth": depth},
+        {"title": title, "label": label, "depth": depth, "revisions": revisions},
     )
     request = result["request"]
     typer.echo(f"queued request #{request['pk']}  {title}  on {label}")

@@ -9,9 +9,17 @@ from wtbot.matching import (
     confirm_proposals,
     propose_index_links,
 )
-from wtbot.model import LinkOrigin, NsRole, Page, PageMeta, RemoteLink, Site
+from wtbot.model import (
+    LinkOrigin,
+    NsRole,
+    Page,
+    PageMeta,
+    RemoteLink,
+    Revision,
+    Site,
+)
 from wtbot.remote_link_store import assert_link, current_anchor
-from wtbot.revision_store import record_head_revision
+from wtbot.revision_store import record_head_revision, record_history
 from wtbot.wiki.wiki_types import RemotePage
 
 """Proposing correspondences, and the ambiguity it deliberately avoids.
@@ -46,6 +54,7 @@ def _page(
     *,
     body: str | None,
     revid: int,
+    parentid: int | None = None,
     index_title: str = INDEX,
     title: str | None = None,
 ) -> Page:
@@ -68,6 +77,7 @@ def _page(
                 content_model=PROOFREAD,
                 text=body,
                 revid=revid,
+                parentid=parentid,
                 timestamp=datetime(2026, 1, 1, tzinfo=timezone.utc),
             ),
         )
@@ -91,12 +101,16 @@ def test_the_same_transcription_under_different_attribution_is_proposable(
     assert proposal.proposable
 
 
-def test_a_differing_quality_level_is_surfaced_not_folded_in(
-    session: Session,
-) -> None:
-    """Same words, different proofreading state. Proposable, but the level is
-    directional -- pushing 2 over someone's 4 discards an assessment -- so it
-    must not arrive looking like an ordinary match."""
+def test_a_differing_quality_level_is_not_a_link(session: Session) -> None:
+    """Same words, different proofreading state, and no anchor in the history
+    held.
+
+    Not proposable: the two revisions are *not* the same content, so a link
+    would be false -- and it would overwrite the useful fact, which is that one
+    side is an edit ahead of a base. Almost always the level bump is exactly
+    that one edit, which is why the answer is to fetch more history rather than
+    to link the heads.
+    """
     local, remote = _site(session, "mywikisource"), _site(session, "wikisource")
     local_page = _page(session, local, 1, body=_body(2, "LocalEditor"), revid=5)
     remote_page = _page(session, remote, 1, body=_body(4, "Hesperian"), revid=900)
@@ -104,7 +118,7 @@ def test_a_differing_quality_level_is_surfaced_not_folded_in(
     proposal = compare_pages(session, local_page, remote_page)
 
     assert proposal.outcome is MatchOutcome.quality_differs
-    assert proposal.proposable
+    assert not proposal.proposable
 
 
 def test_diverged_transcriptions_are_not_proposable(session: Session) -> None:
@@ -406,3 +420,170 @@ def test_unconventional_labels_ask_rather_than_guess(client, engine) -> None:
     detail = response.json()["detail"]
     assert "canonical, staging" in detail
     assert "origin/upstream" in detail
+
+
+def _older(
+    session: Session, page: Page, *, body: str, revid: int, parentid: int | None = None
+) -> None:
+    """An *older* revision, filled in behind the head.
+
+    Which is the direction a history fetch works in: the head is what a normal
+    fetch already recorded, and walking back adds ancestors without changing
+    what "current" means.
+    """
+    record_history(
+        session,
+        page,
+        [
+            RemotePage(
+                title=page.title,
+                namespace_key=104,
+                namespace_canonical="Page",
+                content_model=PROOFREAD,
+                text=body,
+                revid=revid,
+                parentid=parentid,
+                timestamp=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            )
+        ],
+    )
+    session.commit()
+
+
+def test_an_import_matching_an_older_upstream_revision_is_remote_ahead(
+    session: Session,
+) -> None:
+    """The Hertz page 9 shape, and the common one.
+
+    A local import matches upstream's *second-newest* revision; upstream then
+    bumped the proofreading level. Comparing heads alone reports "same words,
+    different level" and offers a link that would be false. The anchor is the
+    pair that really is the same content, and the useful fact is the distance
+    from it: upstream is one edit ahead.
+    """
+    local, remote = _site(session, "mywikisource"), _site(session, "wikisource")
+    local_page = _page(session, local, 9, body=_body(1, "Admin"), revid=10779)
+    remote_page = _page(
+        session,
+        remote,
+        9,
+        body=_body(3, "Tolland"),
+        revid=15757208,
+        parentid=15757193,
+    )
+    _older(session, remote_page, body=_body(1, "Tolland"), revid=15757193)
+
+    proposal = compare_pages(session, local_page, remote_page)
+
+    assert proposal.outcome is MatchOutcome.remote_ahead
+    assert proposal.proposable
+    assert proposal.remote_ahead_by == 1
+    assert proposal.local_ahead_by == 0
+    assert not proposal.anchor_is_heads
+    # The anchor is the older upstream revision, not its head.
+    assert proposal.remote_revid == 15757193
+    assert proposal.local_revid == 10779
+
+
+def test_confirming_a_remote_ahead_pair_links_the_anchor_not_the_heads(
+    session: Session,
+) -> None:
+    """The link has to name the base the unsynced revisions replay onto. Naming
+    the heads would assert two revisions are the same content when they differ,
+    and lose the base at the same time."""
+    local, remote = _site(session, "mywikisource"), _site(session, "wikisource")
+    local_page = _page(session, local, 9, body=_body(1, "Admin"), revid=10779)
+    remote_page = _page(
+        session,
+        remote,
+        9,
+        body=_body(3, "Tolland"),
+        revid=15757208,
+        parentid=15757193,
+    )
+    _older(session, remote_page, body=_body(1, "Tolland"), revid=15757193)
+
+    proposal = compare_pages(session, local_page, remote_page)
+    (link,) = confirm_proposals(session, [proposal], origin=LinkOrigin.title_match)
+    session.commit()
+
+    anchored = session.get(Revision, link.remote_revision_pk)
+    assert anchored.revid == 15757193
+    assert anchored.revid != remote_page.revid
+
+
+def test_local_edits_on_top_of_a_shared_base_are_local_ahead(
+    session: Session,
+) -> None:
+    """The push direction: we proofread a page the other side has not seen."""
+    local, remote = _site(session, "mywikisource"), _site(session, "wikisource")
+    local_page = _page(session, local, 1, body=_body(3, "Admin"), revid=11, parentid=10)
+    remote_page = _page(session, remote, 1, body=_body(1, "Tolland"), revid=900)
+    _older(session, local_page, body=_body(1, "Admin"), revid=10)
+
+    proposal = compare_pages(session, local_page, remote_page)
+
+    assert proposal.outcome is MatchOutcome.local_ahead
+    assert proposal.local_ahead_by == 1
+    assert proposal.proposable
+    assert proposal.local_revid == 10
+
+
+def test_the_newest_of_a_touch_edit_run_is_the_anchor(session: Session) -> None:
+    """Several upstream revisions hold identical content, so several are
+    equally true anchors. The newest is the tightest claim: an older one would
+    report the touch edits as unsynced work when they carry no change."""
+    local, remote = _site(session, "mywikisource"), _site(session, "wikisource")
+    local_page = _page(session, local, 1, body=_body(1, "Admin"), revid=10)
+    remote_page = _page(
+        session, remote, 1, body=_body(3, "Tolland"), revid=903, parentid=902
+    )
+    for revid, parent in ((902, 901), (901, 900), (900, None)):
+        _older(
+            session, remote_page, body=_body(1, "Tolland"), revid=revid, parentid=parent
+        )
+
+    proposal = compare_pages(session, local_page, remote_page)
+
+    assert proposal.outcome is MatchOutcome.remote_ahead
+    assert proposal.remote_revid == 902
+    assert proposal.remote_ahead_by == 1
+
+
+def test_an_incomplete_history_with_no_match_is_not_called_divergence(
+    session: Session,
+) -> None:
+    """ "We did not look far enough" and "they disagree" need different actions,
+    and only the first is fixed by fetching."""
+    local, remote = _site(session, "mywikisource"), _site(session, "wikisource")
+    local_page = _page(session, local, 1, body=_body(1, "Admin", "Ours."), revid=10)
+    # A head whose parent we do not hold: the history is known to be partial.
+    remote_page = _page(
+        session,
+        remote,
+        1,
+        body=_body(1, "Tolland", "Theirs."),
+        revid=950,
+        parentid=949,
+    )
+
+    proposal = compare_pages(session, local_page, remote_page)
+
+    assert proposal.outcome is MatchOutcome.history_exhausted
+    assert not proposal.proposable
+    assert "incomplete" in proposal.detail
+
+
+def test_a_complete_history_with_no_match_is_divergence(session: Session) -> None:
+    """Both sides held in full and nothing matches: that is a real conflict,
+    and no amount of fetching changes it."""
+    local, remote = _site(session, "mywikisource"), _site(session, "wikisource")
+    local_page = _page(session, local, 1, body=_body(1, "Admin", "Ours."), revid=10)
+    remote_page = _page(
+        session, remote, 1, body=_body(1, "Tolland", "Theirs."), revid=900
+    )
+
+    proposal = compare_pages(session, local_page, remote_page)
+
+    assert proposal.outcome is MatchOutcome.diverged
+    assert not proposal.proposable

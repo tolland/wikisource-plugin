@@ -34,6 +34,14 @@ class FetchRequest(SQLModel, table=True):
     title: str  # 'Index:...djvu', 'Page:...djvu/3', or a mainspace title
     kind: FetchKind = FetchKind.index
     depth: int = 0  # 0 = this title only; >0 = expand associated assets
+    revisions: int = 1
+    """How many revisions back from the head to store.
+
+    1 is a normal fetch: the head, which is all the VFS and the editor need.
+    More fills in history behind it, which is what an anchor search walks --
+    a page imported from an older revision of the other side has no match at
+    the head, and no amount of comparing heads finds one (see
+    wtbot.matching)."""
 
     status: FetchStatus = Field(default=FetchStatus.pending, index=True)
     priority: int = 0  # higher = sooner ("open this now" jumps the queue)
