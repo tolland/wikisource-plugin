@@ -128,6 +128,20 @@ private content_element ::= internal_link
               | ENTITY_REF
               | PRE_START
               | NEWLINE
+              // Quote markup, accepted as inline LEAVES for now -- no
+              // bold/italic PSI structure yet, deliberately. A run's meaning
+              // depends on the run that closes it ("'''''x'' y'''" and
+              // "'''''x''' y''" open identically and nest oppositely), and
+              // unclosed runs are common and legal in real wikitext, so a
+              // naive pairing rule would manufacture error elements all over
+              // ordinary pages. Accepting them as text keeps the tree honest
+              // until the pairing pass is written. SINGLE_APOS is never
+              // markup at all -- it is the apostrophe in "don't", split out
+              // only because the lexer must stop PLAIN_TEXT runs at quotes.
+              | SINGLE_APOS
+              | TWO_APOS
+              | THREE_APOS
+              | FIVE_APOS
 
 contained_element ::= content_element*
 
