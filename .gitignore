@@ -62,10 +62,11 @@ __pycache__/
 /user-config.py
 /.gradle-codex/
 /my_first_notebook.ipynb
-/Query.sql
+/query_wtbot.sql
 /idea-flex.skeleton
 /editorStateDump-*.txt
 /apicache/
 /throttle.ctrl
 /fixtures/vcr_cassettes/
 /docker/wtbot/wtbot_18574_data/
+/query

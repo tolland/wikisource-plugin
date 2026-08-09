@@ -43,6 +43,7 @@ $wgCachePages = false;
 $wgParserCacheType = CACHE_NONE;
 
 $wgDefaultUserOptions[ 'usecodemirror' ] = true;
+$wgMaxUploadSize = 512 * 1024 * 1024;
 
 wfLoadExtension( 'CodeEditor' );
 wfLoadExtension( 'CodeMirror' );
