@@ -13,6 +13,7 @@
     { href: '/pages', label: 'Pages' },
     { href: '/indexes', label: 'Indexes' },
     { href: '/links', label: 'Links' },
+    { href: '/sync', label: 'Sync' },
     { href: '/vfs', label: 'VFS' }
   ];
 </script>
