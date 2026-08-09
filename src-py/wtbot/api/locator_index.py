@@ -15,7 +15,7 @@ from wtbot.model import Page, Site
 from wtbot.vfs.paths import WikiPath
 from wtbot.vfs.store import PageStore
 
-"""GET /locator-index/{sections,page-numbers} — resolves a back-of-book
+"""GET /locator-index/{sections,page-numbers,dump} — resolves a back-of-book
 locator (a printed page number, or a section/paragraph id) to the `Page:`
 that holds it, for building a `{{double link|...}}`-style reference without
 hunting through the scan by hand.
@@ -28,11 +28,19 @@ unsaved local edits (`PageStore.effective_body`) immediately — exactly what
 you want while you are the one adding the `<section begin=".."/>` tags this
 endpoint is about to help you link to.
 
-Both endpoints accept the *wikisource://* VFS `path` of either the `Index:`
-itself or any `Page:` within it (matching `GET /pages/nav`'s own contract) —
-so a completion feature running in the transcription editor of one page can
-ask about locators for the whole work it belongs to without first resolving
-the Index title itself.
+All three endpoints accept the *wikisource://* VFS `path` of either the
+`Index:` itself or any `Page:` within it (matching `GET /pages/nav`'s own
+contract) — so a completion feature running in the transcription editor of
+one page can ask about locators for the whole work it belongs to without
+first resolving the Index title itself.
+
+`/dump` is the exception to "targeted lookup": it returns everything this
+module knows about one work in one call, unfiltered — meant for the viewer's
+inspection route and, later, for seeding IntelliJ SDK features that want a
+work's whole shape (symbol search, "find usages" of a section id) rather
+than one query's answer. An interactive completion feature should still call
+the targeted endpoints for the one locator it needs; slurping the whole dump
+on every keystroke is the wrong shape even though computing it is cheap.
 """
 
 router = APIRouter(
@@ -59,6 +67,34 @@ class SectionMatch(BaseModel):
     section_id: str
     role: Literal["begin", "end", "anchor_template"]
     page: PageRef
+
+
+class PagelistAssignmentEntry(BaseModel):
+    """One explicit `<pagelist>` entry, as written -- the raw source of truth
+    [PageIndexEntry.confidence] `"explicit"` is read back from, versus
+    `"inferred"` which has no entry here at all."""
+
+    scan_page: int
+    kind: Literal["blank", "text", "numeral"]
+    text: str | None = None
+    style: Literal["arabic", "roman", "highroman"] | None = None
+    value: int | None = None
+
+
+class PageIndexEntry(BaseModel):
+    page: PageRef
+    label: str | None
+    confidence: Literal["explicit", "inferred", "unknown"]
+
+
+class LocatorIndexDump(BaseModel):
+    """Everything this module currently knows about one work, unfiltered."""
+
+    index_title: str
+    index_path: str
+    pagelist_assignments: list[PagelistAssignmentEntry]
+    pages: list[PageIndexEntry]
+    sections: list[SectionMatch]
 
 
 def _resolve_index(path: str, session: Session) -> tuple[PageStore, Site, str]:
@@ -97,6 +133,17 @@ def _matches(candidate: str, query: str) -> bool:
     return candidate == query or candidate.startswith(query)
 
 
+def _page_refs_by_scan(
+    store: PageStore, pages: list[Page], pages_dir: str
+) -> dict[int, PageRef]:
+    refs: dict[int, PageRef] = {}
+    for page in pages:
+        ref = _page_ref(store, page, pages_dir)
+        if ref is not None:
+            refs[ref.scan_page] = ref
+    return refs
+
+
 @router.get("/page-numbers", response_model=list[PageNumberMatch])
 def lookup_page_numbers(
     path: str = Query(
@@ -118,12 +165,7 @@ def lookup_page_numbers(
     assert index_page is not None  # checked in _resolve_index
     pages = store.proofread_pages(site, index_title)
     pages_dir = _pages_dir(path)
-
-    refs: dict[int, PageRef] = {}
-    for page in pages:
-        ref = _page_ref(store, page, pages_dir)
-        if ref is not None:
-            refs[ref.scan_page] = ref
+    refs = _page_refs_by_scan(store, pages, pages_dir)
 
     assignments = parse_pagelist_assignments(store.effective_body(index_page))
     labels = compute_labels(assignments, list(refs.keys()))
@@ -184,3 +226,67 @@ def lookup_sections(
 
     matches.sort(key=lambda m: (m.section_id != query, m.page.scan_page, m.role))
     return matches[:limit]
+
+
+@router.get("/dump", response_model=LocatorIndexDump)
+def dump_locator_index(
+    path: str = Query(
+        ..., description="wikisource:// VFS path of the Index: or any Page: within it"
+    ),
+    session: Session = Depends(get_session),
+) -> LocatorIndexDump:
+    """Everything this module can currently tell about one work: every
+    explicit `<pagelist>` entry, every `Page:` with its computed printed-page
+    label, and every `<section>`/`{{anchor}}` occurrence — unfiltered. See
+    the module docstring for why an interactive feature should prefer the
+    targeted endpoints instead.
+    """
+    store, site, index_title = _resolve_index(path, session)
+    index_page = store.page(site, index_title)
+    assert index_page is not None  # checked in _resolve_index
+    pages = store.proofread_pages(site, index_title)
+    pages_dir = _pages_dir(path)
+    refs = _page_refs_by_scan(store, pages, pages_dir)
+
+    assignments = parse_pagelist_assignments(store.effective_body(index_page))
+    labels = compute_labels(assignments, list(refs.keys()))
+
+    pagelist_entries = [
+        PagelistAssignmentEntry(
+            scan_page=scan_page,
+            kind=assignment.kind,
+            text=assignment.text,
+            style=assignment.style.value if assignment.style is not None else None,
+            value=assignment.value,
+        )
+        for scan_page, assignment in sorted(assignments.items())
+    ]
+    page_entries = [
+        PageIndexEntry(
+            page=refs[scan_page], label=label.label, confidence=label.confidence
+        )
+        for scan_page, label in sorted(labels.items())
+    ]
+
+    sections: list[SectionMatch] = []
+    for page in pages:
+        ref = _page_ref(store, page, pages_dir)
+        if ref is None:
+            continue
+        for occurrence in scan_section_occurrences(
+            store.effective_body(page), ref.scan_page
+        ):
+            sections.append(
+                SectionMatch(
+                    section_id=occurrence.section_id, role=occurrence.role, page=ref
+                )
+            )
+    sections.sort(key=lambda m: (m.page.scan_page, m.section_id, m.role))
+
+    return LocatorIndexDump(
+        index_title=index_title,
+        index_path="/" + "/".join(WikiPath.parse(path).segments[:3]),
+        pagelist_assignments=pagelist_entries,
+        pages=page_entries,
+        sections=sections,
+    )

@@ -4,6 +4,7 @@ import type {
   IndexPageDetail,
   IndexPageSummary,
   ListChildrenResponse,
+  LocatorIndexDump,
   LocatorPageNumberMatch,
   LocatorSectionMatch,
   CachedPage,
@@ -300,4 +301,9 @@ export async function retractPairRungs(pairPk: number): Promise<void> {
 
 export function syncReport(payload: SyncRequest): Promise<SyncReport> {
   return postJson<SyncReport>('/sync/report', payload);
+}
+
+export function dumpLocatorIndex(path: string): Promise<LocatorIndexDump> {
+  const params = new URLSearchParams({ path });
+  return getJson<LocatorIndexDump>(`/locator-index/dump?${params}`);
 }
