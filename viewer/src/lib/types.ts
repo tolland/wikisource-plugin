@@ -117,6 +117,8 @@ export interface OcrBackendList {
 export interface IndexPageSummary {
   pk: number;
   title: string;
+  family: string;
+  code: string;
   page_count?: number | null;
   revid?: number | null;
   content_model?: string | null;
@@ -390,4 +392,27 @@ export interface PairRevisions {
   rungs: RungRow[];
   local_history_complete: boolean;
   remote_history_complete: boolean;
+}
+
+// ---- Locator index (GET /locator-index/{page-numbers,sections}) ----------
+
+export type LocatorConfidence = 'explicit' | 'inferred' | 'unknown';
+export type SectionRole = 'begin' | 'end' | 'anchor_template';
+
+export interface LocatorPageRef {
+    path: string;
+    title: string;
+    scan_page: number;
+}
+
+export interface LocatorPageNumberMatch {
+    label: string;
+    confidence: LocatorConfidence;
+    page: LocatorPageRef;
+}
+
+export interface LocatorSectionMatch {
+    section_id: string;
+    role: SectionRole;
+    page: LocatorPageRef;
 }

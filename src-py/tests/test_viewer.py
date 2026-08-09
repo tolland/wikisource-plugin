@@ -79,6 +79,8 @@ def test_viewer_lists_only_index_pages(engine):
         {
             "pk": index_page.pk,
             "title": "Index:Example.djvu",
+            "family": "mywikisource",
+            "code": "en",
             "page_count": 12,
             "revid": 123,
             "content_model": "proofread-index",

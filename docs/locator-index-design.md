@@ -162,6 +162,17 @@ fetches from the wiki, and nothing here writes.
   live-typing completion feature — that an uncommitted `EditJournal` edit is
   visible to a lookup immediately.
 
+## Exploring it: the viewer's Locator index route
+
+`viewer/src/routes/locator-index/` — since this is computed live off the
+current cache, the debug viewer is where to poke at it: pick a work (reused
+from the same `GET /viewer/indexes` list `/indexes` already shows, now
+carrying `family`/`code` so a VFS path can be built without a second round
+trip), pick section-id or page-number mode, type a locator, get results
+live (debounced ~250ms, not a submit button) with a "copy path" action per
+match. No new backend beyond `family`/`code` on `IndexPageSummary` — it's
+a client over the same two endpoints described above.
+
 ## Future: consuming this from the plugin
 
 Not built yet; the seam to build it against:
