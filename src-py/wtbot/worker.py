@@ -22,7 +22,7 @@ from wtbot.page_processors import (
     ProcessContext,
     processor_for,
 )
-from wtbot.revision_store import record_head_revision, record_history
+from wtbot.revision_store import head_revision, record_head_revision, record_history
 from wtbot.timeutil import utcnow
 from wtbot.wiki.client import WikiClient
 from wtbot.wiki.failures import WikiFailure
@@ -204,21 +204,51 @@ def _process(
     )
 
 
-def _record_history(session, client, page, req) -> None:
+def _record_history(
+    session: Session,
+    client: WikiClient,
+    page: CachedPage,
+    req: ClaimedFetchRequest,
+) -> None:
     """Fill in revisions behind the head, best effort.
 
     A failure here does not fail the fetch: the head is what the editor and the
     VFS need, and history is an enrichment for the anchor search. Losing it
     downgrades a match to `history_exhausted`, which is a state the caller
-    already has to handle.
+    already has to handle -- so *everything* here is guarded, not only the
+    network call. An enrichment that can mark a successfully fetched page as
+    errored is not best effort.
+
+    The network call comes first and the database work second, in its own
+    ``write_batch``: the session is idle when this is entered (``_upsert_page``
+    committed), and rows flushed outside a batch would ride along on whatever
+    the processor commits next.
     """
     try:
         history = client.get_history(req.title, limit=req.revisions)
     except Exception as exc:  # noqa: BLE001 - enrichment must not fail a fetch
         log.warning("history fetch failed for %s: %s", req.title, exc)
         return
-    head_revid = page.revid
-    record_history(session, page, [rev for rev in history if rev.revid != head_revid])
+    if not history:
+        return
+
+    try:
+        with write_batch(session):
+            # The ORM row, not the CachedPage snapshot the processors carry.
+            # `record_history` writes *through* the page -- it moves
+            # `history_complete_from_revid` and reads the head denormalisation
+            # -- and a frozen dataclass has neither the columns nor a session
+            # to be added to.
+            row = session.get(Page, page.pk)
+            if row is None:  # pragma: no cover - the upsert just wrote it
+                return
+            head = head_revision(session, row)
+            head_revid = head.revid if head is not None else None
+            record_history(
+                session, row, [rev for rev in history if rev.revid != head_revid]
+            )
+    except Exception:  # noqa: BLE001 - enrichment must not fail a fetch
+        log.warning("recording history for %s failed", req.title, exc_info=True)
 
 
 def _load_site_snapshot(session: Session, site_pk: int) -> Site:
