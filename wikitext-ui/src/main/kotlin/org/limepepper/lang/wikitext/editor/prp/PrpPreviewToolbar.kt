@@ -181,7 +181,11 @@ private class ZoomOutAction(
 
 private class ResetZoomAction(
     private val imagePane: ReferenceImagePane,
-) : AnAction("Reset Zoom", "Fit the reference image to the pane", AllIcons.General.ActualZoom) {
+) : AnAction(
+    "Reset Zoom",
+    "Fit the reference image to the pane (see wikitext.editing.preview.imageFitMode)",
+    AllIcons.General.ActualZoom,
+) {
     override fun actionPerformed(event: AnActionEvent) = imagePane.resetZoom()
 
     override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT

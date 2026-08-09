@@ -9,6 +9,7 @@ import org.limepepper.lang.wikitext.annotation.AnnotationCategory
 import org.limepepper.lang.wikitext.annotation.BoundingBox
 import org.limepepper.lang.wikitext.annotation.BoundingBoxModel
 import org.limepepper.lang.wikitext.annotation.ImageAnnotationPane
+import org.limepepper.lang.wikitext.editing.WtEditingFlags
 import org.limepepper.lang.wikitext.vfs.WtVirtualFile
 import org.limepepper.lang.wikitext.vfs.backend.VfsBackendException
 import org.limepepper.lang.wikitext.vfs.backend.WtVfsService
@@ -45,7 +46,13 @@ private val IMAGE_LOG = logger<ReferenceImagePane>()
 class ReferenceImagePane(
     private val file: VirtualFile,
 ) : Disposable {
-    private val annotationPane = ImageAnnotationPane()
+    private val annotationPane = ImageAnnotationPane().apply {
+        // The default layout tiles this pane above the render, stacked, so it
+        // is usually shorter than it is wide — fit-to-width uses that space,
+        // fit-to-page would leave the scan tiny with room to spare on each
+        // side. See WtEditingFlags.previewImageFitMode.
+        defaultFitMode = WtEditingFlags.previewImageFitMode()
+    }
 
     val component: JComponent
         get() = annotationPane.component
@@ -187,8 +194,14 @@ class ReferenceImagePane(
 
     fun zoomBy(factor: Double) = annotationPane.zoomBy(factor)
 
-    /** "Reset" fits the whole scan into the pane, the same as the initial view. */
+    /** "Reset" returns to the configured default fit, the same as the initial view. */
     fun resetZoom() = annotationPane.resetZoom()
+
+    /** Always fits the whole page, regardless of the configured default. */
+    fun fitToPage() = annotationPane.fitToPage()
+
+    /** Always fits the page's width, regardless of the configured default. */
+    fun fitToWidth() = annotationPane.fitToWidth()
 
     private fun loadImage(bytes: ByteArray): BufferedImage =
         ImageIO.read(ByteArrayInputStream(bytes))
