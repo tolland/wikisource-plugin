@@ -61,14 +61,25 @@ class ImageAnnotationPane(
         }
     }
 
+    /** Which fit [showImage] and [resetZoom] use. See [ImageAnnotationCanvas.FitMode]. */
+    var defaultFitMode: ImageAnnotationCanvas.FitMode
+        get() = canvas.defaultFitMode
+        set(value) { canvas.defaultFitMode = value }
+
     fun showImage(image: BufferedImage) = canvas.showImage(image)
 
     fun showStatus(text: String) = canvas.showStatus(text)
 
     fun zoomBy(factor: Double) = canvas.zoomTo(canvas.zoom * factor, canvas.visibleCenter())
 
-    /** "Reset" fits the whole image into the pane, the same as the initial view. */
-    fun resetZoom() = canvas.fitToViewport()
+    /** "Reset" returns to [defaultFitMode], the same fit the initial view used. */
+    fun resetZoom() = canvas.fitToDefault()
+
+    /** Always fits the whole page, regardless of [defaultFitMode]. */
+    fun fitToPage() = canvas.fitToViewport()
+
+    /** Always fits the page's width, regardless of [defaultFitMode]. */
+    fun fitToWidth() = canvas.fitToWidth()
 
     /** Selects [boxId] and scrolls it into view. */
     fun revealBox(boxId: String) = canvas.revealBox(boxId)

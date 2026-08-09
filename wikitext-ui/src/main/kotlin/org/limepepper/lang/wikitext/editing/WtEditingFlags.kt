@@ -2,6 +2,7 @@ package org.limepepper.lang.wikitext.editing
 
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.util.registry.Registry
+import org.limepepper.lang.wikitext.annotation.ImageAnnotationCanvas
 import org.limepepper.lang.wikitext.editor.prp.PrpPreviewBrowser
 
 /**
@@ -125,12 +126,31 @@ object WtEditingFlags {
      */
     fun previewSplitStacked(): Boolean = boolean(PREVIEW_SPLIT_STACKED, true)
 
+    /**
+     * The reference scan's default zoom fit. Width by default: the scan pane
+     * is usually shorter than it is wide now that [previewSplitStacked]
+     * stacks it above the render, and fitting to the whole page there leaves
+     * the scan small with unused space on each side. Fitting to width uses
+     * the space actually available, at the cost of scrolling down the page —
+     * which is how a reader treats a real book anyway.
+     *
+     * Returns an `ImageAnnotationCanvas.FitMode` id; an unrecognised value
+     * falls back to width rather than failing to open an editor.
+     */
+    fun previewImageFitMode(): ImageAnnotationCanvas.FitMode =
+        when (string(PREVIEW_IMAGE_FIT_MODE, PREVIEW_IMAGE_FIT_WIDTH).lowercase()) {
+            "page" -> ImageAnnotationCanvas.FitMode.PAGE
+            else -> ImageAnnotationCanvas.FitMode.WIDTH
+        }
+
     // ---- Registry plumbing ----------------------------------------------
 
     const val TOGGLE_ENABLED: String = "wikitext.editing.toggle.enabled"
     const val TOGGLE_PROMOTE: String = "wikitext.editing.toggle.promote"
     const val PREVIEW_MODE: String = "wikitext.editing.preview.mode"
     const val PREVIEW_SPLIT_STACKED: String = "wikitext.editing.preview.splitStacked"
+    const val PREVIEW_IMAGE_FIT_MODE: String = "wikitext.editing.preview.imageFitMode"
+    private const val PREVIEW_IMAGE_FIT_WIDTH = "width"
     private const val PREVIEW_MODE_BOTH = "both"
     const val SURROUND_ENABLED: String = "wikitext.editing.surround.enabled"
     const val SURROUND_STRATEGY: String = "wikitext.editing.surround.strategy"

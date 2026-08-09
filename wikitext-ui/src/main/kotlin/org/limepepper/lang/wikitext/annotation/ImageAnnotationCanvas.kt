@@ -63,6 +63,23 @@ class ImageAnnotationCanvas(
     var zoom: Double = 1.0
         private set
 
+    /** What "fit" means for this canvas — see [fitToViewport] / [fitToWidth]. */
+    enum class FitMode { PAGE, WIDTH }
+
+    /**
+     * Which [FitMode] [showImage] and [fitToDefault] apply. The canvas has no
+     * opinion of its own on which reads better — that depends on the shape of
+     * whatever pane hosts it — so the host sets this rather than the canvas
+     * guessing from its own (possibly not-yet-laid-out) size.
+     */
+    var defaultFitMode: FitMode = FitMode.PAGE
+
+    /** Zooms per [defaultFitMode]. What [showImage] uses for the first fit. */
+    fun fitToDefault() = when (defaultFitMode) {
+        FitMode.PAGE -> fitToViewport()
+        FitMode.WIDTH -> fitToWidth()
+    }
+
     /**
      * Host hook for the right-click menu: called with the box under the
      * cursor (already selected) or null on empty space; a null return shows
@@ -320,7 +337,7 @@ class ImageAnnotationCanvas(
         image = loaded
         statusText = null
         updateCursor(null)
-        fitToViewport()
+        fitToDefault()
     }
 
     /**
@@ -392,14 +409,26 @@ class ImageAnnotationCanvas(
         repaint()
     }
 
-    fun fitToViewport() {
+    /** Zooms so the whole page is visible — both dimensions fit the viewport. */
+    fun fitToViewport() = applyFit { extent, img ->
+        min(extent.width.toDouble() / img.width, extent.height.toDouble() / img.height)
+    }
+
+    /**
+     * Zooms so the page fills the viewport's width, height left to overflow
+     * into the scroll pane. The pane this canvas lives in is one half of a
+     * stacked scan/render split, so it is usually shorter than it is wide;
+     * fitting to height there leaves the page tiny with empty space on each
+     * side, whereas fitting to width uses the space actually available and
+     * lets the reader scroll down the page as they would a real book.
+     */
+    fun fitToWidth() = applyFit { extent, img -> extent.width.toDouble() / img.width }
+
+    private fun applyFit(ratio: (extent: Dimension, img: BufferedImage) -> Double) {
         val img = image ?: return
         val extent = scrollPaneProvider().viewport.extentSize
         zoom = if (extent.width > 0 && extent.height > 0) {
-            min(
-                extent.width.toDouble() / img.width,
-                extent.height.toDouble() / img.height,
-            ).coerceIn(MIN_ZOOM, MAX_ZOOM)
+            ratio(extent, img).coerceIn(MIN_ZOOM, MAX_ZOOM)
         } else {
             1.0
         }

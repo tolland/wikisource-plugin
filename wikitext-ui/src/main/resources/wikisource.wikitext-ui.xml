@@ -103,6 +103,11 @@
             description="Wikitext: when both previews are shown, tile them stacked (scan above render) rather than side by side"
         />
         <registryKey
+            key="wikitext.editing.preview.imageFitMode"
+            defaultValue="width"
+            description="Wikitext: how the reference scan's initial zoom fits the pane - 'width' or 'page' (whole page)"
+        />
+        <registryKey
             key="wikitext.editing.variablePrompt"
             defaultValue="inline"
             description="Wikitext: how a tag's value (e.g. a section name) is asked for - 'inline' (type in the editor), 'dialog' (modal input), or 'none' (insert a placeholder)"
