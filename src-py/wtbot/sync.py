@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Literal
 
 from sqlmodel import Session, select
 
@@ -172,12 +173,51 @@ class SyncSide:
     placeholder_pages: int = 0
 
 
+@dataclass(frozen=True)
+class SyncAsset:
+    """A non-``Page:`` object the work depends on: its ``Index:`` and the
+    ``File:`` scan behind it.
+
+    Reported because a work is not only its pages, and the two most common
+    reasons a sync cannot proceed are both here rather than in the page list: a
+    target with no index, and a scan check that could not run because nobody
+    fetched the file. Listing them as *assets* rather than folding them into
+    ``blockers`` means the missing one can be pointed at and fetched.
+    """
+
+    kind: Literal["index", "file"]
+    source_title: str
+    target_title: str
+
+    source_cached: bool
+    """Held in our cache for the source site. False means we cannot even say
+    what a sync would do with it."""
+
+    target_cached: bool
+    verdict: SyncVerdict
+    detail: str
+
+
+@dataclass(frozen=True)
+class FetchPlanItem:
+    """One fetch that would let the report answer a question it currently
+    cannot. Queued, never run here -- the same split the rest of the fetch path
+    keeps, so a report never turns into hundreds of requests at a wiki.
+    """
+
+    label: str
+    title: str
+    reason: str
+
+
 @dataclass
 class SyncReport:
     source: SyncSide
     target: SyncSide
     scan: ScanCheck
     pages: list[SyncPage] = field(default_factory=list)
+    assets: list[SyncAsset] = field(default_factory=list)
+    fetch_plan: list[FetchPlanItem] = field(default_factory=list)
     work_pk: int | None = None
     blockers: list[str] = field(default_factory=list)
 
@@ -261,6 +301,21 @@ def build_report(
             "the index itself would be created before any page."
         )
 
+    report.assets = _asset_reports(
+        session,
+        source_site=source_site,
+        target_site=target_site,
+        source_index=source_index,
+        target_index=target_index,
+        target_index_title=target_index_title,
+        scan=scan,
+    )
+    report.fetch_plan = _fetch_plan(
+        source_site=source_site,
+        target_site=target_site,
+        assets=report.assets,
+        scan=scan,
+    )
     report.pages = _page_reports(
         session,
         source_site=source_site,
@@ -269,6 +324,144 @@ def build_report(
         target_children=target_children,
     )
     return report
+
+
+def _asset_reports(
+    session: Session,
+    *,
+    source_site: Site,
+    target_site: Site,
+    source_index: Page,
+    target_index: Page | None,
+    target_index_title: str,
+    scan: ScanCheck,
+) -> list[SyncAsset]:
+    """The ``Index:`` and the ``File:``, as things a sync has to account for.
+
+    The file title is derived from the index title -- ``Index:Foo.pdf`` is
+    backed by ``File:Foo.pdf``, which is ProofreadPage's own structural rule,
+    not a template field to parse. It is also how the fetch fan-out finds it,
+    so the two agree by construction.
+    """
+    source_file_title, source_blob = _file_of(session, source_index)
+    target_file_title = f"File:{target_index_title.partition(':')[2]}"
+    target_file_page = session.exec(
+        select(Page).where(
+            Page.site_pk == target_site.pk, Page.title == target_file_title
+        )
+    ).first()
+    target_blob = (
+        session.exec(
+            select(FileBlob).where(FileBlob.page_pk == target_file_page.pk)
+        ).first()
+        if target_file_page is not None
+        else None
+    )
+
+    index_asset = SyncAsset(
+        kind="index",
+        source_title=source_index.title,
+        target_title=target_index_title,
+        source_cached=True,  # build_report refuses without it
+        target_cached=target_index is not None,
+        verdict=SyncVerdict.in_sync if target_index else SyncVerdict.create,
+        detail=(
+            "both sides hold the index"
+            if target_index
+            else (
+                f"no index cached for {_site_name(target_site)}. Either the "
+                "work is not there at all -- in which case the index is the "
+                "first thing a sync creates -- or it is there and we have not "
+                "fetched it, which the fetch plan settles."
+            )
+        ),
+    )
+
+    if scan.status is ScanStatus.ok:
+        file_detail = "both sides hold the same upload"
+        verdict = SyncVerdict.in_sync
+    elif scan.status is ScanStatus.mismatch:
+        file_detail = "different uploads: the page offsets do not correspond"
+        verdict = SyncVerdict.diverged
+    elif source_blob is None:
+        file_detail = (
+            f"no scan cached for {_site_name(source_site)}. Fetch it: the file "
+            "may live on the wiki itself or on a shared repository (Commons), "
+            "and the fetch follows both."
+        )
+        verdict = SyncVerdict.unknown
+    else:
+        file_detail = (
+            f"no scan cached for {_site_name(target_site)}, so the scan check "
+            "cannot run. Fetching it settles whether the target already has "
+            "the upload; if it genuinely has none, uploading a backing scan is "
+            "a deliberate, case-by-case act and not something a sync does."
+        )
+        verdict = SyncVerdict.unknown
+
+    return [
+        index_asset,
+        SyncAsset(
+            kind="file",
+            source_title=source_file_title or "",
+            target_title=target_file_title,
+            source_cached=source_blob is not None,
+            target_cached=target_blob is not None,
+            verdict=verdict,
+            detail=file_detail,
+        ),
+    ]
+
+
+def _fetch_plan(
+    *,
+    source_site: Site,
+    target_site: Site,
+    assets: list[SyncAsset],
+    scan: ScanCheck,
+) -> list[FetchPlanItem]:
+    """What to fetch so the report can answer what it currently cannot.
+
+    Only ever the assets: the pages have their own, much larger, fetch action
+    on the work view, and rolling the two together would make "check the scan"
+    cost a whole work's worth of requests.
+
+    A fetch against a wiki that does not hold the title fails as a
+    ``page not found`` on its own queue row -- which is the answer, recorded
+    where a later run can see it, rather than a guess made here.
+    """
+    plan: list[FetchPlanItem] = []
+    by_kind = {asset.kind: asset for asset in assets}
+
+    index = by_kind["index"]
+    if not index.target_cached:
+        plan.append(
+            FetchPlanItem(
+                label=target_site.label or "",
+                title=index.target_title,
+                reason="settle whether the target already has this work",
+            )
+        )
+
+    if scan.status is not ScanStatus.ok:
+        file_asset = by_kind["file"]
+        if not file_asset.source_cached:
+            plan.append(
+                FetchPlanItem(
+                    label=source_site.label or "",
+                    title=file_asset.source_title,
+                    reason="the scan check needs the source upload's sha1",
+                )
+            )
+        if not file_asset.target_cached:
+            plan.append(
+                FetchPlanItem(
+                    label=target_site.label or "",
+                    title=file_asset.target_title,
+                    reason="the scan check needs the target upload's sha1",
+                )
+            )
+    return plan
 
 
 def _page_reports(
@@ -528,16 +721,19 @@ def _scan_check(
     }
 
     if source_blob is None or target_blob is None:
-        missing = "target" if source_blob is not None else "source"
         if source_blob is None and target_blob is None:
-            missing = "neither side"
+            missing = "neither side's scan is held"
+        elif source_blob is None:
+            missing = "the source's scan is not held"
+        else:
+            missing = "the target's scan is not held"
         return ScanCheck(
             status=ScanStatus.unverifiable,
             detail=(
-                f"no File: blob held for the {missing} index, so the scan check "
-                "cannot run. An index without a file is legal, but page "
-                "correspondence then rests on page numbers with nothing "
-                "validating it."
+                f"{missing}, so the scan check cannot run. Fetch it (see the "
+                "assets below): an index without a file is legal, but until "
+                "the two uploads can be compared, page correspondence rests on "
+                "page numbers with nothing validating it."
             ),
             **common,
         )

@@ -461,11 +461,36 @@ export interface SyncPage {
   actionable: boolean;
 }
 
+export interface SyncAsset {
+  kind: 'index' | 'file';
+  source_title: string;
+  target_title: string;
+  source_cached: boolean;
+  target_cached: boolean;
+  verdict: SyncVerdict;
+  detail: string;
+}
+
+export interface FetchPlanItem {
+  label: string;
+  title: string;
+  reason: string;
+}
+
+export interface FetchAssetsResult {
+  queued: FetchPlanItem[];
+  note: string;
+}
+
 export interface SyncReport {
   source: SyncSide;
   target: SyncSide;
   scan: ScanCheck;
   pages: SyncPage[];
+  /** The work's Index: and backing File: -- a work is not only its pages. */
+  assets: SyncAsset[];
+  /** Fetches that would let the report answer what it currently cannot. */
+  fetch_plan: FetchPlanItem[];
   counts: Record<string, number>;
   actionable: number;
   work_pk?: number | null;

@@ -38,6 +38,16 @@ The immediate work list. Reasoning, rejected approaches and policy live in
 - **Migration discipline** — never `batch_alter_table` on a table something
   references; `test_migrations.py` runs migrations over populated tables.
 
+- **Site identity discipline** — a wiki is registered once, by `label`, and
+  never conjured from a request. Taking `family`/`code`/`api_url` per request
+  meant a typo registered a new wiki with no credentials and read from it
+  anonymously. `test_site_identity.py` enforces it rather than leaving it to be
+  re-audited: only the CRUD router may construct a `Site`, no request *body*
+  outside it may name a wiki's location, and the viewer's `FetchCreate` must
+  send a label. Reading those fields is fine — displaying them, deriving an OCR
+  scope from them, looking a site up by them (a lookup returns None where a
+  create would have invented one).
+
 - **`RemoteLink`** — the assertion that **two revisions, one per site, are the
   same content**. Asserted and recorded, never computed from hashes (discussion
   §3: a `pagequality` header makes cross-site hashes disagree precisely as
@@ -253,6 +263,25 @@ Built: `wtbot.sync` + `POST /sync/report` + the `/sync` viewer route.
       model — not even the pairings it reads. Tracking a work stays a separate,
       deliberate act, or "just show me" becomes the most consequential button
       on the page.
+
+- [x] **A work is not only its pages.** The `Index:` and the backing `File:`
+      are reported as *assets*, each with what each side holds. The two
+      commonest reasons a sync cannot proceed live here rather than in the page
+      list: no index on the target, and a scan check that could not run.
+- [x] **"Could not check" is a question, not a verdict.** Both of those mean
+      nobody has asked the wiki yet, so the report carries a `fetch_plan` and
+      `POST /sync/fetch-assets` (`wtbot sync fetch-assets`) queues exactly it —
+      the target index, and whichever side's scan is missing. Assets only, and
+      `kind=single`: this is a yes/no probe, and fanning the index out would
+      make "check the scan" cost a whole work of throttled requests. A scan
+      hosted on Commons is followed by the existing
+      `_resolve_file_page` → `site.image_repository()` path.
+- [x] The file title comes from the index title (`Index:Foo.pdf` →
+      `File:Foo.pdf`), which is ProofreadPage's structural rule and what the
+      fetch fan-out already uses, so the two agree by construction.
+
+Uploading a backing scan the target genuinely lacks stays out: that is a
+case-by-case decision (discussion §7), not something a sync does.
 
 Still to come, and it is item 6's job rather than this one's: turning a
 `create`/`push` row into an actual edit. The report is the preflight that

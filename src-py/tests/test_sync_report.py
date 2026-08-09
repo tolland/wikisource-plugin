@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from sqlmodel import Session, select
 
 from wtbot.model import (
+    FetchRequest,
     FetchState,
     FileBlob,
     NsRole,
@@ -469,3 +470,125 @@ def test_a_tracked_work_is_named_on_the_report(client, engine):
 
     data = client.post("/sync/report", json=request()).json()
     assert data["work_pk"] == tracked.json()["work"]["pk"]
+
+
+# -- the work's assets: its Index and its scan --------------------------------
+
+
+def test_the_report_names_the_index_and_the_file_as_assets(client, engine):
+    """A work is not only its pages. The two commonest reasons a sync cannot
+    proceed -- no index on the target, no scan to check -- are objects, so they
+    are reported as objects rather than buried in prose."""
+    seed_source_only(engine, pages=1)
+
+    data = client.post("/sync/report", json=request()).json()
+    assets = {asset["kind"]: asset for asset in data["assets"]}
+
+    assert set(assets) == {"index", "file"}
+    assert assets["index"]["verdict"] == "create"
+    assert assets["index"]["target_cached"] is False
+    # The file title is ProofreadPage's structural rule, not a template field.
+    assert assets["file"]["source_title"] == "File:Varieties.djvu"
+    assert assets["file"]["target_title"] == "File:Varieties.djvu"
+
+
+def test_the_file_asset_follows_the_target_index_title(client, engine):
+    """`Index:X (local).djvu` is backed by `File:X (local).djvu`, so a `--to`
+    that renames the work renames its scan too."""
+    seed_source_only(engine, pages=1)
+    with Session(engine) as session:
+        local = session.exec(select(Site).where(Site.label == "mywikisource")).one()
+        build_index(session, local, TARGET_INDEX, sha1=SCAN_SHA1)
+
+    data = client.post(
+        "/sync/report", json=request(target_index_title=TARGET_INDEX)
+    ).json()
+    assets = {asset["kind"]: asset for asset in data["assets"]}
+    assert assets["file"]["target_title"] == "File:Varieties (local).djvu"
+
+
+def test_an_unrunnable_scan_check_produces_a_fetch_plan(client, engine):
+    """ "We could not check" is not a verdict about the two scans -- it means
+    nobody asked the wiki. The report says which asks would settle it."""
+    seed_source_only(engine, pages=1)
+    with Session(engine) as session:
+        local = session.exec(select(Site).where(Site.label == "mywikisource")).one()
+        build_index(session, local, SOURCE_INDEX, sha1=None)  # index, no scan
+
+    data = client.post("/sync/report", json=request()).json()
+
+    assert data["scan"]["status"] == "unverifiable"
+    plan = {(item["label"], item["title"]) for item in data["fetch_plan"]}
+    assert plan == {("mywikisource", "File:Varieties.djvu")}
+    assert all(item["reason"] for item in data["fetch_plan"])
+
+
+def test_a_missing_target_index_is_in_the_fetch_plan(client, engine):
+    """Before concluding the work is absent, ask: an index we have not fetched
+    and an index that is not there look identical from the cache."""
+    seed_source_only(engine, pages=1)
+
+    data = client.post("/sync/report", json=request()).json()
+    plan = {(item["label"], item["title"]) for item in data["fetch_plan"]}
+    assert ("mywikisource", SOURCE_INDEX) in plan
+
+
+def test_a_passing_scan_check_asks_for_nothing(client, engine):
+    seed_source_only(engine, pages=1)
+    with Session(engine) as session:
+        local = session.exec(select(Site).where(Site.label == "mywikisource")).one()
+        build_index(session, local, SOURCE_INDEX, sha1=SCAN_SHA1)
+
+    data = client.post("/sync/report", json=request()).json()
+    assert data["fetch_plan"] == []
+    assets = {asset["kind"]: asset for asset in data["assets"]}
+    assert assets["file"]["verdict"] == "in_sync"
+    assert assets["index"]["verdict"] == "in_sync"
+
+
+def test_fetch_assets_queues_the_plan_and_nothing_else(client, engine):
+    """Assets only. The pages are a separate, far larger fetch -- rolling them
+    together would make "check the scan" cost a whole work of requests."""
+    seed_source_only(engine, pages=3)
+
+    result = client.post("/sync/fetch-assets", json=request())
+    assert result.status_code == 200, result.text
+    queued = result.json()["queued"]
+    assert {item["title"] for item in queued} == {
+        SOURCE_INDEX,
+        "File:Varieties.djvu",
+    }
+
+    with Session(engine) as session:
+        requests = session.exec(select(FetchRequest)).all()
+    assert len(requests) == 2
+    # `single`, not `index`: this is a yes/no probe, not a fan-out.
+    assert {r.kind.value for r in requests} == {"single"}
+    assert not any(r.title.startswith("Page:") for r in requests)
+
+
+def test_fetch_assets_refuses_a_site_that_cannot_log_in(client, engine):
+    seed_source_only(engine, pages=1)
+    with Session(engine) as session:
+        local = session.exec(select(Site).where(Site.label == "mywikisource")).one()
+        credential = session.exec(
+            select(SiteCredential).where(SiteCredential.site_pk == local.pk)
+        ).one()
+        session.delete(credential)
+        session.commit()
+
+    refused = client.post("/sync/fetch-assets", json=request())
+    assert refused.status_code == 409
+    with Session(engine) as session:
+        assert session.exec(select(FetchRequest)).all() == []
+
+
+def test_fetch_assets_is_a_no_op_when_both_assets_are_held(client, engine):
+    seed_source_only(engine, pages=1)
+    with Session(engine) as session:
+        local = session.exec(select(Site).where(Site.label == "mywikisource")).one()
+        build_index(session, local, SOURCE_INDEX, sha1=SCAN_SHA1)
+
+    assert client.post("/sync/fetch-assets", json=request()).json()["queued"] == []
+    with Session(engine) as session:
+        assert session.exec(select(FetchRequest)).all() == []

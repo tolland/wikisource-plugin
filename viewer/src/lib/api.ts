@@ -29,6 +29,7 @@ import type {
   PairRevisions,
   ProposeWorkResult,
   RungRow,
+  FetchAssetsResult,
   SyncReport,
   SyncRequest,
   WorkDetail,
@@ -306,4 +307,8 @@ export function syncReport(payload: SyncRequest): Promise<SyncReport> {
 export function dumpLocatorIndex(path: string): Promise<LocatorIndexDump> {
   const params = new URLSearchParams({ path });
   return getJson<LocatorIndexDump>(`/locator-index/dump?${params}`);
+}
+
+export function fetchSyncAssets(payload: SyncRequest): Promise<FetchAssetsResult> {
+  return postJson<FetchAssetsResult>('/sync/fetch-assets', payload);
 }
