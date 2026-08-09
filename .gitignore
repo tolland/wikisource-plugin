@@ -68,3 +68,4 @@ __pycache__/
 /apicache/
 /throttle.ctrl
 /fixtures/vcr_cassettes/
+/docker/wtbot/wtbot_18574_data/

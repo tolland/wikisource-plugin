@@ -52,7 +52,7 @@ services:
     #    ports:
     #      - "127.0.0.1:${WTBOT_PORT:-18574}:8000"
     volumes:
-      - wtbot-data:/data
+      - ./docker/wtbot/wtbot_${WTBOT_PORT:-18574}_data:/data:z
     healthcheck:
       # No curl in python:3.13-slim, and adding one for a healthcheck is a
       # package to keep patched; the interpreter is already here.
