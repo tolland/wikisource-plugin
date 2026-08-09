@@ -4,11 +4,14 @@ import type {
   IndexPageDetail,
   IndexPageSummary,
   ListChildrenResponse,
+  LocatorPageNumberMatch,
+  LocatorSectionMatch,
   CachedPage,
   Commit,
   CommitRunResponse,
   PendingCommitPage,
   ReadContentResponse,
+  SectionRole,
   Site,
   SiteCredential,
   SitePayload,
@@ -192,4 +195,22 @@ export function listVfsChildren(path: string): Promise<ListChildrenResponse> {
 
 export function readVfsContent(path: string): Promise<ReadContentResponse> {
   return getJson<ReadContentResponse>(`/vfs/content?path=${encodeURIComponent(path)}`);
+}
+
+export function lookupPageNumbers(
+  path: string,
+  query: string,
+  minConfidence: 'explicit' | 'inferred' = 'inferred'
+): Promise<LocatorPageNumberMatch[]> {
+  const params = new URLSearchParams({ path, query, min_confidence: minConfidence });
+  return getJson<LocatorPageNumberMatch[]>(`/locator-index/page-numbers?${params}`);
+}
+
+export function lookupSections(
+  path: string,
+  query: string,
+  roles: SectionRole[] = ['begin', 'anchor_template']
+): Promise<LocatorSectionMatch[]> {
+  const params = new URLSearchParams({ path, query, roles: roles.join(',') });
+  return getJson<LocatorSectionMatch[]>(`/locator-index/sections?${params}`);
 }

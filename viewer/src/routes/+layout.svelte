@@ -12,6 +12,7 @@
     { href: '/commits', label: 'Commits' },
     { href: '/pages', label: 'Pages' },
     { href: '/indexes', label: 'Indexes' },
+    { href: '/locator-index', label: 'Locator index' },
     { href: '/vfs', label: 'VFS' }
   ];
 </script>
