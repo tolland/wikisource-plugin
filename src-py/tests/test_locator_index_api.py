@@ -83,6 +83,44 @@ def seeded(engine):
     _seed(engine)
 
 
+BARE_INDEX = "Index:NeglectedArgument.pdf"
+BARE_INDEX_PATH = f"/{FAMILY}/{CODE}/{BARE_INDEX}"
+
+
+def _seed_bare_pagelist(engine) -> None:
+    # Index:NeglectedArgument.pdf's real Index page: a bare <pagelist />
+    # with no attributes at all, which means straight 1:1 numbering.
+    with Session(engine) as s:
+        site = Site(family=FAMILY, code=CODE)
+        s.add(site)
+        s.flush()
+        index = Page(
+            site_pk=site.pk,
+            title=BARE_INDEX,
+            namespace_role=NsRole.index,
+            content_model="proofread-index",
+            text="<pagelist />",
+        )
+        s.add(index)
+        for n in (1, 2, 50):
+            page = Page(
+                site_pk=site.pk,
+                title=f"Page:NeglectedArgument.pdf/{n}",
+                namespace_role=NsRole.page,
+                content_model="proofread-page",
+                text="",
+            )
+            s.add(page)
+            s.flush()
+            s.add(PageMeta(page_pk=page.pk, index_title=BARE_INDEX, page_number=n))
+        s.commit()
+
+
+@pytest.fixture
+def seeded_bare(engine):
+    _seed_bare_pagelist(engine)
+
+
 def test_page_number_exact_match_is_inferred(client, seeded):
     r = client.get(
         "/locator-index/page-numbers",
@@ -143,6 +181,28 @@ def test_page_number_prefix_match(client, seeded):
     # 155=121 (explicit), 163 -> 129 (inferred), 164 -> 130 (inferred)
     assert "121" in labels
     assert "129" in labels
+
+
+def test_bare_pagelist_defaults_pages_to_one_to_one(client, seeded_bare):
+    r = client.get(
+        "/locator-index/page-numbers",
+        params={"path": BARE_INDEX_PATH, "query": "50"},
+    )
+    assert r.status_code == 200
+    matches = r.json()
+    assert len(matches) == 1
+    assert matches[0]["label"] == "50"
+    assert matches[0]["confidence"] == "inferred"
+    assert matches[0]["page"]["scan_page"] == 50
+
+
+def test_bare_pagelist_dump_shows_every_page_numbered(client, seeded_bare):
+    r = client.get("/locator-index/dump", params={"path": BARE_INDEX_PATH})
+    assert r.status_code == 200
+    dump = r.json()
+    assert dump["pagelist_assignments"] == []
+    labels = {p["page"]["scan_page"]: p["label"] for p in dump["pages"]}
+    assert labels == {1: "1", 2: "2", 50: "50"}
 
 
 def test_section_lookup_finds_the_begin_occurrence(client, seeded):

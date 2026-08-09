@@ -97,10 +97,10 @@ Split into two functions on purpose:
 - **`parse_pagelist_assignments`** extracts every explicit `N=value` /
   `NtoM=value` entry, across every `<pagelist>` tag on the Index (a work is
   routinely split into several — one per front-matter block/chapter, as in
-  the Hertz example this was built against). No `from=`/`to=` parsing is
-  needed to do this correctly: the digit-run key requirement means `from=`
-  and `to=` never look like page assignments in the first place, so there's
-  no exclusion list to maintain.
+  the Hertz example this was built against). Each key is clamped to its own
+  tag's declared `[from, to]` — real Index pages reuse page numbers across
+  tags in ways that would otherwise leak (see "Bugs found against a real
+  Index" below).
 - **`compute_labels`** resolves a label for a *specific* set of scan pages
   (the ones we actually hold a `Page:` row for — no attempt to enumerate an
   abstract 1..N range from the tag's own bounds). A page with its own entry
@@ -124,6 +124,38 @@ readback, and is the one part of this module worth checking against a real
 rendered Index — ideally by comparing a handful of `compute_labels` outputs
 against the printed numbers visible in the page images themselves — before
 trusting it unreviewed on an unfamiliar work's front matter.
+
+## Bugs found against a real Index, fixed
+
+Testing against Hertz's actual `Index:` page (not the paraphrased snippet
+this module was first built against) surfaced three real bugs, all in the
+`<pagelist>` half:
+
+1. **A key leaked outside its own tag.** The real Index has `Prefaces:
+   <pagelist from=11 to=30 11=5 7to30=roman />` — note `7to30`, a range whose
+   *start* is before that tag's own `from=11`. Without clamping, this range
+   reached back into the *unrelated, earlier* "Front Matter" tag's `7=half-
+   title`/`8=adv` and overwrote them. Fixed by clamping every key to its own
+   tag's declared `[from, to]` (a missing `from` defaults to 1, matching
+   ProofreadPage's own default; a missing `to` is left unbounded).
+2. **A `roman`/`highroman` range didn't advance.** `7to30=roman` was being
+   applied identically to *every* page 7–30 — each one independently "restart
+   roman at i" — instead of anchoring only the first page of the range and
+   letting the normal continuation rule carry ii, iii, … through the rest.
+   Fixed: a style-switch keyword given as a range now anchors only its first
+   page (after clamping, page 11 in this example); a bare number or literal
+   roman numeral given as a range still applies per-page identically, since
+   that really is the intent for e.g. `2to6=-`, a run of blank leaves.
+3. **A fully bare `<pagelist />` (or no `<pagelist>` at all) resolved every
+   page to `"unknown"`.** `Index:NeglectedArgument.pdf` has exactly this —
+   `<pagelist />`, no attributes, no entries — and its real, documented
+   ProofreadPage meaning is straight 1:1 arabic numbering across the whole
+   work, not "we know nothing." This is a confident readback of
+   ProofreadPage's own default, not a guess the "blank/text doesn't disturb
+   the count" rule above is, so it's now seeded unconditionally as an
+   implicit page-1 anchor — but only when `assignments` is empty outright; a
+   work with some real pagelist data that merely doesn't cover an early page
+   keeps the honest `"unknown"`.
 
 ## API — `GET /locator-index/{page-numbers,sections}`
 

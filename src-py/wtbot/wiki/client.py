@@ -450,12 +450,16 @@ class PywikibotClient:
         # Same fail-soft rationale as get_page_images: this powers fan-out
         # optimisation and placeholder discovery, not correctness -- a miss
         # just means the page_count fallback path.
+        #
+        # list=proofreadpagesinindex takes only prppiititle/prppiipageid/
+        # prppiiprop -- no limit parameter exists (see MediaWiki's own
+        # module help), so passing one just draws an "Unrecognized
+        # parameter" API warning on every call.
         data = self._api_query(
             action="query",
             list="proofreadpagesinindex",
             prppiititle=title,
             prppiiprop="ids|title",
-            prppiilimit=500,
         )
         if data is None:
             return None

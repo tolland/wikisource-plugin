@@ -140,6 +140,14 @@ _PAGELIST_TAG_RE = re.compile(r"<pagelist\b([^>]*)/>", re.IGNORECASE)
 _ASSIGNMENT_RE = re.compile(
     r'\b(\d+)(?:to(\d+))?\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s/>]+))'
 )
+_BOUND_RE = "\\b{name}\\s*=\\s*(?:\"(\\d+)\"|'(\\d+)'|(\\d+))"
+
+
+def _read_bound(attrs: str, name: str) -> int | None:
+    m = re.search(_BOUND_RE.format(name=name), attrs, re.IGNORECASE)
+    if not m:
+        return None
+    return next(int(g) for g in m.groups() if g is not None)
 
 
 def _classify_value(scan_page: int, raw: str) -> PagelistAssignment:
@@ -175,16 +183,49 @@ def parse_pagelist_assignments(index_body: str) -> dict[int, PagelistAssignment]
     built against). Later tags win on a page number reused by more than one
     (shouldn't happen in a well-formed Index, but silently picking the last
     is safer than raising over a paste error mid-transcription).
+
+    Two things a key can name that are NOT simply "assign this value to each
+    named page":
+
+    - **A key is clamped to its own tag's declared `[from, to]` window.**
+      Real Index pages reuse page numbers across tags in ways that would
+      otherwise leak: Hertz's "Prefaces" block (`from=11 to=30`) contains
+      `7to30=roman`, whose range starts *before* that tag's own `from` — a
+      plain range-apply would let it overwrite the unrelated "Front Matter"
+      block's `7=half-title`/`8=adv` a few lines above. Clamping to the
+      enclosing tag's own bounds is what keeps a tag's keys from reaching
+      outside the pages it actually describes. A missing `from` defaults to
+      1 (ProofreadPage's own default); a missing `to` is left unbounded.
+    - **A `roman`/`highroman` value given as a *range* anchors only the
+      first page of that range**, rather than restarting the numeral at i/I
+      on every page in it. `11to30=roman` means "pages 11 through 30 are
+      roman-numbered, counting on from page 11" — not "every one of pages
+      11 through 30 is independently page i". A bare number or literal
+      roman numeral ("48", "xi") given as a range, by contrast, really does
+      mean the same value repeated on every page (e.g. `2to6=-`, a run of
+      blank leaves) and is applied per-page as before.
     """
     assignments: dict[int, PagelistAssignment] = {}
     for tag_match in _PAGELIST_TAG_RE.finditer(index_body):
-        for m in _ASSIGNMENT_RE.finditer(tag_match.group(1)):
+        attrs = tag_match.group(1)
+        tag_from = _read_bound(attrs, "from") or 1
+        tag_to = _read_bound(attrs, "to")
+        for m in _ASSIGNMENT_RE.finditer(attrs):
             start_s, end_s, dq, sq, bare = m.groups()
             value = dq if dq is not None else (sq if sq is not None else bare)
             if value is None:
                 continue
-            start = int(start_s)
-            end = int(end_s) if end_s else start
+            raw_start = int(start_s)
+            raw_end = int(end_s) if end_s else raw_start
+            start = max(raw_start, tag_from)
+            end = min(raw_end, tag_to) if tag_to is not None else raw_end
+            if start > end:
+                continue  # entirely outside this tag's own window
+
+            is_style_switch = value.strip().lower() in ("roman", "highroman")
+            if is_style_switch and end > start:
+                assignments[start] = _classify_value(start, value)
+                continue
             for scan_page in range(start, end + 1):
                 assignments[scan_page] = _classify_value(scan_page, value)
     return assignments
@@ -205,11 +246,28 @@ def compute_labels(
     every example this was built against, but is worth checking against a
     real rendered Index before trusting it on a work with an unusual
     numbering scheme.
+
+    A work with no explicit `<pagelist>` entries at all — no tag (see
+    `Index:NeglectedArgument.pdf`, whose `<pagelist />` carries no attributes)
+    or a bare `<pagelist />` — is *not* left at `"unknown"` for every page.
+    ProofreadPage's own documented default with nothing else specified is
+    straight arabic numbering starting at 1, i.e. scan page N is printed page
+    N; that is confidently a readback of ProofreadPage's own behaviour, not a
+    guess the way the blank/text continuation rule above is, so it is seeded
+    unconditionally as an implicit page-1 anchor. It only applies when
+    [assignments] is empty outright — a work with *some* explicit entries
+    that merely don't cover an early page keeps the honest `"unknown"`.
     """
     numeral_anchors = sorted(
         (a for a in assignments.values() if a.kind == "numeral"),
         key=lambda a: a.scan_page,
     )
+    if not assignments:
+        numeral_anchors = [
+            PagelistAssignment(
+                scan_page=1, kind="numeral", style=NumeralStyle.arabic, value=1
+            )
+        ]
     labels: dict[int, PageNumberLabel] = {}
     for scan_page in sorted(set(scan_pages)):
         own = assignments.get(scan_page)

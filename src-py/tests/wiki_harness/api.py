@@ -190,13 +190,16 @@ class WikiApi:
         return out
 
     def list_index_pages(self, index_title: str) -> list[dict[str, Any]]:
+        # list=proofreadpagesinindex takes only prppiititle/prppiipageid/prppiiprop
+        # (https://.../api.php?action=help&modules=query+proofreadpagesinindex) --
+        # no limit parameter exists; passing one just draws an "Unrecognized
+        # parameter" API warning on every call.
         payload = self._request(
             "GET",
             action="query",
             list="proofreadpagesinindex",
             prppiititle=index_title,
             prppiiprop="ids|title",
-            prppiilimit=500,
         )
         return payload.get("query", {}).get("proofreadpagesinindex", [])
 

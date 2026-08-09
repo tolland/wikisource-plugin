@@ -182,6 +182,130 @@ def test_a_new_numeric_anchor_overrides_the_previous_style():
 
 
 # ---------------------------------------------------------------------------
+# Real-world regressions found against Index:The principles of mechanics...
+# ---------------------------------------------------------------------------
+
+
+def test_a_range_key_is_clamped_to_its_own_tags_bounds():
+    # Hertz's actual Index: a "Prefaces" pagelist (from=11 to=30) whose
+    # "7to30=roman" key starts before that tag's own `from`. It must not
+    # reach back into an unrelated earlier tag's pages 7/8.
+    body = (
+        "Front Matter: <pagelist from=1 to=8 1=Cover 2to6=- 7=half-title 8=adv />\n"
+        "Prefaces: <pagelist from=11 to=30 11=5 7to30=roman />\n"
+    )
+    assignments = parse_pagelist_assignments(body)
+    assert assignments[7].kind == "text"
+    assert assignments[7].text == "half-title"
+    assert assignments[8].kind == "text"
+    assert assignments[8].text == "adv"
+
+
+def test_a_single_key_below_its_tags_from_is_dropped():
+    assignments = parse_pagelist_assignments("<pagelist from=10 to=20 5=48 />")
+    assert 5 not in assignments
+
+
+def test_a_single_key_above_its_tags_to_is_dropped():
+    assignments = parse_pagelist_assignments("<pagelist from=10 to=20 25=48 />")
+    assert 25 not in assignments
+
+
+def test_a_range_key_is_dropped_entirely_when_wholly_outside_its_tags_bounds():
+    assignments = parse_pagelist_assignments("<pagelist from=50 to=60 2to6=- />")
+    assert not assignments
+
+
+def test_roman_range_only_anchors_the_first_page():
+    # Without this, "11to30=roman" would independently set every one of
+    # 11..30 to "restart roman at i" instead of counting on from 11.
+    assignments = parse_pagelist_assignments("<pagelist from=11 to=30 11to30=roman />")
+    assert set(assignments) == {11}
+    assert assignments[11].style == NumeralStyle.roman
+    assert assignments[11].value == 1
+
+
+def test_romans_advance_across_a_roman_range():
+    assignments = parse_pagelist_assignments("<pagelist from=11 to=30 11to30=roman />")
+    labels = compute_labels(assignments, [11, 12, 13])
+    assert labels[11].label == "i"
+    assert labels[12].label == "ii"
+    assert labels[13].label == "iii"
+
+
+def test_the_full_hertz_front_matter_and_prefaces_example_end_to_end():
+    body = (
+        "Front Matter: <pagelist from=1 to=8 1=Cover 2to6=- 7=half-title 8=adv />\n"
+        "Prefaces: <pagelist from=11 to=30 11=5 7to30=roman />\n"
+    )
+    assignments = parse_pagelist_assignments(body)
+    labels = compute_labels(assignments, list(range(1, 14)))
+    assert [labels[p].label for p in range(1, 9)] == [
+        "Cover", None, None, None, None, None, "half-title", "adv",
+    ]  # fmt: skip
+    assert labels[11].label == "i"
+    assert labels[12].label == "ii"
+    assert labels[13].label == "iii"
+
+
+def test_a_highroman_range_also_only_anchors_the_first_page():
+    assignments = parse_pagelist_assignments("<pagelist from=1 to=5 1to5=highroman />")
+    labels = compute_labels(assignments, [1, 2, 3])
+    assert labels[1].label == "I"
+    assert labels[2].label == "II"
+    assert labels[3].label == "III"
+
+
+def test_a_range_of_a_bare_number_still_repeats_per_page():
+    # Only the roman/highroman keyword gets the anchor-only treatment --
+    # NtoM=<number> is a real (if unusual) "every page here reads N" case,
+    # same as NtoM=- already is.
+    assignments = parse_pagelist_assignments("<pagelist from=1 to=5 1to5=9 />")
+    assert {p: a.value for p, a in assignments.items()} == {
+        1: 9,
+        2: 9,
+        3: 9,
+        4: 9,
+        5: 9,
+    }
+
+
+def test_a_completely_bare_pagelist_defaults_to_one_to_one_numbering():
+    # Index:NeglectedArgument.pdf: <pagelist /> with no attributes at all.
+    assignments = parse_pagelist_assignments("<pagelist />")
+    assert assignments == {}
+    labels = compute_labels(assignments, [1, 2, 50])
+    assert labels[1].label == "1"
+    assert labels[2].label == "2"
+    assert labels[50].label == "50"
+    assert labels[1].confidence == "inferred"
+
+
+def test_a_pagelist_tag_with_only_from_to_and_no_entries_also_defaults_to_one_to_one():
+    assignments = parse_pagelist_assignments('<pagelist from="1" to="20" />')
+    labels = compute_labels(assignments, [1, 20])
+    assert labels[1].label == "1"
+    assert labels[20].label == "20"
+
+
+def test_no_pagelist_tag_at_all_also_defaults_to_one_to_one():
+    assignments = parse_pagelist_assignments("just some prose, no <pagelist> here")
+    labels = compute_labels(assignments, [1, 3])
+    assert labels[1].label == "1"
+    assert labels[3].label == "3"
+
+
+def test_the_bare_default_does_not_apply_once_any_explicit_entry_exists():
+    # A work with SOME pagelist data keeps the honest "unknown" for pages
+    # before its first anchor -- only a wholly empty pagelist gets the
+    # 1:1 default. (Same case as test_page_before_any_anchor_is_unknown_
+    # not_guessed, restated here next to the bare-default tests it guards.)
+    assignments = parse_pagelist_assignments("<pagelist from=5 to=10 7=1 />")
+    labels = compute_labels(assignments, [5])
+    assert labels[5].confidence == "unknown"
+
+
+# ---------------------------------------------------------------------------
 # Section/paragraph anchor scanning
 # ---------------------------------------------------------------------------
 
