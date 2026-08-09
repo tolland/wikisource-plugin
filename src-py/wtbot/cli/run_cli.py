@@ -10,6 +10,7 @@ from wtbot.cli.commands import (
     show_config,
     site,
     site_credential,
+    sync,
 )
 
 """Typer CLI for wtbot. Thin demonstration of the wiki-access seam from the
@@ -40,6 +41,7 @@ def create_app() -> typer.Typer:
     cli.add_typer(fetch_page.app)
     cli.add_typer(fetch_refresh.app)
     cli.add_typer(link.app)
+    cli.add_typer(sync.app)
     cli.add_typer(show_config.app)
     cli.add_typer(import_svg_annotations.app)
 

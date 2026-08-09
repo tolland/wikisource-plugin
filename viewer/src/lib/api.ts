@@ -28,6 +28,8 @@ import type {
   PairRevisions,
   ProposeWorkResult,
   RungRow,
+  SyncReport,
+  SyncRequest,
   WorkDetail,
   WorkSummary
 } from '$lib/types';
@@ -294,4 +296,8 @@ export async function retractRung(linkPk: number): Promise<void> {
 
 export async function retractPairRungs(pairPk: number): Promise<void> {
   await deleteRequest(`/links/pairs/${pairPk}/rungs`);
+}
+
+export function syncReport(payload: SyncRequest): Promise<SyncReport> {
+  return postJson<SyncReport>('/sync/report', payload);
 }

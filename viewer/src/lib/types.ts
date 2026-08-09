@@ -135,6 +135,7 @@ export interface FetchRequest {
   title: string;
   kind: FetchKind;
   depth: number;
+  revisions: number;
   status: string;
   progress_total?: number | null;
   progress_done?: number | null;
@@ -163,11 +164,17 @@ export interface CachedPage {
 
 export interface FetchCreate {
   title: string;
-  family: string;
-  code: string;
-  api_url?: string | null;
+  /** The registered site to fetch from. A site is never created by a fetch. */
+  label: string;
   kind?: FetchKind;
   depth?: number;
+  /**
+   * Revisions to store, counting back from the head. 1 is a normal fetch; more
+   * fills in history for the cross-site anchor search, which cannot find a
+   * match at the head when one side was imported from an older revision of the
+   * other.
+   */
+  revisions?: number;
 }
 
 export interface FetchResponse {
@@ -392,6 +399,85 @@ export interface PairRevisions {
   rungs: RungRow[];
   local_history_complete: boolean;
   remote_history_complete: boolean;
+}
+
+/* --- sync report ----------------------------------------------------------
+ *
+ * Directional, unlike the link layer beneath it. A pairing says two pages are
+ * the same page and does not care which is which; a sync asks what would be
+ * written and to which wiki, so reversing it reverses the answer.
+ */
+
+export type SyncVerdict =
+  | 'in_sync'
+  | 'create'
+  | 'push'
+  | 'pull'
+  | 'diverged'
+  | 'unlinked'
+  | 'source_missing'
+  | 'unknown';
+
+export type ScanStatus = 'ok' | 'mismatch' | 'unverifiable';
+
+export interface ScanCheck {
+  status: ScanStatus;
+  detail: string;
+  source_file?: string | null;
+  target_file?: string | null;
+  source_sha1?: string | null;
+  target_sha1?: string | null;
+  source_page_count?: number | null;
+  target_page_count?: number | null;
+  blocks: boolean;
+}
+
+export interface SyncSide {
+  site: string;
+  site_pk: number;
+  index_title: string;
+  exists: boolean;
+  cached_pages: number;
+  /** Paginated slots holding no revision: known absent, not unfetched. */
+  placeholder_pages: number;
+}
+
+export interface SyncPage {
+  verdict: SyncVerdict;
+  page_number?: number | null;
+  source_title?: string | null;
+  target_title?: string | null;
+  pair_pk?: number | null;
+  target_is_placeholder: boolean;
+  source_revid?: number | null;
+  target_revid?: number | null;
+  anchor_source_revid?: number | null;
+  anchor_target_revid?: number | null;
+  rungs: number;
+  source_ahead_by: number;
+  target_ahead_by: number;
+  detail?: string | null;
+  /** True when a push in the reported direction would write this page. */
+  actionable: boolean;
+}
+
+export interface SyncReport {
+  source: SyncSide;
+  target: SyncSide;
+  scan: ScanCheck;
+  pages: SyncPage[];
+  counts: Record<string, number>;
+  actionable: number;
+  work_pk?: number | null;
+  blockers: string[];
+  blocked: boolean;
+}
+
+export interface SyncRequest {
+  source_label?: string | null;
+  target_label?: string | null;
+  index_title: string;
+  target_index_title?: string | null;
 }
 
 // ---- Locator index (GET /locator-index/{page-numbers,sections}) ----------

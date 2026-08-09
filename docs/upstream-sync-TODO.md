@@ -214,19 +214,49 @@ Not covered, and deliberately not half-covered:
 - [ ] This is for *planning*, not safety. The `baserevid` precondition covers
       the race between fetch and push; they are complementary.
 
-### 4. `wtctl sync --from Index:X [--to Index:Y]`
+### 4. `wtbot sync report --from Index:X [--to Index:Y]`
 
-The happy path, end to end. `--to` is only needed when the titles or namespaces
-differ.
+Built: `wtbot.sync` + `POST /sync/report` + the `/sync` viewer route.
 
-- [ ] Enumerate both indexes via `list=proofreadpagesinindex` (authoritative
-      pagination, missing slots reported as `pageid` 0).
-- [ ] Run the §6 scan check first — differing backing files means the page
-      offsets do not correspond and nothing below is trustworthy.
-- [ ] Produce a **ladder** per page: the ordered `RemoteLink` rows, and the
-      current anchor. Where a pair cannot be matched, say so and why, rather
-      than guessing.
-- [ ] Output is a report, not an edit. No writes to either wiki.
+- [x] **Directional**, unlike everything under it. A pairing and a rung are
+      unordered claims — "A corresponds to B" is the same fact as its reverse —
+      but a sync asks what would be *written* and to *which* wiki, so reversing
+      it reverses the answer. Hence `SyncVerdict` rather than reusing
+      `MatchOutcome`: `local_ahead` is a fact about a pair, `push` is a fact
+      about a direction. The viewer's swap button is the whole difference.
+- [x] **Addressed by title, not by a tracked work.** The case most in need of a
+      report is the one where the target index does not exist yet (§7), and
+      there is no pairing to key on until it does. An absent target index is a
+      blocker reported *alongside* the page list, not instead of it: seeding a
+      work from upstream is a thing people do, and the page list is what they
+      came for.
+- [x] Pagination comes from the cache, which is `list=proofreadpagesinindex`
+      one step removed — that call is what the index fan-out already makes, and
+      the placeholder rows it writes are its record. `cached_pages` says how
+      much is held, so a shallowly fetched work does not read as a complete one.
+- [x] **The §6 scan check runs first**, and its result is on the response
+      whether it passed or not: "we checked and they match" and "we could not
+      check" are different claims. `mismatch` blocks. A target with no `File:`
+      is `unverifiable`, not a block — an index without a file is legal, but
+      nothing then validates the page correspondence.
+- [x] Per page: the anchor revids, the ladder depth, and how far each side has
+      moved. Where a pair cannot be matched the matcher's own reason is
+      carried through rather than flattened to "no".
+- [x] **Three kinds of absence, distinguished.** No target index (whole work is
+      a create); no target row (that page is a create); a target row with no
+      revision — a **placeholder**, the stub the fan-out writes for a paginated
+      slot nobody has transcribed. The last is a `create`; a row we merely have
+      not fetched is `unknown`, because writing it as a create could clobber a
+      page somebody else wrote. Read through `head_revision`, not `Page.revid`:
+      the head columns are a denormalisation with more than one writer.
+- [x] **Output is a report.** No writes to either wiki, and none to the local
+      model — not even the pairings it reads. Tracking a work stays a separate,
+      deliberate act, or "just show me" becomes the most consequential button
+      on the page.
+
+Still to come, and it is item 6's job rather than this one's: turning a
+`create`/`push` row into an actual edit. The report is the preflight that
+queue will read.
 
 ### 5. RemoteLink proposal endpoint
 

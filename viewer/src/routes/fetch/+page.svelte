@@ -12,29 +12,17 @@
   import type { FetchKind, FetchResponse, Site } from '$lib/types';
 
   let title = $state('Index:');
-  let family = $state('wikisource');
-  let code = $state('en');
-  let apiUrl = $state('https://en.wikisource.org/w/api.php');
   let sites: Site[] = $state([]);
   let selectedSitePk: number | null = $state(null);
   let kind: FetchKind = $state('single');
   let depth = $state(0);
+  let revisions = $state(1);
   let loadingSites = $state(true);
   let loading = $state(false);
   let error = $state('');
   let result: FetchResponse | null = $state(null);
 
-  function selectedSite(): Site | null {
-    return sites.find((site) => site.pk === selectedSitePk) ?? null;
-  }
-
-  function applySelectedSite(): void {
-    const site = selectedSite();
-    if (!site) return;
-    family = site.family;
-    code = site.code;
-    apiUrl = site.api_url ?? '';
-  }
+  const selectedSite = $derived(sites.find((site) => site.pk === selectedSitePk) ?? null);
 
   async function loadSites(): Promise<void> {
     loadingSites = true;
@@ -42,7 +30,6 @@
     try {
       sites = await listSites();
       selectedSitePk = sites[0]?.pk ?? null;
-      applySelectedSite();
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to load sites';
     } finally {
@@ -51,19 +38,19 @@
   }
 
   async function submitFetch(): Promise<void> {
-    applySelectedSite();
+    // The site is named by its registered label, not by family/code/api_url:
+    // nothing conjures a site from a fetch request's parameters, so a fetch
+    // against an unregistered wiki is a 404 rather than a new Site row.
+    const label = selectedSite?.label;
+    if (!label) {
+      error = 'Register a site first -- a fetch names a registered wiki by label.';
+      return;
+    }
     loading = true;
     error = '';
     result = null;
     try {
-      result = await createFetch({
-        title,
-        family,
-        code,
-        api_url: apiUrl || null,
-        kind,
-        depth
-      });
+      result = await createFetch({ title, label, kind, depth, revisions });
     } catch (err) {
       error = err instanceof Error ? err.message : 'Fetch request failed';
     } finally {
@@ -87,7 +74,7 @@
   {#if loadingSites}
     <p class="state">Loading sites...</p>
   {:else if sites.length > 1}
-    <SiteSelect {sites} bind:value={selectedSitePk} onchange={applySelectedSite} />
+    <SiteSelect {sites} bind:value={selectedSitePk} />
   {:else if sites.length === 1}
     <div class="site-summary">
       <span>Site</span>
@@ -95,16 +82,7 @@
       <small>{sites[0].api_url ?? `${sites[0].family}:${sites[0].code}`}</small>
     </div>
   {:else}
-    <FormRow>
-      <TextField label="Family" bind:value={family} required />
-      <TextField label="Code" bind:value={code} required />
-    </FormRow>
-
-    <TextField
-      label="API URL"
-      bind:value={apiUrl}
-      placeholder="https://en.wikisource.org/w/api.php"
-    />
+    <Notice>No sites registered. Add one on the Sites page before fetching.</Notice>
   {/if}
 
   <FormRow>
@@ -113,7 +91,16 @@
       <option value="index">index</option>
     </SelectField>
     <TextField label="Depth" type="number" min="0" max="3" bind:value={depth} />
+    <TextField label="Revisions" type="number" min="1" max="500" bind:value={revisions} />
   </FormRow>
+
+  <p class="hint">
+    <strong>Revisions</strong> is how far back from the head to store. 1 is a normal
+    fetch -- the head is all the editor and the VFS need. More fills in history for
+    the cross-site anchor search, which cannot find a match at the head when one side
+    was imported from an older revision of the other. Index fan-out children inherit
+    it.
+  </p>
 
   <div class="submit-row">
     <ActionButton type="submit" disabled={loading}>
@@ -151,6 +138,12 @@
 {/if}
 
 <style>
+  .hint {
+    max-width: 46rem;
+    color: #73583d;
+    font-size: 0.84rem;
+  }
+
   .description {
     color: #594430;
     font-size: 1.1rem;

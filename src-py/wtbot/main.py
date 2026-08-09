@@ -22,6 +22,7 @@ from wtbot.api import (
     preview,
     reference_image,
     sites,
+    sync,
     vfs,
     viewer,
     works,
@@ -136,6 +137,7 @@ def create_app(
     app.include_router(preview.router)
     app.include_router(reference_image.router)
     app.include_router(sites.router)
+    app.include_router(sync.router)
     app.include_router(vfs.router)
     app.include_router(viewer.router)
 
