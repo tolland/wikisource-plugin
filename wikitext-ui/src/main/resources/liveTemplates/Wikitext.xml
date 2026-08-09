@@ -13,5 +13,19 @@
             <option name="WIKITEXT" value="true"/>
         </context>
     </template>
+    <template name="{{ne" value="{{ne&#10;|1=$LEFTITEM$&#10;|2=&lt;math&gt;$MIDITEM$&lt;/math&gt;&#10;|3=$RIGHTITEM$&#10;}}&#10;$END$" description="insert numerical equation template" toReformat="false" toShortenFQNames="true">
+        <variable name="LEFTITEM" expression="" defaultValue="" alwaysStopAt="true" />
+        <variable name="MIDITEM" expression="complete()" defaultValue="" alwaysStopAt="true" />
+        <variable name="RIGHTITEM" expression="" defaultValue="" alwaysStopAt="true" />
+        <context>
+            <option name="WIKITEXT" value="true" />
+        </context>
+    </template>
+    <template name="{{ne-surround" value="{{ne&#10;|1=$LEFTITEM$&#10;|2=$SELECTION$&#10;|3=$RIGHTITEM$&#10;}}&#10;$END$" description="insert numerical equation template" toReformat="false" toShortenFQNames="true">
+        <variable name="LEFTITEM" expression="" defaultValue="" alwaysStopAt="true" />
+        <variable name="RIGHTITEM" expression="" defaultValue="" alwaysStopAt="true" />
+        <context>
+            <option name="WIKITEXT" value="true" />
+        </context>
+    </template>
 </templateSet>
-

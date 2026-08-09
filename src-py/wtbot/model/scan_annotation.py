@@ -26,6 +26,7 @@ class AnnotationCategory(StrEnum):
     paragraph = "paragraph"
     section = "section"
     ignore = "ignore"
+    equation = "equation"
 
 
 class ScanAnnotation(SQLModel, table=True):

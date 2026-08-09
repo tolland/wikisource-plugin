@@ -6,7 +6,7 @@ package org.limepepper.lang.wikitext.annotation
  * cut into subsections and sent to OCR, the category decides what a box
  * contributes: [BODY]/[PARAGRAPH]/[SECTION] regions are transcribed,
  * [HEADER]/[FOOTER] route to the page header/footer fields, [IGNORE] is
- * skipped.
+ * skipped. [EQUATION] is is sent to a "Tex" specific OCR backend.
  */
 enum class AnnotationCategory(val wire: String, val displayName: String) {
     HEADER("header", "Header"),
@@ -15,6 +15,7 @@ enum class AnnotationCategory(val wire: String, val displayName: String) {
     PARAGRAPH("paragraph", "Paragraph"),
     SECTION("section", "Section"),
     IGNORE("ignore", "Ignore"),
+    EQUATION("equation", "equation"),
     ;
 
     companion object {
