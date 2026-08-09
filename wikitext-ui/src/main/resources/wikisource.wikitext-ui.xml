@@ -74,6 +74,29 @@
             defaultValue="template"
             description="Wikitext: how Surround With inserts markup - 'template' (live template, mirrors section names) or 'document' (plain document edit)"
         />
+        <!-- Puts the bold/italic actions ahead of the platform actions that
+        share their shortcuts. See WtEditingActionPromoter for why disabling
+        the platform action is not sufficient on its own. -->
+        <actionPromoter
+            order="last"
+            implementation="org.limepepper.lang.wikitext.editing.toggle.WtEditingActionPromoter"
+        />
+
+        <registryKey
+            key="wikitext.editing.toggle.enabled"
+            defaultValue="true"
+            description="Wikitext: enable the bold/italic toggle actions (Ctrl+B / Ctrl+I)"
+        />
+        <registryKey
+            key="wikitext.editing.toggle.promote"
+            defaultValue="true"
+            description="Wikitext: let the wikitext bold/italic actions win Ctrl+B / Ctrl+I over Go To Declaration / Implement Methods in wikitext files"
+        />
+        <registryKey
+            key="wikitext.editing.preview.verticalSplit"
+            defaultValue="true"
+            description="Wikitext: stack the split editor's preview below the text (rather than side by side)"
+        />
         <registryKey
             key="wikitext.editing.variablePrompt"
             defaultValue="inline"
@@ -109,6 +132,28 @@
     </extensions>
 
     <actions>
+        <!-- Formatting toggles. The shortcuts collide with Go To Declaration
+        (Ctrl+B) and Implement Methods (Ctrl+I) on purpose: they are what every
+        other editor uses for bold/italic. The actions hide themselves outside
+        wikitext files, and WtEditingActionPromoter decides the tie inside
+        them. -->
+        <action
+            id="org.limepepper.lang.wikitext.editing.toggle.WtToggleBoldAction"
+            class="org.limepepper.lang.wikitext.editing.toggle.WtToggleBoldAction"
+            text="Bold"
+            description="Wrap the selection in ''' ''' (or unwrap it)">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="control B"/>
+        </action>
+        <action
+            id="org.limepepper.lang.wikitext.editing.toggle.WtToggleItalicAction"
+            class="org.limepepper.lang.wikitext.editing.toggle.WtToggleItalicAction"
+            text="Italic"
+            description="Wrap the selection in '' '' (or unwrap it)">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="control I"/>
+        </action>
+
         <action
             id="org.limepepper.lang.wikitext.editor.prp.CreateTextRangeAction"
             class="org.limepepper.lang.wikitext.editor.prp.CreateTextRangeAction"

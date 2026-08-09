@@ -309,3 +309,34 @@ Known follow-ups left open by the steps above:
 
 Each step ships independently; 1–3 are pure-editor features usable on plain
 files and VFS files alike from day one.
+
+## Inline rich rendering of quote markup (idea, not yet built)
+
+Observation: the XML/HTML editor shows an entity as its literal character, and
+TeXiFy does the same for LaTeX commands. Both are **folding** — a
+`FoldingBuilder` replaces a range with placeholder text — not styling. That
+suggests two separate, independently useful features for quote markup, worth
+keeping apart because they have different risks:
+
+1. **Style the content** — render text between `'''` markers in an actual bold
+   font, markers left visible. This is a `TextAttributes` change only: it does
+   not alter the character count, so no offset mapping, no interaction with
+   folding, and nothing to go wrong when the user edits mid-run.
+   `WtQuoteScanner.styledSpans()` already returns exactly the spans this needs
+   (it was written for the toggle actions and returns content ranges, not
+   marker ranges), so this is close to just an annotator that sets
+   `FontType.BOLD` / `ITALIC`.
+2. **Fold the markers** — hide the `'''` themselves so a bolded word looks like
+   a bolded word. This is the part that changes what the user sees at an
+   offset, and it needs care: folds must open when the caret enters them, or
+   editing near a marker becomes guesswork.
+
+Recommended order: (1) first, behind a registry key, since it is cheap and
+reversible; (2) only if (1) proves it reads well. Doing (2) without (1) would
+hide the markup while leaving the text visually unchanged, which is the worst
+of both.
+
+Caveat for both: the scanner is line-scoped, which matches MediaWiki's
+single-line rule, so an unclosed run styles to end of line and stops. That is
+the correct rendering, but it means a stray apostrophe run can visibly restyle
+the rest of a line — arguably a useful signal that the markup is unbalanced.

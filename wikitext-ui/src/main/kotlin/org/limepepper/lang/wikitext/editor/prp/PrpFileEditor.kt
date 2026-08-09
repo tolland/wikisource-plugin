@@ -70,6 +70,7 @@ class PrpFileEditor private constructor(
     init {
         // Initialize TextEditorWithPreview's lazy UI before disposal-sensitive editor switching can occur.
         component
+        org.limepepper.lang.wikitext.preview.WtPreviewLayoutDefaults.apply(this)
 
         // Independent transcription text ranges: rendered/edited in the body
         // editor by the manager, loaded once from the sidecar, persisted

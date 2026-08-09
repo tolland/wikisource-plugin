@@ -83,8 +83,39 @@ object WtEditingFlags {
         }
     }
 
+    // ---- Formatting toggles (Ctrl+B / Ctrl+I) ----------------------------
+
+    /** Master switch for the bold/italic toggle actions. */
+    fun toggleEnabled(): Boolean = boolean(TOGGLE_ENABLED, true)
+
+    /**
+     * Whether the toggle actions are promoted over the platform actions that
+     * share their shortcuts (Go To Declaration, Implement Methods). Separate
+     * from [toggleEnabled] because hijacking two very well-known keystrokes is
+     * the part most likely to be regretted — this hands them back without
+     * losing the actions themselves from the menu.
+     */
+    fun togglePromote(): Boolean = boolean(TOGGLE_PROMOTE, true)
+
+    // ---- Split editor ----------------------------------------------------
+
+    /**
+     * Whether the editor/preview split stacks the panes vertically (editor
+     * above preview) instead of side by side. Stacked is the default because
+     * wikitext lines are long and two side-by-side panes are each too narrow
+     * to read.
+     *
+     * Note this is a *default*, not a persisted preference: the platform
+     * stores the chosen layout (editor / preview / both) per editor name, but
+     * not the split orientation, so this applies on every open.
+     */
+    fun previewVerticalSplit(): Boolean = boolean(PREVIEW_VERTICAL_SPLIT, true)
+
     // ---- Registry plumbing ----------------------------------------------
 
+    const val TOGGLE_ENABLED: String = "wikitext.editing.toggle.enabled"
+    const val TOGGLE_PROMOTE: String = "wikitext.editing.toggle.promote"
+    const val PREVIEW_VERTICAL_SPLIT: String = "wikitext.editing.preview.verticalSplit"
     const val SURROUND_ENABLED: String = "wikitext.editing.surround.enabled"
     const val SURROUND_STRATEGY: String = "wikitext.editing.surround.strategy"
     const val VARIABLE_PROMPT: String = "wikitext.editing.variablePrompt"
