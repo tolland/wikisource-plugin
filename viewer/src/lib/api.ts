@@ -17,8 +17,22 @@ import type {
   OcrBackend,
   OcrBackendList,
   OcrBackendPayload,
-  OcrCatalog
+  OcrCatalog,
+  CandidateList,
+  FetchHistoryResult,
+  LinkOrigin,
+  LinkWorkResult,
+  PairRevisions,
+  ProposeWorkResult,
+  RungRow,
+  WorkDetail,
+  WorkSummary
 } from '$lib/types';
+
+/** The work list response, inlined: one field, and no other caller wants it. */
+interface WorkList {
+  works: WorkSummary[];
+}
 
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(`/api${path}`);
@@ -192,4 +206,70 @@ export function listVfsChildren(path: string): Promise<ListChildrenResponse> {
 
 export function readVfsContent(path: string): Promise<ReadContentResponse> {
   return getJson<ReadContentResponse>(`/vfs/content?path=${encodeURIComponent(path)}`);
+}
+
+/* --- cross-site links ------------------------------------------------------ */
+
+export function listWorks(localLabel?: string, remoteLabel?: string): Promise<WorkList> {
+  const params = new URLSearchParams();
+  if (localLabel) params.set('local_label', localLabel);
+  if (remoteLabel) params.set('remote_label', remoteLabel);
+  const query = params.toString();
+  return getJson<WorkList>(`/links/works${query ? `?${query}` : ''}`);
+}
+
+export function listIndexCandidates(sitePk: number): Promise<CandidateList> {
+  return getJson<CandidateList>(`/links/works/candidates?site_pk=${sitePk}`);
+}
+
+export function linkWork(payload: {
+  local_label: string;
+  remote_label: string;
+  index_title: string;
+  remote_index_title?: string | null;
+  pair_pages?: boolean;
+}): Promise<LinkWorkResult> {
+  return postJson<LinkWorkResult>('/links/works', payload);
+}
+
+export function getWork(workPk: number): Promise<WorkDetail> {
+  return getJson<WorkDetail>(`/links/works/${workPk}`);
+}
+
+export function proposeWork(workPk: number, confirm: boolean): Promise<ProposeWorkResult> {
+  return postJson<ProposeWorkResult>(`/links/works/${workPk}/propose`, { confirm });
+}
+
+export function fetchWorkHistory(
+  workPk: number,
+  revisions: number,
+  allPages = false
+): Promise<FetchHistoryResult> {
+  return postJson<FetchHistoryResult>(`/links/works/${workPk}/fetch-history`, {
+    revisions,
+    all_pages: allPages
+  });
+}
+
+export async function untrackWork(workPk: number, cascade = false): Promise<void> {
+  await deleteRequest(`/links/works/${workPk}${cascade ? '?cascade=true' : ''}`);
+}
+
+export function getPairRevisions(pairPk: number): Promise<PairRevisions> {
+  return getJson<PairRevisions>(`/links/pairs/${pairPk}/revisions`);
+}
+
+export function assertRung(
+  pairPk: number,
+  payload: { local_revid: number; remote_revid: number; origin?: LinkOrigin; force?: boolean }
+): Promise<RungRow> {
+  return postJson<RungRow>(`/links/pairs/${pairPk}/rungs`, payload);
+}
+
+export async function retractRung(linkPk: number): Promise<void> {
+  await deleteRequest(`/links/${linkPk}`);
+}
+
+export async function retractPairRungs(pairPk: number): Promise<void> {
+  await deleteRequest(`/links/pairs/${pairPk}/rungs`);
 }

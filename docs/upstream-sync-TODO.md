@@ -114,6 +114,38 @@ The immediate work list. Reasoning, rejected approaches and policy live in
   a work before it can be re-proposed is busywork that also loses the pair's
   page numbering and its place in the work's listing.
 
+- **`IndexLink`** — the work-level correspondence, and the viewer's entry point.
+  For Wikisource the unit of comparison is the Index, not the page: pages are
+  compared and promoted *within* a work, and "is this work tracked upstream?" is
+  the question asked first. It is a **side table on `PageLink`**, the way
+  `IndexMeta` is on `Page` — an `Index:` page is a page, so pairing two of them
+  is already a `PageLink`, with a ladder over the index bodies (which diverge
+  like any other) for free. A second pairing table would mean two places that
+  can assert page correspondence and two unordered-pair constraints that cannot
+  see each other. `PageLink.index_link_pk` points children at their work so the
+  drill-down is a join, and stays **nullable**: a mainspace or `Portal:` pairing
+  is a legitimate standalone row, which is what generic MediaWiki use needs.
+
+  Three levels, `/links/works` and `/links/pairs/{pk}/revisions`, with the
+  viewer route `/links` on top:
+
+  1. **works** — two site columns, indexes below each, tracked pairs pinned
+     above. `wtbot link works` / `track-work`.
+  2. **page pairs** — one work's pages with a live outcome each, plus the two
+     actions the unresolved outcomes call for: `fetch-history` (queues deeper
+     fetches for the pages whose anchor search ran out) and `propose`.
+  3. **revisions** — both histories side by side, joined on `comparable_sha1`.
+     This exists because the anchor search compares each head against the other
+     side's history *one side at a time* and stops there: a page where both
+     sides edited after they last agreed gets no proposal even though the
+     matching pair is one revision back on each side. The view shows it, and
+     `POST /links/pairs/{pk}/rungs` lets a person assert it (still refusing a
+     non-matching pair without `force`). `wtbot link revisions [--link-best]`.
+
+  Deliberately absent: anything that changes a proofreading level. Two sides
+  still differing in level with complete history disagree about an assessment,
+  and resolving that is an edit through the commit path, not a link operation.
+
 - **`Content.comparable_sha1`** — the content-model comparison's verdict,
   precomputed. Hashing the bytes cannot decide cross-site sameness (discussion
   section 3); hashing the *normalised* form can, and does. Equal digests mean

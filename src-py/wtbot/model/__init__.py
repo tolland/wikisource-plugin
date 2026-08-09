@@ -13,6 +13,7 @@ from wtbot.model.edit_journal import EditJournal
 from wtbot.model.fetch_request import FetchKind, FetchRequest, FetchStatus
 from wtbot.model.file_blob import FileBlob
 from wtbot.model.file_meta import FileMeta, FileOrigin
+from wtbot.model.index_link import IndexLink
 from wtbot.model.index_meta import IndexMeta
 from wtbot.model.namespace import Namespace, NsRole, role_for_canonical
 from wtbot.model.ocr_backend import OcrBackendConfig, OcrBackendKind
@@ -51,6 +52,7 @@ __all__ = [
     "Slot",
     "MAIN_SLOT",
     "Content",
+    "IndexLink",
     "IndexMeta",
     "PageMeta",
     "FileMeta",

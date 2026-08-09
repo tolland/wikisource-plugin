@@ -55,6 +55,21 @@ class PageLink(SQLModel, table=True):
     local_page_pk: int = Field(foreign_key="page.pk", index=True)
     remote_page_pk: int = Field(foreign_key="page.pk", index=True)
 
+    index_link_pk: int | None = Field(
+        default=None, foreign_key="indexlink.pk", index=True
+    )
+    """The tracked work this pair belongs to, when it belongs to one.
+
+    A materialised shortcut for the drill-down the viewer opens on: work ->
+    its page pairs, as a join rather than a walk back through
+    ``PageMeta.index_title``. Membership is still derived from the index when
+    the work is linked; this records the answer.
+
+    Null is ordinary, not missing data. A pairing outside any tracked work --
+    mainspace, ``Portal:``, a page paired by hand before its work was -- has no
+    work to point at, and the Index pairing that *carries* the ``IndexLink``
+    does not point at itself."""
+
     origin: LinkOrigin = LinkOrigin.title_match
     """How the pairing was arrived at. Weaker evidence than a revision link's
     origin by nature -- pairing two pages by page number says nothing about

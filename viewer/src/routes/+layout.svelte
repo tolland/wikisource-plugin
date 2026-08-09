@@ -12,6 +12,7 @@
     { href: '/commits', label: 'Commits' },
     { href: '/pages', label: 'Pages' },
     { href: '/indexes', label: 'Indexes' },
+    { href: '/links', label: 'Links' },
     { href: '/vfs', label: 'VFS' }
   ];
 </script>
