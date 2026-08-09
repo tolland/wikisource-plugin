@@ -8,12 +8,16 @@ into External Store and ``old_flags`` carries compression. We hold text directly
 in SQLite, so the two are merged here -- the indirection buys nothing.
 
 The one place this deliberately diverges from MediaWiki is that it carries
-**two** hashes, because for ``proofread-page`` they are genuinely different
+**three** hashes, because for ``proofread-page`` they are genuinely different
 quantities (see docs/proofread-page-sha1-discordance.md):
 
 - ``content_sha1`` is ours, over the bytes the API actually served us. It is
-  the only portable identity token, and the one cross-wiki comparison joins on.
+  the portable identity token for the *bytes*, and what dedups rows.
 - ``remote_sha1`` is the wiki's own ``content_sha1``, over the blob it stored.
+- ``comparable_sha1`` is ours too, but over the body's canonical form rather
+  than its bytes: site-local metadata blanked, significant metadata folded in.
+  It is the token cross-site correspondence compares on, precisely because the
+  byte hashes cannot be (see below, and ``wtbot.content_model.digest``).
 
 The stored blob is the serialization **as written at save time**, wrappers and
 all -- reading ``text.old_text`` directly shows it byte-identical to what the
@@ -42,7 +46,9 @@ class Content(SQLModel, table=True):
     routinely hash differently, and diverge further as the work progresses. A
     hash match is strong evidence of sameness; a mismatch is no evidence of
     difference. Cross-site correspondence is asserted and recorded (RemoteLink),
-    with comparison done content-model-aware.
+    with comparison done content-model-aware -- and ``comparable_sha1`` is that
+    comparison's verdict, precomputed. It is a cache of a decision, not a second
+    identity: rows are still keyed and deduped by ``content_sha1``.
     """
 
     __table_args__ = (
@@ -55,7 +61,22 @@ class Content(SQLModel, table=True):
     pk: int | None = Field(default=None, primary_key=True)
 
     content_sha1: str = Field(index=True)
-    """Base-36 SHA-1 of ``text`` as UTF-8, computed by us. The comparison token."""
+    """Base-36 SHA-1 of ``text`` as UTF-8, computed by us. The within-site
+    identity token: same bytes, same row."""
+
+    comparable_sha1: str | None = Field(default=None, index=True)
+    """Base-36 SHA-1 of the body's *canonical* form -- the model-aware one.
+
+    The cross-site token, and the one thing here that is not a hash of what the
+    wiki served. Site-local metadata is blanked and significant metadata folded
+    in before hashing (see ``wtbot.content_model.digest``), so two rows share
+    this value exactly when the content-model comparison would call them the
+    same content. Comparable only between rows of the same ``content_model``.
+
+    Nullable only because rows written before the column existed have it
+    backfilled by migration; the store never writes None. A reader that finds
+    None falls back to the full comparison rather than assuming a difference --
+    a missing digest is an unanswered question, not a "no"."""
 
     content_model: str | None = None  # 'wikitext', 'proofread-page', ...
     text: str

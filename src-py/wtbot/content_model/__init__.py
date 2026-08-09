@@ -3,6 +3,7 @@ from wtbot.content_model.comparison import (
     FieldDifference,
     Significance,
 )
+from wtbot.content_model.digest import comparable_sha1
 from wtbot.content_model.document import ContentDocument, parse_document
 from wtbot.content_model.proofread_page import ProofreadPageDocument
 from wtbot.content_model.wikitext import WikitextDocument
@@ -22,5 +23,6 @@ __all__ = [
     "ProofreadPageDocument",
     "Significance",
     "WikitextDocument",
+    "comparable_sha1",
     "parse_document",
 ]

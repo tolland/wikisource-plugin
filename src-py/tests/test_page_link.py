@@ -275,6 +275,70 @@ def test_a_single_rung_can_be_removed_as_a_mistake(client, engine) -> None:
     with Session(engine) as session:
         (link,) = session.exec(select(RemoteLink)).all()
 
-    assert client.delete(f"/links/{link.pk}").json() == {"deleted": link.pk}
+    removed = client.delete(f"/links/{link.pk}").json()
+    assert removed == {"deleted": link.pk, "pairing": link.page_link_pk}
     # The pairing outlives the rung: the pages are still the same page.
     assert len(client.get("/links/pairs").json()["pairs"]) == 1
+
+
+def test_a_ladder_can_be_cleared_without_losing_the_pairing(client, engine) -> None:
+    """The retraction `unpair` is too wide for. Links proposed against the
+    wrong other side are wrong about the revisions; that the two pages are the
+    same page is not in doubt, and re-pairing to re-propose is busywork."""
+    with Session(engine) as session:
+        local = build_site(session, "mywikisource")
+        remote = build_site(session, "wikisource")
+        build_page(session, local, 1, body="Same.", revid=5)
+        build_page(session, remote, 1, body="Same.", revid=900)
+
+    body = {
+        "local_label": "mywikisource",
+        "remote_label": "wikisource",
+        "index_title": INDEX,
+    }
+    client.post("/links/propose", json={**body, "confirm": True})
+    (row,) = client.get("/links/pairs").json()["pairs"]
+    assert row["rungs"] == 1
+
+    cleared = client.delete(f"/links/pairs/{row['pk']}/rungs")
+    assert cleared.json() == {"pairing": row["pk"], "rungs_removed": 1}
+
+    (still_paired,) = client.get("/links/pairs").json()["pairs"]
+    assert still_paired["pk"] == row["pk"]
+    assert still_paired["rungs"] == 0
+    assert still_paired["page_number"] == 1
+
+    # And the pair is proposable again without being paired again.
+    again = client.post("/links/propose", json={**body, "confirm": True})
+    assert again.json()["confirmed"] == 1
+
+
+def test_clearing_a_ladder_leaves_other_pairings_alone(client, engine) -> None:
+    """`retract_rungs` is keyed on the pairing, not on the work: clearing one
+    page's ladder must not touch its neighbour's."""
+    with Session(engine) as session:
+        local = build_site(session, "mywikisource")
+        remote = build_site(session, "wikisource")
+        for number in (1, 2):
+            build_page(session, local, number, body=f"Page {number}.", revid=5 + number)
+            build_page(
+                session, remote, number, body=f"Page {number}.", revid=900 + number
+            )
+
+    body = {
+        "local_label": "mywikisource",
+        "remote_label": "wikisource",
+        "index_title": INDEX,
+    }
+    client.post("/links/propose", json={**body, "confirm": True})
+    first, second = client.get("/links/pairs").json()["pairs"]
+
+    client.delete(f"/links/pairs/{first['pk']}/rungs")
+
+    by_pk = {row["pk"]: row for row in client.get("/links/pairs").json()["pairs"]}
+    assert by_pk[first["pk"]]["rungs"] == 0
+    assert by_pk[second["pk"]]["rungs"] == 1
+
+
+def test_clearing_the_ladder_of_an_unknown_pairing_is_a_404(client) -> None:
+    assert client.delete("/links/pairs/9999/rungs").status_code == 404

@@ -99,6 +99,27 @@ class ProofreadPageDocument:
         """
         return "\0".join((self.header, self.body, self.footer))
 
+    @property
+    def canonical_text(self) -> str:
+        """The comparable text with the proofreading level folded back in.
+
+        ``user`` is dropped -- it names an account on one wiki, so keeping it
+        would make the same transcription canonicalise differently on the two
+        sides, which is the whole problem this form exists to sidestep.
+        ``level`` is kept, and kept *distinct from absent*, because it is
+        significant: identical words at level 2 and level 4 are not the same
+        content, and treating them as such would let a push discard somebody's
+        assessment.
+
+        Joined rather than re-serialized: round-tripping through
+        ``serialize()`` would put the parts back inside ``<noinclude>``
+        wrappers, where a body containing a wrapper of its own could alias with
+        a different header/body/footer split. Same reason as
+        :attr:`comparable_text`, which this extends.
+        """
+        level = "" if self.level is None else str(self.level)
+        return "\0".join((level, self.header, self.body, self.footer))
+
     def compare(self, other) -> Comparison:
         if not isinstance(other, ProofreadPageDocument):
             equal = self.comparable_text == other.comparable_text

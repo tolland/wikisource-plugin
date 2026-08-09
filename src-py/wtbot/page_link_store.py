@@ -17,6 +17,12 @@ The pairing is the mutable half of correspondence, and the split from
   claim about two immutable objects; it cannot stop being true, so it is
   superseded rather than edited (see ``wtbot.remote_link_store``).
 
+The cascade is why ``retract_rungs`` exists alongside ``unpair``. Wanting the
+ladder gone is not wanting the pairing gone -- a work whose links were proposed
+against the wrong other side needs re-proposing, not re-pairing -- and if the
+only way to clear a ladder is to delete its pairing, the pairing gets deleted
+for reasons that have nothing to do with it.
+
 Pairings survive renames because they name page pks. Nothing here compares
 titles: a page moved on either wiki keeps its pairing, which is the whole
 reason this is stored rather than recomputed.
@@ -116,6 +122,28 @@ def pairs_for_index(
     )
 
 
+def retract_rungs(session: Session, link: PageLink) -> int:
+    """Remove every revision link asserted under a pairing, keeping the pairing.
+
+    The narrower half of ``unpair``, and the one worth reaching for first. A
+    ladder built from a comparison that turned out to be wrong -- the wrong
+    ``--to``, a re-import, a page whose history was only half fetched when it
+    was proposed -- is retracted so it can be proposed again. Dropping the
+    pairing as well would throw away the one claim that was not in doubt (that
+    these are two copies of one page) and make the work unlistable until it is
+    paired from scratch.
+
+    Returns how many rungs went.
+    """
+    rungs = session.exec(
+        select(RemoteLink).where(RemoteLink.page_link_pk == link.pk)
+    ).all()
+    for rung in rungs:
+        session.delete(rung)
+    session.flush()
+    return len(rungs)
+
+
 def unpair(session: Session, link: PageLink) -> int:
     """Remove a pairing and the revision links asserted under it.
 
@@ -124,14 +152,10 @@ def unpair(session: Session, link: PageLink) -> int:
     revisions nobody says correspond, and leaving it would let a later pairing
     inherit assertions made under a different one.
     """
-    rungs = session.exec(
-        select(RemoteLink).where(RemoteLink.page_link_pk == link.pk)
-    ).all()
-    for rung in rungs:
-        session.delete(rung)
+    removed = retract_rungs(session, link)
     session.delete(link)
     session.flush()
-    return len(rungs)
+    return removed
 
 
 def other_side(link: PageLink, page_pk: int) -> int:

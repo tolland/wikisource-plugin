@@ -281,6 +281,56 @@ def unpair_command(
     pair_pk: int = typer.Argument(..., help="Pairing pk (see `wtbot link pairs`)"),
     api: ApiClient = Depends(get_api),
 ) -> None:
-    """Retract a pairing, and the revision links asserted under it."""
+    """Retract a pairing, and the revision links asserted under it.
+
+    The wide retraction: use `unpair-revision` to drop the links and keep the
+    pairing, which is what is usually wanted after a bad `propose`.
+    """
     data = api.delete(f"/links/pairs/{pair_pk}")
     typer.echo(f"removed pairing {data['deleted']} and {data['rungs_removed']} rung(s)")
+
+
+@app.command("unpair-revision")
+def unpair_revision(
+    link_pk: int | None = typer.Argument(
+        None, help="Rung pk to retract (see `wtbot link show`)"
+    ),
+    pair_pk: int | None = typer.Option(
+        None,
+        "--pair",
+        help="Retract every rung under this pairing (see `wtbot link pairs`).",
+    ),
+    api: ApiClient = Depends(get_api),
+) -> None:
+    """Retract a paired revision, keeping the page pairing.
+
+    A rung says two *revisions* hold the same content. Retracting one says that
+    was wrong -- a `propose` run against the wrong `--to`, or one confirmed
+    before enough history had been fetched -- and says nothing about whether
+    the two pages are the same page. `unpair` would answer that second question
+    too, discarding the pairing and everything listed under it, and leaving the
+    work to be paired from scratch before it can be proposed again.
+
+    Takes a rung pk, or `--pair` to clear a whole ladder at once.
+    """
+    if (link_pk is None) == (pair_pk is None):
+        typer.secho(
+            "give a rung pk, or --pair to retract a whole ladder -- not both",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(2)
+
+    if pair_pk is not None:
+        data = api.delete(f"/links/pairs/{pair_pk}/rungs")
+        typer.echo(
+            f"retracted {data['rungs_removed']} rung(s); "
+            f"pairing {data['pairing']} kept"
+        )
+        return
+
+    data = api.delete(f"/links/{link_pk}")
+    # `pairing` is None only for a rung written before pairings were stored --
+    # there is then nothing to reassure the caller about.
+    kept = f"pairing {data['pairing']} kept" if data.get("pairing") else "pairing kept"
+    typer.echo(f"retracted rung {data['deleted']}; {kept}")

@@ -418,11 +418,14 @@ def _newest_match(
         other_content = _content_of(session, revision)
         if other_content is None:
             continue
+        if not _is_same_content(content, other_content):
+            continue
+        # Only the winner is parsed. The scan itself decided on the precomputed
+        # digest; the comparison is re-run here for the *significance*, which
+        # the digest deliberately does not carry (identical and metadata_only
+        # hash alike -- they differ only in the username).
         comparison = _compare(content, other_content)
-        if comparison.same_transcription and comparison.significance is not (
-            Significance.metadata_significant
-        ):
-            return revision, comparison.significance, offset
+        return revision, comparison.significance, offset
     return None
 
 
@@ -444,6 +447,33 @@ def _content_of(session: Session, revision: Revision) -> Content | None:
 def _compare(left: Content, right: Content):
     return parse_document(left.text, left.content_model).compare(
         parse_document(right.text, right.content_model)
+    )
+
+
+def _is_same_content(left: Content, right: Content) -> bool:
+    """Whether two bodies are the same content for linking purposes.
+
+    The predicate the anchor search runs, and the reason ``comparable_sha1``
+    exists: equal canonical digests mean equal comparable text *and* equal
+    proofreading level, which is exactly ``same_transcription`` at a
+    significance other than ``metadata_significant``. Comparing two strings
+    instead of parsing two bodies is what makes walking a long history cheap.
+
+    Falls back to the full comparison when either digest is missing (a row
+    predating the column) or the two rows have different content models, where
+    a digest match would be an artefact of the normalisation rather than a fact
+    about the text.
+    """
+    if (
+        left.comparable_sha1 is not None
+        and right.comparable_sha1 is not None
+        and left.content_model == right.content_model
+    ):
+        return left.comparable_sha1 == right.comparable_sha1
+
+    comparison = _compare(left, right)
+    return comparison.same_transcription and comparison.significance is not (
+        Significance.metadata_significant
     )
 
 

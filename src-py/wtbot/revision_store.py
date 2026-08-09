@@ -1,5 +1,6 @@
 from sqlmodel import Session, select
 
+from wtbot.content_model import comparable_sha1
 from wtbot.model import MAIN_SLOT, Content, Page, Revision, Slot
 from wtbot.wiki.sha1 import content_sha1_base36, normalize_sha1
 from wtbot.wiki.wiki_types import RemotePage
@@ -72,10 +73,17 @@ def upsert_content(
             existing.remote_sha1 = normalize_sha1(remote_sha1)
             existing.remote_size = remote_size
             session.add(existing)
+        # A row predating the column, or one written by an older wtbot. Filled
+        # in on the way past rather than left for the migration to be the only
+        # thing that ever computes it.
+        if existing.comparable_sha1 is None:
+            existing.comparable_sha1 = comparable_sha1(text, content_model)
+            session.add(existing)
         return existing
 
     content = Content(
         content_sha1=digest,
+        comparable_sha1=comparable_sha1(text, content_model),
         content_model=content_model,
         text=text,
         size=len(text.encode("utf-8")),

@@ -105,6 +105,24 @@ The immediate work list. Reasoning, rejected approaches and policy live in
   missing counterparts is nearly always a wrong `--to` or a different scan.
   `GET/POST/DELETE /links/pairs` is the CRUD the viewer drives.
 
+  Retraction comes in two widths, because wanting a ladder gone is not wanting
+  a pairing gone. `DELETE /links/pairs/{pk}` (`wtbot link unpair`) discards
+  both. `DELETE /links/{pk}` and `DELETE /links/pairs/{pk}/rungs`
+  (`wtbot link unpair-revision`, by rung or `--pair` for a whole ladder) retract
+  the revision links and keep the pairing — which is what a bad `propose` run
+  actually calls for: the links were wrong about the *revisions*, and re-pairing
+  a work before it can be re-proposed is busywork that also loses the pair's
+  page numbering and its place in the work's listing.
+
+- **`Content.comparable_sha1`** — the content-model comparison's verdict,
+  precomputed. Hashing the bytes cannot decide cross-site sameness (discussion
+  section 3); hashing the *normalised* form can, and does. Equal digests mean
+  the comparison would return `same_transcription` at a significance other than
+  `metadata_significant`, which is the predicate the anchor search runs — so the
+  search compares strings across a page's history and parses only the revision
+  it settles on. Compared only within one content model, and a null digest falls
+  back to the full comparison. See discussion section 3a.
+
 ## Now
 
 Numbered as originally listed; items 1 (`RemoteLink`) and 3
