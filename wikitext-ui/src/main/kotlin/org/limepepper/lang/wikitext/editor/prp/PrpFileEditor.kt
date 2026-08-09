@@ -84,6 +84,12 @@ class PrpFileEditor private constructor(
             bodyStartOffset = { editorHalf.bodyStartOffset },
             bodyEndOffset = { editorHalf.bodyEndOffset },
             revidSupplier = { pane.baseRevid },
+            // A range wears its linked box's category color, if it has one —
+            // several boxes may link to one range, so the first with a
+            // category wins rather than picking arbitrarily between equals.
+            categoryForRange = { rangeId ->
+                linkModel.boxesFor(rangeId).firstNotNullOfOrNull { boxId -> pane.model[boxId]?.category }
+            },
         )
         Disposer.register(this, anchorManager)
         this.linkModel = linkModel
@@ -141,10 +147,18 @@ class PrpFileEditor private constructor(
                 if (pane.boxesLoaded) {
                     linkModel.retainBoxes(pane.model.boxes().mapTo(HashSet()) { it.id })
                 }
+                // A box's category may have changed (not just its geometry or
+                // its existence), which can change a linked range's color.
+                anchorManager.reconcile()
             }
         })
         linkModel.addListener(object : BoxLinkModel.Listener {
-            override fun linksChanged() = pane.repaintCanvas()
+            override fun linksChanged() {
+                pane.repaintCanvas()
+                // A link changing which box a range points at can change the
+                // category -- hence color -- that range now matches.
+                anchorManager.reconcile()
+            }
         })
 
         // Toggling the preview card (scan ↔ rendered HTML) changes which

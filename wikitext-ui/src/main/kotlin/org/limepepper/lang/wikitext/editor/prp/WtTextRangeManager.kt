@@ -24,6 +24,7 @@ import com.intellij.openapi.editor.markup.TextAttributes
 import com.intellij.openapi.util.Disposer
 import com.intellij.util.Alarm
 import com.intellij.util.ui.ColorIcon
+import org.limepepper.lang.wikitext.annotation.AnnotationCategory
 import org.limepepper.lang.wikitext.annotation.AnnotationPalette
 import org.limepepper.lang.wikitext.annotation.AnnotationPalette.withAlpha
 import java.awt.BasicStroke
@@ -69,12 +70,24 @@ class WtTextRangeManager(
     private val bodyStartOffset: () -> Int,
     private val bodyEndOffset: () -> Int,
     private val revidSupplier: () -> Long?,
+    /**
+     * The category of the box(es) linked to a range, if any — see
+     * [org.limepepper.lang.wikitext.annotation.AnnotationPalette]. A range has
+     * no category of its own (it may exist with no box at all), so its color
+     * only matches a box's when this reports one; the default (no linking
+     * known) falls back to [AnnotationPalette]'s index-based cycling, same as
+     * an uncategorized box.
+     */
+    private val categoryForRange: (rangeId: String) -> AnnotationCategory? = { null },
 ) : Disposable {
     /**
      * Editor artifacts for one range. [modelStart]/[modelEnd] mirror the
      * range's offsets as of the last reconcile so a marker that merely
      * *drifted with edits* (writeback pending) is told apart from one whose
-     * extent was *edited* (chrome must be rebuilt).
+     * extent was *edited* (chrome must be rebuilt). [color] is the resolved
+     * paint color (see [categoryForRange]), stored rather than recomputed so
+     * [reconcile] can tell "still the right color" from "needs a rebuild"
+     * without caring whether the category or the fallback index changed.
      */
     private class Chrome(
         val marker: RangeMarker,
@@ -82,7 +95,7 @@ class WtTextRangeManager(
         val startHandle: Inlay<*>?,
         val endHandle: Inlay<*>?,
         val pointChip: Inlay<*>?,
-        val colorIndex: Int,
+        val color: Color,
         var modelStart: Int,
         var modelEnd: Int,
     )
@@ -169,8 +182,13 @@ class WtTextRangeManager(
 
     // ---- model → editor ---------------------------------------------------
 
-    /** Rebuilds chrome where the model changed; drops the rest. */
-    private fun reconcile() {
+    /**
+     * Rebuilds chrome where the model, its color, or a link changed; drops the
+     * rest. Public so [PrpFileEditor] can call it when something outside this
+     * class's own view — a box's category, or a box↔range link — changes a
+     * range's [categoryForRange] color without touching the range itself.
+     */
+    fun reconcile() {
         if (editor.isDisposed) {
             return
         }
@@ -184,25 +202,25 @@ class WtTextRangeManager(
         }
         for ((index, range) in ranges) {
             val existing = chromes[range.id]
+            val color = AnnotationPalette.colorFor(categoryForRange(range.id), index)
             if (existing != null &&
                 existing.modelStart == range.start &&
                 existing.modelEnd == range.end &&
-                existing.colorIndex == index &&
+                existing.color == color &&
                 existing.marker.isValid
             ) {
                 continue // unchanged (marker drift is pending writeback, not a change)
             }
             removeChrome(range.id)
-            chromes[range.id] = createChrome(range, index)
+            chromes[range.id] = createChrome(range, color)
         }
     }
 
-    private fun createChrome(range: TextRange, colorIndex: Int): Chrome {
+    private fun createChrome(range: TextRange, color: Color): Chrome {
         val bodyStart = bodyStartOffset()
         val length = editor.document.textLength
         val start = (range.start + bodyStart).coerceIn(bodyStart, length)
         val end = (range.end + bodyStart).coerceIn(start, length)
-        val color = AnnotationPalette.colorFor(colorIndex)
 
         val marker = editor.document.createRangeMarker(start, end)
         val highlighter = editor.markupModel.addRangeHighlighter(
@@ -225,7 +243,7 @@ class WtTextRangeManager(
             startHandle = editor.inlayModel.addInlineElement(start, false, HandleRenderer(range.id, Edge.START, color, point = false))
             endHandle = editor.inlayModel.addInlineElement(end, true, HandleRenderer(range.id, Edge.END, color, point = false))
         }
-        return Chrome(marker, highlighter, startHandle, endHandle, pointChip, colorIndex, range.start, range.end)
+        return Chrome(marker, highlighter, startHandle, endHandle, pointChip, color, range.start, range.end)
     }
 
     private fun removeChrome(id: String) {
@@ -404,12 +422,11 @@ class WtTextRangeManager(
         }
         val start = chrome.marker.startOffset
         editor.scrollingModel.scrollTo(editor.offsetToLogicalPosition(start), ScrollType.CENTER)
-        flash(start, chrome.marker.endOffset, chrome.colorIndex)
+        flash(start, chrome.marker.endOffset, chrome.color)
     }
 
-    private fun flash(start: Int, end: Int, colorIndex: Int) {
+    private fun flash(start: Int, end: Int, color: Color) {
         flashHighlighter?.let(editor.markupModel::removeHighlighter)
-        val color = AnnotationPalette.colorFor(colorIndex)
         val flashEnd = if (end > start) end else (start + 1).coerceAtMost(editor.document.textLength)
         flashHighlighter = editor.markupModel.addRangeHighlighter(
             start,

@@ -536,14 +536,15 @@ class ImageAnnotationCanvas(
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
         val boxes = model.boxes()
         for ((index, box) in boxes.withIndex()) {
-            paintBox(g2, box, AnnotationPalette.colorFor(index), selected = box.id == model.selectedId)
+            paintBox(g2, box, AnnotationPalette.colorFor(box.category, index), selected = box.id == model.selectedId)
         }
         (gesture as? Gesture.DrawNew)?.let { draw ->
-            paintBox(g2, draw.box(), AnnotationPalette.colorFor(boxes.size), selected = false)
+            val box = draw.box()
+            paintBox(g2, box, AnnotationPalette.colorFor(box.category, boxes.size), selected = false)
         }
         if (linkDropHandler != null) {
             for ((index, box) in boxes.withIndex()) {
-                paintLinkHandle(g2, box, AnnotationPalette.colorFor(index))
+                paintLinkHandle(g2, box, AnnotationPalette.colorFor(box.category, index))
             }
             (gesture as? Gesture.LinkDrag)?.let { drag ->
                 model[drag.boxId]?.let { box ->
