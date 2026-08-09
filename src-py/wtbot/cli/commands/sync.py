@@ -110,6 +110,19 @@ def report(
             f"  [{side['cached_pages']} page(s) cached{placeholders}]"
         )
 
+    for asset in data["assets"]:
+        held = (
+            "both"
+            if asset["source_cached"] and asset["target_cached"]
+            else (
+                "source only"
+                if asset["source_cached"]
+                else "target only" if asset["target_cached"] else "neither"
+            )
+        )
+        typer.echo(f"  {asset['kind']:<6} {asset['verdict']:<10} held: {held}")
+        typer.echo(f"         {asset['detail']}")
+
     scan = data["scan"]
     colour = {
         "ok": typer.colors.GREEN,
@@ -150,3 +163,39 @@ def report(
         f"  {data['actionable']} page(s) a push would write. "
         "This is a report: nothing has been changed."
     )
+
+
+@app.command("fetch-assets")
+def fetch_assets(
+    index_title: str = typer.Option(
+        ..., "--from", help="Index title on the source site"
+    ),
+    target_index_title: str | None = typer.Option(
+        None, "--to", help="Only needed when the two sides' index titles differ"
+    ),
+    direction: dict = Direction,
+    api: ApiClient = Depends(get_api),
+) -> None:
+    """Queue the report's fetch plan: the work's Index and its backing File.
+
+    What to run when the report says the scan check could not run, or that it
+    cannot see the target's index. Neither is a verdict -- both mean nobody has
+    asked the wiki yet -- and the file may live on the wiki or on a shared
+    repository (Commons), which the fetch follows either way.
+
+    Assets only: the pages are a separate, far larger fetch.
+    """
+    data = api.post(
+        "/sync/fetch-assets",
+        {
+            **direction,
+            "index_title": index_title,
+            "target_index_title": target_index_title,
+        },
+    )
+    if not data["queued"]:
+        typer.echo("nothing to fetch: the report already holds both assets")
+        return
+    for item in data["queued"]:
+        typer.echo(f"  queued {item['title']} on {item['label']}  ({item['reason']})")
+    typer.echo(data["note"])

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page as routePage } from '$app/state';
-  import { listIndexCandidates, listSites, syncReport } from '$lib/api';
+  import { fetchSyncAssets, listIndexCandidates, listSites, syncReport } from '$lib/api';
   import ActionButton from '$lib/components/ActionButton.svelte';
   import Notice from '$lib/components/Notice.svelte';
   import PageHeading from '$lib/components/PageHeading.svelte';
@@ -34,7 +34,9 @@
   let report: SyncReport | null = $state(null);
   let loading = $state(true);
   let running = $state(false);
+  let fetching = $state(false);
   let error = $state('');
+  let message = $state('');
 
   const sourceSite = $derived(sites.find((site) => site.pk === sourcePk) ?? null);
   const targetSite = $derived(sites.find((site) => site.pk === targetPk) ?? null);
@@ -143,6 +145,30 @@
     }
   }
 
+  async function fetchAssets(): Promise<void> {
+    // The answer to "the scan check could not run" and "is the work even
+    // there": both are questions nobody has asked the wiki yet. Queued only --
+    // draining stays the separate, throttled step.
+    fetching = true;
+    error = '';
+    message = '';
+    try {
+      const result = await fetchSyncAssets({
+        source_label: label(sourceSite),
+        target_label: label(targetSite),
+        index_title: indexTitle,
+        target_index_title: targetIndexTitle || null
+      });
+      message = result.queued.length
+        ? `Queued ${result.queued.map((item) => `${item.title} on ${item.label}`).join(', ')}. ${result.note}`
+        : 'Nothing to fetch: both assets are already held.';
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Failed to queue the assets';
+    } finally {
+      fetching = false;
+    }
+  }
+
   function swap(): void {
     [sourcePk, targetPk] = [targetPk, sourcePk];
     [sourceIndexes, targetIndexes] = [targetIndexes, sourceIndexes];
@@ -163,6 +189,9 @@
 
 {#if error}
   <Notice>{error}</Notice>
+{/if}
+{#if message}
+  <Notice kind="success">{message}</Notice>
 {/if}
 
 {#if loading}
@@ -232,6 +261,53 @@
         {/if}
       </div>
     {/each}
+  </section>
+
+  <section class="assets" aria-label="Assets">
+    <p class="eyebrow">Assets</p>
+    <p class="lead">
+      A work is not only its pages. The index and the scan behind it are the two
+      things a sync has to account for first.
+    </p>
+    <ul>
+      {#each report.assets as asset}
+        <li>
+          <span class="chip {VERDICTS[asset.verdict]?.tone ?? 'warn'}">{asset.kind}</span>
+          <span class="asset-body">
+            <strong>{asset.source_title}</strong>
+            {#if asset.target_title !== asset.source_title}
+              <em>&rarr; {asset.target_title}</em>
+            {/if}
+            <small>{asset.detail}</small>
+            <small class="held">
+              held: {asset.source_cached ? report.source.site : '—'} /
+              {asset.target_cached ? report.target.site : '—'}
+            </small>
+          </span>
+        </li>
+      {/each}
+    </ul>
+
+    {#if report.fetch_plan.length}
+      <div class="plan">
+        <p>
+          {report.fetch_plan.length} fetch(es) would settle what this report cannot
+          answer:
+        </p>
+        <ul class="plan-list">
+          {#each report.fetch_plan as item}
+            <li><code>{item.title}</code> on {item.label} &mdash; {item.reason}</li>
+          {/each}
+        </ul>
+        <ActionButton disabled={fetching} onclick={fetchAssets}>
+          {fetching ? 'Queueing...' : 'Fetch the index and scan'}
+        </ActionButton>
+        <small>
+          Queued only &mdash; run a drain from the Fetch page, then re-run this report.
+          A scan hosted on Commons is followed automatically.
+        </small>
+      </div>
+    {/if}
   </section>
 
   <section class="scan {report.scan.status}" aria-label="Scan check">
@@ -464,6 +540,84 @@
   .scan dd {
     margin: 0;
     overflow-wrap: anywhere;
+  }
+
+  .assets {
+    border: 1px solid rgba(72, 49, 31, 0.18);
+    border-radius: 18px;
+    margin: 1rem 0;
+    padding: 0.9rem 1.1rem;
+  }
+
+  .assets .lead {
+    margin: 0 0 0.7rem;
+    color: #73583d;
+    font-size: 0.86rem;
+  }
+
+  .assets ul {
+    display: grid;
+    gap: 0.6rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .assets li {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.7rem;
+    align-items: start;
+  }
+
+  .asset-body strong,
+  .asset-body em,
+  .asset-body small {
+    display: block;
+    overflow-wrap: anywhere;
+  }
+
+  .asset-body em {
+    color: #73583d;
+    font-style: normal;
+    font-size: 0.84rem;
+  }
+
+  .asset-body small {
+    margin-top: 0.2rem;
+    color: #73583d;
+    font-size: 0.78rem;
+  }
+
+  .asset-body .held {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  .plan {
+    border-top: 1px solid rgba(72, 49, 31, 0.14);
+    margin-top: 0.9rem;
+    padding-top: 0.9rem;
+  }
+
+  .plan p {
+    margin: 0 0 0.4rem;
+    color: #73583d;
+    font-size: 0.86rem;
+  }
+
+  .plan-list {
+    display: grid;
+    gap: 0.25rem;
+    margin: 0 0 0.75rem;
+    color: #73583d;
+    font-size: 0.82rem;
+  }
+
+  .plan small {
+    display: block;
+    margin-top: 0.6rem;
+    color: #8a6a45;
+    font-size: 0.78rem;
   }
 
   .summary {
