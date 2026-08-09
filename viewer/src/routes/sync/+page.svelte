@@ -330,6 +330,14 @@
   {#each report.blockers as blocker}
     <Notice>{blocker}</Notice>
   {/each}
+  {#each report.advisories as advisory}
+    <div class="advisory">
+      <p>{advisory}</p>
+      {#if report.work_pk}
+        <a class="drill" href={`/links/${report.work_pk}`}>Open the work to propose &rarr;</a>
+      {/if}
+    </div>
+  {/each}
 
   <section class="summary" aria-label="Verdicts">
     {#each Object.entries(report.counts) as [verdict, count]}
@@ -338,7 +346,12 @@
         <strong>{count}</strong>
       </span>
     {/each}
-    <span class="total">{report.actionable} page(s) a push would write</span>
+    <span class="total">
+      {report.actionable} page(s) a push would write
+      {#if report.ready !== report.actionable}
+        &middot; {report.ready} ready, {report.unasserted_anchors} need linking first
+      {/if}
+    </span>
   </section>
 
   <div class="filter">
@@ -381,8 +394,11 @@
             <td class="revs">
               {row.source_revid ?? '-'} &rarr; {row.target_revid ?? 'none'}
               {#if row.anchor_source_revid}
-                <small>
+                <small class:unasserted={!row.anchor_asserted}>
                   anchor {row.anchor_source_revid} &harr; {row.anchor_target_revid}
+                  {#if !row.anchor_asserted}
+                    (not asserted)
+                  {/if}
                 </small>
               {/if}
             </td>
@@ -676,6 +692,29 @@
     border-color: rgba(72, 49, 31, 0.22);
     background: rgba(255, 252, 240, 0.7);
     color: #73583d;
+  }
+
+  .advisory {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    align-items: center;
+    justify-content: space-between;
+    border: 1px solid rgba(176, 120, 20, 0.45);
+    border-radius: 16px;
+    background: rgba(255, 244, 219, 0.7);
+    margin-bottom: 1rem;
+    padding: 0.9rem 1.1rem;
+    color: #7d5510;
+  }
+
+  .advisory p {
+    margin: 0;
+    font-size: 0.88rem;
+  }
+
+  .pages small.unasserted {
+    color: #7d5510;
   }
 
   .filter {

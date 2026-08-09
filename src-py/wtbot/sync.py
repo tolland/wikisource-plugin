@@ -11,9 +11,9 @@ from wtbot.matching import (
     find_anchor,
     index_children,
 )
-from wtbot.model import FetchState, FileBlob, NsRole, Page, PageLink, Site
+from wtbot.model import FetchState, FileBlob, NsRole, Page, PageLink, Revision, Site
 from wtbot.page_link_store import find_pair
-from wtbot.remote_link_store import ladder
+from wtbot.remote_link_store import find_link, ladder
 from wtbot.revision_store import head_revision
 from wtbot.vfs.store import canonical_title
 
@@ -152,6 +152,18 @@ class SyncPage:
     target_revid: int | None = None
     anchor_source_revid: int | None = None
     anchor_target_revid: int | None = None
+    anchor_asserted: bool = False
+    """Whether the anchor is a stored ``RemoteLink`` or merely the pair a
+    comparison just found.
+
+    The distinction a push cannot do without. An anchor is the base the
+    unsynced revisions replay *onto*, and a computed one is a proposal -- the
+    same guess ``propose`` refuses to auto-confirm. Replaying onto it would act
+    on a correspondence nobody asserted, which is precisely the failure the
+    whole assert-don't-compute design exists to prevent.
+
+    Vacuously False on a ``create``, which has nothing to replay onto."""
+
     rungs: int = 0
 
     source_ahead_by: int = 0
@@ -160,7 +172,22 @@ class SyncPage:
 
     @property
     def actionable(self) -> bool:
+        """A push in this direction has work to do on this page."""
         return self.verdict in ACTIONABLE
+
+    @property
+    def ready(self) -> bool:
+        """...and it could be queued as it stands.
+
+        A ``create`` needs no anchor: there is nothing on the target to replay
+        onto. A ``push`` needs an asserted one, so a page whose anchor is only
+        computed is work that is *known* but not yet *sanctioned* -- one
+        `propose --confirm` away, and reported as such rather than counted as
+        ready.
+        """
+        if not self.actionable:
+            return False
+        return self.verdict is SyncVerdict.create or self.anchor_asserted
 
 
 @dataclass(frozen=True)
@@ -220,6 +247,12 @@ class SyncReport:
     fetch_plan: list[FetchPlanItem] = field(default_factory=list)
     work_pk: int | None = None
     blockers: list[str] = field(default_factory=list)
+    advisories: list[str] = field(default_factory=list)
+    """Things worth knowing that are not reasons to stop.
+
+    Kept apart from ``blockers`` because collapsing the two teaches a reader to
+    ignore both: a scan mismatch means "do not do this", an unasserted anchor
+    means "do this other thing first"."""
 
     @property
     def blocked(self) -> bool:
@@ -235,6 +268,20 @@ class SyncReport:
     @property
     def actionable(self) -> int:
         return sum(1 for page in self.pages if page.actionable)
+
+    @property
+    def ready(self) -> int:
+        """Actionable pages a push could be queued for as they stand."""
+        return sum(1 for page in self.pages if page.ready)
+
+    @property
+    def unasserted_anchors(self) -> int:
+        """Actionable pages whose anchor is a comparison's guess, not a link.
+
+        The gap between ``actionable`` and ``ready``, named because it is not a
+        problem with the pages -- it is a step nobody has taken yet.
+        """
+        return sum(1 for page in self.pages if page.actionable and not page.ready)
 
 
 class SyncError(ValueError):
@@ -323,6 +370,18 @@ def build_report(
         source_children=source_children,
         target_children=target_children,
     )
+
+    # After the pages, because it is a fact about them. Not a blocker: nothing
+    # is wrong with these pages -- there is a step nobody has taken, and naming
+    # the step is the whole point.
+    unasserted = report.unasserted_anchors
+    if unasserted:
+        report.advisories.append(
+            f"{unasserted} page(s) would replay onto an anchor found by "
+            "comparison rather than one anybody asserted. Confirm the links "
+            "first (`wtbot link propose --confirm`, or the work's Propose "
+            "button): a push needs a base that is recorded, not guessed."
+        )
     return report
 
 
@@ -586,6 +645,17 @@ def _compared(
         base["anchor_target_revid"] = anchor.remote_revision.revid
         base["source_ahead_by"] = anchor.local_ahead_by
         base["target_ahead_by"] = anchor.remote_ahead_by
+        # Is this anchor a claim anyone made, or only one this comparison just
+        # found? The revids look identical either way, which is exactly why the
+        # report has to say which.
+        base["anchor_asserted"] = (
+            find_link(
+                session,
+                revision_pk=anchor.local_revision.pk,
+                other_revision_pk=anchor.remote_revision.pk,
+            )
+            is not None
+        )
 
     outcome = proposal.outcome
     if outcome is MatchOutcome.already_linked:
@@ -623,7 +693,10 @@ def _from_anchor(
     session: Session, source_page: Page, target_page: Page, base: dict
 ) -> SyncPage:
     """A pair that is already linked: the verdict is the distance from its
-    anchor, not what a fresh comparison would propose."""
+    anchor, not what a fresh comparison would propose.
+
+    Everything reached through here has an asserted anchor by construction --
+    the ladder is what got us here."""
     rungs = ladder(session, page_pk=source_page.pk, other_page_pk=target_page.pk)
     source_head = head_revision(session, source_page)
     target_head = head_revision(session, target_page)
@@ -631,6 +704,9 @@ def _from_anchor(
     if anchor is None:  # pragma: no cover - already_linked implies a rung
         return SyncPage(verdict=SyncVerdict.unlinked, **base)
 
+    base["anchor_asserted"] = True
+    base["anchor_source_revid"] = _revid(session, anchor.local_revision_pk)
+    base["anchor_target_revid"] = _revid(session, anchor.remote_revision_pk)
     anchored = {anchor.local_revision_pk, anchor.remote_revision_pk}
     at_source_head = source_head is not None and source_head.pk in anchored
     at_target_head = target_head is not None and target_head.pk in anchored
@@ -650,6 +726,11 @@ def _from_anchor(
         detail="both sides have moved past the anchor",
         **base,
     )
+
+
+def _revid(session: Session, revision_pk: int) -> int | None:
+    revision = session.get(Revision, revision_pk)
+    return revision.revid if revision else None
 
 
 def _is_placeholder(session: Session, page: Page) -> bool:

@@ -133,6 +133,8 @@ def report(
 
     for blocker in data["blockers"]:
         typer.secho(f"  BLOCKED: {blocker}", fg=typer.colors.RED)
+    for advisory in data.get("advisories", []):
+        typer.secho(f"  note: {advisory}", fg=typer.colors.YELLOW)
 
     counts = data["counts"]
     typer.echo(
@@ -157,12 +159,19 @@ def report(
             )
         if page["detail"]:
             line += f"  [{page['detail']}]"
+        # The anchor's revids look identical whether it was asserted or found,
+        # so the line has to say which -- it decides whether the row is ready.
+        if page["actionable"] and not page["ready"]:
+            line += "  (anchor not asserted)"
         typer.secho(line, fg=colour)
 
-    typer.echo(
-        f"  {data['actionable']} page(s) a push would write. "
-        "This is a report: nothing has been changed."
-    )
+    ready, actionable = data["ready"], data["actionable"]
+    summary = f"  {actionable} page(s) a push would write"
+    if ready != actionable:
+        summary += (
+            f", {ready} of them ready ({data['unasserted_anchors']} need linking first)"
+        )
+    typer.echo(summary + ". This is a report: nothing has been changed.")
 
 
 @app.command("fetch-assets")

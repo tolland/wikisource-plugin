@@ -457,8 +457,16 @@ export interface SyncPage {
   source_ahead_by: number;
   target_ahead_by: number;
   detail?: string | null;
+  /**
+   * True when the anchor is a stored link rather than the pair a comparison
+   * just found. A push replays onto the anchor, so a computed one is a
+   * proposal, not a base.
+   */
+  anchor_asserted: boolean;
   /** True when a push in the reported direction would write this page. */
   actionable: boolean;
+  /** Actionable *and* queueable as it stands. */
+  ready: boolean;
 }
 
 export interface SyncAsset {
@@ -493,8 +501,14 @@ export interface SyncReport {
   fetch_plan: FetchPlanItem[];
   counts: Record<string, number>;
   actionable: number;
+  /** Of the actionable pages, how many could be queued as they stand. */
+  ready: number;
+  /** The gap between the two: one `propose --confirm` away, not a fault. */
+  unasserted_anchors: number;
   work_pk?: number | null;
   blockers: string[];
+  /** Worth knowing, but not reasons to stop. */
+  advisories: string[];
   blocked: boolean;
 }
 

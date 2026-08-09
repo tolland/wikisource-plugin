@@ -92,8 +92,22 @@ class SyncPageOut(BaseModel):
     source_ahead_by: int = 0
     target_ahead_by: int = 0
     detail: str | None = None
+    anchor_asserted: bool = Field(
+        default=False,
+        description=(
+            "True when the anchor is a stored RemoteLink rather than the pair "
+            "a comparison just found. A push replays onto the anchor, so a "
+            "computed one is a proposal, not a base."
+        ),
+    )
     actionable: bool = Field(
         description="True when a push in this direction would act on the page."
+    )
+    ready: bool = Field(
+        description=(
+            "Actionable *and* queueable as it stands: a create (nothing to "
+            "replay onto) or a push onto an asserted anchor."
+        )
     )
 
 
@@ -146,6 +160,20 @@ class SyncReportOut(BaseModel):
     )
     counts: dict[str, int]
     actionable: int = Field(description="Pages a push in this direction would write.")
+    ready: int = Field(description="Of those, how many could be queued as they stand.")
+    unasserted_anchors: int = Field(
+        description=(
+            "The gap between the two: pages whose anchor is a comparison's "
+            "guess. One `propose --confirm` away, not a fault."
+        )
+    )
+    advisories: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Worth knowing, but not reasons to stop. Kept apart from blockers "
+            "because collapsing the two teaches a reader to ignore both."
+        ),
+    )
     work_pk: int | None = Field(
         default=None, description="The tracked work, when the pair is tracked."
     )
@@ -176,7 +204,9 @@ def _page_out(page: SyncPage) -> SyncPageOut:
         source_ahead_by=page.source_ahead_by,
         target_ahead_by=page.target_ahead_by,
         detail=page.detail,
+        anchor_asserted=page.anchor_asserted,
         actionable=page.actionable,
+        ready=page.ready,
     )
 
 
@@ -190,6 +220,9 @@ def _out(report: SyncReport) -> SyncReportOut:
         fetch_plan=[FetchPlanItemOut(**vars(item)) for item in report.fetch_plan],
         counts=report.counts,
         actionable=report.actionable,
+        ready=report.ready,
+        unasserted_anchors=report.unasserted_anchors,
+        advisories=report.advisories,
         work_pk=report.work_pk,
         blockers=report.blockers,
         blocked=report.blocked,

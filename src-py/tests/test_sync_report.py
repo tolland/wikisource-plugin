@@ -592,3 +592,135 @@ def test_fetch_assets_is_a_no_op_when_both_assets_are_held(client, engine):
     assert client.post("/sync/fetch-assets", json=request()).json()["queued"] == []
     with Session(engine) as session:
         assert session.exec(select(FetchRequest)).all() == []
+
+
+# -- asserted anchors versus found ones ---------------------------------------
+
+
+def _ahead(engine, *, link: bool) -> dict:
+    """The Hertz page-62 shape: the source is one revision past a pair that
+    holds the same content, and that pair may or may not be linked.
+
+    Reported as `push` either way -- the anchor is real, found by comparison --
+    but a push replays *onto* it, so whether anybody asserted it is the
+    difference between work that can be queued and work that cannot.
+    """
+    seed_source_only(engine, pages=1)
+    with Session(engine) as session:
+        local = session.exec(select(Site).where(Site.label == "mywikisource")).one()
+        build_index(session, local, SOURCE_INDEX, sha1=SCAN_SHA1)
+        build_page(
+            session, local, SOURCE_INDEX, 1, text=body(3, "Us", "Page 1."), revid=254
+        )
+        upstream_page = session.exec(
+            select(Page).where(
+                Page.title == "Page:Varieties.djvu/1",
+                Page.site_pk != local.pk,
+            )
+        ).one()
+        record_head_revision(
+            session,
+            upstream_page,
+            RemotePage(
+                title=upstream_page.title,
+                namespace_key=250,
+                namespace_canonical="Page",
+                content_model="proofread-page",
+                text=body(3, "Them", "Page 1, revised."),
+                revid=887,
+                parentid=901,
+                timestamp=WHEN,
+            ),
+        )
+        session.commit()
+
+    if link:
+        confirmed = client_propose(engine)
+        assert confirmed >= 1
+    return {}
+
+
+def client_propose(engine) -> int:
+    """Assert the links the comparison proposes, as `propose --confirm` does."""
+    from wtbot.matching import confirm_proposals, propose_index_links
+
+    with Session(engine) as session:
+        upstream = session.exec(select(Site).where(Site.label == "wikisource")).one()
+        local = session.exec(select(Site).where(Site.label == "mywikisource")).one()
+        proposals = propose_index_links(
+            session,
+            local_site=upstream,
+            remote_site=local,
+            local_index_title=SOURCE_INDEX,
+        )
+        written = confirm_proposals(session, [p for p in proposals if p.proposable])
+        session.commit()
+        return len(written)
+
+
+def test_a_push_onto_an_unasserted_anchor_is_not_ready(client, engine):
+    """The gap the Hertz run showed: 88 pages reported `push` against an
+    anchor with no RemoteLink behind it. The verdict is right and the anchor
+    is right; what was missing was that nobody had claimed it."""
+    _ahead(engine, link=False)
+
+    data = client.post("/sync/report", json=request()).json()
+    (page,) = data["pages"]
+
+    assert page["verdict"] == "push"
+    assert page["anchor_source_revid"] == 901  # the pair really does match
+    assert page["anchor_target_revid"] == 254
+    assert page["rungs"] == 0
+    assert page["anchor_asserted"] is False
+    assert page["actionable"] is True
+    assert page["ready"] is False
+
+    assert data["actionable"] == 1
+    assert data["ready"] == 0
+    assert data["unasserted_anchors"] == 1
+    assert any("Confirm the links first" in note for note in data["advisories"])
+    # An advisory, not a blocker: nothing is wrong with the page.
+    assert data["blockers"] == []
+
+
+def test_confirming_the_link_makes_the_same_push_ready(client, engine):
+    """One `propose --confirm` is the whole difference."""
+    _ahead(engine, link=True)
+
+    data = client.post("/sync/report", json=request()).json()
+    (page,) = data["pages"]
+
+    assert page["verdict"] == "push"
+    assert page["anchor_asserted"] is True
+    assert page["rungs"] == 1
+    assert page["ready"] is True
+    assert data["ready"] == data["actionable"] == 1
+    assert data["unasserted_anchors"] == 0
+    assert data["advisories"] == []
+
+
+def test_a_create_needs_no_anchor_to_be_ready(client, engine):
+    """There is nothing on the target to replay onto, so the question does not
+    arise -- counting creates as unready would make a fresh work look blocked."""
+    seed_source_only(engine, pages=2)
+
+    data = client.post("/sync/report", json=request()).json()
+    assert data["counts"] == {"create": 2}
+    assert data["ready"] == data["actionable"] == 2
+    assert data["unasserted_anchors"] == 0
+    assert all(page["anchor_asserted"] is False for page in data["pages"])
+
+
+def test_an_in_sync_page_is_neither_actionable_nor_ready(client, engine):
+    seed_source_only(engine, pages=1)
+    with Session(engine) as session:
+        local = session.exec(select(Site).where(Site.label == "mywikisource")).one()
+        build_index(session, local, SOURCE_INDEX, sha1=SCAN_SHA1)
+        build_page(
+            session, local, SOURCE_INDEX, 1, text=body(3, "Us", "Page 1."), revid=5
+        )
+
+    (page,) = client.post("/sync/report", json=request()).json()["pages"]
+    assert page["verdict"] == "in_sync"
+    assert page["actionable"] is False
+    assert page["ready"] is False

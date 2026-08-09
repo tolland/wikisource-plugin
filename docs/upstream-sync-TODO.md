@@ -280,6 +280,21 @@ Built: `wtbot.sync` + `POST /sync/report` + the `/sync` viewer route.
       `File:Foo.pdf`), which is ProofreadPage's structural rule and what the
       fetch fan-out already uses, so the two agree by construction.
 
+- [x] **An anchor found is not an anchor asserted.** A `push` replays *onto*
+      the anchor, and `find_anchor` will happily produce one for a pair nobody
+      has linked — that is what it is for. Reported as `push` either way (the
+      pair really does hold the same content), but each row carries
+      `anchor_asserted`, and the report separates `actionable` from `ready`:
+      a create needs no anchor, a push needs a recorded one. The gap is an
+      *advisory*, not a blocker — nothing is wrong with those pages, there is a
+      `propose --confirm` nobody has run — and advisories are kept apart from
+      blockers so that collapsing the two does not teach a reader to ignore
+      both.
+
+      Found on a real 316-page Hertz run: 93 pushes, of which only 5 sat on an
+      asserted anchor. The other 88 were correct and unsanctioned, and the
+      report could not tell them apart.
+
 Uploading a backing scan the target genuinely lacks stays out: that is a
 case-by-case decision (discussion §7), not something a sync does.
 
