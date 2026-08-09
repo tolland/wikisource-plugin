@@ -25,7 +25,6 @@ open class WtEditorWithPreview(
     init {
         // Initialize TextEditorWithPreview's lazy UI before disposal-sensitive editor switching can occur.
         component
-        WtPreviewLayoutDefaults.apply(this)
     }
 }
 

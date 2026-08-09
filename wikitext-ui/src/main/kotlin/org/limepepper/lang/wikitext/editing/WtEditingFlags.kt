@@ -2,6 +2,7 @@ package org.limepepper.lang.wikitext.editing
 
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.util.registry.Registry
+import org.limepepper.lang.wikitext.editor.prp.PrpPreviewBrowser
 
 /**
  * Runtime switches for the text-editing features.
@@ -97,25 +98,40 @@ object WtEditingFlags {
      */
     fun togglePromote(): Boolean = boolean(TOGGLE_PROMOTE, true)
 
-    // ---- Split editor ----------------------------------------------------
+    // ---- Proofread preview pane ------------------------------------------
 
     /**
-     * Whether the editor/preview split stacks the panes vertically (editor
-     * above preview) instead of side by side. Stacked is the default because
-     * wikitext lines are long and two side-by-side panes are each too narrow
-     * to read.
+     * Which preview(s) the ProofreadPage preview pane shows on open — the
+     * "compare both" choice from its toolbar. Both by default: proofreading
+     * means reading the scan while checking the render against it.
      *
-     * Note this is a *default*, not a persisted preference: the platform
-     * stores the chosen layout (editor / preview / both) per editor name, but
-     * not the split orientation, so this applies on every open.
+     * Returns the id of a `PrpPreviewBrowser.Mode`; an unrecognised value
+     * falls back to showing both rather than failing to open an editor.
      */
-    fun previewVerticalSplit(): Boolean = boolean(PREVIEW_VERTICAL_SPLIT, true)
+    fun previewDefaultMode(): PrpPreviewBrowser.Mode =
+        when (string(PREVIEW_MODE, PREVIEW_MODE_BOTH).lowercase()) {
+            "image" -> PrpPreviewBrowser.Mode.IMAGE_ONLY
+            "render" -> PrpPreviewBrowser.Mode.RENDER_ONLY
+            else -> PrpPreviewBrowser.Mode.SPLIT
+        }
+
+    /**
+     * Whether the two previews are tiled stacked (scan above render) rather
+     * than side by side, when both are shown.
+     *
+     * Note these are *defaults*, not persisted preferences — nothing stores
+     * the pane's mode or orientation across sessions, so they apply on every
+     * open and a toolbar change lasts only for that editor's lifetime.
+     */
+    fun previewSplitStacked(): Boolean = boolean(PREVIEW_SPLIT_STACKED, true)
 
     // ---- Registry plumbing ----------------------------------------------
 
     const val TOGGLE_ENABLED: String = "wikitext.editing.toggle.enabled"
     const val TOGGLE_PROMOTE: String = "wikitext.editing.toggle.promote"
-    const val PREVIEW_VERTICAL_SPLIT: String = "wikitext.editing.preview.verticalSplit"
+    const val PREVIEW_MODE: String = "wikitext.editing.preview.mode"
+    const val PREVIEW_SPLIT_STACKED: String = "wikitext.editing.preview.splitStacked"
+    private const val PREVIEW_MODE_BOTH = "both"
     const val SURROUND_ENABLED: String = "wikitext.editing.surround.enabled"
     const val SURROUND_STRATEGY: String = "wikitext.editing.surround.strategy"
     const val VARIABLE_PROMPT: String = "wikitext.editing.variablePrompt"

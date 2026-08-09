@@ -93,9 +93,14 @@
             description="Wikitext: let the wikitext bold/italic actions win Ctrl+B / Ctrl+I over Go To Declaration / Implement Methods in wikitext files"
         />
         <registryKey
-            key="wikitext.editing.preview.verticalSplit"
+            key="wikitext.editing.preview.mode"
+            defaultValue="both"
+            description="Wikitext: which preview(s) a ProofreadPage editor opens showing - 'both', 'image' (reference scan only), or 'render'"
+        />
+        <registryKey
+            key="wikitext.editing.preview.splitStacked"
             defaultValue="true"
-            description="Wikitext: stack the split editor's preview below the text (rather than side by side)"
+            description="Wikitext: when both previews are shown, tile them stacked (scan above render) rather than side by side"
         />
         <registryKey
             key="wikitext.editing.variablePrompt"

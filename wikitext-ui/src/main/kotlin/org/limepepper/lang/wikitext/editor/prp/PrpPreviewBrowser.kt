@@ -12,6 +12,7 @@ import com.intellij.openapi.util.UserDataHolderBase
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.JBSplitter
 import com.intellij.ui.components.JBPanel
+import org.limepepper.lang.wikitext.editing.WtEditingFlags
 import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.KeyboardFocusManager
@@ -84,11 +85,12 @@ class PrpPreviewBrowser(
     private var disposed = false
 
     /**
-     * Which preview(s) are shown. The reference scan is the initial view
-     * (wikisource editor convention). Changing it re-lays out the center and
-     * notifies [onPaneChanged].
+     * Which preview(s) are shown. Both, tiled, by default: transcribing means
+     * reading the scan and checking the render against it, so needing two
+     * toolbar clicks to see them together was the wrong starting point.
+     * Changing it re-lays out the center and notifies [onPaneChanged].
      */
-    var mode: Mode = Mode.IMAGE_ONLY
+    var mode: Mode = WtEditingFlags.previewDefaultMode()
         set(value) {
             if (field != value) {
                 field = value
@@ -99,8 +101,14 @@ class PrpPreviewBrowser(
     /**
      * Tiling orientation for [Mode.SPLIT]: `true` stacks the previews top and
      * bottom, `false` places them side by side. Ignored outside SPLIT.
+     *
+     * Stacked by default. This pane is already one half of the editor/preview
+     * split, so halving its width again leaves a scan column and a render
+     * column both too narrow to read; height is the cheaper axis to divide.
+     * With [swapped] false the scan takes the top slot and the render the
+     * bottom, matching how the printed page and its transcription line up.
      */
-    var splitStacked: Boolean = false
+    var splitStacked: Boolean = WtEditingFlags.previewSplitStacked()
         set(value) {
             if (field != value) {
                 field = value
@@ -153,8 +161,8 @@ class PrpPreviewBrowser(
         // SPLIT/RENDER_ONLY) rather than staying blank until the first edit.
         renderPane.scheduleReload()
 
-        // Apply the initial mode (IMAGE_ONLY): the property initializer sets the
-        // backing field directly without firing the setter, so lay out here.
+        // Apply the initial mode: the property initializers set the backing
+        // fields directly without firing the setters, so lay out here.
         applyLayout()
 
         KeyboardFocusManager.getCurrentKeyboardFocusManager()
