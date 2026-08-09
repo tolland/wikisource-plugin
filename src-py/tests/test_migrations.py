@@ -170,6 +170,35 @@ def test_dropping_remotelink_leaves_the_revisions_it_referenced(
         assert session.exec(text("SELECT count(*) FROM slot")).one()[0] == 1
 
 
+def test_comparable_sha1_is_backfilled_from_the_stored_text(populated_engine) -> None:
+    """The digest is a pure function of text and content model, so existing
+    rows are computed rather than left null -- otherwise every body fetched
+    before the upgrade would keep falling back to a parse forever."""
+    from wtbot.content_model import comparable_sha1
+
+    same_words_other_user = (
+        '<noinclude><pagequality level="3" user="Them" /></noinclude>Words'
+        "<noinclude></noinclude>"
+    )
+    with Session(populated_engine) as session:
+        session.exec(
+            text(
+                "INSERT INTO content (pk, content_sha1, content_model, text, size)"
+                " VALUES (2, 'def', 'proofread-page', :text, 60)"
+            ).bindparams(text=same_words_other_user)
+        )
+        session.commit()
+
+    _upgrade(populated_engine, "head")
+
+    with Session(populated_engine) as session:
+        digests = dict(
+            session.exec(text("SELECT pk, comparable_sha1 FROM content")).all()
+        )
+    assert digests[1] == comparable_sha1("body", "proofread-page")
+    assert digests[2] == comparable_sha1(same_words_other_user, "proofread-page")
+
+
 def test_downgrade_also_survives_referenced_rows(populated_engine) -> None:
     """The reverse direction rebuilds nothing either -- a downgrade that drops
     `page` would fail on the eleven tables referencing page.pk."""

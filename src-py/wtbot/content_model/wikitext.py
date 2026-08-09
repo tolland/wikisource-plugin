@@ -32,6 +32,11 @@ class WikitextDocument:
     def comparable_text(self) -> str:
         return normalise_newlines(self.text)
 
+    @property
+    def canonical_text(self) -> str:
+        """The same thing: plain wikitext has no metadata to fold in."""
+        return self.comparable_text
+
     def compare(self, other) -> Comparison:
         equal = self.comparable_text == other.comparable_text
         return Comparison(

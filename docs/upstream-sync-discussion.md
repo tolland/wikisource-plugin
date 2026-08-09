@@ -86,6 +86,30 @@ comparable). See also `proofread-page-sha1-discordance.md` for the separate
 problem of historical revisions whose stored hash predates a serialization
 change.
 
+### 3a. …but the comparison's verdict can be hashed
+
+None of the above says hashing is useless here — it says hashing *the bytes* is.
+The comparison already normalises before it decides: it blanks the site-local
+field (`user`) and keeps the significant one (`level`). Hash the result of that
+normalisation and you get a token whose equality means what the comparison
+means, and `Content.comparable_sha1` is exactly that — precomputed once when the
+content row is written.
+
+The distinction matters because the anchor search is the hot path: it walks a
+page's stored revisions newest-first, and it used to parse every one of them on
+every walk. It now compares two strings per revision and parses only the one it
+settles on, for the significance the digest deliberately does not carry
+(`identical` and `metadata_only` hash alike — they differ only in the username,
+which is the reviewer's business and not the matcher's).
+
+Two properties keep this honest. Digests are compared only between rows of the
+same content model, because a match across models would be an artefact of the
+normalisation rather than a fact about the text. And a missing digest — a row
+written before the column existed — falls back to the full comparison rather
+than reading as a difference: not-computed is an unanswered question, not a
+"no". The digest is a cache of a decision, not a second identity; rows are still
+keyed and deduped by `content_sha1`.
+
 ## 4. A curated mirror is the goal, not a cost
 
 Earlier drafts framed this as "probe, don't mirror", treating local copies of

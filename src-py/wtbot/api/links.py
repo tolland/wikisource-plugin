@@ -18,6 +18,7 @@ from wtbot.page_link_store import (
     find_pair,
     pair_pages,
     pairs_for_index,
+    retract_rungs,
     unpair,
 )
 from wtbot.remote_link_store import LinkError, assert_link, current_anchor, ladder
@@ -466,6 +467,25 @@ def delete_pair(pair_pk: int, session: Session = Depends(get_session)) -> dict:
     return {"deleted": pair_pk, "rungs_removed": removed}
 
 
+@router.delete("/pairs/{pair_pk}/rungs", status_code=200)
+def delete_pair_rungs(pair_pk: int, session: Session = Depends(get_session)) -> dict:
+    """Retract every revision link under a pairing, keeping the pairing.
+
+    The narrow retraction, and usually the one that is meant. A ladder proposed
+    against the wrong other side, or before enough history had been fetched, is
+    wrong about the *revisions*; that the two pages are the same page is not in
+    doubt, and deleting the pairing to clear the ladder would discard it along
+    with everything hanging off it -- the page numbering, and the pair's place
+    in a work's listing.
+    """
+    link = session.get(PageLink, pair_pk)
+    if link is None:
+        raise HTTPException(404, f"no pairing {pair_pk}")
+    removed = retract_rungs(session, link)
+    session.commit()
+    return {"pairing": pair_pk, "rungs_removed": removed}
+
+
 @router.delete("/{link_pk}", status_code=200)
 def delete_link(link_pk: int, session: Session = Depends(get_session)) -> dict:
     """Remove one revision link.
@@ -473,13 +493,17 @@ def delete_link(link_pk: int, session: Session = Depends(get_session)) -> dict:
     The one exception to append-only, and it is for mistakes rather than for
     history: a rung asserted in error is not superseded by a later one, it was
     never true. Correcting a *changed* correspondence is still a new rung.
+
+    The pairing is untouched, and the response names it: retracting a rung says
+    the two *revisions* do not correspond, never that the two pages do not.
     """
     link = session.get(RemoteLink, link_pk)
     if link is None:
         raise HTTPException(404, f"no link {link_pk}")
+    pairing = link.page_link_pk
     session.delete(link)
     session.commit()
-    return {"deleted": link_pk}
+    return {"deleted": link_pk, "pairing": pairing}
 
 
 class PairIndexRequest(BaseModel):

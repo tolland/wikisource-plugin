@@ -27,6 +27,21 @@ class ContentDocument(Protocol):
         """The parts that decide whether this is the same transcription."""
         ...
 
+    @property
+    def canonical_text(self) -> str:
+        """``comparable_text`` plus the metadata that is *significant*.
+
+        The form that gets hashed (see ``digest.py``): everything the
+        comparison would refuse to call the same content, and nothing that is
+        merely site-local. Two documents of one content model have equal
+        canonical text exactly when they are linkable as the same content.
+
+        Never valid source text -- parts are joined by a character wikitext
+        cannot contain, so a body ending in what looks like a header cannot
+        alias with a different split.
+        """
+        ...
+
     def compare(self, other: "ContentDocument") -> Comparison: ...
 
     def validation_errors(self) -> tuple[str, ...]:
