@@ -28,4 +28,10 @@
             <option name="WIKITEXT" value="true" />
         </context>
     </template>
+    <template name="&lt;ma" value="&lt;math&gt;$EQU$&lt;/math&gt; $END$" description="open a math tag" toReformat="false" toShortenFQNames="true">
+        <variable name="EQU" expression="" defaultValue="" alwaysStopAt="true" />
+        <context>
+            <option name="WIKITEXT" value="true" />
+        </context>
+    </template>
 </templateSet>
