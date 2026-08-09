@@ -77,11 +77,33 @@ The immediate work list. Reasoning, rejected approaches and policy live in
   Enforced in `wtbot.remote_link_store`, the only writer: append-only (no
   update, no retract), cross-site only (within one wiki, revision ancestry
   already says everything a link would), and idempotent on the unordered pair
-  with the first `origin` winning. Page-level correspondence is *derived* by
-  `corresponding_page` walking `link → revision → page`, in either direction;
-  a target redlink has no link, which is correct — there is nothing to compare,
-  and "local present, target absent" is a pairing question, not a linking one.
-  `origin=reconciled` records the forward re-anchoring of discussion §2.
+  with the first `origin` winning. `origin=reconciled` records the forward
+  re-anchoring of discussion §2.
+
+- **`PageLink`** — the pairing the revision links hang off. This **reverses** an
+  earlier decision to derive page correspondence from the links
+  (`corresponding_page` walking `link → revision → page`). Derivation was wrong
+  three ways, each visible the moment a person looks at a work:
+
+  - a pair with nothing linkable is unrepresentable — a diverged pair, or one
+    whose other side is unfetched, derives into nothing, and those are exactly
+    the pairs that need attention;
+  - titles are not stable, so a page moved on either wiki broke any pairing
+    recomputed from them;
+  - a work's pairs could not be enumerated without re-deriving the whole index,
+    which is the first thing the viewer needs.
+
+  The two are different kinds of claim, and the split follows. `PageLink` —
+  "these two pages are the same page" — is about the present, can be wrong, and
+  has a `DELETE` that takes its rungs with it. `RemoteLink` — "these two
+  revisions hold the same content" — is about two immutable objects, so it is
+  superseded, never edited. Both are unique on the unordered pair, and a rung
+  follows its pairing's orientation so a ladder reads one way round.
+
+  `POST /links/pairs/index` (`wtbot link pair-index`) pairs a whole work before
+  any content is compared, refusing by default if pages do not line up — a work
+  missing counterparts is nearly always a wrong `--to` or a different scan.
+  `GET/POST/DELETE /links/pairs` is the CRUD the viewer drives.
 
 ## Now
 

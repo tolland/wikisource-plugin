@@ -215,3 +215,72 @@ def show(
         # Not an error: the link stays true, and the distance from it is
         # exactly what says the pages have moved since it was asserted.
         typer.echo("  anchor is behind the heads (the pages moved since)")
+
+
+@app.command("pair-index")
+def pair_index(
+    index_title: str = typer.Argument(..., help="e.g. Index:Some_book.djvu"),
+    remote_index_title: str | None = typer.Option(
+        None, "--to", help="Only needed when the two sides' index titles differ"
+    ),
+    strict: bool = typer.Option(
+        True,
+        help=(
+            "Refuse the work if any page has no counterpart. A work that does "
+            "not line up is usually a wrong --to or a different scan."
+        ),
+    ),
+    pair: dict = Pair,
+    api: ApiClient = Depends(get_api),
+) -> None:
+    """Pair a whole work's pages, before comparing any content.
+
+    The step that makes a work navigable: a diverged page is only listable once
+    its pair exists, so pairing comes first and content comparison second.
+    """
+    data = api.post(
+        "/links/pairs/index",
+        {
+            **pair,
+            "index_title": index_title,
+            "remote_index_title": remote_index_title,
+            "strict": strict,
+        },
+    )
+    typer.echo(f"paired {data['paired']} page(s); {data['created']} new")
+    for title in data["unpaired"]:
+        typer.secho(f"  no counterpart: {title}", fg=typer.colors.YELLOW)
+
+
+@app.command("pairs")
+def pairs(
+    index_title: str | None = typer.Option(None, "--index", help="Narrow to one work"),
+    pair: dict = Pair,
+    api: ApiClient = Depends(get_api),
+) -> None:
+    """List page pairings and how much is linked under each."""
+    params = {k: v for k, v in pair.items() if v}
+    if index_title:
+        params["index_title"] = index_title
+    data = api.get("/links/pairs", **params)
+
+    if not data["pairs"]:
+        typer.echo("no pairings")
+        return
+    for row in data["pairs"]:
+        number = row["page_number"]
+        state = "anchored" if row["anchor_is_current"] else f"{row['rungs']} rung(s)"
+        typer.echo(
+            f"  #{row['pk']:<5} {str(number) if number is not None else '?':>4}  "
+            f"{state:<14} {row['local_title']}"
+        )
+
+
+@app.command("unpair")
+def unpair_command(
+    pair_pk: int = typer.Argument(..., help="Pairing pk (see `wtbot link pairs`)"),
+    api: ApiClient = Depends(get_api),
+) -> None:
+    """Retract a pairing, and the revision links asserted under it."""
+    data = api.delete(f"/links/pairs/{pair_pk}")
+    typer.echo(f"removed pairing {data['deleted']} and {data['rungs_removed']} rung(s)")

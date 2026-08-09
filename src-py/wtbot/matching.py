@@ -169,8 +169,8 @@ def propose_index_links(
     """
     remote_index_title = remote_index_title or local_index_title
 
-    local_pages = _index_children(session, local_site, local_index_title)
-    remote_pages = _index_children(session, remote_site, remote_index_title)
+    local_pages = index_children(session, local_site, local_index_title)
+    remote_pages = index_children(session, remote_site, remote_index_title)
     remote_by_number = {
         number: page for number, page in remote_pages if number is not None
     }
@@ -481,7 +481,7 @@ def confirm_proposals(
     return links
 
 
-def _index_children(
+def index_children(
     session: Session, site: Site, index_title: str
 ) -> list[tuple[int | None, Page]]:
     """A work's Page: rows with their page numbers.

@@ -17,6 +17,7 @@ from wtbot.model.index_meta import IndexMeta
 from wtbot.model.namespace import Namespace, NsRole, role_for_canonical
 from wtbot.model.ocr_backend import OcrBackendConfig, OcrBackendKind
 from wtbot.model.page import FetchState, Page
+from wtbot.model.page_link import PageLink
 from wtbot.model.page_meta import (
     PageMeta,
     default_short_name,
@@ -45,6 +46,7 @@ __all__ = [
     "FetchState",
     "Revision",
     "RemoteLink",
+    "PageLink",
     "LinkOrigin",
     "Slot",
     "MAIN_SLOT",
