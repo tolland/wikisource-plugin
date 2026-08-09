@@ -183,6 +183,55 @@ def test_section_lookup_no_match_is_empty(client, seeded):
     assert r.json() == []
 
 
+def test_dump_returns_everything_unfiltered(client, seeded):
+    r = client.get("/locator-index/dump", params={"path": INDEX_PATH})
+    assert r.status_code == 200
+    dump = r.json()
+    assert dump["index_title"] == INDEX
+    assert dump["index_path"] == INDEX_PATH
+
+    # Raw pagelist entries: exactly the two explicit ones from _PAGELIST_BODY.
+    raw = {a["scan_page"]: a for a in dump["pagelist_assignments"]}
+    assert raw[155] == {
+        "scan_page": 155,
+        "kind": "numeral",
+        "text": None,
+        "style": "arabic",
+        "value": 121,
+    }
+    assert raw[170]["kind"] == "blank"
+
+    # Every seeded page, with computed labels -- not filtered by any query.
+    labels = {p["page"]["scan_page"]: p for p in dump["pages"]}
+    assert set(labels) == {155, 163, 164}
+    assert labels[163]["label"] == "129"
+    assert labels[163]["confidence"] == "inferred"
+    assert labels[155]["confidence"] == "explicit"
+
+    # Every section/anchor occurrence, all roles, unfiltered.
+    section_roles = {(s["section_id"], s["role"]) for s in dump["sections"]}
+    assert ("p-273", "begin") in section_roles
+    assert ("p-273", "end") in section_roles
+    assert ("p-273", "anchor_template") in section_roles
+
+
+def test_dump_works_from_a_page_path_too(client, seeded):
+    r = client.get(
+        "/locator-index/dump",
+        params={"path": _page_path("Page:Principles_of_mechanics.pdf/164")},
+    )
+    assert r.status_code == 200
+    assert r.json()["index_title"] == INDEX
+
+
+def test_dump_of_unknown_index_is_404(client, seeded):
+    r = client.get(
+        "/locator-index/dump",
+        params={"path": f"/{FAMILY}/{CODE}/Index:Nope.pdf"},
+    )
+    assert r.status_code == 404
+
+
 def test_unknown_index_is_404(client, seeded):
     r = client.get(
         "/locator-index/page-numbers",

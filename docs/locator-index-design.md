@@ -162,16 +162,46 @@ fetches from the wiki, and nothing here writes.
   live-typing completion feature — that an uncommitted `EditJournal` edit is
   visible to a lookup immediately.
 
+## `GET /locator-index/dump` — everything, unfiltered
+
+The two targeted endpoints answer one query each; `/dump` answers "what does
+wtbot know about this work, altogether" in one call — every explicit
+`<pagelist>` entry (`pagelist_assignments`), every `Page:` with its computed
+label (`pages`, unfiltered — the same `compute_labels` pass the
+`page-numbers` endpoint runs, just not narrowed to one query), and every
+`<section>`/`{{anchor}}` occurrence, any role (`sections`). No new
+computation — it is the existing pure functions run without a query filter,
+composed into one response.
+
+This is explicitly **not** the shape an interactive feature should reach
+for. It exists for the viewer's inspection route, and — the more consequential
+reason it's worth having — as the seed for IntelliJ SDK features that need a
+work's whole relational shape rather than one query's answer: a
+"documentation on hover" provider for a `{{double link|...|273}}` reference,
+or "find usages" of a section id across the work, are naturally *symbol
+search* problems, and `/dump` is close to what an IDE's index-building pass
+would consume once. A live completion popup should still call `/sections` or
+`/page-numbers` for the one locator being typed — dumping a whole work on
+every keystroke is the wrong shape even though computing it is cheap.
+
 ## Exploring it: the viewer's Locator index route
 
-`viewer/src/routes/locator-index/` — since this is computed live off the
-current cache, the debug viewer is where to poke at it: pick a work (reused
-from the same `GET /viewer/indexes` list `/indexes` already shows, now
-carrying `family`/`code` so a VFS path can be built without a second round
-trip), pick section-id or page-number mode, type a locator, get results
-live (debounced ~250ms, not a submit button) with a "copy path" action per
-match. No new backend beyond `family`/`code` on `IndexPageSummary` — it's
-a client over the same two endpoints described above.
+`viewer/src/routes/locator-index/` — since all three endpoints are computed
+live off the current cache, the debug viewer is where to poke at them: pick
+a work, then either query section ids or page numbers, or switch to
+"Everything" for the `/dump` view (three scrollable tables — pagelist
+entries, pages, sections — with a shared substring filter, since a dump can
+run to hundreds of rows). Query modes update live (debounced ~250ms, not a
+submit button); each result row has a "copy path" action. `IndexPageSummary`
+(`GET /viewer/indexes`, already backing `/indexes`) now carries `family`/
+`code` so a VFS path can be built without a second round trip.
+
+**Work selection**: a collapsible card tray (`WorkPicker.svelte`) rather
+than a permanent sidebar list — expanded it's a full-width grid of cards;
+clicking one selects it and collapses the tray to a one-line summary bar
+(click it to reopen), so the results underneath get the full content width
+instead of losing half of it to a list that is only useful during selection
+itself.
 
 ## Future: consuming this from the plugin
 

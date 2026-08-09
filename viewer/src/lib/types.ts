@@ -262,3 +262,27 @@ export interface LocatorSectionMatch {
   role: SectionRole;
   page: LocatorPageRef;
 }
+
+export type PagelistNumeralStyle = 'arabic' | 'roman' | 'highroman';
+
+export interface LocatorPagelistAssignment {
+  scan_page: number;
+  kind: 'blank' | 'text' | 'numeral';
+  text?: string | null;
+  style?: PagelistNumeralStyle | null;
+  value?: number | null;
+}
+
+export interface LocatorPageIndexEntry {
+  page: LocatorPageRef;
+  label: string | null;
+  confidence: LocatorConfidence;
+}
+
+export interface LocatorIndexDump {
+  index_title: string;
+  index_path: string;
+  pagelist_assignments: LocatorPagelistAssignment[];
+  pages: LocatorPageIndexEntry[];
+  sections: LocatorSectionMatch[];
+}

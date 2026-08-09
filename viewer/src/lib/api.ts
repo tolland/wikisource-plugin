@@ -4,6 +4,7 @@ import type {
   IndexPageDetail,
   IndexPageSummary,
   ListChildrenResponse,
+  LocatorIndexDump,
   LocatorPageNumberMatch,
   LocatorSectionMatch,
   CachedPage,
@@ -213,4 +214,9 @@ export function lookupSections(
 ): Promise<LocatorSectionMatch[]> {
   const params = new URLSearchParams({ path, query, roles: roles.join(',') });
   return getJson<LocatorSectionMatch[]>(`/locator-index/sections?${params}`);
+}
+
+export function dumpLocatorIndex(path: string): Promise<LocatorIndexDump> {
+  const params = new URLSearchParams({ path });
+  return getJson<LocatorIndexDump>(`/locator-index/dump?${params}`);
 }
