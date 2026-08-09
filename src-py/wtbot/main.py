@@ -13,6 +13,7 @@ from wtbot.api import (
     file_blob,
     health,
     links,
+    locator_index,
     namespace,
     ocr,
     page_meta,
@@ -145,6 +146,7 @@ def create_app(
     app.include_router(ocr.router)  # /ocr/* and /pages/ocr/*
     app.include_router(page_meta.router)  # /pages/resolve, /pages/{pk}/*-meta
     app.include_router(page_nav.router)  # /pages/nav
+    app.include_router(locator_index.router)  # /locator-index/{sections,page-numbers}
     app.include_router(pages.router)  # /pages/, /pages/{page_pk} — must be last
 
     return app
