@@ -37,6 +37,7 @@ def assert_link(
     local_revision_pk: int,
     remote_revision_pk: int,
     origin: LinkOrigin,
+    page_link_pk: int | None = None,
 ) -> RemoteLink:
     """Record that two revisions hold the same content.
 
@@ -70,10 +71,24 @@ def assert_link(
         local_revision_pk=local_revision_pk,
         remote_revision_pk=remote_revision_pk,
         origin=origin,
+        page_link_pk=page_link_pk or _pairing_for(session, local_page, remote_page).pk,
     )
     session.add(link)
     session.flush()
     return link
+
+
+def _pairing_for(session: Session, local_page: Page, remote_page: Page):
+    """The pairing this rung belongs under, created if the caller did not.
+
+    A revision link always implies its page pairing -- asserting two revisions
+    correspond asserts their pages do -- so the pairing is materialised rather
+    than left for a caller to remember. Imported here to keep the dependency
+    one-way at module load: the pairing store reads links, not the reverse.
+    """
+    from wtbot.page_link_store import pair_pages
+
+    return pair_pages(session, local_page, remote_page)
 
 
 def find_link(

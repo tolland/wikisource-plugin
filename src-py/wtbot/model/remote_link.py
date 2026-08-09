@@ -19,10 +19,11 @@ re-anchors two diverged sides by making them identical again, that is a new row
 with ``origin=reconciled``, not an edit to the old one. The rows for a page pair
 are the ladder; the most recently inserted is the current anchor.
 
-Page-level correspondence is *derived* (``revision -> page``), not stored. A
-target redlink therefore has no link at all, which is correct: there is nothing
-to compare. "Local present, target absent" is a pairing question, not a linking
-one.
+Page-level correspondence used to be *derived* from these rows. It is now
+stored, as ``PageLink``, and every rung belongs to one -- see that module for
+why derivation could not represent the pairs that most need attention (a
+diverged pair, or one where a side is unfetched, has no linkable revision and
+so derived into nothing).
 """
 
 
@@ -87,6 +88,16 @@ class RemoteLink(SQLModel, table=True):
     )
 
     pk: int | None = Field(default=None, primary_key=True)
+
+    page_link_pk: int | None = Field(
+        default=None, foreign_key="pagelink.pk", index=True
+    )
+    """The pairing this rung belongs to.
+
+    Nullable only because rows written before ``PageLink`` existed have their
+    pairing backfilled by migration; the store never writes None. ``local`` and
+    ``remote`` below follow the parent's orientation, so a ladder reads one way
+    round rather than reconciling two."""
 
     local_revision_pk: int = Field(foreign_key="revision.pk", index=True)
     remote_revision_pk: int = Field(foreign_key="revision.pk", index=True)
