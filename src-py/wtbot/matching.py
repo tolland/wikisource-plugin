@@ -304,8 +304,8 @@ def find_anchor(session: Session, local_page: Page, remote_page: Page) -> Anchor
     if local_head is None or remote_head is None:
         return None
 
-    local_content = _content_of(session, local_head)
-    remote_content = _content_of(session, remote_head)
+    local_content = content_of(session, local_head)
+    remote_content = content_of(session, remote_head)
     if local_content is None or remote_content is None:
         return None
 
@@ -370,7 +370,7 @@ def _no_match_outcome(
     incomplete = [
         page
         for page in (local_page, remote_page)
-        if not _history_is_complete(session, page)
+        if not history_is_complete(session, page)
     ]
     if incomplete:
         sides = " and ".join(
@@ -383,7 +383,7 @@ def _no_match_outcome(
     return MatchOutcome.diverged, None
 
 
-def _history_is_complete(session: Session, page: Page) -> bool:
+def history_is_complete(session: Session, page: Page) -> bool:
     """Whether we hold this page back to its first revision.
 
     ``history_complete_from_revid`` marks the oldest revid of a contiguous run
@@ -415,10 +415,10 @@ def _newest_match(
     for offset, revision in enumerate(revisions):
         if revision.pk == other_head.pk:
             continue
-        other_content = _content_of(session, revision)
+        other_content = content_of(session, revision)
         if other_content is None:
             continue
-        if not _is_same_content(content, other_content):
+        if not is_same_content(content, other_content):
             continue
         # Only the winner is parsed. The scan itself decided on the precomputed
         # digest; the comparison is re-run here for the *significance*, which
@@ -439,7 +439,7 @@ def _revisions_newest_first(session: Session, page: Page) -> list[Revision]:
     )
 
 
-def _content_of(session: Session, revision: Revision) -> Content | None:
+def content_of(session: Session, revision: Revision) -> Content | None:
     slot = session.get(Slot, (revision.pk, MAIN_SLOT))
     return None if slot is None else session.get(Content, slot.content_pk)
 
@@ -450,7 +450,7 @@ def _compare(left: Content, right: Content):
     )
 
 
-def _is_same_content(left: Content, right: Content) -> bool:
+def is_same_content(left: Content, right: Content) -> bool:
     """Whether two bodies are the same content for linking purposes.
 
     The predicate the anchor search runs, and the reason ``comparable_sha1``

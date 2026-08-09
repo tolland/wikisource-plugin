@@ -276,6 +276,155 @@ def pairs(
         )
 
 
+@app.command("works")
+def works(
+    pair: dict = Pair,
+    api: ApiClient = Depends(get_api),
+) -> None:
+    """List tracked works -- the Index-to-Index correspondences.
+
+    The unit above pairs: for Wikisource an Index is to a work what a
+    repository is to its files, and "which works do we track" is the question
+    asked before any page is looked at.
+    """
+    params = {k: v for k, v in pair.items() if v}
+    data = api.get("/links/works", **params)
+
+    if not data["works"]:
+        typer.echo("no tracked works (`wtbot link track-work Index:...`)")
+        return
+    for row in data["works"]:
+        unpaired = row["local_pages"] - row["pairs"]
+        typer.echo(
+            f"  #{row['pk']:<4} {row['local_site']} <-> {row['remote_site']}  "
+            f"{row['linked']}/{row['pairs']} linked"
+            + (f", {unpaired} unpaired" if unpaired > 0 else "")
+        )
+        typer.echo(f"        {row['local_title']}")
+        if row["remote_title"] != row["local_title"]:
+            typer.echo(f"        {row['remote_title']}")
+
+
+@app.command("track-work")
+def track_work(
+    index_title: str = typer.Argument(..., help="Index title on the local site"),
+    remote_index_title: str | None = typer.Option(
+        None, "--to", help="Only needed when the two sides' index titles differ"
+    ),
+    pair_pages: bool = typer.Option(
+        True, help="Also pair the work's Page: children, by page number."
+    ),
+    pair: dict = Pair,
+    api: ApiClient = Depends(get_api),
+) -> None:
+    """Track a work: pair two Index: pages, and their pages with them.
+
+    Idempotent -- re-running adopts page pairs made since, so "track, fetch
+    more, track again" behaves the way it reads.
+    """
+    data = api.post(
+        "/links/works",
+        {
+            **pair,
+            "index_title": index_title,
+            "remote_index_title": remote_index_title,
+            "pair_pages": pair_pages,
+        },
+    )
+    work = data["work"]
+    state = "tracking" if data["created"] else "already tracked"
+    typer.echo(
+        f"{state} work #{work['pk']}: {work['pairs']} page pair(s) "
+        f"({data['paired']} new, {data['adopted']} adopted)"
+    )
+    for title in data["unpaired"]:
+        typer.secho(f"  no counterpart: {title}", fg=typer.colors.YELLOW)
+
+
+@app.command("revisions")
+def revisions(
+    pair_pk: int = typer.Argument(..., help="Pairing pk (see `wtbot link pairs`)"),
+    link_match: bool = typer.Option(
+        False,
+        "--link-best",
+        help="Assert the closest unlinked match, rather than only reporting.",
+    ),
+    api: ApiClient = Depends(get_api),
+) -> None:
+    """Both sides' stored revisions, and every same-content pair among them.
+
+    What to run on a page the proposer will not touch. `quality_differs` and
+    `history_exhausted` both mean the anchor search found nothing *reachable
+    from a head* -- it compares one side's head against the other's history and
+    stops there. A page where both sides have edited since they last agreed has
+    its matching pair sitting one or two revisions back on each side, and this
+    is where it shows up.
+    """
+    data = api.get(f"/links/pairs/{pair_pk}/revisions")
+
+    typer.echo(f"{data['local_title']}  <->  {data['remote_title']}")
+    for side, rows, complete in (
+        (data["local_site"], data["local"], data["local_history_complete"]),
+        (data["remote_site"], data["remote"], data["remote_history_complete"]),
+    ):
+        typer.echo(f"  {side}" + ("" if complete else "  (history incomplete)"))
+        for row in rows:
+            marks = " ".join(
+                filter(
+                    None,
+                    [
+                        "head" if row["is_head"] else "",
+                        "linked" if row["linked_to"] else "",
+                    ],
+                )
+            )
+            level = "" if row["level"] is None else f"level {row['level']}"
+            typer.echo(
+                f"    {row['revid']:<10} {level:<8} {row['user'] or '':<18}"
+                f" {(row['comparable_sha1'] or '')[:10]}  {marks}"
+            )
+
+    if not data["matches"]:
+        typer.secho("  no revision pair holds the same content", fg=typer.colors.YELLOW)
+        if data["local_history_complete"] and data["remote_history_complete"]:
+            # Worth saying plainly: this is the one case fetching cannot fix.
+            typer.echo(
+                "  both histories are complete, so these pages were written "
+                "independently -- reconciling them is an edit, not a link"
+            )
+        return
+
+    typer.echo("  same content:")
+    for match in data["matches"]:
+        state = f"linked #{match['link_pk']}" if match["linked"] else "not linked"
+        typer.echo(
+            f"    {match['local_revid']} <-> {match['remote_revid']}  "
+            f"(local +{match['local_ahead_by']}, remote +{match['remote_ahead_by']})"
+            f"  {state}"
+        )
+
+    if not link_match:
+        if any(not m["linked"] for m in data["matches"]):
+            typer.echo("nothing written; re-run with --link-best to assert the closest")
+        return
+
+    best = next((m for m in data["matches"] if not m["linked"]), None)
+    if best is None:
+        typer.echo("every match is already linked")
+        return
+    written = api.post(
+        f"/links/pairs/{pair_pk}/rungs",
+        {
+            "local_revid": best["local_revid"],
+            "remote_revid": best["remote_revid"],
+            "origin": "manual",
+        },
+    )
+    typer.echo(
+        f"link #{written['pk']}  {best['local_revid']} <-> {best['remote_revid']}"
+    )
+
+
 @app.command("unpair")
 def unpair_command(
     pair_pk: int = typer.Argument(..., help="Pairing pk (see `wtbot link pairs`)"),

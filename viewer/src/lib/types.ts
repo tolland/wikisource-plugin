@@ -237,3 +237,157 @@ export interface ReadContentResponse {
   revid?: number | null;
   content_base64: string;
 }
+
+/* --- cross-site links -----------------------------------------------------
+ *
+ * Three levels, and the viewer navigates them in order:
+ *
+ *   work      two Index: pages that are the same work        /links
+ *   page pair one page of that work, on both sides           /links/[work]
+ *   revisions the two histories, and what matches in them    /links/pairs/[pk]
+ *
+ * The third exists because the anchor search stops at the heads: a page whose
+ * two sides have both moved on has no proposable link even when the matching
+ * revision pair is plainly there, and a person can see it and assert it.
+ */
+
+export type MatchOutcome =
+  | 'same'
+  | 'local_ahead'
+  | 'remote_ahead'
+  | 'quality_differs'
+  | 'diverged'
+  | 'history_exhausted'
+  | 'no_counterpart'
+  | 'unfetched'
+  | 'already_linked';
+
+export type LinkOrigin = 'copy' | 'title_match' | 'manual' | 'reconciled';
+
+export interface WorkSummary {
+  pk: number;
+  page_link_pk: number;
+  created_at: string;
+  local_title: string;
+  remote_title: string;
+  local_site: string;
+  remote_site: string;
+  local_page_pk: number;
+  remote_page_pk: number;
+  /** Page pairs claimed by this work. */
+  pairs: number;
+  /** Of those, how many have at least one revision link. */
+  linked: number;
+  /** Page: children the local index has cached, paired or not. */
+  local_pages: number;
+}
+
+export interface IndexCandidate {
+  page_pk: number;
+  title: string;
+  page_count?: number | null;
+  cached_pages: number;
+  /** Non-null when this index is already half of a tracked work. */
+  work_pk?: number | null;
+  paired_with?: string | null;
+}
+
+export interface CandidateList {
+  site: string;
+  site_pk: number;
+  indexes: IndexCandidate[];
+}
+
+export interface LinkWorkResult {
+  work: WorkSummary;
+  created: boolean;
+  paired: number;
+  adopted: number;
+  unpaired: string[];
+}
+
+export interface PagePair {
+  pair_pk?: number | null;
+  page_number?: number | null;
+  outcome: MatchOutcome;
+  proposable: boolean;
+  /** True when a deeper fetch could turn this into a link. */
+  resolvable_by_fetch: boolean;
+  local_title: string;
+  remote_title?: string | null;
+  local_revid?: number | null;
+  remote_revid?: number | null;
+  local_ahead_by: number;
+  remote_ahead_by: number;
+  significance?: string | null;
+  detail?: string | null;
+  rungs: number;
+}
+
+export interface WorkDetail {
+  work: WorkSummary;
+  pages: PagePair[];
+  counts: Record<string, number>;
+  needs_history: number;
+}
+
+export interface ProposeWorkResult {
+  counts: Record<string, number>;
+  confirmed: number;
+}
+
+export interface FetchHistoryResult {
+  queued: number;
+  pages: number;
+  revisions: number;
+  note: string;
+}
+
+export interface RevisionRow {
+  revision_pk: number;
+  revid: number;
+  parent_revid?: number | null;
+  timestamp?: string | null;
+  contributor?: string | null;
+  comment?: string | null;
+  is_head: boolean;
+  /** Two revisions with the same digest hold the same content, either site. */
+  comparable_sha1?: string | null;
+  content_sha1?: string | null;
+  level?: number | null;
+  user?: string | null;
+  linked_to: number[];
+}
+
+export interface RevisionMatch {
+  local_revision_pk: number;
+  remote_revision_pk: number;
+  local_revid: number;
+  remote_revid: number;
+  local_ahead_by: number;
+  remote_ahead_by: number;
+  is_heads: boolean;
+  linked: boolean;
+  link_pk?: number | null;
+}
+
+export interface RungRow {
+  pk: number;
+  local_revision_pk: number;
+  remote_revision_pk: number;
+  origin: LinkOrigin;
+}
+
+export interface PairRevisions {
+  pair_pk: number;
+  local_title: string;
+  remote_title: string;
+  local_site: string;
+  remote_site: string;
+  local: RevisionRow[];
+  remote: RevisionRow[];
+  matches: RevisionMatch[];
+  rungs: RungRow[];
+  local_history_complete: boolean;
+  remote_history_complete: boolean;
+}

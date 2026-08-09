@@ -5,15 +5,30 @@ from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
 from wtbot.api.debug_logging_route import DebugLoggingRoute
+from wtbot.content_model import parse_document
 from wtbot.deps import get_session
 from wtbot.matching import (
     LinkProposal,
     MatchOutcome,
     compare_pages,
     confirm_proposals,
+    content_of,
+    history_is_complete,
+    is_same_content,
     propose_index_links,
 )
-from wtbot.model import LinkOrigin, Page, PageLink, PageMeta, RemoteLink, Site
+from wtbot.model import (
+    MAIN_SLOT,
+    Content,
+    LinkOrigin,
+    Page,
+    PageLink,
+    PageMeta,
+    RemoteLink,
+    Revision,
+    Site,
+    Slot,
+)
 from wtbot.page_link_store import (
     find_pair,
     pair_pages,
@@ -484,6 +499,343 @@ def delete_pair_rungs(pair_pk: int, session: Session = Depends(get_session)) -> 
     removed = retract_rungs(session, link)
     session.commit()
     return {"pairing": pair_pk, "rungs_removed": removed}
+
+
+# --- the revisions inside one pairing --------------------------------------
+#
+# The drill-down the two unresolved outcomes need. `quality_differs` and
+# `history_exhausted` both end in "no anchor in the history held", which is the
+# anchor *search*'s answer, not the whole truth: the search compares each head
+# against the other side's history, one side at a time, and deliberately stops
+# there. A pair where both sides moved on cannot be resolved by a link the
+# search is willing to propose -- but the matching pair may be sitting in the
+# two histories, older on both sides, and a person looking at the two columns
+# can see it immediately.
+#
+# So this reports the full cross-product on `comparable_sha1` and lets the
+# reviewer assert one. That is the division the whole design rests on: the
+# machine proposes only what it is sure of, and a human can assert more.
+
+
+class RevisionOut(BaseModel):
+    """One stored revision of one side, as a row in the drill-down."""
+
+    revision_pk: int
+    revid: int
+    parent_revid: int | None = None
+    timestamp: datetime | None = None
+    contributor: str | None = None
+    comment: str | None = None
+    is_head: bool = False
+
+    comparable_sha1: str | None = Field(
+        default=None,
+        description=(
+            "The model-aware digest. Two revisions with the same value hold the "
+            "same content for linking purposes, whichever site they are on."
+        ),
+    )
+    content_sha1: str | None = None
+    level: int | None = Field(
+        default=None, description="proofread-page quality level, when it has one."
+    )
+    user: str | None = Field(
+        default=None,
+        description=(
+            "The pagequality username -- an account on that revision's own "
+            "wiki. Shown because it explains why the byte hashes differ; never "
+            "compared."
+        ),
+    )
+    linked_to: list[int] = Field(
+        default_factory=list,
+        description="Revision pks on the other side already linked to this one.",
+    )
+
+
+class RevisionMatch(BaseModel):
+    """A revision pair holding the same content, whether or not it is linked.
+
+    Found by digest equality, so it is exactly what the anchor search would
+    accept -- including the pairs the search will not *propose* because both
+    sides have moved on since.
+    """
+
+    local_revision_pk: int
+    remote_revision_pk: int
+    local_revid: int
+    remote_revid: int
+    local_ahead_by: int = Field(
+        description="Local revisions newer than this one -- what would replay out."
+    )
+    remote_ahead_by: int = Field(
+        description="Remote revisions newer than this one -- what would replay in."
+    )
+    is_heads: bool = Field(description="True when both sides are at this revision.")
+    linked: bool = False
+    link_pk: int | None = None
+
+
+class PairRevisionsOut(BaseModel):
+    pair_pk: int
+    local_title: str
+    remote_title: str
+    local_site: str
+    remote_site: str
+
+    local: list[RevisionOut] = Field(description="Newest first.")
+    remote: list[RevisionOut] = Field(description="Newest first.")
+    matches: list[RevisionMatch] = Field(
+        description="Same-content revision pairs, best (newest) first."
+    )
+    rungs: list[LinkOut] = Field(description="Links already asserted, oldest first.")
+    local_history_complete: bool = Field(
+        description="Whether we hold this side back to its first revision."
+    )
+    remote_history_complete: bool = Field(
+        description=(
+            "Same for the other side. When either is false, an absent match "
+            "means 'we did not look far enough', not 'they never agreed'."
+        )
+    )
+
+
+class AssertRungRequest(BaseModel):
+    """Link two named revisions of a pairing, by revid."""
+
+    local_revid: int = Field(description="Revision id on the pairing's local side.")
+    remote_revid: int = Field(description="Revision id on the pairing's remote side.")
+    origin: LinkOrigin = Field(
+        default=LinkOrigin.manual,
+        description=(
+            "`manual` for a human asserting a match the search would not "
+            "propose; `reconciled` when the two sides were made identical by "
+            "hand and this is the new base."
+        ),
+    )
+    force: bool = Field(
+        default=False,
+        description=(
+            "Assert the link even when the two revisions do not hold the same "
+            "content. Off by default: the point of picking revisions by hand is "
+            "to find the pair that *does* match."
+        ),
+    )
+
+
+def _revision_rows(
+    session: Session, page: Page
+) -> tuple[list[Revision], dict[int, Content | None]]:
+    revisions = list(
+        session.exec(
+            select(Revision)
+            .where(Revision.page_pk == page.pk)
+            .order_by(Revision.revid.desc())
+        ).all()
+    )
+    content: dict[int, Content | None] = {}
+    for revision in revisions:
+        slot = session.get(Slot, (revision.pk, MAIN_SLOT))
+        content[revision.pk] = (
+            None if slot is None else session.get(Content, slot.content_pk)
+        )
+    return revisions, content
+
+
+def _revision_out(
+    revision: Revision,
+    content: Content | None,
+    *,
+    head_pk: int | None,
+    linked_to: list[int],
+) -> RevisionOut:
+    level = user = None
+    if content is not None:
+        document = parse_document(content.text, content.content_model)
+        level = getattr(document, "level", None)
+        user = getattr(document, "user", None)
+    return RevisionOut(
+        revision_pk=revision.pk,
+        revid=revision.revid,
+        parent_revid=revision.parent_revid,
+        timestamp=revision.timestamp,
+        contributor=revision.contributor,
+        comment=revision.comment,
+        is_head=revision.pk == head_pk,
+        comparable_sha1=content.comparable_sha1 if content else None,
+        content_sha1=content.content_sha1 if content else None,
+        level=level,
+        user=user,
+        linked_to=linked_to,
+    )
+
+
+@router.get("/pairs/{pair_pk}/revisions", response_model=PairRevisionsOut)
+def pair_revisions(
+    pair_pk: int, session: Session = Depends(get_session)
+) -> PairRevisionsOut:
+    """Both sides' stored revisions, and every same-content pair among them.
+
+    The view that resolves a `quality_differs` page: the heads differ by a
+    proofreading level, but an older revision on one side usually holds exactly
+    what the other side's head holds, and this shows which. Matching is by
+    ``comparable_sha1`` -- no parsing per comparison, and the same predicate the
+    anchor search uses, so a match here is a match there.
+
+    Matches are ordered by how little would replay: the pair closest to both
+    heads first, since that is the tightest true claim and the one a reviewer
+    almost always wants.
+    """
+    pairing = session.get(PageLink, pair_pk)
+    if pairing is None:
+        raise HTTPException(404, f"no pairing {pair_pk}")
+
+    local_page = session.get(Page, pairing.local_page_pk)
+    remote_page = session.get(Page, pairing.remote_page_pk)
+    local_revisions, local_content = _revision_rows(session, local_page)
+    remote_revisions, remote_content = _revision_rows(session, remote_page)
+
+    local_head = head_revision(session, local_page)
+    remote_head = head_revision(session, remote_page)
+
+    rungs = ladder(session, page_pk=local_page.pk, other_page_pk=remote_page.pk)
+    linked_pairs: dict[tuple[int, int], RemoteLink] = {}
+    linked_from: dict[int, list[int]] = {}
+    for rung in rungs:
+        for near, far in (
+            (rung.local_revision_pk, rung.remote_revision_pk),
+            (rung.remote_revision_pk, rung.local_revision_pk),
+        ):
+            linked_pairs[(near, far)] = rung
+            linked_from.setdefault(near, []).append(far)
+
+    matches: list[RevisionMatch] = []
+    remote_by_digest: dict[str, list[tuple[int, Revision]]] = {}
+    for offset, revision in enumerate(remote_revisions):
+        content = remote_content.get(revision.pk)
+        if content is None or content.comparable_sha1 is None:
+            continue
+        remote_by_digest.setdefault(content.comparable_sha1, []).append(
+            (offset, revision)
+        )
+
+    for local_offset, revision in enumerate(local_revisions):
+        content = local_content.get(revision.pk)
+        if content is None or content.comparable_sha1 is None:
+            continue
+        for remote_offset, other in remote_by_digest.get(content.comparable_sha1, []):
+            rung = linked_pairs.get((revision.pk, other.pk))
+            matches.append(
+                RevisionMatch(
+                    local_revision_pk=revision.pk,
+                    remote_revision_pk=other.pk,
+                    local_revid=revision.revid,
+                    remote_revid=other.revid,
+                    local_ahead_by=local_offset,
+                    remote_ahead_by=remote_offset,
+                    is_heads=local_offset == 0 and remote_offset == 0,
+                    linked=rung is not None,
+                    link_pk=rung.pk if rung else None,
+                )
+            )
+    matches.sort(key=lambda m: (m.local_ahead_by + m.remote_ahead_by, m.local_ahead_by))
+
+    return PairRevisionsOut(
+        pair_pk=pair_pk,
+        local_title=local_page.title,
+        remote_title=remote_page.title,
+        local_site=_site_name(session.get(Site, local_page.site_pk)),
+        remote_site=_site_name(session.get(Site, remote_page.site_pk)),
+        local=[
+            _revision_out(
+                revision,
+                local_content.get(revision.pk),
+                head_pk=local_head.pk if local_head else None,
+                linked_to=linked_from.get(revision.pk, []),
+            )
+            for revision in local_revisions
+        ],
+        remote=[
+            _revision_out(
+                revision,
+                remote_content.get(revision.pk),
+                head_pk=remote_head.pk if remote_head else None,
+                linked_to=linked_from.get(revision.pk, []),
+            )
+            for revision in remote_revisions
+        ],
+        matches=matches,
+        rungs=[LinkOut(**rung.model_dump()) for rung in rungs],
+        local_history_complete=history_is_complete(session, local_page),
+        remote_history_complete=history_is_complete(session, remote_page),
+    )
+
+
+@router.post("/pairs/{pair_pk}/rungs", response_model=LinkOut, status_code=201)
+def assert_pair_rung(
+    pair_pk: int,
+    payload: AssertRungRequest,
+    session: Session = Depends(get_session),
+) -> LinkOut:
+    """Link two revisions of a pairing, chosen by hand.
+
+    The action the drill-down exists for. The anchor search proposes only pairs
+    it can reach from a head, so a page where both sides moved on after their
+    last agreement has no proposal even when the agreeing pair is plainly there
+    in the two histories. A reviewer who can see it can assert it.
+
+    Still checked: the two revisions must hold the same content unless
+    ``force``. Picking by hand is meant to find the pair that matches, not to
+    bypass the question -- and a false rung is inherited by everything above it.
+    """
+    pairing = session.get(PageLink, pair_pk)
+    if pairing is None:
+        raise HTTPException(404, f"no pairing {pair_pk}")
+
+    local = _revision_by_id(session, pairing.local_page_pk, payload.local_revid)
+    remote = _revision_by_id(session, pairing.remote_page_pk, payload.remote_revid)
+
+    if not payload.force:
+        local_content = content_of(session, local)
+        remote_content = content_of(session, remote)
+        if local_content is None or remote_content is None:
+            raise HTTPException(
+                409, "a chosen revision has no cached content to compare"
+            )
+        if not is_same_content(local_content, remote_content):
+            raise HTTPException(
+                409,
+                f"revisions {payload.local_revid} and {payload.remote_revid} do "
+                "not hold the same content. Pick a pair the drill-down reports "
+                "as matching, or pass force to assert this one anyway.",
+            )
+
+    try:
+        link = assert_link(
+            session,
+            local_revision_pk=local.pk,
+            remote_revision_pk=remote.pk,
+            origin=payload.origin,
+            page_link_pk=pairing.pk,
+        )
+    except LinkError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    session.commit()
+    session.refresh(link)
+    return LinkOut(**link.model_dump())
+
+
+def _revision_by_id(session: Session, page_pk: int, revid: int) -> Revision:
+    revision = session.exec(
+        select(Revision).where(Revision.page_pk == page_pk, Revision.revid == revid)
+    ).first()
+    if revision is None:
+        raise HTTPException(
+            404,
+            f"revision {revid} is not cached for this pairing's page. Fetch more "
+            "history, or pick a revision the drill-down lists.",
+        )
+    return revision
 
 
 @router.delete("/{link_pk}", status_code=200)

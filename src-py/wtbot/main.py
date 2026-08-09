@@ -23,6 +23,7 @@ from wtbot.api import (
     sites,
     vfs,
     viewer,
+    works,
 )
 from wtbot.api import (
     commit as commit_api,
@@ -125,6 +126,9 @@ def create_app(
     app.include_router(commit_api.router)
     app.include_router(edit_journal.router)
     app.include_router(fetch.router)
+    # Before `links`: /links/works must not be matched by
+    # DELETE /links/{link_pk}, which would 422 on parsing "works" as an int.
+    app.include_router(works.router)
     app.include_router(links.router)
     app.include_router(file_blob.router)
     app.include_router(namespace.router)
