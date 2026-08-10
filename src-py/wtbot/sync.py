@@ -728,6 +728,44 @@ def _index_page(session: Session, site: Site, title: str) -> Page | None:
     ).first()
 
 
+def _page(session: Session, site: Site, title: str) -> Page | None:
+    return session.exec(
+        select(Page).where(Page.site_pk == site.pk, Page.title == title)
+    ).first()
+
+
+def build_page_report(
+    session: Session,
+    *,
+    source_site: Site,
+    target_site: Site,
+    source_title: str,
+    target_title: str | None = None,
+) -> SyncPage:
+    """Compare one page across two sites: what a push would do to it, and
+    nothing else.
+
+    The single-page counterpart of :func:`build_report`, for the promotion
+    workflow that targets one page and its revisions rather than a whole
+    work -- no index, no scan check, no sibling pages. Deliberately no
+    fan-out: the caller named one page, and this reports on exactly that one.
+
+    The verdict logic is ``build_report``'s own per-page rule, reused rather
+    than re-derived, so "what would a push do to this page" cannot have two
+    different answers depending on which screen asked.
+    """
+    target_title = target_title or source_title
+
+    source_page = _page(session, source_site, source_title)
+    if source_page is None:
+        raise SyncError(
+            f"{source_title} is not cached for {_site_name(source_site)}. "
+            "A sync reports on what we hold: fetch the source page first."
+        )
+    target_page = _page(session, target_site, target_title)
+    return _page_report(session, None, source_page, target_page)
+
+
 def _side(
     session: Session,
     site: Site,

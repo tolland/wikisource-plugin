@@ -22,6 +22,7 @@ from wtbot.promotion_store import (
     promotions,
     skip,
     stage_batch,
+    stage_page,
 )
 from wtbot.promotion_worker import push_one
 from wtbot.site_store import require_credentialed_site, resolve_pair
@@ -31,6 +32,7 @@ from wtbot.sync import (
     SyncPage,
     SyncReport,
     SyncVerdict,
+    build_page_report,
     build_report,
 )
 
@@ -331,6 +333,66 @@ def fetch_assets(
     return FetchAssetsResult(queued=queued)
 
 
+# --- single-page promotion --------------------------------------------------
+#
+# The embarrassment-risk case: pushing a page (or a handful, reviewed one at a
+# time) straight back to the public, upstream wiki, with no fan-out to hide
+# behind. `/sync/report` compares a whole work; this compares exactly the one
+# page named, and nothing else -- no scan check, no sibling pages, no index.
+
+
+class PageSyncRequest(BaseModel):
+    source_label: str | None = Field(
+        default=None, description="Registered site the page would be copied *from*."
+    )
+    target_label: str | None = Field(
+        default=None,
+        description=(
+            "Registered site it would be copied *to*. Omit both to use a "
+            "naming convention (local/remote, origin/upstream, "
+            "mywikisource/wikisource)."
+        ),
+    )
+    source_title: str = Field(description="Page title on the source site.")
+    target_title: str | None = Field(
+        default=None,
+        description="Only needed when the two sides' titles differ.",
+    )
+
+
+class PageSyncReportOut(BaseModel):
+    source_site: str
+    target_site: str
+    page: SyncPageOut
+
+
+@router.post("/page-report", response_model=PageSyncReportOut)
+def sync_page_report(
+    payload: PageSyncRequest, session: Session = Depends(get_session)
+) -> PageSyncReportOut:
+    """Compare one page across two sites: what a push would do to it, and
+    nothing else. The single-page counterpart of ``/sync/report``.
+    """
+    source_site, target_site = resolve_pair(
+        session, payload.source_label, payload.target_label
+    )
+    try:
+        page = build_page_report(
+            session,
+            source_site=source_site,
+            target_site=target_site,
+            source_title=payload.source_title,
+            target_title=payload.target_title,
+        )
+    except SyncError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    return PageSyncReportOut(
+        source_site=_site_name(source_site),
+        target_site=_site_name(target_site),
+        page=_page_out(page),
+    )
+
+
 # --- the push queue ---------------------------------------------------------
 #
 # A report says what would happen; a batch is somebody deciding it should.
@@ -481,6 +543,50 @@ def create_batch(
             target_site=target_site,
             label=payload.label,
             page_numbers=payload.page_numbers,
+        )
+    except SyncError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except PromotionError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    session.commit()
+    session.refresh(batch)
+    return _batch_out(session, batch)
+
+
+class StagePageRequest(PageSyncRequest):
+    label: str | None = Field(
+        default=None, description="A name for this run, to tell it from others."
+    )
+
+
+@router.post("/page-batches", response_model=BatchOut, status_code=201)
+def create_page_batch(
+    payload: StagePageRequest, session: Session = Depends(get_session)
+) -> BatchOut:
+    """Stage a single-page push run: this page, this direction, nothing else.
+
+    The ``sync-page`` counterpart of ``POST /sync/batches``, with no fan-out
+    -- the batch this produces holds exactly one promotion. Everything past
+    staging (approve, push, abort) is the same batch machinery, because a
+    batch of one page is still a batch.
+    """
+    source_site, target_site = resolve_pair(
+        session, payload.source_label, payload.target_label
+    )
+    try:
+        page = build_page_report(
+            session,
+            source_site=source_site,
+            target_site=target_site,
+            source_title=payload.source_title,
+            target_title=payload.target_title,
+        )
+        batch = stage_page(
+            session,
+            page,
+            source_site=source_site,
+            target_site=target_site,
+            label=payload.label,
         )
     except SyncError as exc:
         raise HTTPException(404, str(exc)) from exc

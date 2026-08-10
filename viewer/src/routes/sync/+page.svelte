@@ -218,6 +218,11 @@
     with the scan check first. Nothing here writes to either wiki, or to the local
     model.
   </p>
+  <p class="description">
+    Pushing back to a public wiki one page at a time, without waiting on the
+    rest of the work? Use <a href="/sync-page">Promote a page</a> instead. See
+    <a href="/sync/batches">every staged run</a> for what is pending or errored.
+  </p>
 </PageHeading>
 
 {#if error}
@@ -472,6 +477,10 @@
 {/if}
 
 <style>
+  .description a {
+    color: #9c5632;
+  }
+
   .description,
   .state,
   .hint {

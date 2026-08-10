@@ -18,7 +18,7 @@ from wtbot.model import (
 from wtbot.page_link_store import find_pair
 from wtbot.remote_link_store import ladder
 from wtbot.revision_store import head_revision
-from wtbot.sync import SyncReport, SyncVerdict
+from wtbot.sync import SyncPage, SyncReport, SyncVerdict
 from wtbot.timeutil import utcnow
 
 """Staging a push run from a sync report, and pushing it one page at a time.
@@ -86,6 +86,46 @@ def stage_batch(
 
     for page in wanted:
         session.add(_promotion_for(session, batch, page, source_site, target_site))
+    session.flush()
+    return batch
+
+
+def stage_page(
+    session: Session,
+    page: SyncPage,
+    *,
+    source_site: Site,
+    target_site: Site,
+    label: str | None = None,
+) -> PromotionBatch:
+    """Stage a single-page push run: this page, this direction, nothing else.
+
+    The ``sync-page`` counterpart of :func:`stage_batch`, with no fan-out --
+    the batch this produces holds exactly one promotion. Reusing
+    ``PromotionBatch``/``Promotion`` rather than a parallel one-row model
+    means the review, approve and push screens work unchanged: a batch of one
+    is still a batch, and pushing it "one page at a time" is simply pushing
+    its only row.
+    """
+    if not page.actionable:
+        raise PromotionError(
+            f"{page.source_title} is not writable in this direction "
+            f"({page.verdict.value}); a push replays onto an asserted anchor "
+            "and cannot invent one"
+        )
+
+    batch = PromotionBatch(
+        source_site_pk=source_site.pk,
+        target_site_pk=target_site.pk,
+        index_link_pk=None,
+        source_index_title=page.source_title or "",
+        target_index_title=page.target_title or page.source_title or "",
+        label=label,
+    )
+    session.add(batch)
+    session.flush()
+
+    session.add(_promotion_for(session, batch, page, source_site, target_site))
     session.flush()
     return batch
 

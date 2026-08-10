@@ -31,6 +31,9 @@ import type {
   RungRow,
   Batch,
   FetchAssetsResult,
+  PageSyncReport,
+  PageSyncRequest,
+  StagePageRequest,
   StageRequest,
   SyncReport,
   SyncRequest,
@@ -313,6 +316,16 @@ export function dumpLocatorIndex(path: string): Promise<LocatorIndexDump> {
 
 export function fetchSyncAssets(payload: SyncRequest): Promise<FetchAssetsResult> {
   return postJson<FetchAssetsResult>('/sync/fetch-assets', payload);
+}
+
+/* --- single-page promotion -------------------------------------------------- */
+
+export function syncPageReport(payload: PageSyncRequest): Promise<PageSyncReport> {
+  return postJson<PageSyncReport>('/sync/page-report', payload);
+}
+
+export function stagePageBatch(payload: StagePageRequest): Promise<Batch> {
+  return postJson<Batch>('/sync/page-batches', payload);
 }
 
 /* --- the push queue -------------------------------------------------------- */
