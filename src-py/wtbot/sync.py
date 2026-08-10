@@ -6,14 +6,12 @@ from sqlmodel import Session, select
 
 from wtbot.index_link_store import find_index_link
 from wtbot.matching import (
-    MatchOutcome,
     compare_pages,
-    find_anchor,
     index_children,
 )
 from wtbot.model import FetchState, FileBlob, NsRole, Page, PageLink, Revision, Site
 from wtbot.page_link_store import find_pair
-from wtbot.remote_link_store import find_link, ladder
+from wtbot.remote_link_store import ladder
 from wtbot.revision_store import head_revision
 from wtbot.vfs.store import canonical_title
 
@@ -74,20 +72,23 @@ class SyncVerdict(str, Enum):
     """The source has revisions above the anchor and the target does not. The
     replay case: what the anchor exists to be the base of."""
 
-    pull = "pull"
-    """The target has revisions above the anchor and the source does not. The
-    same operation pointed the other way, reported rather than hidden -- a sync
-    that silently ignored inbound work would lose it."""
+    behind = "behind"
+    """Linked, and the *target* has revisions above the anchor. Real work, and
+    not this direction's: reported rather than hidden, because a one-way sync
+    that silently ignored inbound edits would overwrite them."""
 
     diverged = "diverged"
-    """Both sides moved after the anchor, or the transcriptions simply differ
-    with the full history held. Needs a person (discussion §2)."""
+    """Linked, and both sides moved after the anchor. Needs a person
+    (discussion §2)."""
 
     unlinked = "unlinked"
-    """Both sides exist and hold content, but nothing says which revisions
-    correspond. Not a conflict -- an unanswered question. ``detail`` carries the
-    matcher's reason, which is what says whether fetching more would answer
-    it."""
+    """No asserted link between the two pages' revisions.
+
+    Whatever a comparison would find, this page has no base to replay onto, so
+    a sync cannot write it. That is the whole of the verdict -- see
+    :attr:`SyncPage.linkable` for whether linking it is one `propose --confirm`
+    away, which is a fact about the *linking* workflow rather than about what a
+    sync would do today."""
 
     source_missing = "source_missing"
     """The target has a page the source does not. Reported because a work that
@@ -102,9 +103,11 @@ class SyncVerdict(str, Enum):
 ACTIONABLE = (SyncVerdict.create, SyncVerdict.push)
 """Verdicts a push in the requested direction would act on.
 
-``pull`` is deliberately absent: it is real work, but it is work in the other
+``behind`` is deliberately absent: it is real work, but it is work in the other
 direction, and rolling it into the same count is how an inbound edit gets
-quietly overwritten."""
+quietly overwritten. So is ``unlinked``, however confidently a comparison could
+link it -- a sync writes onto the anchor, and an anchor nobody asserted is a
+proposal, not a base."""
 
 
 class ScanStatus(str, Enum):
@@ -152,17 +155,14 @@ class SyncPage:
     target_revid: int | None = None
     anchor_source_revid: int | None = None
     anchor_target_revid: int | None = None
-    anchor_asserted: bool = False
-    """Whether the anchor is a stored ``RemoteLink`` or merely the pair a
-    comparison just found.
+    linkable: bool = False
+    """Only meaningful on ``unlinked``: a comparison finds a revision pair
+    holding the same content, so `propose --confirm` would link this page.
 
-    The distinction a push cannot do without. An anchor is the base the
-    unsynced revisions replay *onto*, and a computed one is a proposal -- the
-    same guess ``propose`` refuses to auto-confirm. Replaying onto it would act
-    on a correspondence nobody asserted, which is precisely the failure the
-    whole assert-don't-compute design exists to prevent.
-
-    Vacuously False on a ``create``, which has nothing to replay onto."""
+    Reported, never acted on. It is the difference between "this needs a
+    person" and "this needs a button somebody else's page owns", and a sync
+    that treated the two the same would be auto-confirming proposals by the
+    back door."""
 
     rungs: int = 0
 
@@ -172,22 +172,15 @@ class SyncPage:
 
     @property
     def actionable(self) -> bool:
-        """A push in this direction has work to do on this page."""
-        return self.verdict in ACTIONABLE
+        """A push in this direction would write this page.
 
-    @property
-    def ready(self) -> bool:
-        """...and it could be queued as it stands.
-
-        A ``create`` needs no anchor: there is nothing on the target to replay
-        onto. A ``push`` needs an asserted one, so a page whose anchor is only
-        computed is work that is *known* but not yet *sanctioned* -- one
-        `propose --confirm` away, and reported as such rather than counted as
-        ready.
+        True only for work a sync can actually do: a ``create`` (nothing on the
+        target to replay onto) and a ``push`` (an asserted anchor to replay
+        onto). Everything else -- including a page a comparison could link but
+        nobody has -- is not writable today, and counting it here would put
+        unsanctioned work in the number people read as "what will happen".
         """
-        if not self.actionable:
-            return False
-        return self.verdict is SyncVerdict.create or self.anchor_asserted
+        return self.verdict in ACTIONABLE
 
 
 @dataclass(frozen=True)
@@ -270,18 +263,13 @@ class SyncReport:
         return sum(1 for page in self.pages if page.actionable)
 
     @property
-    def ready(self) -> int:
-        """Actionable pages a push could be queued for as they stand."""
-        return sum(1 for page in self.pages if page.ready)
+    def linkable(self) -> int:
+        """Unlinked pages a `propose --confirm` would link.
 
-    @property
-    def unasserted_anchors(self) -> int:
-        """Actionable pages whose anchor is a comparison's guess, not a link.
-
-        The gap between ``actionable`` and ``ready``, named because it is not a
-        problem with the pages -- it is a step nobody has taken yet.
+        Not a count of work a sync would do -- a count of work that would
+        become sync-able once somebody linked it.
         """
-        return sum(1 for page in self.pages if page.actionable and not page.ready)
+        return sum(1 for page in self.pages if page.linkable)
 
 
 class SyncError(ValueError):
@@ -374,13 +362,14 @@ def build_report(
     # After the pages, because it is a fact about them. Not a blocker: nothing
     # is wrong with these pages -- there is a step nobody has taken, and naming
     # the step is the whole point.
-    unasserted = report.unasserted_anchors
-    if unasserted:
+    linkable = report.linkable
+    if linkable:
         report.advisories.append(
-            f"{unasserted} page(s) would replay onto an anchor found by "
-            "comparison rather than one anybody asserted. Confirm the links "
-            "first (`wtbot link propose --confirm`, or the work's Propose "
-            "button): a push needs a base that is recorded, not guessed."
+            f"{linkable} unlinked page(s) hold a matching revision pair and "
+            "would be linked by `wtbot link propose --confirm` (or the work's "
+            "Propose button). They are not counted as writable here: a sync "
+            "replays onto the anchor, and an anchor nobody asserted is a "
+            "proposal, not a base."
         )
     return report
 
@@ -631,80 +620,57 @@ def _page_report(
 def _compared(
     session: Session, source_page: Page, target_page: Page, base: dict
 ) -> SyncPage:
-    """Turn the symmetric matcher's answer into a directional one.
+    """The verdict, read off the **stored ladder** rather than a comparison.
 
-    ``compare_pages`` is called source-as-local, so its ``local`` is our source
-    and its ``remote`` our target -- which is the whole translation: the
-    matcher's ``local_ahead`` becomes ``push``, its ``remote_ahead`` becomes
-    ``pull``.
+    This is the rule the whole module turns on. ``find_anchor`` will happily
+    produce an anchor for a pair nobody has linked -- that is what it is for,
+    and the linking workflow acts on it. But a sync *writes*, and it writes on
+    top of the anchor, so the only anchor it may use is one somebody asserted.
+    A page whose correspondence exists solely as a comparison result is
+    ``unlinked`` here, however confident that comparison is.
+
+    The comparison is still run, for one thing only: to say whether the page is
+    ``linkable``, so the report can point at the button that would fix it
+    without pretending the fix has happened.
     """
-    proposal = compare_pages(session, source_page, target_page)
-    anchor = find_anchor(session, source_page, target_page)
-    if anchor is not None:
-        base["anchor_source_revid"] = anchor.local_revision.revid
-        base["anchor_target_revid"] = anchor.remote_revision.revid
-        base["source_ahead_by"] = anchor.local_ahead_by
-        base["target_ahead_by"] = anchor.remote_ahead_by
-        # Is this anchor a claim anyone made, or only one this comparison just
-        # found? The revids look identical either way, which is exactly why the
-        # report has to say which.
-        base["anchor_asserted"] = (
-            find_link(
-                session,
-                revision_pk=anchor.local_revision.pk,
-                other_revision_pk=anchor.remote_revision.pk,
-            )
-            is not None
+    rungs = ladder(session, page_pk=source_page.pk, other_page_pk=target_page.pk)
+    base["rungs"] = len(rungs)
+
+    if not rungs:
+        proposal = compare_pages(session, source_page, target_page)
+        return SyncPage(
+            verdict=SyncVerdict.unlinked,
+            linkable=proposal.proposable,
+            detail=(
+                "no link yet; a matching revision pair exists, so `propose "
+                "--confirm` would link it"
+                if proposal.proposable
+                else proposal.detail or f"no link yet ({proposal.outcome.value})"
+            ),
+            **base,
         )
 
-    outcome = proposal.outcome
-    if outcome is MatchOutcome.already_linked:
-        # The matcher stops at "linked" without saying how far the heads have
-        # moved since; the ladder's own anchor is what answers that.
-        return _from_anchor(session, source_page, target_page, base)
-    if outcome is MatchOutcome.same:
-        return SyncPage(verdict=SyncVerdict.in_sync, **base)
-    if outcome is MatchOutcome.local_ahead:
-        return SyncPage(
-            verdict=SyncVerdict.push,
-            detail=f"{base.get('source_ahead_by', 0)} revision(s) to replay",
-            **base,
-        )
-    if outcome is MatchOutcome.remote_ahead:
-        return SyncPage(
-            verdict=SyncVerdict.pull,
-            detail=f"{base.get('target_ahead_by', 0)} revision(s) inbound",
-            **base,
-        )
-    if outcome is MatchOutcome.diverged:
-        return SyncPage(
-            verdict=SyncVerdict.diverged,
-            detail=proposal.detail or "both sides moved after their last agreement",
-            **base,
-        )
-    return SyncPage(
-        verdict=SyncVerdict.unlinked,
-        detail=proposal.detail or outcome.value,
-        **base,
-    )
+    return _from_anchor(session, source_page, target_page, base, rungs)
 
 
 def _from_anchor(
-    session: Session, source_page: Page, target_page: Page, base: dict
+    session: Session,
+    source_page: Page,
+    target_page: Page,
+    base: dict,
+    rungs: list,
 ) -> SyncPage:
     """A pair that is already linked: the verdict is the distance from its
     anchor, not what a fresh comparison would propose.
 
     Everything reached through here has an asserted anchor by construction --
     the ladder is what got us here."""
-    rungs = ladder(session, page_pk=source_page.pk, other_page_pk=target_page.pk)
     source_head = head_revision(session, source_page)
     target_head = head_revision(session, target_page)
     anchor = rungs[-1] if rungs else None
     if anchor is None:  # pragma: no cover - already_linked implies a rung
         return SyncPage(verdict=SyncVerdict.unlinked, **base)
 
-    base["anchor_asserted"] = True
     base["anchor_source_revid"] = _revid(session, anchor.local_revision_pk)
     base["anchor_target_revid"] = _revid(session, anchor.remote_revision_pk)
     anchored = {anchor.local_revision_pk, anchor.remote_revision_pk}
@@ -719,7 +685,9 @@ def _from_anchor(
         )
     if at_source_head:
         return SyncPage(
-            verdict=SyncVerdict.pull, detail="target has moved past the anchor", **base
+            verdict=SyncVerdict.behind,
+            detail="target has moved past the anchor",
+            **base,
         )
     return SyncPage(
         verdict=SyncVerdict.diverged,

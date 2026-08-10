@@ -29,7 +29,9 @@ import type {
   PairRevisions,
   ProposeWorkResult,
   RungRow,
+  Batch,
   FetchAssetsResult,
+  StageRequest,
   SyncReport,
   SyncRequest,
   WorkDetail,
@@ -311,4 +313,41 @@ export function dumpLocatorIndex(path: string): Promise<LocatorIndexDump> {
 
 export function fetchSyncAssets(payload: SyncRequest): Promise<FetchAssetsResult> {
   return postJson<FetchAssetsResult>('/sync/fetch-assets', payload);
+}
+
+/* --- the push queue -------------------------------------------------------- */
+
+export function stageBatch(payload: StageRequest): Promise<Batch> {
+  return postJson<Batch>('/sync/batches', payload);
+}
+
+export function listBatches(): Promise<Batch[]> {
+  return getJson<Batch[]>('/sync/batches');
+}
+
+export function getBatch(batchPk: number): Promise<Batch> {
+  return getJson<Batch>(`/sync/batches/${batchPk}`);
+}
+
+export function approveBatch(batchPk: number, approvedBy: string): Promise<Batch> {
+  return postJson<Batch>(`/sync/batches/${batchPk}/approve`, { approved_by: approvedBy });
+}
+
+/** Pushes exactly one page. Call it again for the next one. */
+export function pushBatchPage(
+  batchPk: number,
+  options: { promotion_pk?: number; force?: boolean } = {}
+): Promise<Batch> {
+  return postJson<Batch>(`/sync/batches/${batchPk}/push`, options);
+}
+
+export function skipPromotion(batchPk: number, promotionPk: number): Promise<Batch> {
+  return postJson<Batch>(
+    `/sync/batches/${batchPk}/promotions/${promotionPk}/skip`,
+    {}
+  );
+}
+
+export function abortBatch(batchPk: number): Promise<Batch> {
+  return postJson<Batch>(`/sync/batches/${batchPk}/abort`, {});
 }

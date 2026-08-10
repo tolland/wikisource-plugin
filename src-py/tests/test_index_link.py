@@ -484,3 +484,73 @@ def test_a_page_pair_knows_its_work(session: Session) -> None:
 
     assert work_for_index_page(session, local_index.pk).pk == work.pk
     assert work_for_index_page(session, remote_index.pk).pk == work.pk
+
+
+# -- link state, separate from what a comparison proposes ---------------------
+
+
+def test_a_pair_reports_its_link_state_beside_the_proposal(client, engine) -> None:
+    """Two different questions, and the column that answered both was
+    confusing: `remote_ahead` describes what confirming *would* assert, and
+    says nothing about whether anybody has. A pair reading "remote ahead" with
+    no rung behind it looks like a state it is not in."""
+    seed_work(engine)
+    work_pk = client.post("/links/works", json=LINK_BODY).json()["work"]["pk"]
+
+    before = client.get(f"/links/works/{work_pk}").json()
+    row = next(p for p in before["pages"] if p["page_number"] == 1)
+    assert row["outcome"] == "same"  # what confirming would assert
+    assert row["linked"] is False  # ...and nobody has
+    assert row["needs_attention"] is True
+    assert before["needs_attention"] == 3
+    assert before["settled"] == 0
+
+    client.post(f"/links/works/{work_pk}/propose", json={"confirm": True})
+
+    after = client.get(f"/links/works/{work_pk}").json()
+    row = next(p for p in after["pages"] if p["page_number"] == 1)
+    assert row["linked"] is True
+    assert row["anchor_is_current"] is True
+    # Linked and current: nothing left to do, so this page's list should stop
+    # showing it.
+    assert row["needs_attention"] is False
+    assert after["settled"] == 1
+    assert after["needs_attention"] == 2
+
+
+def test_a_linked_pair_that_has_moved_still_needs_attention(client, engine) -> None:
+    """Linked is not the same as done. A pair whose anchor has fallen behind
+    its heads is exactly what a reviewer came to find."""
+    seed_work(engine)
+    work_pk = client.post("/links/works", json=LINK_BODY).json()["work"]["pk"]
+    client.post(f"/links/works/{work_pk}/propose", json={"confirm": True})
+
+    with Session(engine) as session:
+        local = session.exec(select(Site).where(Site.label == "mywikisource")).one()
+        page = session.exec(
+            select(Page).where(
+                Page.site_pk == local.pk,
+                Page.title == "Page:Canadian patent 29537.djvu/1",
+            )
+        ).one()
+        record_head_revision(
+            session,
+            page,
+            RemotePage(
+                title=page.title,
+                namespace_key=250,
+                namespace_canonical="Page",
+                content_model="proofread-page",
+                text=body(3, "Us", "Same, but edited."),
+                revid=99,
+                parentid=5,
+                timestamp=datetime(2026, 2, 1, tzinfo=timezone.utc),
+            ),
+        )
+        session.commit()
+
+    data = client.get(f"/links/works/{work_pk}").json()
+    row = next(p for p in data["pages"] if p["page_number"] == 1)
+    assert row["linked"] is True
+    assert row["anchor_is_current"] is False
+    assert row["needs_attention"] is True

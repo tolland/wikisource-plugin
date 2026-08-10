@@ -331,6 +331,12 @@ export interface PagePair {
   significance?: string | null;
   detail?: string | null;
   rungs: number;
+  /** Whether any revision link is asserted -- distinct from what `outcome` says
+   *  a comparison *would* assert. */
+  linked: boolean;
+  anchor_is_current: boolean;
+  /** False exactly when linked and current: nothing left to do. */
+  needs_attention: boolean;
 }
 
 export interface WorkDetail {
@@ -338,6 +344,8 @@ export interface WorkDetail {
   pages: PagePair[];
   counts: Record<string, number>;
   needs_history: number;
+  needs_attention: number;
+  settled: number;
 }
 
 export interface ProposeWorkResult {
@@ -412,7 +420,7 @@ export type SyncVerdict =
   | 'in_sync'
   | 'create'
   | 'push'
-  | 'pull'
+  | 'behind'
   | 'diverged'
   | 'unlinked'
   | 'source_missing'
@@ -458,15 +466,14 @@ export interface SyncPage {
   target_ahead_by: number;
   detail?: string | null;
   /**
-   * True when the anchor is a stored link rather than the pair a comparison
-   * just found. A push replays onto the anchor, so a computed one is a
+   * Only meaningful on `unlinked`: a comparison finds a matching revision
+   * pair, so `propose --confirm` would link this page. Reported, never acted
+   * on -- a sync replays onto the anchor, and an anchor nobody asserted is a
    * proposal, not a base.
    */
-  anchor_asserted: boolean;
+  linkable: boolean;
   /** True when a push in the reported direction would write this page. */
   actionable: boolean;
-  /** Actionable *and* queueable as it stands. */
-  ready: boolean;
 }
 
 export interface SyncAsset {
@@ -501,10 +508,8 @@ export interface SyncReport {
   fetch_plan: FetchPlanItem[];
   counts: Record<string, number>;
   actionable: number;
-  /** Of the actionable pages, how many could be queued as they stand. */
-  ready: number;
-  /** The gap between the two: one `propose --confirm` away, not a fault. */
-  unasserted_anchors: number;
+  /** Unlinked pages a `propose --confirm` would link. Not writable today. */
+  linkable: number;
   work_pk?: number | null;
   blockers: string[];
   /** Worth knowing, but not reasons to stop. */
@@ -564,4 +569,56 @@ export interface LocatorIndexDump {
   pagelist_assignments: LocatorPagelistAssignment[];
   pages: LocatorPageIndexEntry[];
   sections: LocatorSectionMatch[];
+}
+
+/* --- the push queue -------------------------------------------------------
+ *
+ * A report says what would happen; a batch is somebody deciding it should.
+ * Separate surfaces because the boundary between them is the only place a
+ * person's judgement is recorded.
+ */
+
+export type BatchStatus =
+  | 'draft'
+  | 'approved'
+  | 'running'
+  | 'complete'
+  | 'partial'
+  | 'aborted';
+
+export type PromotionStatus = 'staged' | 'pushed' | 'conflict' | 'error' | 'skipped';
+export type PromotionIntent = 'create' | 'update';
+
+export interface PromotionRow {
+  pk: number;
+  page_number?: number | null;
+  target_title: string;
+  intent: PromotionIntent;
+  status: PromotionStatus;
+  base_revid?: number | null;
+  pre_push_target_revid?: number | null;
+  result_revid?: number | null;
+  error_message?: string | null;
+  body_length: number;
+}
+
+export interface Batch {
+  pk: number;
+  label?: string | null;
+  status: BatchStatus;
+  source_site: string;
+  target_site: string;
+  source_index_title: string;
+  target_index_title: string;
+  approved_by?: string | null;
+  work_pk?: number | null;
+  counts: Record<string, number>;
+  /** Rows still staged. */
+  remaining: number;
+  promotions: PromotionRow[];
+}
+
+export interface StageRequest extends SyncRequest {
+  label?: string | null;
+  page_numbers?: number[] | null;
 }

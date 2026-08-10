@@ -280,20 +280,23 @@ Built: `wtbot.sync` + `POST /sync/report` + the `/sync` viewer route.
       `File:Foo.pdf`), which is ProofreadPage's structural rule and what the
       fetch fan-out already uses, so the two agree by construction.
 
-- [x] **An anchor found is not an anchor asserted.** A `push` replays *onto*
-      the anchor, and `find_anchor` will happily produce one for a pair nobody
-      has linked — that is what it is for. Reported as `push` either way (the
-      pair really does hold the same content), but each row carries
-      `anchor_asserted`, and the report separates `actionable` from `ready`:
-      a create needs no anchor, a push needs a recorded one. The gap is an
-      *advisory*, not a blocker — nothing is wrong with those pages, there is a
-      `propose --confirm` nobody has run — and advisories are kept apart from
-      blockers so that collapsing the two does not teach a reader to ignore
-      both.
+- [x] **The verdicts come off the stored ladder, not off a comparison.** This
+      replaces a first cut that reported `push` for any pair `find_anchor`
+      could anchor. That was wrong in the way the whole design exists to
+      prevent: a sync *writes*, and it writes on top of the anchor, so the only
+      anchor it may use is one somebody asserted. A pair whose correspondence
+      exists solely as a comparison result is `unlinked`, however confident the
+      comparison. `linkable` says a `propose --confirm` would fix it — reported
+      as an *advisory*, never counted as writable, because acting on it would
+      be auto-confirming proposals by the back door.
 
-      Found on a real 316-page Hertz run: 93 pushes, of which only 5 sat on an
-      asserted anchor. The other 88 were correct and unsanctioned, and the
-      report could not tell them apart.
+      `pull` became `behind` in the same pass: it means linked-and-the-target-
+      moved, which is a state, where "pull" named an operation nothing here
+      performs.
+
+      Found on a real 316-page Hertz run: 93 pushes, of which 5 sat on an
+      asserted anchor and 88 did not. The 88 were correct and unsanctioned, and
+      the report presented them identically.
 
 Uploading a backing scan the target genuinely lacks stays out: that is a
 case-by-case decision (discussion §7), not something a sync does.
@@ -362,21 +365,52 @@ sha1: a `pagequality user=` names an account on one wiki, so equivalent
 transcriptions routinely differ. `metadata_significant` (same words, different
 level) is proposable but reported separately, because level is directional.
 
-### 6. `Promotion` / `PromotionBatch` schema
+### 6. `Promotion` / `PromotionBatch`
 
-The push queue: mutable, reviewable, cancellable — deliberately not a status
-column on an audit log (discussion §12).
+Built: `wtbot.model.promotion`, `wtbot.promotion_store`,
+`wtbot.promotion_worker`, `POST /sync/batches*`, and the `/sync/batches/{pk}`
+viewer route.
 
-- [ ] `PromotionBatch`: source site, target site, index, label, status
-      (`draft → preflight → approved → running → complete | partial | aborted |
-      rolled_back`), approval record.
-- [ ] `Promotion` (one per page): the pairing and preflight result — source
-      revision, target page, base anchor, computed body, check outcomes, and the
-      **pre-push target revid**, which is what rollback targets and must be
-      persisted.
-- [ ] Intent (`create` | `update`) recorded explicitly, not inferred from
-      `base_revid is None`. This is what lets the push set
-      `createonly`/`nocreate` correctly.
+- [x] `PromotionBatch`: source site, target site, work, label, status
+      (`draft → approved → running → complete | partial | aborted`), and the
+      approval record. `partial` is a first-class end state, not a failure:
+      pushing 300 pages through a rate-limited wiki and having 12 refused is
+      Tuesday, and a status that could not say so would make every real run
+      read as broken. `preflight` and `rolled_back` are absent until something
+      performs them — rollback is still its own item.
+- [x] `Promotion` (one per page): the pairing, the source revision, the anchor
+      link, the base revid, the **frozen body**, the outcome, and the
+      **pre-push target revid** — persisted because it is what a rollback
+      targets and it is unrecoverable once the push has appended a revision.
+- [x] Intent (`create` | `update`) recorded explicitly, never inferred from
+      `base_revid is None`. The inference is wrong in exactly the case that
+      matters: a page we believe absent that somebody created since would be
+      silently overwritten by a create that was really an update.
+- [x] **Staging freezes the report.** The report is recomputed per load, and
+      should be; a queued push must not change meaning between review and
+      execution. Body, base revid and anchor are copied in at staging and
+      re-checked at push time — a source that moved is a `conflict`, which is a
+      state rather than a surprise.
+- [x] **Only writable rows stage.** An unlinked page a comparison likes is
+      refused: staging is the last point at which "we are not sure these
+      correspond" is cheap to say.
+- [x] **Nothing runs unapproved**, and the approver's name is stored rather
+      than assumed from the fact that a request arrived.
+- [x] **One page per call.** `POST /sync/batches/{pk}/push` writes exactly one
+      promotion. The viewer's "push the rest" walks the same call and halts on
+      the first row that does not push cleanly — a conflict means the world
+      moved under the batch, and the remaining rows were staged on the same
+      assumption.
+- [x] The push writes **no link**. A successful push creates a revision known
+      here only as a revid, and the revision store has one writer (the fetch
+      worker); a later refetch makes it concrete and the ordinary `propose`
+      path links it, `origin=copy`.
+
+Still open, and each is its own item rather than a gap in this one: the rest of
+discussion §7's transform chain (only the `pagequality user=` rewrite is
+implemented — level capping, local-only templates/`File:`s and staging-host
+URLs are named checks that want their own verdicts), `createonly`/`nocreate` on
+the save call, and rollback.
 
 ### 7. Seeding a work that exists only upstream
 
