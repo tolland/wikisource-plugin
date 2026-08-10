@@ -3,33 +3,36 @@ from dataclasses import dataclass
 from typing import Annotated, Any
 
 import typer
+from typer_di import Depends
 
-"""Shared CLI options, as TyperDI dependencies.
+"""Shared CLI dependencies.
 
-Every command talks to the same API and most of them address the same wiki, so
-``--base-url`` and ``--label`` were being redeclared per command along with the
-httpx call and its error handling. A Typer *callback* is the other way to share
-them, but a callback's values arrive on ``ctx.parent.params``, so each command
-then digs them back out by name -- the option is declared in one place and
-retrieved by string in another.
+Every command talks to the same API and most of them address the same wiki.
+The API location is a root option stored as a typed ``CliConfig`` in Click's
+context; command-specific options such as ``--label`` are supplied by TyperDI.
 
-TyperDI inverts that: a dependency declares the options it needs, and any
-command that depends on it gets them merged into its own signature (so they
-still appear in ``--help`` and are still passed on that command's own command
-line). The command receives a built object rather than loose strings.
+Commands receive built objects rather than context dictionaries or loose
+strings:
 
     @app.command()
     def show(api: ApiClient = Depends(get_api)) -> None:
         typer.echo(api.get("/fetch/queue"))
 
-There is deliberately no global state and no ctx digging here.
+The context lookup is isolated in ``get_cli_config`` and checked by type.
 """
 
-DEFAULT_BASE_URL = "http://127.0.100.1:18564"
+DEFAULT_BASE_URL = "http://127.0.0.1:18574"
 
 #: Generous by default: a drain of a throttled fan-out legitimately runs for
 #: minutes, and a timeout mid-drain looks like a server fault.
 DEFAULT_TIMEOUT = 3600.0
+
+
+@dataclass(frozen=True)
+class CliConfig:
+    """Configuration parsed once by the root command."""
+
+    base_url: str
 
 
 @dataclass(frozen=True)
@@ -98,23 +101,30 @@ class ApiClient:
         return response.json()
 
 
+def get_context(ctx: typer.Context) -> typer.Context:
+    """Expose Typer's context as a dependency shared across the DI graph."""
+    return ctx
+
+
+def get_cli_config(
+    ctx: typer.Context = Depends(get_context),
+) -> CliConfig:
+    """Return the nearest root CLI configuration with its concrete type."""
+    config = ctx.find_object(CliConfig)
+    if config is None:
+        raise RuntimeError("CLI configuration was not initialized")
+    return config
+
+
 def get_api(
-    base_url: Annotated[
-        str,
-        typer.Option(
-            "--base-url",
-            envvar="WTBOT_API_URL",
-            show_envvar=False,
-            help="wtbot API base URL",
-        ),
-    ] = DEFAULT_BASE_URL,
+    config: CliConfig = Depends(get_cli_config),
     timeout: Annotated[
         float,
         typer.Option("--timeout", help="HTTP timeout in seconds."),
     ] = DEFAULT_TIMEOUT,
 ) -> ApiClient:
-    """Dependency: the API client, with --base-url/--timeout on the command."""
-    return ApiClient(base_url=base_url, timeout=timeout)
+    """Dependency: the API client, with a command-specific timeout."""
+    return ApiClient(base_url=config.base_url, timeout=timeout)
 
 
 def get_label(

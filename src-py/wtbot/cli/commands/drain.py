@@ -1,7 +1,7 @@
 import typer
 from typer_di import Depends, TyperDI
 
-from wtbot.cli.deps import ApiClient, get_api
+from wtbot.cli.deps import ApiClient, get_api, get_context
 
 app = TyperDI(
     no_args_is_help=False,
@@ -23,7 +23,7 @@ worth draining" without starting one.
 
 @app.callback(invoke_without_command=True)
 def drain(
-    ctx: typer.Context,
+    ctx: typer.Context = Depends(get_context),
     status_only: bool = typer.Option(
         False,
         "--status",

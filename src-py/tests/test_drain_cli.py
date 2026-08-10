@@ -54,7 +54,7 @@ def api(monkeypatch):
 
 
 def test_drain_posts_and_reports(api):
-    result = runner.invoke(create_app(), ["drain", "--base-url", "http://wtbot:8000"])
+    result = runner.invoke(create_app(), ["--base-url", "http://wtbot:8000", "drain"])
 
     assert result.exit_code == 0, result.output
     assert api["post_url"] == "http://wtbot:8000/fetch/drain"
@@ -62,10 +62,20 @@ def test_drain_posts_and_reports(api):
     assert "drained 3 request(s) in 2 pass(es); 0 remaining" in result.output
 
 
+def test_base_url_is_not_accepted_after_the_subcommand(api):
+    result = runner.invoke(
+        create_app(), ["drain", "--base-url", "http://wtbot:8000", "--status"]
+    )
+
+    assert result.exit_code == 2
+    assert "No such option: --base-url" in result.output
+    assert "get_url" not in api
+
+
 def test_drain_passes_its_bounds_through(api):
     result = runner.invoke(
         create_app(),
-        ["drain", "--batch", "25", "--max-passes", "4", "--base-url", "http://w:8000"],
+        ["--base-url", "http://w:8000", "drain", "--batch", "25", "--max-passes", "4"],
     )
 
     assert result.exit_code == 0, result.output
@@ -83,7 +93,7 @@ def test_an_incomplete_drain_says_so(api):
         "complete": False,
     }
 
-    result = runner.invoke(create_app(), ["drain", "--base-url", "http://w:8000"])
+    result = runner.invoke(create_app(), ["--base-url", "http://w:8000", "drain"])
 
     assert result.exit_code == 0, result.output
     assert "40 remaining" in result.output
@@ -104,7 +114,7 @@ def test_a_rate_limited_drain_says_not_to_just_run_again(api):
         "retry_after": 45.0,
     }
 
-    result = runner.invoke(create_app(), ["drain", "--base-url", "http://w:8000"])
+    result = runner.invoke(create_app(), ["--base-url", "http://w:8000", "drain"])
 
     assert result.exit_code == 0, result.output
     assert "rate-limited" in result.output
@@ -115,7 +125,7 @@ def test_a_rate_limited_drain_says_not_to_just_run_again(api):
 
 def test_status_reports_the_queue_without_draining(api):
     result = runner.invoke(
-        create_app(), ["drain", "--status", "--base-url", "http://wtbot:8000"]
+        create_app(), ["--base-url", "http://wtbot:8000", "drain", "--status"]
     )
 
     assert result.exit_code == 0, result.output
@@ -129,5 +139,5 @@ def test_status_reports_the_queue_without_draining(api):
 def test_the_timeout_allows_for_a_throttled_fan_out(api):
     """A book's worth of throttled fetches takes minutes; a default httpx
     timeout would abort the drain mid-run and look like a server fault."""
-    runner.invoke(create_app(), ["drain", "--base-url", "http://w:8000"])
+    runner.invoke(create_app(), ["--base-url", "http://w:8000", "drain"])
     assert api["timeout"] >= 600

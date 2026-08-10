@@ -3,7 +3,7 @@ from datetime import datetime
 import typer
 from typer_di import Depends, TyperDI
 
-from wtbot.cli.deps import ApiClient, get_api, get_label
+from wtbot.cli.deps import ApiClient, get_api, get_context, get_label
 
 app = TyperDI(
     no_args_is_help=False,
@@ -13,7 +13,7 @@ app = TyperDI(
 
 @app.callback(invoke_without_command=True)
 def fetch_refresh(
-    ctx: typer.Context,
+    ctx: typer.Context = Depends(get_context),
     title_prefix: str | None = typer.Option(
         None,
         help=(

@@ -9,6 +9,7 @@ from wtbot import (
     __app_name__,
     __version__,
 )
+from wtbot.cli.deps import DEFAULT_BASE_URL, CliConfig
 
 
 def _version_callback(value: bool) -> None:
@@ -17,7 +18,7 @@ def _version_callback(value: bool) -> None:
         raise typer.Exit()
 
 
-def get_callback() -> Callable[[typer.Context, Optional[bool], Optional[int]], None]:
+def get_callback() -> Callable[..., None]:
     # noinspection PyUnusedLocal
     def callback(
         ctx: typer.Context,
@@ -47,7 +48,17 @@ def get_callback() -> Callable[[typer.Context, Optional[bool], Optional[int]], N
                 # hidden=True,
             ),
         ] = None,
+        base_url: Annotated[
+            str,
+            typer.Option(
+                "--base-url",
+                envvar="WTBOT_API_URL",
+                show_envvar=False,
+                help="wtbot API base URL",
+            ),
+        ] = DEFAULT_BASE_URL,
     ):
+        ctx.obj = CliConfig(base_url=base_url)
         # inspect(ctx)
         if ctx.invoked_subcommand is None:
             typer.echo("No subcommand invoked")

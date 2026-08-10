@@ -276,8 +276,11 @@ def test_an_api_error_is_reported_without_a_traceback(api, monkeypatch):
     assert "Traceback" not in result.output
 
 
-def test_shared_options_are_present_on_every_command_that_depends_on_them():
-    """The injected options must really reach each command's own parser."""
+def test_api_location_is_global_and_command_dependencies_remain_local():
+    root_help = runner.invoke(create_app(), ["--help"])
+    assert root_help.exit_code == 0
+    assert "--base-url" in root_help.output
+
     for argv in (
         ["site", "add", "--help"],
         ["site-credential", "add", "--help"],
@@ -286,7 +289,7 @@ def test_shared_options_are_present_on_every_command_that_depends_on_them():
     ):
         result = runner.invoke(create_app(), argv)
         assert result.exit_code == 0, argv
-        assert "--base-url" in result.output, argv
+        assert "--base-url" not in result.output, argv
 
     for argv in (["site-credential", "add", "--help"], ["fetch-page", "--help"]):
         result = runner.invoke(create_app(), argv)

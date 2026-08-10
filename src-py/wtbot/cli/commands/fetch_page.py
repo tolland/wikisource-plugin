@@ -2,7 +2,7 @@ import typer
 from rich import inspect
 from typer_di import Depends, TyperDI
 
-from wtbot.cli.deps import ApiClient, get_api, get_label
+from wtbot.cli.deps import ApiClient, get_api, get_context, get_label
 
 app = TyperDI(
     no_args_is_help=True,
@@ -12,7 +12,7 @@ app = TyperDI(
 
 @app.callback(invoke_without_command=True)
 def fetch_page(
-    ctx: typer.Context,
+    ctx: typer.Context = Depends(get_context),
     title: str = typer.Argument(..., help="e.g. Index:Some_book.djvu"),
     depth: int = typer.Option(
         1, help="expansion depth: 0=page only, 1=expand Index/File"
