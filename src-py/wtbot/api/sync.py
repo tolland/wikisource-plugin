@@ -1,10 +1,29 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.deps import get_session
-from wtbot.model import FetchKind, FetchRequest
+from wtbot.model import (
+    BatchStatus,
+    FetchKind,
+    FetchRequest,
+    Promotion,
+    PromotionBatch,
+    PromotionIntent,
+    PromotionStatus,
+    Site,
+)
+from wtbot.promotion_store import (
+    PromotionError,
+    abort,
+    approve,
+    next_staged,
+    promotions,
+    skip,
+    stage_batch,
+)
+from wtbot.promotion_worker import push_one
 from wtbot.site_store import require_credentialed_site, resolve_pair
 from wtbot.sync import (
     ScanStatus,
@@ -92,21 +111,18 @@ class SyncPageOut(BaseModel):
     source_ahead_by: int = 0
     target_ahead_by: int = 0
     detail: str | None = None
-    anchor_asserted: bool = Field(
+    linkable: bool = Field(
         default=False,
         description=(
-            "True when the anchor is a stored RemoteLink rather than the pair "
-            "a comparison just found. A push replays onto the anchor, so a "
-            "computed one is a proposal, not a base."
+            "Only meaningful on `unlinked`: a comparison finds a matching "
+            "revision pair, so `propose --confirm` would link this page. "
+            "Reported, never acted on here."
         ),
     )
     actionable: bool = Field(
-        description="True when a push in this direction would act on the page."
-    )
-    ready: bool = Field(
         description=(
-            "Actionable *and* queueable as it stands: a create (nothing to "
-            "replay onto) or a push onto an asserted anchor."
+            "True when a push in this direction would write this page -- a "
+            "create, or a push onto an asserted anchor. Nothing else."
         )
     )
 
@@ -160,11 +176,10 @@ class SyncReportOut(BaseModel):
     )
     counts: dict[str, int]
     actionable: int = Field(description="Pages a push in this direction would write.")
-    ready: int = Field(description="Of those, how many could be queued as they stand.")
-    unasserted_anchors: int = Field(
+    linkable: int = Field(
         description=(
-            "The gap between the two: pages whose anchor is a comparison's "
-            "guess. One `propose --confirm` away, not a fault."
+            "Unlinked pages a `propose --confirm` would link -- work that "
+            "would become sync-able, not work a sync would do."
         )
     )
     advisories: list[str] = Field(
@@ -204,9 +219,8 @@ def _page_out(page: SyncPage) -> SyncPageOut:
         source_ahead_by=page.source_ahead_by,
         target_ahead_by=page.target_ahead_by,
         detail=page.detail,
-        anchor_asserted=page.anchor_asserted,
+        linkable=page.linkable,
         actionable=page.actionable,
-        ready=page.ready,
     )
 
 
@@ -220,8 +234,7 @@ def _out(report: SyncReport) -> SyncReportOut:
         fetch_plan=[FetchPlanItemOut(**vars(item)) for item in report.fetch_plan],
         counts=report.counts,
         actionable=report.actionable,
-        ready=report.ready,
-        unasserted_anchors=report.unasserted_anchors,
+        linkable=report.linkable,
         advisories=report.advisories,
         work_pk=report.work_pk,
         blockers=report.blockers,
@@ -316,3 +329,258 @@ def fetch_assets(
     session.commit()
 
     return FetchAssetsResult(queued=queued)
+
+
+# --- the push queue ---------------------------------------------------------
+#
+# A report says what would happen; a batch is somebody deciding it should.
+# The two stay separate surfaces because the boundary between them is the only
+# place a person's judgement is recorded, and folding "stage" into "report"
+# would make looking a consequential act.
+
+
+class StageRequest(SyncRequest):
+    label: str | None = Field(
+        default=None, description="A name for this run, to tell it from others."
+    )
+    page_numbers: list[int] | None = Field(
+        default=None,
+        description=(
+            "Stage only these pages. The usual case: a reviewer works down a "
+            "list and stages what they actually looked at. Omit for every "
+            "writable page in the report."
+        ),
+    )
+
+
+class ApproveRequest(BaseModel):
+    approved_by: str = Field(
+        description=(
+            "Who is signing this off. Stored, not assumed -- 'did a person "
+            "agree to this' is exactly the fact an audit wants."
+        )
+    )
+
+
+class PushRequest(BaseModel):
+    promotion_pk: int | None = Field(
+        default=None,
+        description="Which page to push. Omit to take the next staged one.",
+    )
+    force: bool = Field(
+        default=False,
+        description=(
+            "Write even when the source has moved since staging, or the "
+            "target's base revid no longer matches. Off by default: both mean "
+            "the body under review is not the body being written."
+        ),
+    )
+
+
+class PromotionOut(BaseModel):
+    pk: int
+    page_number: int | None = None
+    target_title: str
+    intent: PromotionIntent
+    status: PromotionStatus
+    base_revid: int | None = None
+    pre_push_target_revid: int | None = None
+    result_revid: int | None = None
+    error_message: str | None = None
+    body_length: int
+
+
+class BatchOut(BaseModel):
+    pk: int
+    label: str | None = None
+    status: BatchStatus
+    source_site: str
+    target_site: str
+    source_index_title: str
+    target_index_title: str
+    approved_by: str | None = None
+    work_pk: int | None = None
+    counts: dict[str, int] = Field(description="Promotions per status.")
+    remaining: int = Field(description="Rows still staged.")
+    promotions: list[PromotionOut]
+
+
+def _promotion_out(row: Promotion) -> PromotionOut:
+    return PromotionOut(
+        pk=row.pk,
+        page_number=row.page_number,
+        target_title=row.target_title,
+        intent=row.intent,
+        status=row.status,
+        base_revid=row.base_revid,
+        pre_push_target_revid=row.pre_push_target_revid,
+        result_revid=row.result_revid,
+        error_message=row.error_message,
+        body_length=len(row.body),
+    )
+
+
+def _site_name(site: Site) -> str:
+    return site.label or f"{site.family}:{site.code}"
+
+
+def _batch_out(session: Session, batch: PromotionBatch) -> BatchOut:
+    rows = promotions(session, batch.pk)
+    counts: dict[str, int] = {}
+    for row in rows:
+        counts[row.status.value] = counts.get(row.status.value, 0) + 1
+    return BatchOut(
+        pk=batch.pk,
+        label=batch.label,
+        status=batch.status,
+        source_site=_site_name(session.get(Site, batch.source_site_pk)),
+        target_site=_site_name(session.get(Site, batch.target_site_pk)),
+        source_index_title=batch.source_index_title,
+        target_index_title=batch.target_index_title,
+        approved_by=batch.approved_by,
+        work_pk=batch.index_link_pk,
+        counts=counts,
+        remaining=counts.get(PromotionStatus.staged.value, 0),
+        promotions=[_promotion_out(row) for row in rows],
+    )
+
+
+def _batch(session: Session, batch_pk: int) -> PromotionBatch:
+    batch = session.get(PromotionBatch, batch_pk)
+    if batch is None:
+        raise HTTPException(404, f"no batch {batch_pk}")
+    return batch
+
+
+@router.post("/batches", response_model=BatchOut, status_code=201)
+def create_batch(
+    payload: StageRequest, session: Session = Depends(get_session)
+) -> BatchOut:
+    """Stage a push run from what the report says is writable.
+
+    Refuses anything else. An unlinked page a comparison likes, a diverged
+    pair, a page the target is ahead on -- staging is the last point at which
+    "we are not sure these correspond" is cheap to say, and a queue that
+    accepted them would make it expensive.
+    """
+    source_site, target_site = resolve_pair(
+        session, payload.source_label, payload.target_label
+    )
+    try:
+        report = build_report(
+            session,
+            source_site=source_site,
+            target_site=target_site,
+            index_title=payload.index_title,
+            target_index_title=payload.target_index_title,
+        )
+        batch = stage_batch(
+            session,
+            report,
+            source_site=source_site,
+            target_site=target_site,
+            label=payload.label,
+            page_numbers=payload.page_numbers,
+        )
+    except SyncError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except PromotionError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    session.commit()
+    session.refresh(batch)
+    return _batch_out(session, batch)
+
+
+@router.get("/batches", response_model=list[BatchOut])
+def list_batches(session: Session = Depends(get_session)) -> list[BatchOut]:
+    batches = session.exec(
+        select(PromotionBatch).order_by(PromotionBatch.pk.desc())
+    ).all()
+    return [_batch_out(session, batch) for batch in batches]
+
+
+@router.get("/batches/{batch_pk}", response_model=BatchOut)
+def get_batch(batch_pk: int, session: Session = Depends(get_session)) -> BatchOut:
+    return _batch_out(session, _batch(session, batch_pk))
+
+
+@router.post("/batches/{batch_pk}/approve", response_model=BatchOut)
+def approve_batch(
+    batch_pk: int, payload: ApproveRequest, session: Session = Depends(get_session)
+) -> BatchOut:
+    """Sign a draft off. Nothing runs without this."""
+    batch = _batch(session, batch_pk)
+    try:
+        approve(session, batch, approved_by=payload.approved_by)
+    except PromotionError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    session.commit()
+    return _batch_out(session, batch)
+
+
+@router.post("/batches/{batch_pk}/push", response_model=BatchOut)
+def push_batch_page(
+    batch_pk: int,
+    request: Request,
+    payload: PushRequest | None = None,
+    session: Session = Depends(get_session),
+) -> BatchOut:
+    """Push **one** page of the batch, and return the batch as it now stands.
+
+    One at a time on purpose: the run can be watched, paused and abandoned
+    between pages, the wiki gets one request rather than three hundred, and a
+    batch that half-succeeds needs no unpicking because each row carries its
+    own outcome.
+    """
+    payload = payload or PushRequest()
+    _batch(session, batch_pk)  # 404 before anything else touches the wiki
+
+    target = payload.promotion_pk
+    if target is None:
+        upcoming = next_staged(session, batch_pk)
+        if upcoming is None:
+            raise HTTPException(409, f"batch {batch_pk} has no staged rows left")
+        target = upcoming.pk
+
+    client_factory = getattr(request.app.state, "client_factory", None)
+    if client_factory is None:  # pragma: no cover - wired at app construction
+        raise HTTPException(500, "no wiki client factory configured")
+
+    try:
+        push_one(session, target, client_factory, force=payload.force)
+    except PromotionError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    session.commit()
+    return _batch_out(session, _batch(session, batch_pk))
+
+
+@router.post(
+    "/batches/{batch_pk}/promotions/{promotion_pk}/skip", response_model=BatchOut
+)
+def skip_promotion(
+    batch_pk: int, promotion_pk: int, session: Session = Depends(get_session)
+) -> BatchOut:
+    """Drop one page from a run without abandoning the run."""
+    batch = _batch(session, batch_pk)
+    promotion = session.get(Promotion, promotion_pk)
+    if promotion is None or promotion.batch_pk != batch_pk:
+        raise HTTPException(404, f"no promotion {promotion_pk} in batch {batch_pk}")
+    try:
+        skip(session, promotion)
+    except PromotionError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    session.commit()
+    return _batch_out(session, batch)
+
+
+@router.post("/batches/{batch_pk}/abort", response_model=BatchOut)
+def abort_batch(batch_pk: int, session: Session = Depends(get_session)) -> BatchOut:
+    """Stop a run. Staged rows are skipped; pushed rows stay pushed.
+
+    There is no undo: reversing a push means appending another revision, which
+    is the rollback item the TODO keeps separate because it is not free.
+    """
+    batch = _batch(session, batch_pk)
+    abort(session, batch)
+    session.commit()
+    return _batch_out(session, batch)

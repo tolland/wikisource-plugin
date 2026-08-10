@@ -23,6 +23,13 @@ from wtbot.model.page_meta import (
     PageMeta,
     default_short_name,
 )
+from wtbot.model.promotion import (
+    BatchStatus,
+    Promotion,
+    PromotionBatch,
+    PromotionIntent,
+    PromotionStatus,
+)
 from wtbot.model.remote_link import LinkOrigin, RemoteLink
 from wtbot.model.revision import Revision
 from wtbot.model.scan_annotation import AnnotationCategory, ScanAnnotation
@@ -46,6 +53,11 @@ __all__ = [
     "Page",
     "FetchState",
     "Revision",
+    "BatchStatus",
+    "Promotion",
+    "PromotionBatch",
+    "PromotionIntent",
+    "PromotionStatus",
     "RemoteLink",
     "PageLink",
     "LinkOrigin",

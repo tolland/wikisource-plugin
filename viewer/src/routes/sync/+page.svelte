@@ -1,12 +1,20 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page as routePage } from '$app/state';
-  import { fetchSyncAssets, listIndexCandidates, listSites, syncReport } from '$lib/api';
+  import {
+    fetchSyncAssets,
+    listIndexCandidates,
+    listSites,
+    stageBatch,
+    syncReport
+  } from '$lib/api';
+  import { goto } from '$app/navigation';
   import ActionButton from '$lib/components/ActionButton.svelte';
   import Notice from '$lib/components/Notice.svelte';
   import PageHeading from '$lib/components/PageHeading.svelte';
   import SelectField from '$lib/components/SelectField.svelte';
   import SiteSelect from '$lib/components/SiteSelect.svelte';
+  import TextField from '$lib/components/TextField.svelte';
   import type { Site, SyncPage, SyncReport, SyncVerdict } from '$lib/types';
 
   /**
@@ -35,6 +43,8 @@
   let loading = $state(true);
   let running = $state(false);
   let fetching = $state(false);
+  let staging = $state(false);
+  let batchLabel = $state('');
   let error = $state('');
   let message = $state('');
 
@@ -53,10 +63,10 @@
       tone: 'go',
       note: 'Source revisions sit above the anchor; the target is still at it.'
     },
-    pull: {
-      label: 'pull',
+    behind: {
+      label: 'behind',
       tone: 'in',
-      note: 'The target has moved on and the source has not. Work in the other direction.'
+      note: 'Linked, and the target has moved on. Real work, in the other direction.'
     },
     in_sync: { label: 'in sync', tone: 'quiet', note: 'The anchor names both heads.' },
     diverged: {
@@ -67,7 +77,7 @@
     unlinked: {
       label: 'unlinked',
       tone: 'warn',
-      note: 'Both sides hold content, but nothing says which revisions correspond.'
+      note: 'No asserted link, so there is no base to write onto. Not writable today.'
     },
     source_missing: {
       label: 'target only',
@@ -166,6 +176,29 @@
       error = err instanceof Error ? err.message : 'Failed to queue the assets';
     } finally {
       fetching = false;
+    }
+  }
+
+  async function stage(): Promise<void> {
+    // Only what the report calls writable goes in, and the server refuses
+    // anything else -- staging is the last cheap moment to say "we are not
+    // sure these correspond".
+    staging = true;
+    error = '';
+    message = '';
+    try {
+      const batch = await stageBatch({
+        source_label: label(sourceSite),
+        target_label: label(targetSite),
+        index_title: indexTitle,
+        target_index_title: targetIndexTitle || null,
+        label: batchLabel || null
+      });
+      await goto(`/sync/batches/${batch.pk}`);
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Failed to stage the batch';
+    } finally {
+      staging = false;
     }
   }
 
@@ -348,11 +381,29 @@
     {/each}
     <span class="total">
       {report.actionable} page(s) a push would write
-      {#if report.ready !== report.actionable}
-        &middot; {report.ready} ready, {report.unasserted_anchors} need linking first
+      {#if report.linkable}
+        &middot; {report.linkable} more once linked
       {/if}
     </span>
   </section>
+
+  {#if report.actionable > 0}
+    <section class="stage" aria-label="Stage a push">
+      <h2>Stage these {report.actionable} page(s)</h2>
+      <p>
+        Freezes what this report says into a reviewable run: the body, the base
+        revision and the anchor, so what gets approved is what gets written. Nothing
+        is pushed until you approve it on the next screen, and then one page at a
+        time.
+      </p>
+      <div class="row">
+        <TextField label="Name this run (optional)" bind:value={batchLabel} />
+        <ActionButton disabled={staging} onclick={stage}>
+          {staging ? 'Staging...' : 'Stage a push run'}
+        </ActionButton>
+      </div>
+    </section>
+  {/if}
 
   <div class="filter">
     <SelectField label="Show" bind:value={show}>
@@ -390,15 +441,15 @@
             <td class="title">
               {row.source_title ?? row.target_title}
               <small>{row.detail ?? VERDICTS[row.verdict]?.note ?? ''}</small>
+              {#if row.linkable}
+                <small class="linkable">linkable &mdash; one Propose away</small>
+              {/if}
             </td>
             <td class="revs">
               {row.source_revid ?? '-'} &rarr; {row.target_revid ?? 'none'}
               {#if row.anchor_source_revid}
-                <small class:unasserted={!row.anchor_asserted}>
+                <small>
                   anchor {row.anchor_source_revid} &harr; {row.anchor_target_revid}
-                  {#if !row.anchor_asserted}
-                    (not asserted)
-                  {/if}
                 </small>
               {/if}
             </td>
@@ -713,8 +764,35 @@
     font-size: 0.88rem;
   }
 
-  .pages small.unasserted {
+  .pages small.linkable {
     color: #7d5510;
+  }
+
+  .stage {
+    border: 1px solid rgba(40, 107, 76, 0.34);
+    border-radius: 20px;
+    background: rgba(229, 246, 235, 0.5);
+    margin-bottom: 1.5rem;
+    padding: 1.1rem 1.2rem;
+  }
+
+  .stage h2 {
+    margin: 0 0 0.4rem;
+    font-size: 1rem;
+  }
+
+  .stage p {
+    margin: 0 0 0.8rem;
+    max-width: 50rem;
+    color: #24543f;
+    font-size: 0.88rem;
+  }
+
+  .stage .row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    align-items: end;
   }
 
   .filter {

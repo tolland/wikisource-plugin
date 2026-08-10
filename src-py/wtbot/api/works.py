@@ -33,7 +33,8 @@ from wtbot.model import (
     Site,
 )
 from wtbot.page_link_store import find_pair, pair_pages
-from wtbot.remote_link_store import LinkError
+from wtbot.remote_link_store import LinkError, ladder
+from wtbot.revision_store import head_revision
 from wtbot.site_store import require_credentialed_site, resolve_pair
 
 """Works: the cross-site unit a reviewer actually navigates.
@@ -201,6 +202,30 @@ class PagePairOut(BaseModel):
     detail: str | None = None
     rungs: int = 0
 
+    linked: bool = Field(
+        default=False,
+        description=(
+            "Whether any revision link has been asserted for this pair. The "
+            "primary fact this page is about -- `outcome` says what a "
+            "comparison *would* assert, which is a different question."
+        ),
+    )
+    anchor_is_current: bool = Field(
+        default=False,
+        description=(
+            "Linked, and the newest rung names both sides' heads: nothing "
+            "left to do here."
+        ),
+    )
+    needs_attention: bool = Field(
+        default=True,
+        description=(
+            "False exactly when the pair is linked and its anchor is current. "
+            "This page exists to link unlinked pages, so a finished row is "
+            "noise -- the viewer hides these by default."
+        ),
+    )
+
 
 class WorkDetail(BaseModel):
     work: WorkSummary
@@ -208,6 +233,16 @@ class WorkDetail(BaseModel):
     counts: dict[str, int] = Field(description="Page pairs per outcome.")
     needs_history: int = Field(
         description="Pairs an ordinary fetch-history run would act on."
+    )
+    needs_attention: int = Field(
+        default=0,
+        description=(
+            "Pairs that are not already linked-and-current -- the ones this "
+            "page is for."
+        ),
+    )
+    settled: int = Field(
+        default=0, description="Pairs that are linked with their anchor current."
     )
 
 
@@ -349,6 +384,7 @@ def _pair_out(
 ) -> PagePairOut:
     pair_pk: int | None = None
     rungs = 0
+    anchor_is_current = False
     local = session.exec(
         select(Page).where(
             Page.site_pk == local_site.pk, Page.title == proposal.local_title
@@ -367,11 +403,18 @@ def _pair_out(
         pairing = find_pair(session, local.pk, remote.pk)
         if pairing is not None:
             pair_pk = pairing.pk
-            rungs = session.exec(
-                select(func.count())
-                .select_from(RemoteLink)
-                .where(RemoteLink.page_link_pk == pairing.pk)
-            ).one()
+            ladder_rows = ladder(session, page_pk=local.pk, other_page_pk=remote.pk)
+            rungs = len(ladder_rows)
+            if ladder_rows:
+                anchor = ladder_rows[-1]
+                local_head = head_revision(session, local)
+                remote_head = head_revision(session, remote)
+                anchor_is_current = bool(
+                    local_head
+                    and remote_head
+                    and {anchor.local_revision_pk, anchor.remote_revision_pk}
+                    == {local_head.pk, remote_head.pk}
+                )
 
     return PagePairOut(
         pair_pk=pair_pk,
@@ -388,6 +431,9 @@ def _pair_out(
         significance=proposal.significance.value if proposal.significance else None,
         detail=proposal.detail,
         rungs=rungs,
+        linked=rungs > 0,
+        anchor_is_current=anchor_is_current,
+        needs_attention=not (rungs > 0 and anchor_is_current),
     )
 
 
@@ -608,6 +654,8 @@ def get_work(work_pk: int, session: Session = Depends(get_session)) -> WorkDetai
         pages=pages,
         counts=counts,
         needs_history=sum(1 for row in pages if row.resolvable_by_fetch),
+        needs_attention=sum(1 for row in pages if row.needs_attention),
+        settled=sum(1 for row in pages if not row.needs_attention),
     )
 
 

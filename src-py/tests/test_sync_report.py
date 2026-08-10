@@ -304,7 +304,11 @@ def test_placeholders_are_counted_on_the_side_summary(client, engine):
 # -- the directional verdicts -------------------------------------------------
 
 
-def test_a_converged_work_is_in_sync(client, engine):
+def test_two_matching_pages_are_unlinked_until_somebody_links_them(client, engine):
+    """The rule the module turns on. The two pages hold the same transcription
+    and a comparison says so -- but nothing is *asserted*, so a sync has no base
+    to write onto. Reported as unlinked, and flagged linkable so the report can
+    point at the button that fixes it."""
     seed_source_only(engine, pages=1)
     with Session(engine) as session:
         local = session.exec(select(Site).where(Site.label == "mywikisource")).one()
@@ -315,11 +319,30 @@ def test_a_converged_work_is_in_sync(client, engine):
         )
 
     data = client.post("/sync/report", json=request()).json()
+    assert data["counts"] == {"unlinked": 1}
+    assert data["actionable"] == 0
+    assert data["linkable"] == 1
+    assert any("would be linked by" in note for note in data["advisories"])
+
+
+def test_a_converged_work_is_in_sync_once_linked(client, engine):
+    seed_source_only(engine, pages=1)
+    with Session(engine) as session:
+        local = session.exec(select(Site).where(Site.label == "mywikisource")).one()
+        build_index(session, local, SOURCE_INDEX, sha1=SCAN_SHA1)
+        build_page(
+            session, local, SOURCE_INDEX, 1, text=body(3, "Us", "Page 1."), revid=5
+        )
+    client_propose(engine)
+
+    data = client.post("/sync/report", json=request()).json()
     assert data["counts"] == {"in_sync": 1}
     assert data["actionable"] == 0
+    assert data["linkable"] == 0
+    assert data["advisories"] == []
 
 
-def test_the_direction_decides_push_from_pull(client, engine):
+def test_the_direction_decides_push_from_behind(client, engine):
     """The whole reason this has its own vocabulary. The pair is the same pair;
     which side is the source is what makes it a push or a pull."""
     seed_source_only(engine, pages=1)
@@ -350,11 +373,13 @@ def test_the_direction_decides_push_from_pull(client, engine):
             ),
         )
         session.commit()
+    # Link the pair first: without an asserted anchor there is no direction to
+    # measure from, only an unlinked page.
+    client_propose(engine)
 
     forward = client.post("/sync/report", json=request()).json()
     (page_row,) = forward["pages"]
     assert page_row["verdict"] == "push"
-    assert page_row["source_ahead_by"] == 1
 
     reversed_ = client.post(
         "/sync/report",
@@ -365,8 +390,7 @@ def test_the_direction_decides_push_from_pull(client, engine):
         ),
     ).json()
     (reversed_row,) = reversed_["pages"]
-    assert reversed_row["verdict"] == "pull"
-    assert reversed_row["target_ahead_by"] == 1
+    assert reversed_row["verdict"] == "behind"
     # Same pair, opposite direction: the push is only actionable one way round.
     assert page_row["actionable"] is True
     assert reversed_row["actionable"] is False
@@ -386,6 +410,7 @@ def test_a_page_only_on_the_target_is_surfaced(client, engine):
             session, local, SOURCE_INDEX, 2, text=body(3, "Us", "Page 2."), revid=6
         )
 
+    client_propose(engine)
     data = client.post("/sync/report", json=request()).json()
     verdicts = {row["page_number"]: row["verdict"] for row in data["pages"]}
     assert verdicts == {1: "in_sync", 2: "source_missing"}
@@ -412,7 +437,10 @@ def test_an_index_title_that_differs_is_addressed_with_to(client, engine):
 
     assert data["target"]["exists"] is True
     (page,) = data["pages"]
-    assert page["verdict"] == "in_sync"
+    # Unlinked, because nothing has been asserted -- but paired by page number
+    # across the renamed index, which is what `--to` is for.
+    assert page["verdict"] == "unlinked"
+    assert page["linkable"] is True
     assert page["target_title"] == "Page:Varieties (local).djvu/1"
 
 
@@ -658,60 +686,59 @@ def client_propose(engine) -> int:
         return len(written)
 
 
-def test_a_push_onto_an_unasserted_anchor_is_not_ready(client, engine):
-    """The gap the Hertz run showed: 88 pages reported `push` against an
-    anchor with no RemoteLink behind it. The verdict is right and the anchor
-    is right; what was missing was that nobody had claimed it."""
+def test_a_matching_pair_nobody_linked_is_not_writable(client, engine):
+    """The gap the Hertz run showed: 88 pages reported `push` against an anchor
+    with no RemoteLink behind it, and were counted as work a sync would do.
+
+    The comparison was right; the conclusion was not. A sync writes *onto* the
+    anchor, so an anchor nobody asserted is a proposal, not a base -- and the
+    page is `unlinked` however confident the comparison is."""
     _ahead(engine, link=False)
 
     data = client.post("/sync/report", json=request()).json()
     (page,) = data["pages"]
 
-    assert page["verdict"] == "push"
-    assert page["anchor_source_revid"] == 901  # the pair really does match
-    assert page["anchor_target_revid"] == 254
+    assert page["verdict"] == "unlinked"
     assert page["rungs"] == 0
-    assert page["anchor_asserted"] is False
-    assert page["actionable"] is True
-    assert page["ready"] is False
+    assert page["actionable"] is False
+    assert page["linkable"] is True
 
-    assert data["actionable"] == 1
-    assert data["ready"] == 0
-    assert data["unasserted_anchors"] == 1
-    assert any("Confirm the links first" in note for note in data["advisories"])
+    assert data["actionable"] == 0
+    assert data["linkable"] == 1
+    assert any("proposal, not a base" in note for note in data["advisories"])
     # An advisory, not a blocker: nothing is wrong with the page.
     assert data["blockers"] == []
 
 
-def test_confirming_the_link_makes_the_same_push_ready(client, engine):
-    """One `propose --confirm` is the whole difference."""
+def test_confirming_the_link_turns_it_into_a_push(client, engine):
+    """One `propose --confirm` is the whole difference between a page a sync
+    ignores and one it would write."""
     _ahead(engine, link=True)
 
     data = client.post("/sync/report", json=request()).json()
     (page,) = data["pages"]
 
     assert page["verdict"] == "push"
-    assert page["anchor_asserted"] is True
     assert page["rungs"] == 1
-    assert page["ready"] is True
-    assert data["ready"] == data["actionable"] == 1
-    assert data["unasserted_anchors"] == 0
+    assert page["actionable"] is True
+    assert data["actionable"] == 1
+    assert data["linkable"] == 0
     assert data["advisories"] == []
 
 
-def test_a_create_needs_no_anchor_to_be_ready(client, engine):
-    """There is nothing on the target to replay onto, so the question does not
-    arise -- counting creates as unready would make a fresh work look blocked."""
+def test_a_create_needs_no_link_to_be_writable(client, engine):
+    """There is nothing on the target to replay onto, so the anchor question
+    does not arise -- requiring a link would make a fresh work look blocked on
+    a page that does not exist yet."""
     seed_source_only(engine, pages=2)
 
     data = client.post("/sync/report", json=request()).json()
     assert data["counts"] == {"create": 2}
-    assert data["ready"] == data["actionable"] == 2
-    assert data["unasserted_anchors"] == 0
-    assert all(page["anchor_asserted"] is False for page in data["pages"])
+    assert data["actionable"] == 2
+    assert data["linkable"] == 0
 
 
-def test_an_in_sync_page_is_neither_actionable_nor_ready(client, engine):
+def test_an_in_sync_page_is_not_actionable(client, engine):
     seed_source_only(engine, pages=1)
     with Session(engine) as session:
         local = session.exec(select(Site).where(Site.label == "mywikisource")).one()
@@ -719,8 +746,9 @@ def test_an_in_sync_page_is_neither_actionable_nor_ready(client, engine):
         build_page(
             session, local, SOURCE_INDEX, 1, text=body(3, "Us", "Page 1."), revid=5
         )
+    client_propose(engine)
 
     (page,) = client.post("/sync/report", json=request()).json()["pages"]
     assert page["verdict"] == "in_sync"
     assert page["actionable"] is False
-    assert page["ready"] is False
+    assert page["linkable"] is False

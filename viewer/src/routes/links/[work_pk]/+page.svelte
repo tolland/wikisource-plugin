@@ -31,6 +31,11 @@
   let error = $state('');
   let message = $state('');
   let revisions = $state(10);
+  /**
+   * This page exists to link unlinked pages, so a pair that is linked with its
+   * anchor current is finished work -- shown on request, hidden by default.
+   */
+  let showSettled = $state(false);
 
   /** How each outcome reads, and what it means for the reviewer. */
   const OUTCOMES: Record<MatchOutcome, { label: string; tone: string; note: string }> = {
@@ -60,6 +65,11 @@
   const stuck = $derived.by((): PagePair[] => {
     if (detail === null) return [];
     return detail.pages.filter((row) => row.resolvable_by_fetch);
+  });
+
+  const visible = $derived.by((): PagePair[] => {
+    if (detail === null) return [];
+    return showSettled ? detail.pages : detail.pages.filter((row) => row.needs_attention);
   });
 
   async function load(): Promise<void> {
@@ -187,21 +197,42 @@
     </p>
   {/if}
 
+  <div class="listing-controls">
+    <p>
+      Showing {visible.length} of {detail.pages.length} pair(s).
+      {detail.settled} linked and current.
+    </p>
+    <label>
+      <input type="checkbox" bind:checked={showSettled} />
+      Include pairs with nothing left to do
+    </label>
+  </div>
+
   <table class="pages">
     <thead>
       <tr>
         <th scope="col">#</th>
-        <th scope="col">Outcome</th>
+        <th scope="col">Link</th>
+        <th scope="col">Would assert</th>
         <th scope="col">Page</th>
         <th scope="col">Revisions</th>
-        <th scope="col">Rungs</th>
         <th scope="col"></th>
       </tr>
     </thead>
     <tbody>
-      {#each detail.pages as row}
+      {#each visible as row}
         <tr class={OUTCOMES[row.outcome]?.tone ?? 'bad'}>
           <td>{row.page_number ?? '?'}</td>
+          <td>
+            {#if row.linked}
+              <span class="chip ok">
+                linked
+                {#if !row.anchor_is_current}<strong>moved</strong>{/if}
+              </span>
+            {:else}
+              <span class="chip warn">unlinked</span>
+            {/if}
+          </td>
           <td>
             <span class="chip {OUTCOMES[row.outcome]?.tone ?? 'bad'}">
               {OUTCOMES[row.outcome]?.label ?? row.outcome}
@@ -225,7 +256,6 @@
               </small>
             {/if}
           </td>
-          <td>{row.rungs}</td>
           <td>
             {#if pairHref(row)}
               <a class="drill" href={pairHref(row)}>Revisions</a>
@@ -349,6 +379,28 @@
     border-radius: 10px;
     background: rgba(255, 252, 240, 0.9);
     padding: 0.6rem;
+  }
+
+  .listing-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.5rem;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+    color: #73583d;
+    font-size: 0.86rem;
+  }
+
+  .listing-controls p {
+    margin: 0;
+  }
+
+  .listing-controls label {
+    display: flex;
+    gap: 0.4rem;
+    align-items: center;
+    cursor: pointer;
   }
 
   .stuck-hint {

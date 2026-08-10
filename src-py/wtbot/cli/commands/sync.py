@@ -55,7 +55,7 @@ Direction = Depends(get_direction)
 VERDICTS: dict[str, tuple[str, str | None]] = {
     "create": ("create", typer.colors.GREEN),
     "push": ("push", typer.colors.GREEN),
-    "pull": ("pull", typer.colors.CYAN),
+    "behind": ("behind", typer.colors.CYAN),
     "diverged": ("diverged", typer.colors.RED),
     "unlinked": ("unlinked", typer.colors.YELLOW),
     "source_missing": ("source only on target", typer.colors.CYAN),
@@ -161,8 +161,8 @@ def report(
             line += f"  [{page['detail']}]"
         # The anchor's revids look identical whether it was asserted or found,
         # so the line has to say which -- it decides whether the row is ready.
-        if page["actionable"] and not page["ready"]:
-            line += "  (anchor not asserted)"
+        if page["linkable"]:
+            line += "  (linkable)"
         typer.secho(line, fg=colour)
 
     ready, actionable = data["ready"], data["actionable"]
