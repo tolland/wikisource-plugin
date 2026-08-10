@@ -27,7 +27,7 @@ from wtbot.db import create_db_engine, init_db
 from wtbot.main import create_app
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-COMPOSE_FILE = REPO_ROOT / "compose.seeded.yml"
+COMPOSE_FILE = REPO_ROOT / "compose.yml"
 
 # Re-exported: several tests import these from conftest, and wiki_harness owns
 # them so `python -m wiki_harness` builds the same fixture the tests assert on.

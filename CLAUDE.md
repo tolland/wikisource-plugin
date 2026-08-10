@@ -59,17 +59,20 @@ uv run pytest                              # run Python tests (uses pythonpath=s
 uv run pytest src-py/tests/test_fetch.py -k some_case  # single test
 uv run pytest -m slow                      # incl. the docker-backed harness suites (deselected by default)
 
-# The two-wiki sync harness. Both wikis seed themselves from the same compose
-# anchor (SEED_DUMPS/SEED_SCANS), so the pair starts converged; `--wait` blocks
-# until seeding is done. `up`/`status`/`down` is a convenience wrapper on it.
-docker compose -f compose.seeded.yml --profile pair up -d --wait
+# The two-wiki sync harness. compose.yml seeds no content by default, so the
+# pair (a test scenario) asks for it explicitly; both wikis reading the same
+# env is what keeps them converged. `--wait` blocks until seeding is done.
+# `up`/`status`/`down` is a convenience wrapper on it.
+SEED_SCANS=djvu SEED_DUMPS=Canadian_patent_29537_all.xml \
+    docker compose -f compose.yml --profile pair up -d --wait
 PYTHONPATH=src-py/tests uv run python -m wiki_harness status
 
-# ...plus the wtbot API itself (compose.wtbot.yml overlays either base), so the
+# ...plus the wtbot API itself (compose.wtbot.yml overlays compose.yml), so the
 # whole system is reachable over HTTP instead of only from inside pytest.
 # SQLite lives on a disposable volume; WTBOT_RESET_DB=1 empties it without
 # rebuilding the wikis. Served on $WTBOT_PORT (default 18583).
-docker compose -f compose.seeded.yml -f compose.wtbot.yml \
+SEED_SCANS=djvu SEED_DUMPS=Canadian_patent_29537_all.xml \
+    docker compose -f compose.yml -f compose.wtbot.yml \
     --profile pair --profile api up -d --wait
 PYTHONPATH=src-py/tests uv run python -m wiki_harness up --api
 uv run ruff check --fix                    # lint (mirrors the pre-commit hook)

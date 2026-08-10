@@ -1,8 +1,8 @@
 ---
 
-# The wtbot API as a service, to be overlaid on either wiki stack:
+# The wtbot API as a service, to be overlaid on the wiki stack:
 #
-#   docker compose -f compose.seeded.yml -f compose.wtbot.yml \
+#   docker compose -f compose.yml -f compose.wtbot.yml \
 #       --profile pair --profile api up -d --wait
 #   docker compose -f compose.yml -f compose.wtbot.yml \
 #       --profile api up -d --wait

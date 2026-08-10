@@ -16,10 +16,12 @@ from wiki_harness.stack import WikiStack, docker_available, pair_config
 run; plain ``python`` has no equivalent.)
 
 There is no ``--scenario`` and nothing to hold open. The wikis seed themselves
-from ``SEED_DUMPS``/``SEED_SCANS``, and ``compose up -d`` leaves them running
-until something takes them down -- so this is a convenience over
+from ``SEED_DUMPS``/``SEED_SCANS`` (defaulted here -- compose.yml itself seeds
+nothing), and ``compose up -d`` leaves them running until something takes them
+down -- so this is a convenience over
 
-    docker compose -f compose.seeded.yml --profile pair up -d --wait
+    SEED_SCANS=djvu SEED_DUMPS=Canadian_patent_29537_all.xml \
+        docker compose -f compose.yml --profile pair up -d --wait
 
 that prints the URLs and checks the content actually landed. ``--api`` adds the
 wtbot service (compose.wtbot.yml), so the whole system is up and reachable over

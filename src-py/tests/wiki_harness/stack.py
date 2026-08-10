@@ -19,7 +19,14 @@ timestamps, contributors and therefore sha1, which no API-level copy does.
 """
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-COMPOSE_FILE = REPO_ROOT / "compose.seeded.yml"
+COMPOSE_FILE = REPO_ROOT / "compose.yml"
+
+# compose.yml seeds no content by default -- this harness is exactly the "test
+# scenario" that is meant to ask for it. Both wikis read the same env, so they
+# stay converged because they are configured identically, not because
+# something remembered to seed both.
+DEFAULT_SEED_SCANS = "djvu"
+DEFAULT_SEED_DUMPS = "Canadian_patent_29537_all.xml"
 
 # Container-side mount of src-py/tests/fixtures (see compose.yml). The
 # wikis seed *themselves* from here at startup -- importDump and importImages
@@ -141,6 +148,10 @@ class WikiStack:
             "WIKISOURCE_PORT": str(self.config.upstream_port),
             "WIKISOURCE_LOCAL_PORT": str(self.config.local_port),
             "WTBOT_PORT": str(self.config.wtbot_port),
+            # compose.yml's own default is blank; an env var already set (e.g.
+            # by a caller wanting a bare pair) wins over these.
+            "SEED_SCANS": os.environ.get("SEED_SCANS", DEFAULT_SEED_SCANS),
+            "SEED_DUMPS": os.environ.get("SEED_DUMPS", DEFAULT_SEED_DUMPS),
         }
 
     @property

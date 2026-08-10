@@ -1,5 +1,25 @@
 ---
 
+# Standalone image/DB warm-up, isolated from the main compose project.
+#
+# Not overlaid on compose.yml and not automatically consumed by it -- it just
+# builds the mediawiki image and runs install.php + the minimal module import
+# once, ahead of time, into its own volume. Restoring that volume (a plain
+# `docker cp`/`cp -a` of the mariadb data directory) is a manual speed-up for
+# whoever wants to skip the ~30s install penalty; nothing here wires that up
+# automatically any more. compose.yml no longer needs that automatic
+# snapshot-restore itself: with content-seeding off by default, a plain
+# `docker compose up -d` on compose.yml is already fast.
+#
+# Named as its own compose project (not the directory-derived default), and
+# with no published ports, so it can run in parallel with the main project
+# without container/volume/port collisions:
+#
+#   docker compose -f compose.build.yml build
+#   docker compose -f compose.build.yml up -d --wait
+
+name: wikisource-build
+
 services:
   db:
     image: mariadb:11.4
@@ -42,10 +62,10 @@ services:
       MW_DB_USER: mediawiki
       MW_LANG: en
       MW_SCRIPT_PATH: ""
-      MW_SERVER: "http://localhost:${WIKISOURCE_PORT:-18575}"
+      # No published port (see above) so this never needs to be reachable --
+      # MW_SERVER only has to be a syntactically valid value for LocalSettings.
+      MW_SERVER: "http://localhost"
       MW_SITE_NAME: "${WIKISOURCE_SITE_NAME:-Test Wikisource}"
-    ports:
-      - "${WIKISOURCE_PORT:-18575}:80"
     volumes:
       - mediawiki-images:/var/www/html/images
       - ./src-py/tests/fixtures:/fixtures:ro,z

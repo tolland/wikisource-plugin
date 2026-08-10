@@ -51,8 +51,11 @@ already_seeded() {
   # Asked of the database rather than a file, because the database is what the
   # persistent volume holds -- a marker file could survive a wiped database or
   # vice versa, and either way round the wiki would come up subtly wrong.
+  # 252 is Index: under the current (post-clash) ProofreadPage namespace
+  # allocation -- see AGENTS.md. A fresh ProofreadPage install picks this
+  # automatically, no LocalSettings configuration needed.
   local count
-  count="$(mw_sql 'SELECT COUNT(*) FROM page WHERE page_namespace = 106' || echo 0)"
+  count="$(mw_sql 'SELECT COUNT(*) FROM page WHERE page_namespace = 252' || echo 0)"
   [ "${count:-0}" -gt 0 ]
 }
 

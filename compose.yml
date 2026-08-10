@@ -45,11 +45,19 @@ x-mediawiki-common: &mediawiki-common
 
 # Content, as distinct from services. Both wikis reference this one anchor, so
 # they hold the same works because they are configured identically rather than
-# because something remembered to seed both. Blank it to get bare wikis:
-#   SEED_DUMPS= SEED_SCANS= docker compose --profile pair up -d --wait
+# because something remembered to seed both.
+#
+# Empty by default: `docker compose up -d` installs MediaWiki and imports only
+# the minimal Wikisource module set (see start-wikisource.sh) -- no scans, no
+# dumps. Real content is opt-in, from whichever of the two things is actually
+# asking for it:
+#   - an override, layered on top of this file, e.g.:
+#       docker compose -f compose.yml -f compose.principles.yml --profile pair up -d --wait
+#   - a test scenario setting the env itself, e.g. the wiki_harness pair
+#     (see src-py/tests/wiki_harness/stack.py)
 x-seed-env: &seed-env
-  SEED_SCANS: "${SEED_SCANS-djvu}"
-  SEED_DUMPS: "${SEED_DUMPS-Canadian_patent_29537_all.xml}"
+  SEED_SCANS: "${SEED_SCANS-}"
+  SEED_DUMPS: "${SEED_DUMPS-}"
 
 x-db-common: &db-common
   image: mariadb:11.4
@@ -86,12 +94,12 @@ services:
       MW_DB_USER: mediawiki
       MW_LANG: en
       MW_SCRIPT_PATH: ""
-      MW_SERVER: "http://localhost:${WIKISOURCE_PORT:-8080}"
+      MW_SERVER: "http://localhost:${WIKISOURCE_PORT:-18571}"
       MW_SITE_NAME: "${WIKISOURCE_SITE_NAME:-Test Wikisource}"
       <<: *seed-env
       SEED_REVID_BURN: "0"
     ports:
-      - "${WIKISOURCE_PORT:-8080}:80"
+      - "${WIKISOURCE_PORT:-18571}:80"
     volumes:
       - mediawiki-images:/var/www/html/images
       - ./src-py/tests/fixtures:/fixtures:ro,z
@@ -118,7 +126,7 @@ services:
       MW_DB_USER: mediawiki
       MW_LANG: en
       MW_SCRIPT_PATH: ""
-      MW_SERVER: "http://localhost:${WIKISOURCE_LOCAL_PORT:-18582}"
+      MW_SERVER: "http://localhost:${WIKISOURCE_LOCAL_PORT:-18572}"
       MW_SITE_NAME: "${WIKISOURCE_LOCAL_SITE_NAME:-Test Wikisource (local)}"
       <<: *seed-env
       # The one deliberate asymmetry, and it is not content: throwaway
@@ -126,7 +134,7 @@ services:
       # pages. See the burn loop in start-wikisource.sh.
       SEED_REVID_BURN: "${SEED_REVID_BURN-7}"
     ports:
-      - "${WIKISOURCE_LOCAL_PORT:-18582}:80"
+      - "${WIKISOURCE_LOCAL_PORT:-18572}:80"
     volumes:
       - mediawiki-local-images:/var/www/html/images
       - ./src-py/tests/fixtures:/fixtures:ro,z
@@ -137,7 +145,7 @@ services:
       context: .
       dockerfile: docker/wikimedia-ocr/Dockerfile
     ports:
-      - "${WIKIMEDIA_OCR_PORT:-8090}:80"
+      - "${WIKIMEDIA_OCR_PORT:-18575}:80"
 
   # pix2tex/LaTeX-OCR used to be a service here, spoken to directly by a
   # Pix2TexClient of our own. It now sits behind py-ocrapi

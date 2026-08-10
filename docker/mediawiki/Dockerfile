@@ -31,11 +31,8 @@ RUN set -eux; \
       /var/www/html/extensions/LabeledSectionTransclusion;
 
 COPY docker/mediawiki/start-wikisource.sh /usr/local/bin/start-wikisource
-COPY docker/mediawiki/run-wikisource.sh /usr/local/bin/run-wikisource
-COPY docker/mediawiki/seed-wikisource.sh /usr/local/bin/seed-wikisource
-COPY docker/pywikibot/context/modules /bootstrap/modules
-COPY docker/pywikibot/context/mediawiki /bootstrap/mediawiki
+COPY docker/mediawiki/modules /bootstrap/modules
 
-RUN chmod +x /usr/local/bin/*-wikisource
+RUN chmod +x /usr/local/bin/start-wikisource
 
 CMD ["start-wikisource"]

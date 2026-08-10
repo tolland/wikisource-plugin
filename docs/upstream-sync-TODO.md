@@ -446,12 +446,17 @@ twice. That was a real bug: only upstream was ever seeded, so every "diverged"
 fixture was really "never converged", and the local wiki held a lone `Page:`
 with no `Index:` and no `File:` for the scan check to compare.
 
+`compose.yml` seeds no content by default — the pair is exactly the kind of
+test scenario that asks for it explicitly:
+
 ```bash
-docker compose -f compose.seeded.yml --profile pair up -d --wait
+SEED_SCANS=djvu SEED_DUMPS=Canadian_patent_29537_all.xml \
+    docker compose -f compose.yml --profile pair up -d --wait
 
 # ...and the API too, for anything that should speak HTTP rather than reach
 # into the ASGI app in-process:
-docker compose -f compose.seeded.yml -f compose.wtbot.yml \
+SEED_SCANS=djvu SEED_DUMPS=Canadian_patent_29537_all.xml \
+    docker compose -f compose.yml -f compose.wtbot.yml \
     --profile pair --profile api up -d --wait
 ```
 
