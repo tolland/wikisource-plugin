@@ -1571,6 +1571,288 @@ See [[Wikisource:User warning templates]]
     </revision>
   </page>
   <page>
+    <title>Module:Anchor</title>
+    <ns>828</ns>
+    <id>393</id>
+    <revision>
+      <id>777</id>
+      <timestamp>2025-04-19T20:57:16Z</timestamp>
+      <contributor>
+        <username>wikisource&gt;ShakespeareFan00</username>
+        <id>0</id>
+      </contributor>
+      <minor/>
+      <comment>Most of the page namespace is now cleaned up, far quicker than expected and this is adding a LOT of noise</comment>
+      <origin>777</origin>
+      <model>Scribunto</model>
+      <format>text/plain</format>
+      <text bytes="3510" sha1="5f4lcoaa24p0gqn68siy62e63n40ywc" xml:space="preserve">--[=[
+Implements anchor templates
+]=]
+require('strict')
+
+local getArgs = require('Module:Arguments').getArgs
+local Error = require('Module:Error')
+
+local function error_message(message)
+	return Error['error']({['message'] = message})
+end
+
+local p = {}
+
+-- [[Template:Anchor]]
+
+local function _anchor(args)
+	local anchorList = {}
+	for k, v in pairs(args) do
+		table.insert(anchorList, tostring(mw.html.create('span'):addClass('anchor'):attr('id', mw.uri.anchorEncode(v))))
+	end
+	return table.concat(anchorList)
+end
+
+function p.anchor(frame)
+	return _anchor(getArgs(frame))
+end
+
+-- [[Template:Anchor link]]
+
+local function _anchor_link(args)
+	local anchor = args.anchor or args[1]
+	if not anchor then
+		return error_message('No anchor specified')
+	end
+	
+	anchor = mw.uri.anchorEncode(anchor)
+	local pageno = args.pageno or args[2]
+	local subpage = args.subpage or args[3]
+	
+	local page = (args.page and mw.title.new(args.page)) or mw.title.getCurrentTitle()
+	
+	if page.nsText == 'Page' and not pageno then
+		return error_message('No page number specified')
+	end
+	
+	local title = page.text
+	if page.nsText == 'Page' then
+		title = page.rootText .. '/' .. pageno
+	elseif subpage then
+		local rootSubpageTitle = mw.title.makeTitle(page.nsText, page.rootText .. '/' .. subpage)
+		local baseSubpageTitle = mw.title.makeTitle(page.nsText, page.baseText .. '/' .. subpage)
+		if rootSubpageTitle.exists then
+			title = rootSubpageTitle.text
+		elseif baseSubpageTitle.exists then
+			title = baseSubpageTitle.text
+		end
+	end
+	
+	return '[[' .. mw.title.makeTitle(page.nsText, title, anchor).fullText .. '|' .. anchor:gsub("_", " ") .. ']]'
+end
+
+function p.anchor_link(frame)
+	return _anchor_link(getArgs(frame))
+end
+
+-- [[Template:Anchor link 2]]
+
+local function _anchor_link_2(args)
+	local anchor = args.anchor or args[3]
+	if not anchor then
+		return error_message('No anchor specified')
+	end
+	
+	local subpage = args.subpage or args[1]
+	local pageno = args.pageno or args[2]
+	anchor = mw.uri.anchorEncode(anchor)
+	local text = args.text or args[4] or anchor
+	
+	local page = (args.page and mw.title.new(args.page)) or mw.title.getCurrentTitle()
+	
+	if page.nsText == 'Page' and not pageno then
+		return error_message('No page number specified')
+	end
+	
+	local title = page.text
+	if page.nsText == 'Page' then
+		title = page.rootText .. '/' .. pageno
+	elseif subpage then
+		local rootSubpageTitle = mw.title.makeTitle(page.nsText, page.rootText .. '/' .. subpage)
+		local baseSubpageTitle = mw.title.makeTitle(page.nsText, page.baseText .. '/' .. subpage)
+		
+		if not rootSubpageTitle or not baseSubpageTitle then
+			return error_message('Error creating subpage: ' .. subpage)
+		end
+		
+		local baseSubpageBaseTitle = mw.title.makeTitle(page.nsText, baseSubpageTitle.baseText .. '/' .. subpage)
+		if not baseSubpageBaseTitle then
+			return error_message('Error creating subpage: ' .. subpage)
+		end
+		
+		local subpageTitle = mw.title.makeTitle(page.nsText, subpage)
+		if not subpageTitle then
+			return error_message('Error creating page: ' .. subpage)
+		end
+		
+		if rootSubpageTitle.exists then
+			title = rootSubpageTitle.text
+		elseif baseSubpageTitle.exists then
+			title = baseSubpageTitle.text
+		elseif baseSubpageBaseTitle.exists then
+			title = baseSubpageBaseTitle.text
+		elseif subpageTitle.exists then
+			title = subpage
+		end
+	end
+	return '[[' .. mw.title.makeTitle(page.nsText, title, anchor).fullText .. '|' .. text .. ']]'
+end
+
+function p.anchor_link_2(frame)
+	return _anchor_link_2(getArgs(frame))
+end
+
+return p</text>
+      <sha1>5f4lcoaa24p0gqn68siy62e63n40ywc</sha1>
+    </revision>
+    <revision>
+      <id>778</id>
+      <parentid>777</parentid>
+      <timestamp>2026-03-06T06:46:28Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>777</origin>
+      <model>Scribunto</model>
+      <format>text/plain</format>
+      <text bytes="3510" sha1="5f4lcoaa24p0gqn68siy62e63n40ywc" xml:space="preserve">--[=[
+Implements anchor templates
+]=]
+require('strict')
+
+local getArgs = require('Module:Arguments').getArgs
+local Error = require('Module:Error')
+
+local function error_message(message)
+	return Error['error']({['message'] = message})
+end
+
+local p = {}
+
+-- [[Template:Anchor]]
+
+local function _anchor(args)
+	local anchorList = {}
+	for k, v in pairs(args) do
+		table.insert(anchorList, tostring(mw.html.create('span'):addClass('anchor'):attr('id', mw.uri.anchorEncode(v))))
+	end
+	return table.concat(anchorList)
+end
+
+function p.anchor(frame)
+	return _anchor(getArgs(frame))
+end
+
+-- [[Template:Anchor link]]
+
+local function _anchor_link(args)
+	local anchor = args.anchor or args[1]
+	if not anchor then
+		return error_message('No anchor specified')
+	end
+	
+	anchor = mw.uri.anchorEncode(anchor)
+	local pageno = args.pageno or args[2]
+	local subpage = args.subpage or args[3]
+	
+	local page = (args.page and mw.title.new(args.page)) or mw.title.getCurrentTitle()
+	
+	if page.nsText == 'Page' and not pageno then
+		return error_message('No page number specified')
+	end
+	
+	local title = page.text
+	if page.nsText == 'Page' then
+		title = page.rootText .. '/' .. pageno
+	elseif subpage then
+		local rootSubpageTitle = mw.title.makeTitle(page.nsText, page.rootText .. '/' .. subpage)
+		local baseSubpageTitle = mw.title.makeTitle(page.nsText, page.baseText .. '/' .. subpage)
+		if rootSubpageTitle.exists then
+			title = rootSubpageTitle.text
+		elseif baseSubpageTitle.exists then
+			title = baseSubpageTitle.text
+		end
+	end
+	
+	return '[[' .. mw.title.makeTitle(page.nsText, title, anchor).fullText .. '|' .. anchor:gsub("_", " ") .. ']]'
+end
+
+function p.anchor_link(frame)
+	return _anchor_link(getArgs(frame))
+end
+
+-- [[Template:Anchor link 2]]
+
+local function _anchor_link_2(args)
+	local anchor = args.anchor or args[3]
+	if not anchor then
+		return error_message('No anchor specified')
+	end
+	
+	local subpage = args.subpage or args[1]
+	local pageno = args.pageno or args[2]
+	anchor = mw.uri.anchorEncode(anchor)
+	local text = args.text or args[4] or anchor
+	
+	local page = (args.page and mw.title.new(args.page)) or mw.title.getCurrentTitle()
+	
+	if page.nsText == 'Page' and not pageno then
+		return error_message('No page number specified')
+	end
+	
+	local title = page.text
+	if page.nsText == 'Page' then
+		title = page.rootText .. '/' .. pageno
+	elseif subpage then
+		local rootSubpageTitle = mw.title.makeTitle(page.nsText, page.rootText .. '/' .. subpage)
+		local baseSubpageTitle = mw.title.makeTitle(page.nsText, page.baseText .. '/' .. subpage)
+		
+		if not rootSubpageTitle or not baseSubpageTitle then
+			return error_message('Error creating subpage: ' .. subpage)
+		end
+		
+		local baseSubpageBaseTitle = mw.title.makeTitle(page.nsText, baseSubpageTitle.baseText .. '/' .. subpage)
+		if not baseSubpageBaseTitle then
+			return error_message('Error creating subpage: ' .. subpage)
+		end
+		
+		local subpageTitle = mw.title.makeTitle(page.nsText, subpage)
+		if not subpageTitle then
+			return error_message('Error creating page: ' .. subpage)
+		end
+		
+		if rootSubpageTitle.exists then
+			title = rootSubpageTitle.text
+		elseif baseSubpageTitle.exists then
+			title = baseSubpageTitle.text
+		elseif baseSubpageBaseTitle.exists then
+			title = baseSubpageBaseTitle.text
+		elseif subpageTitle.exists then
+			title = subpage
+		end
+	end
+	return '[[' .. mw.title.makeTitle(page.nsText, title, anchor).fullText .. '|' .. text .. ']]'
+end
+
+function p.anchor_link_2(frame)
+	return _anchor_link_2(getArgs(frame))
+end
+
+return p</text>
+      <sha1>5f4lcoaa24p0gqn68siy62e63n40ywc</sha1>
+    </revision>
+  </page>
+  <page>
     <title>Module:Arguments</title>
     <ns>828</ns>
     <id>14</id>
@@ -27910,6 +28192,66 @@ end</text>
     </revision>
   </page>
   <page>
+    <title>Template:--</title>
+    <ns>10</ns>
+    <id>5664</id>
+    <revision>
+      <id>11059</id>
+      <timestamp>2026-03-22T01:38:35Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Pywikibot 11.1.0</comment>
+      <origin>11059</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="44" sha1="fwoat65rj2yict7vegeiemw42iz17u0" xml:space="preserve">—&lt;noinclude&gt;
+{{documentation}}&lt;/noinclude&gt;</text>
+      <sha1>fwoat65rj2yict7vegeiemw42iz17u0</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:All small caps</title>
+    <ns>10</ns>
+    <id>5435</id>
+    <revision>
+      <id>10824</id>
+      <timestamp>2026-03-21T21:48:10Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Pywikibot 11.1.0</comment>
+      <origin>10824</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="153" sha1="oln6onxnzfifiiu26cxscl0e2bub5yy" xml:space="preserve">&lt;onlyinclude&gt;&lt;templatestyles src="All small caps/styles.css /&gt;&lt;span class="wst-asc"&gt;{{{1}}}&lt;/span&gt;&lt;/onlyinclude&gt;&lt;noinclude&gt;
+{{documentation}}&lt;/noinclude&gt;</text>
+      <sha1>oln6onxnzfifiiu26cxscl0e2bub5yy</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Anchor+</title>
+    <ns>10</ns>
+    <id>5810</id>
+    <revision>
+      <id>11205</id>
+      <timestamp>2026-03-22T01:57:37Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Pywikibot 11.1.0</comment>
+      <origin>11205</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="352" sha1="syibplbw9yzsy3tnq541117yc5f6729" xml:space="preserve">&lt;onlyinclude&gt;&lt;templatestyles src="Template:Anchor/styles.css" /&gt;&lt;span {{makeid|{{{a|{{{1|}}}}}}|blank=.}} title="Anchor:{{anchorencode:{{{a|{{{1|}}}}}}}}" class="wst-anchor {{{class|}}}"&gt;{{{label|{{{2|{{{1|}}}}}}}}}&lt;/span&gt;{{#ifeq:{{#invoke:Isdigit|_isdigit|{{{a|{{{1|}}}}}}}}|true|[[Category:Anchor which is numeric]]|}}&lt;/onlyinclude&gt;
+{{documentation}}</text>
+      <sha1>syibplbw9yzsy3tnq541117yc5f6729</sha1>
+    </revision>
+  </page>
+  <page>
     <title>Template:AuxTOC</title>
     <ns>10</ns>
     <id>171</id>
@@ -28191,6 +28533,36 @@ Check for pages using pixel widths - see [[H:PXWIDTH]]; TL;DR they get really na
 	border-color:#FDD017;
 }</text>
       <sha1>syffze8ucukorm7tnjenzv8m7d8ww28</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Blackletter</title>
+    <ns>10</ns>
+    <id>5404</id>
+    <revision>
+      <id>10784</id>
+      <timestamp>2026-03-09T06:15:16Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Created page with "{{yesno |{{{inline|yes}}} |yes={{blackletter/s|lang={{{lang|en-Latf}}}|mode={{{mode|}}}|inline=yes}}&lt;!-- --&gt;{{{1|}}}&lt;!-- --&gt;{{span end}} |¬={{blackletter/s|lang={{{lang|en-Latf}}}|mode={{{mode|}}}|inline=yes}}&lt;!-- --&gt;{{{1|}}}&lt;!-- --&gt;{{span end}} |no={{blackletter/s|lang={{{lang|en-Latf}}}|mode={{{mode|}}}|inline=no}} {{{1|}}} {{div end}} }}&lt;noinclude&gt;{{documentation}}&lt;/noinclude&gt;"</comment>
+      <origin>10784</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="383" sha1="01x8rkxmq2zxsidyw9t4hkffltm5174" xml:space="preserve">{{yesno
+|{{{inline|yes}}}
+|yes={{blackletter/s|lang={{{lang|en-Latf}}}|mode={{{mode|}}}|inline=yes}}&lt;!--
+--&gt;{{{1|}}}&lt;!--
+--&gt;{{span end}}
+|¬={{blackletter/s|lang={{{lang|en-Latf}}}|mode={{{mode|}}}|inline=yes}}&lt;!--
+--&gt;{{{1|}}}&lt;!--
+--&gt;{{span end}}
+|no={{blackletter/s|lang={{{lang|en-Latf}}}|mode={{{mode|}}}|inline=no}}
+{{{1|}}}
+{{div end}}
+}}&lt;noinclude&gt;{{documentation}}&lt;/noinclude&gt;</text>
+      <sha1>01x8rkxmq2zxsidyw9t4hkffltm5174</sha1>
     </revision>
   </page>
   <page>
@@ -30435,6 +30807,27 @@ Don't use the global `hlist` class because this will not export
     </revision>
   </page>
   <page>
+    <title>Template:Gap</title>
+    <ns>10</ns>
+    <id>5403</id>
+    <revision>
+      <id>10783</id>
+      <timestamp>2026-03-09T06:14:34Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Created page with "&lt;onlyinclude&gt;&lt;span class="wst-gap __gap {{{class|}}}" style="display:inline-block; inline-size:{{{1|2em}}}"&gt;&lt;/span&gt;&lt;/onlyinclude&gt;&lt;noinclude&gt; {{documentation}} &lt;/noinclude&gt;"</comment>
+      <origin>10783</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="171" sha1="dayxo3fkl6lodm6yac4b81n8xpe82xa" xml:space="preserve">&lt;onlyinclude&gt;&lt;span class="wst-gap __gap {{{class|}}}" style="display:inline-block; inline-size:{{{1|2em}}}"&gt;&lt;/span&gt;&lt;/onlyinclude&gt;&lt;noinclude&gt;
+{{documentation}}
+&lt;/noinclude&gt;</text>
+      <sha1>dayxo3fkl6lodm6yac4b81n8xpe82xa</sha1>
+    </revision>
+  </page>
+  <page>
     <title>Template:High-risk</title>
     <ns>10</ns>
     <id>112</id>
@@ -31440,6 +31833,65 @@ Don't use the global `hlist` class because this will not export
       <format>text/x-wiki</format>
       <text bytes="36" sha1="9j1n7yswjfgu4yjr3crw5k9iudowciv" xml:space="preserve">#REDIRECT [[Template:Pseudoheading]]</text>
       <sha1>9j1n7yswjfgu4yjr3crw5k9iudowciv</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Pseudoheading</title>
+    <ns>10</ns>
+    <id>5805</id>
+    <revision>
+      <id>11200</id>
+      <timestamp>2026-03-22T01:57:19Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Pywikibot 11.1.0</comment>
+      <origin>11200</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="250" sha1="qaxi122ve8t2idgea93z1ugqx2l09du" xml:space="preserve">&lt;templatestyles src="Pseudoheading/styles.css" /&gt;&lt;div {{#if:{{{id}}}&lt;!--NOT {{{id|}}}--&gt;|id{{=}}"{{anchorencode:{{{id|{{{1|}}}}}}}}"|}} class="wst-heading {{{class|}}}" role="heading" {{{attr|}}}&gt;{{{1|}}}&lt;/div&gt;&lt;noinclude&gt;{{documentation}}&lt;/noinclude&gt;</text>
+      <sha1>qaxi122ve8t2idgea93z1ugqx2l09du</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Rh</title>
+    <ns>10</ns>
+    <id>5663</id>
+    <redirect title="Template:RunningHeader" />
+    <revision>
+      <id>11058</id>
+      <timestamp>2026-03-22T01:38:04Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Pywikibot 11.1.0</comment>
+      <origin>11058</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="35" sha1="tidtjufuek1wg5wr3v4efp4mxrnonmp" xml:space="preserve">#REDIRECT[[Template:RunningHeader]]</text>
+      <sha1>tidtjufuek1wg5wr3v4efp4mxrnonmp</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Running header</title>
+    <ns>10</ns>
+    <id>5659</id>
+    <redirect title="Template:RunningHeader" />
+    <revision>
+      <id>11054</id>
+      <timestamp>2026-03-22T01:31:56Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Pywikibot 11.1.0</comment>
+      <origin>11054</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="36" sha1="gqxlavli624dms6o9in11l5xfj8onwd" xml:space="preserve">#REDIRECT [[Template:RunningHeader]]</text>
+      <sha1>gqxlavli624dms6o9in11l5xfj8onwd</sha1>
     </revision>
   </page>
   <page>
@@ -34430,6 +34882,27 @@ border:1px solid #aaa; background:var(--background-color-base, white); color: in
     </revision>
   </page>
   <page>
+    <title>Template:Xx-larger</title>
+    <ns>10</ns>
+    <id>5400</id>
+    <revision>
+      <id>10780</id>
+      <timestamp>2026-03-09T06:10:51Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Created page with "&lt;includeonly&gt;{{font-size-base|font-size=182%|style={{{style|}}}|1={{{1}}}}}&lt;/includeonly&gt;&lt;noinclude&gt; {{documentation|Template:X-smaller/doc}} &lt;/noinclude&gt;"</comment>
+      <origin>10780</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="154" sha1="c5kpvdak4baev8soufiehqiqpbsz1np" xml:space="preserve">&lt;includeonly&gt;{{font-size-base|font-size=182%|style={{{style|}}}|1={{{1}}}}}&lt;/includeonly&gt;&lt;noinclude&gt;
+{{documentation|Template:X-smaller/doc}}
+&lt;/noinclude&gt;</text>
+      <sha1>c5kpvdak4baev8soufiehqiqpbsz1np</sha1>
+    </revision>
+  </page>
+  <page>
     <title>Template:Xxx-larger block</title>
     <ns>10</ns>
     <id>5646</id>
@@ -34489,6 +34962,27 @@ border:1px solid #aaa; background:var(--background-color-base, white); color: in
       <format>text/x-wiki</format>
       <text bytes="169" sha1="heor18dgfq5q2ofhlbns84g21l0o4je" xml:space="preserve">&lt;includeonly&gt;{{Font size block/s|font-size-name=xxx-larger|style={{{style|}}}|class={{{class|}}}}}&lt;/includeonly&gt;&lt;noinclude&gt;{{documentation|Template:Font size block/doc}}</text>
       <sha1>heor18dgfq5q2ofhlbns84g21l0o4je</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:X-smaller</title>
+    <ns>10</ns>
+    <id>5809</id>
+    <revision>
+      <id>11204</id>
+      <timestamp>2026-03-22T01:57:31Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Pywikibot 11.1.0</comment>
+      <origin>11204</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="153" sha1="sk4k32obx8x04thci1d0gk236dhuptk" xml:space="preserve">&lt;includeonly&gt;{{font-size-base|font-size=69%|style={{{style|}}}|1={{{1}}}}}&lt;/includeonly&gt;&lt;noinclude&gt;
+{{documentation|Template:X-smaller/doc}}
+&lt;/noinclude&gt;</text>
+      <sha1>sk4k32obx8x04thci1d0gk236dhuptk</sha1>
     </revision>
   </page>
   <page>
@@ -34561,6 +35055,28 @@ border:1px solid #aaa; background:var(--background-color-base, white); color: in
 {{Documentation}}
 &lt;/noinclude&gt;</text>
       <sha1>bioaq6x8oitfnx7oqmfhviol4hbp1nd</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Sic</title>
+    <ns>10</ns>
+    <id>5834</id>
+    <revision>
+      <id>11229</id>
+      <timestamp>2026-03-22T01:59:04Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Pywikibot 11.1.0</comment>
+      <origin>11229</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="91" sha1="8qvar02snlx9wodotk620ucz75mqlzl" xml:space="preserve">&lt;noinclude&gt;
+&lt;!--THIS TEMPLATE IS INTENTIONALLY LEFT BLANK--&gt;
+{{documentation}}
+&lt;/noinclude&gt;</text>
+      <sha1>8qvar02snlx9wodotk620ucz75mqlzl</sha1>
     </revision>
   </page>
   <page>
@@ -39719,26 +40235,6 @@ html.skin-theme-clientpref-night .navbar li a abbr {
     </revision>
   </page>
   <page>
-    <title>Template:All small caps</title>
-    <ns>10</ns>
-    <id>5435</id>
-    <revision>
-      <id>10824</id>
-      <timestamp>2026-03-21T21:48:10Z</timestamp>
-      <contributor>
-        <username>Admin</username>
-        <id>1</id>
-      </contributor>
-      <comment>Pywikibot 11.1.0</comment>
-      <origin>10824</origin>
-      <model>wikitext</model>
-      <format>text/x-wiki</format>
-      <text bytes="153" sha1="oln6onxnzfifiiu26cxscl0e2bub5yy" xml:space="preserve">&lt;onlyinclude&gt;&lt;templatestyles src="All small caps/styles.css /&gt;&lt;span class="wst-asc"&gt;{{{1}}}&lt;/span&gt;&lt;/onlyinclude&gt;&lt;noinclude&gt;
-{{documentation}}&lt;/noinclude&gt;</text>
-      <sha1>oln6onxnzfifiiu26cxscl0e2bub5yy</sha1>
-    </revision>
-  </page>
-  <page>
     <title>Template:Capitalize</title>
     <ns>10</ns>
     <id>5450</id>
@@ -39981,27 +40477,6 @@ html.skin-theme-clientpref-night .navbar li a abbr {
 {{documentation}}
 &lt;/noinclude&gt;</text>
       <sha1>sh8kej3uwlqznwvk8r1lx79ebc6oe10</sha1>
-    </revision>
-  </page>
-  <page>
-    <title>Template:Gap</title>
-    <ns>10</ns>
-    <id>5403</id>
-    <revision>
-      <id>10783</id>
-      <timestamp>2026-03-09T06:14:34Z</timestamp>
-      <contributor>
-        <username>Admin</username>
-        <id>1</id>
-      </contributor>
-      <comment>Created page with "&lt;onlyinclude&gt;&lt;span class="wst-gap __gap {{{class|}}}" style="display:inline-block; inline-size:{{{1|2em}}}"&gt;&lt;/span&gt;&lt;/onlyinclude&gt;&lt;noinclude&gt; {{documentation}} &lt;/noinclude&gt;"</comment>
-      <origin>10783</origin>
-      <model>wikitext</model>
-      <format>text/x-wiki</format>
-      <text bytes="171" sha1="dayxo3fkl6lodm6yac4b81n8xpe82xa" xml:space="preserve">&lt;onlyinclude&gt;&lt;span class="wst-gap __gap {{{class|}}}" style="display:inline-block; inline-size:{{{1|2em}}}"&gt;&lt;/span&gt;&lt;/onlyinclude&gt;&lt;noinclude&gt;
-{{documentation}}
-&lt;/noinclude&gt;</text>
-      <sha1>dayxo3fkl6lodm6yac4b81n8xpe82xa</sha1>
     </revision>
   </page>
   <page>
@@ -42451,288 +42926,6 @@ return p</text>
     </revision>
   </page>
   <page>
-    <title>Module:Anchor</title>
-    <ns>828</ns>
-    <id>393</id>
-    <revision>
-      <id>777</id>
-      <timestamp>2025-04-19T20:57:16Z</timestamp>
-      <contributor>
-        <username>wikisource&gt;ShakespeareFan00</username>
-        <id>0</id>
-      </contributor>
-      <minor/>
-      <comment>Most of the page namespace is now cleaned up, far quicker than expected and this is adding a LOT of noise</comment>
-      <origin>777</origin>
-      <model>Scribunto</model>
-      <format>text/plain</format>
-      <text bytes="3510" sha1="5f4lcoaa24p0gqn68siy62e63n40ywc" xml:space="preserve">--[=[
-Implements anchor templates
-]=]
-require('strict')
-
-local getArgs = require('Module:Arguments').getArgs
-local Error = require('Module:Error')
-
-local function error_message(message)
-	return Error['error']({['message'] = message})
-end
-
-local p = {}
-
--- [[Template:Anchor]]
-
-local function _anchor(args)
-	local anchorList = {}
-	for k, v in pairs(args) do
-		table.insert(anchorList, tostring(mw.html.create('span'):addClass('anchor'):attr('id', mw.uri.anchorEncode(v))))
-	end
-	return table.concat(anchorList)
-end
-
-function p.anchor(frame)
-	return _anchor(getArgs(frame))
-end
-
--- [[Template:Anchor link]]
-
-local function _anchor_link(args)
-	local anchor = args.anchor or args[1]
-	if not anchor then
-		return error_message('No anchor specified')
-	end
-	
-	anchor = mw.uri.anchorEncode(anchor)
-	local pageno = args.pageno or args[2]
-	local subpage = args.subpage or args[3]
-	
-	local page = (args.page and mw.title.new(args.page)) or mw.title.getCurrentTitle()
-	
-	if page.nsText == 'Page' and not pageno then
-		return error_message('No page number specified')
-	end
-	
-	local title = page.text
-	if page.nsText == 'Page' then
-		title = page.rootText .. '/' .. pageno
-	elseif subpage then
-		local rootSubpageTitle = mw.title.makeTitle(page.nsText, page.rootText .. '/' .. subpage)
-		local baseSubpageTitle = mw.title.makeTitle(page.nsText, page.baseText .. '/' .. subpage)
-		if rootSubpageTitle.exists then
-			title = rootSubpageTitle.text
-		elseif baseSubpageTitle.exists then
-			title = baseSubpageTitle.text
-		end
-	end
-	
-	return '[[' .. mw.title.makeTitle(page.nsText, title, anchor).fullText .. '|' .. anchor:gsub("_", " ") .. ']]'
-end
-
-function p.anchor_link(frame)
-	return _anchor_link(getArgs(frame))
-end
-
--- [[Template:Anchor link 2]]
-
-local function _anchor_link_2(args)
-	local anchor = args.anchor or args[3]
-	if not anchor then
-		return error_message('No anchor specified')
-	end
-	
-	local subpage = args.subpage or args[1]
-	local pageno = args.pageno or args[2]
-	anchor = mw.uri.anchorEncode(anchor)
-	local text = args.text or args[4] or anchor
-	
-	local page = (args.page and mw.title.new(args.page)) or mw.title.getCurrentTitle()
-	
-	if page.nsText == 'Page' and not pageno then
-		return error_message('No page number specified')
-	end
-	
-	local title = page.text
-	if page.nsText == 'Page' then
-		title = page.rootText .. '/' .. pageno
-	elseif subpage then
-		local rootSubpageTitle = mw.title.makeTitle(page.nsText, page.rootText .. '/' .. subpage)
-		local baseSubpageTitle = mw.title.makeTitle(page.nsText, page.baseText .. '/' .. subpage)
-		
-		if not rootSubpageTitle or not baseSubpageTitle then
-			return error_message('Error creating subpage: ' .. subpage)
-		end
-		
-		local baseSubpageBaseTitle = mw.title.makeTitle(page.nsText, baseSubpageTitle.baseText .. '/' .. subpage)
-		if not baseSubpageBaseTitle then
-			return error_message('Error creating subpage: ' .. subpage)
-		end
-		
-		local subpageTitle = mw.title.makeTitle(page.nsText, subpage)
-		if not subpageTitle then
-			return error_message('Error creating page: ' .. subpage)
-		end
-		
-		if rootSubpageTitle.exists then
-			title = rootSubpageTitle.text
-		elseif baseSubpageTitle.exists then
-			title = baseSubpageTitle.text
-		elseif baseSubpageBaseTitle.exists then
-			title = baseSubpageBaseTitle.text
-		elseif subpageTitle.exists then
-			title = subpage
-		end
-	end
-	return '[[' .. mw.title.makeTitle(page.nsText, title, anchor).fullText .. '|' .. text .. ']]'
-end
-
-function p.anchor_link_2(frame)
-	return _anchor_link_2(getArgs(frame))
-end
-
-return p</text>
-      <sha1>5f4lcoaa24p0gqn68siy62e63n40ywc</sha1>
-    </revision>
-    <revision>
-      <id>778</id>
-      <parentid>777</parentid>
-      <timestamp>2026-03-06T06:46:28Z</timestamp>
-      <contributor>
-        <username>Admin</username>
-        <id>1</id>
-      </contributor>
-      <minor/>
-      <comment>1 revision imported</comment>
-      <origin>777</origin>
-      <model>Scribunto</model>
-      <format>text/plain</format>
-      <text bytes="3510" sha1="5f4lcoaa24p0gqn68siy62e63n40ywc" xml:space="preserve">--[=[
-Implements anchor templates
-]=]
-require('strict')
-
-local getArgs = require('Module:Arguments').getArgs
-local Error = require('Module:Error')
-
-local function error_message(message)
-	return Error['error']({['message'] = message})
-end
-
-local p = {}
-
--- [[Template:Anchor]]
-
-local function _anchor(args)
-	local anchorList = {}
-	for k, v in pairs(args) do
-		table.insert(anchorList, tostring(mw.html.create('span'):addClass('anchor'):attr('id', mw.uri.anchorEncode(v))))
-	end
-	return table.concat(anchorList)
-end
-
-function p.anchor(frame)
-	return _anchor(getArgs(frame))
-end
-
--- [[Template:Anchor link]]
-
-local function _anchor_link(args)
-	local anchor = args.anchor or args[1]
-	if not anchor then
-		return error_message('No anchor specified')
-	end
-	
-	anchor = mw.uri.anchorEncode(anchor)
-	local pageno = args.pageno or args[2]
-	local subpage = args.subpage or args[3]
-	
-	local page = (args.page and mw.title.new(args.page)) or mw.title.getCurrentTitle()
-	
-	if page.nsText == 'Page' and not pageno then
-		return error_message('No page number specified')
-	end
-	
-	local title = page.text
-	if page.nsText == 'Page' then
-		title = page.rootText .. '/' .. pageno
-	elseif subpage then
-		local rootSubpageTitle = mw.title.makeTitle(page.nsText, page.rootText .. '/' .. subpage)
-		local baseSubpageTitle = mw.title.makeTitle(page.nsText, page.baseText .. '/' .. subpage)
-		if rootSubpageTitle.exists then
-			title = rootSubpageTitle.text
-		elseif baseSubpageTitle.exists then
-			title = baseSubpageTitle.text
-		end
-	end
-	
-	return '[[' .. mw.title.makeTitle(page.nsText, title, anchor).fullText .. '|' .. anchor:gsub("_", " ") .. ']]'
-end
-
-function p.anchor_link(frame)
-	return _anchor_link(getArgs(frame))
-end
-
--- [[Template:Anchor link 2]]
-
-local function _anchor_link_2(args)
-	local anchor = args.anchor or args[3]
-	if not anchor then
-		return error_message('No anchor specified')
-	end
-	
-	local subpage = args.subpage or args[1]
-	local pageno = args.pageno or args[2]
-	anchor = mw.uri.anchorEncode(anchor)
-	local text = args.text or args[4] or anchor
-	
-	local page = (args.page and mw.title.new(args.page)) or mw.title.getCurrentTitle()
-	
-	if page.nsText == 'Page' and not pageno then
-		return error_message('No page number specified')
-	end
-	
-	local title = page.text
-	if page.nsText == 'Page' then
-		title = page.rootText .. '/' .. pageno
-	elseif subpage then
-		local rootSubpageTitle = mw.title.makeTitle(page.nsText, page.rootText .. '/' .. subpage)
-		local baseSubpageTitle = mw.title.makeTitle(page.nsText, page.baseText .. '/' .. subpage)
-		
-		if not rootSubpageTitle or not baseSubpageTitle then
-			return error_message('Error creating subpage: ' .. subpage)
-		end
-		
-		local baseSubpageBaseTitle = mw.title.makeTitle(page.nsText, baseSubpageTitle.baseText .. '/' .. subpage)
-		if not baseSubpageBaseTitle then
-			return error_message('Error creating subpage: ' .. subpage)
-		end
-		
-		local subpageTitle = mw.title.makeTitle(page.nsText, subpage)
-		if not subpageTitle then
-			return error_message('Error creating page: ' .. subpage)
-		end
-		
-		if rootSubpageTitle.exists then
-			title = rootSubpageTitle.text
-		elseif baseSubpageTitle.exists then
-			title = baseSubpageTitle.text
-		elseif baseSubpageBaseTitle.exists then
-			title = baseSubpageBaseTitle.text
-		elseif subpageTitle.exists then
-			title = subpage
-		end
-	end
-	return '[[' .. mw.title.makeTitle(page.nsText, title, anchor).fullText .. '|' .. text .. ']]'
-end
-
-function p.anchor_link_2(frame)
-	return _anchor_link_2(getArgs(frame))
-end
-
-return p</text>
-      <sha1>5f4lcoaa24p0gqn68siy62e63n40ywc</sha1>
-    </revision>
-  </page>
-  <page>
     <title>Template:Header structure/styles.css</title>
     <ns>10</ns>
     <id>135</id>
@@ -43064,27 +43257,6 @@ end
 
 return p</text>
       <sha1>hrgorewi10670e3soofoqxl17a7owpi</sha1>
-    </revision>
-  </page>
-  <page>
-    <title>Template:Xx-larger</title>
-    <ns>10</ns>
-    <id>5400</id>
-    <revision>
-      <id>10780</id>
-      <timestamp>2026-03-09T06:10:51Z</timestamp>
-      <contributor>
-        <username>Admin</username>
-        <id>1</id>
-      </contributor>
-      <comment>Created page with "&lt;includeonly&gt;{{font-size-base|font-size=182%|style={{{style|}}}|1={{{1}}}}}&lt;/includeonly&gt;&lt;noinclude&gt; {{documentation|Template:X-smaller/doc}} &lt;/noinclude&gt;"</comment>
-      <origin>10780</origin>
-      <model>wikitext</model>
-      <format>text/x-wiki</format>
-      <text bytes="154" sha1="c5kpvdak4baev8soufiehqiqpbsz1np" xml:space="preserve">&lt;includeonly&gt;{{font-size-base|font-size=182%|style={{{style|}}}|1={{{1}}}}}&lt;/includeonly&gt;&lt;noinclude&gt;
-{{documentation|Template:X-smaller/doc}}
-&lt;/noinclude&gt;</text>
-      <sha1>c5kpvdak4baev8soufiehqiqpbsz1np</sha1>
     </revision>
   </page>
   <page>
@@ -44712,27 +44884,6 @@ return p</text>
     </revision>
   </page>
   <page>
-    <title>Template:X-smaller</title>
-    <ns>10</ns>
-    <id>5809</id>
-    <revision>
-      <id>11204</id>
-      <timestamp>2026-03-22T01:57:31Z</timestamp>
-      <contributor>
-        <username>Admin</username>
-        <id>1</id>
-      </contributor>
-      <comment>Pywikibot 11.1.0</comment>
-      <origin>11204</origin>
-      <model>wikitext</model>
-      <format>text/x-wiki</format>
-      <text bytes="153" sha1="sk4k32obx8x04thci1d0gk236dhuptk" xml:space="preserve">&lt;includeonly&gt;{{font-size-base|font-size=69%|style={{{style|}}}|1={{{1}}}}}&lt;/includeonly&gt;&lt;noinclude&gt;
-{{documentation|Template:X-smaller/doc}}
-&lt;/noinclude&gt;</text>
-      <sha1>sk4k32obx8x04thci1d0gk236dhuptk</sha1>
-    </revision>
-  </page>
-  <page>
     <title>Template:M-larger</title>
     <ns>10</ns>
     <id>5821</id>
@@ -44878,6 +45029,44 @@ return p</text>
 	['w'] = 'Wave',
 }</text>
       <sha1>labtkomfj83ny6yaxpzdudgrmtj3n4l</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Module:Anchor/doc</title>
+    <ns>828</ns>
+    <id>465</id>
+    <revision>
+      <id>921</id>
+      <timestamp>2023-03-03T06:02:09Z</timestamp>
+      <contributor>
+        <username>wikisource&gt;CalendulaAsteraceae</username>
+        <id>0</id>
+      </contributor>
+      <origin>921</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="108" sha1="1ldjhy2ugqs1709034iwf7wgdokdh1d" xml:space="preserve">{{lua|Module:Arguments|Module:Error}}
+
+Logic for {{tl|anchor}}, {{tl|anchor link}} and {{tl|anchor link 2}}.</text>
+      <sha1>1ldjhy2ugqs1709034iwf7wgdokdh1d</sha1>
+    </revision>
+    <revision>
+      <id>922</id>
+      <parentid>921</parentid>
+      <timestamp>2026-03-06T06:46:33Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <minor/>
+      <comment>1 revision imported</comment>
+      <origin>921</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="108" sha1="1ldjhy2ugqs1709034iwf7wgdokdh1d" xml:space="preserve">{{lua|Module:Arguments|Module:Error}}
+
+Logic for {{tl|anchor}}, {{tl|anchor link}} and {{tl|anchor link 2}}.</text>
+      <sha1>1ldjhy2ugqs1709034iwf7wgdokdh1d</sha1>
     </revision>
   </page>
   <page>
@@ -50162,6 +50351,154 @@ Although the blank string usually evaluates to false in wikitext, it evaluates t
     </revision>
   </page>
   <page>
+    <title>Template:--/doc</title>
+    <ns>10</ns>
+    <id>5665</id>
+    <revision>
+      <id>11060</id>
+      <timestamp>2026-03-22T01:38:56Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Pywikibot 11.1.0</comment>
+      <origin>11060</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="964" sha1="kkr6x9blwwrbyfjwqhp3481iwleg4jc" xml:space="preserve">{{documentation subpage}}
+
+== Usage ==
+This template displays a punctuation mark, an em dash with '''no''' leading &amp; trailing hairspaces:
+ —
+Notes:
+# This is a convenience template and should not be used to replace other input methods, eg, [[w:Dash#Common_dashes|coding table]].
+# {{tl|Mdash}} redirects here.
+
+=== Keyboard shortcuts ===
+Instead of this template:
+* '''Mac''' users can use keystroke &lt;code&gt;option + shift&lt;/code&gt; + &lt;code&gt;-&lt;/code&gt; for this character.
+* '''Windows''' users can use keystroke combination &lt;code&gt;alt&lt;/code&gt; + &lt;code&gt;0151&lt;/code&gt; (on the num keypad).
+* '''Linux''' users: &lt;code&gt;ctrl + shift + U&lt;/code&gt; + &lt;code&gt;2014&lt;/code&gt; or just &lt;code&gt;Compose&lt;/code&gt; + &lt;code&gt;-&lt;/code&gt; + &lt;code&gt;-&lt;/code&gt; + &lt;code&gt;-&lt;/code&gt;.
+
+== See also ==
+* {{tl|Page end hyphen}}
+* {{tl|Ndash}}
+* {{tl|Longdash}}
+
+&lt;!-- template categories and interwiki links --&gt;
+&lt;includeonly&gt;
+[[Category:Formatting templates|#]]
+[[Category:Templates that can be substituted]]
+&lt;/includeonly&gt;</text>
+      <sha1>kkr6x9blwwrbyfjwqhp3481iwleg4jc</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Anchor+/doc</title>
+    <ns>10</ns>
+    <id>5927</id>
+    <revision>
+      <id>11322</id>
+      <timestamp>2026-03-22T02:08:20Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Pywikibot 11.1.0</comment>
+      <origin>11322</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="977" sha1="qm90vfifix8kcbo8s74ycfopc9z9t0s" xml:space="preserve">{{documentation subpage}}
+{{template shortcut|a+}}
+{{span-based-template}}
+{{Uses TemplateStyles|Template:Anchor/styles.css}}
+
+==Usage==
+This template provides an anchor on the page, along with visible text, which will be highlighted when a link to the anchor is followed. The visible text is not necessarily the same as the anchor name.
+
+===Examples===
+
+====Anchor with name and text identical====
+
+&lt;pre&gt;
+{{anchor+|Anchor}}
+&lt;/pre&gt;
+
+{{anchor+|Anchor}}
+
+:Creates the anchor named "Anchor", with the visible text "Anchor". The anchor is reachable by the link [[{{FULLPAGENAME}}#Anchor]].
+
+====Anchor with name and text different====
+
+&lt;pre&gt;
+{{anchor+|Anchor1|Visible anchor text}}
+&lt;/pre&gt;
+
+{{anchor+|Anchor1|Visible anchor text}}
+
+==See also==
+* {{tl|anchor}} - can carry multiple variables, though no visible text
+
+&lt;!-- template categories and interwiki links --&gt;
+&lt;includeonly&gt;
+[[Category:Internal link templates]]
+[[Category:Templates that create an anchor point]]
+&lt;/includeonly&gt;</text>
+      <sha1>qm90vfifix8kcbo8s74ycfopc9z9t0s</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Anchor/styles.css</title>
+    <ns>10</ns>
+    <id>5850</id>
+    <revision>
+      <id>11245</id>
+      <timestamp>2026-03-22T01:59:58Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Pywikibot 11.1.0</comment>
+      <origin>11245</origin>
+      <model>sanitized-css</model>
+      <format>text/css</format>
+      <text bytes="139" sha1="1xnw6hzqlc1w9q9a5yj1egue3wb5kvi" xml:space="preserve">.wst-anchor:target {
+	background-color:rgba(100, 149, 237, 0.1);
+    color: var(--color-base,#202122);
+	outline:1px solid cornflowerblue;
+}</text>
+      <sha1>1xnw6hzqlc1w9q9a5yj1egue3wb5kvi</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Span-based-template</title>
+    <ns>10</ns>
+    <id>5934</id>
+    <revision>
+      <id>11329</id>
+      <timestamp>2026-03-22T02:08:53Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Pywikibot 11.1.0</comment>
+      <origin>11329</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="492" sha1="joj6dvjj3cl52m6eagcd4wjrp5af2lq" xml:space="preserve">&lt;onlyinclude&gt;{{ombox|type = notice
+|small = yes
+|image =[[File:Italic font awesome.svg|35px]]
+|text=&lt;p&gt;This template uses a &lt;code&gt;&amp;lt;span&amp;gt;&lt;/code&gt; element for formatting.&lt;br /&gt;
+Block-based templates and paragraph breaks cannot be nested inside it.&lt;/p&gt;
+&lt;p&gt;See [[H:DIVSPAN]] for details.&lt;/p&gt;
+{{#if:{{{class|}}}|{{class notice|class={{{class}}}|classcount={{{classcount|}}}}}}}
+}}&lt;includeonly&gt;{{sandbox other||[[Category:Span based templates]]}}&lt;/includeonly&gt;&lt;/onlyinclude&gt;
+
+{{documentation}}</text>
+      <sha1>joj6dvjj3cl52m6eagcd4wjrp5af2lq</sha1>
+    </revision>
+  </page>
+  <page>
     <title>Template:Templatestyles</title>
     <ns>10</ns>
     <id>38</id>
@@ -50609,6 +50946,119 @@ Note: The choice of formatting of bullets, or numbered bullets, or without will 
       <format>text/x-wiki</format>
       <text bytes="30" sha1="s7hmu109ak6fmskssps3uvofxnxug6y" xml:space="preserve">#redirect [[Template:Div end]]</text>
       <sha1>s7hmu109ak6fmskssps3uvofxnxug6y</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Blackletter/s</title>
+    <ns>10</ns>
+    <id>5405</id>
+    <revision>
+      <id>10785</id>
+      <timestamp>2026-03-09T06:15:38Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Created page with "&lt;includeonly&gt;&lt;templatestyles src="Template:Blackletter/styles.css" /&gt;&lt;{{yesno|{{{inline|yes}}}|yes=span|no=div|¬=span}} lang="{{{lang|en-Latf}}}" class="blackletter blackletter-mode-{{{mode|0}}}" style="{{#switch:{{{mode|}}}   | 1 = &lt;!-- Original; no additional features --&gt;   | 2 = -webkit-font-feature-settings:'cv08'; -ms-font-feature-settings:'cv08';&lt;!-- Modern-S --&gt;   | 3 = -webkit-font-feature-settings:'cv01'; -ms-font-feature-settings:'cv01';&lt;!-- Modern-k --&gt;   | 4..."</comment>
+      <origin>10785</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="1099" sha1="38wo1smc5ycyt20fy8v9u6slftk95rh" xml:space="preserve">&lt;includeonly&gt;&lt;templatestyles src="Template:Blackletter/styles.css" /&gt;&lt;{{yesno|{{{inline|yes}}}|yes=span|no=div|¬=span}} lang="{{{lang|en-Latf}}}" class="blackletter blackletter-mode-{{{mode|0}}}" style="{{#switch:{{{mode|}}}
+  | 1 = &lt;!-- Original; no additional features --&gt;
+  | 2 = -webkit-font-feature-settings:'cv08'; -ms-font-feature-settings:'cv08';&lt;!-- Modern-S --&gt;
+  | 3 = -webkit-font-feature-settings:'cv01'; -ms-font-feature-settings:'cv01';&lt;!-- Modern-k --&gt;
+  | 4 = -webkit-font-feature-settings:'cv01', 'cv08'; -ms-font-feature-settings:'cv01', 'cv08';&lt;!-- Modern-S &amp; Modern-k --&gt;
+  | 5 = -webkit-font-feature-settings:'cv04' 2; -ms-font-feature-settings:'cv01', 'cv08' 'cv04' 2;&lt;!-- Modern-S, &amp; Modern-k, Other modern A --&gt;
+  | 0 | #default = -webkit-font-feature-settings:'cv01', 'cv02', 'cv03', 'cv04', 'cv05', 'cv06', 'cv07', 'cv08', 'cv09', 'cv10'; -ms-font-feature-settings:'cv01', 'cv02', 'cv03', 'cv04', 'cv05', 'cv06', 'cv07', 'cv08', 'cv09', 'cv10';&lt;!-- Modern-ksxy, upper and lower case --&gt; 
+}}"&gt;&lt;/includeonly&gt;&lt;noinclude&gt;{{documentation|Template:Blackletter/doc}}&lt;/noinclude&gt;</text>
+      <sha1>38wo1smc5ycyt20fy8v9u6slftk95rh</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Span end</title>
+    <ns>10</ns>
+    <id>5407</id>
+    <revision>
+      <id>10787</id>
+      <timestamp>2026-03-09T06:16:42Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Created page with "&lt;includeonly&gt;&lt;/span&gt;&lt;/includeonly&gt;&lt;noinclude&gt; {{documentation}} &lt;/noinclude&gt;"</comment>
+      <origin>10787</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="76" sha1="eiiuioy2o5kcbg04ogg6wgdsj6x5pcb" xml:space="preserve">&lt;includeonly&gt;&lt;/span&gt;&lt;/includeonly&gt;&lt;noinclude&gt;
+{{documentation}}
+&lt;/noinclude&gt;</text>
+      <sha1>eiiuioy2o5kcbg04ogg6wgdsj6x5pcb</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Blackletter/styles.css</title>
+    <ns>10</ns>
+    <id>5406</id>
+    <revision>
+      <id>10786</id>
+      <timestamp>2026-03-09T06:16:05Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Created page with ".blackletter { 	font-family:'UnifrakturMaguntia', 'UnifrakturCook', 'Unifraktur', serif; 	font-size:113%; } /* Modern-ksxy, upper and lower case*/ .blackletter-mode-0 { 	font-feature-settings:'cv01', 'cv02', 'cv03', 'cv04', 'cv05', 'cv06', 'cv07', 'cv08', 'cv09', 'cv10'; 	/* 	-webkit-font-feature-settings:'cv01', 'cv02', 'cv03', 'cv04', 'cv05', 'cv06', 'cv07', 'cv08', 'cv09', 'cv10'; 	-ms-font-feature-settings:'cv01', 'cv02', 'cv03', 'cv04', 'cv05', 'cv06', 'cv07', 'cv08..."</comment>
+      <origin>10786</origin>
+      <model>sanitized-css</model>
+      <format>text/css</format>
+      <text bytes="1276" sha1="cvmz8emrihoki91jhwums3xuape8ast" xml:space="preserve">.blackletter {
+	font-family:'UnifrakturMaguntia', 'UnifrakturCook', 'Unifraktur', serif;
+	font-size:113%;
+}
+/* Modern-ksxy, upper and lower case*/
+.blackletter-mode-0 {
+	font-feature-settings:'cv01', 'cv02', 'cv03', 'cv04', 'cv05', 'cv06', 'cv07', 'cv08', 'cv09', 'cv10';
+	/*
+	-webkit-font-feature-settings:'cv01', 'cv02', 'cv03', 'cv04', 'cv05', 'cv06', 'cv07', 'cv08', 'cv09', 'cv10';
+	-ms-font-feature-settings:'cv01', 'cv02', 'cv03', 'cv04', 'cv05', 'cv06', 'cv07', 'cv08', 'cv09', 'cv10';
+	*/
+}
+/* Original; no additional features */
+/*.blackletter-mode-1 {
+	
+}*/
+/* Modern-S */
+.blackletter-mode-2 {
+	font-feature-settings:'cv08';
+	/*
+	-webkit-font-feature-settings:'cv08';
+	-ms-font-feature-settings:'cv08';
+	*/
+}
+/* Modern-k */
+.blackletter-mode-3 {
+	font-feature-settings:'cv01';
+	/*
+	-webkit-font-feature-settings:'cv01';
+	-ms-font-feature-settings:'cv01';
+	*/
+}
+/* Modern-S &amp; Modern-k */
+.blackletter-mode-4 {
+	font-feature-settings:'cv01', 'cv08';
+	/*
+	-webkit-font-feature-settings:'cv01', 'cv08';
+	-ms-font-feature-settings:'cv01', 'cv08';
+	*/
+}
+/* Modern-S, &amp; Modern-k, Other modern A */
+.blackletter-mode-5 {
+	font-feature-settings:'cv01', 'cv08', 'cv04' 2;
+	/*
+	-webkit-font-feature-settings:'cv04' 2;
+	-ms-font-feature-settings:'cv01', 'cv08' 'cv04' 2;
+	*/
+}</text>
+      <sha1>cvmz8emrihoki91jhwums3xuape8ast</sha1>
     </revision>
   </page>
   <page>
@@ -52358,6 +52808,287 @@ This template is used to resolve [[w:ISO 639-1]], [[w:ISO 639-2]] and [[w:ISO 63
 [[Category:Internationalization templates]]
 &lt;/includeonly&gt;</text>
       <sha1>k9npez7fx5atyaxcuh40l5n3rhr34jk</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Pseudoheading/doc</title>
+    <ns>10</ns>
+    <id>5978</id>
+    <revision>
+      <id>11373</id>
+      <timestamp>2026-03-22T02:18:07Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Pywikibot 11.1.0</comment>
+      <origin>11373</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="5694" sha1="2l6guh7elnz9eora7ghj75xrdf9zi3n" xml:space="preserve">{{Documentation subpage}}
+&lt;!-- PLEASE ADD CATEGORIES AT THE BOTTOM OF THIS PAGE AND INTERWIKIS IN WIKIDATA --&gt;
+{{#switch:{{FULLPAGENAME}}
+|Template:Pseudoheading={{template shortcut|ph}}
+|Template:Pseudoheading/main={{template shortcut|ph/main}}
+|Template:Pseudoheading/subheading={{template shortcut|ph/sub}}
+|Template:Pseudoheading/leveled={{template shortcut|ph/leveled|ph/l}}
+|Template:Pseudoheading/inline={{template shortcut|ph/i}}
+|#default=
+}}
+{{templatestyles|Template:Pseudoheading/styles.css}}
+{{-}}
+
+== Pseudoheading ==
+{{tl|Pseudoheading}} generates a classed div with an ID, as an alternative to HTML heading elements (which MediaWiki will often override the styles of); the ID can be used for anchor links. It ''explicitly'' has no support for direct CSS formatting, and applies no styles except for highlighting the text when a link to the anchor is followed. It is designed for use with classes and [[Help:Page styles|index-specific CSS]].
+
+=== Parameters ===
+* {{parameter|1}}: The content of the header.
+* {{parameter|class}}: Optional CSS classes (use this if you have multiple heading styles in a single work). The div always has the class &lt;syntaxhighlight lang="wikitext" inline="yes"&gt;.wst-heading&lt;/syntaxhighlight&gt; as well as additional classes.
+* {{parameter|id}}: Optional ID (used as an anchor). If not given, the contents of the header is used. This parameter should also be used to add a suitable simple ID, if markup or complex formatting is used in the header (such as a footnote directly associated with the heading). To omit the ID, set &lt;syntaxhighlight lang="wikitext" inline="yes"&gt;id = &lt;/syntaxhighlight&gt;.
+* {{parameter|attr}}: Additional attributes.
+*: For example, {{tl|pseudoheading/leveled}} uses this to set &lt;syntaxhighlight lang="wikitext" inline="yes"&gt;attr = aria-level="{{{level|2}}}"&lt;/syntaxhighlight&gt;.
+
+=== Examples ===
+{{doc example|
+A div with class &lt;code&gt;wst-heading&lt;/code&gt; and id &lt;code&gt;Chapter_One&lt;/code&gt;:
+&lt;pre&gt;{{pseudoheading|Chapter One}}&lt;/pre&gt;
+{{pseudoheading|Chapter One}}
+}}
+
+{{doc example|
+A div with classes &lt;code&gt;.wst-heading&lt;/code&gt; and &lt;code&gt;.chapter_heading&lt;/code&gt; and id &lt;code&gt;Chapter_1&lt;/code&gt;:
+&lt;pre&gt;
+{{pseudoheading|Chapter ''One''&lt;ref&gt;example&lt;/ref&gt;|id=Chapter 1|class=chapter_heading}}
+&lt;references /&gt;
+&lt;/pre&gt;
+{{pseudoheading|Chapter ''One''&lt;ref&gt;example&lt;/ref&gt;|id=Chapter 1|class=chapter_heading}}
+&lt;references /&gt;
+}}
+
+There are a few common styling choices you may wish to replicate.
+
+==== Margin/leading underneath the heading ====
+
+Example: [[Page:Ayn Rand Anthem.pdf/21]] (using [[Index:Ayn Rand Anthem.pdf/styles.css]])
+
+&lt;syntaxhighlight lang=css&gt;
+.wst-heading {
+	text-align:center;
+	font-size:120%;
+	margin-bottom:1.5em;
+}
+&lt;/syntaxhighlight&gt;
+
+==== Small-caps for subtitles ====
+
+&lt;syntaxhighlight lang=css&gt;
+.wst-heading {
+	text-align:center;
+}
+.wst-heading.subtitle {
+	font-variant:small-caps;
+}
+&lt;/syntaxhighlight&gt;
+
+Also consider &lt;code&gt;all-small-caps&lt;/code&gt; if you want Proper Nouns to appear in "all small caps", including the first letters: e.g. {{asc|Oxford}}.
+
+== Pseudoheading/inline ==
+{{tl|Pseudoheading/inline}} has the same behavior as {{tl|pseudoheading}}, except that it generates a span rather than a div and adds the additional class &lt;code&gt;.wst-heading-inline&lt;/code&gt;.
+
+== Pseudoheading/main and Pseudoheading/subheading ==
+{{tl|Pseudoheading/main}} and {{tl|pseudoheading/subheading}} call {{tl|pseudoheading}} with the additional classes &lt;code&gt;.wst-main-heading&lt;/code&gt; and &lt;code&gt;.wst-subheading&lt;/code&gt; respectively, and produce centered text, which {{tl|pseudoheading/main}} also makes font size 120%.
+
+=== Parameters ===
+* {{parameter|1}} The content of the header.
+* {{parameter|class}} Optional CSS classes.
+* {{parameter|id}} Optional ID.
+
+=== Examples ===
+{{doc example|
+&lt;pre&gt;
+{{pseudoheading/main|Chapter I}}
+{{pseudoheading/subheading|Subtitle}}
+&lt;/pre&gt;
+{{pseudoheading/main|Chapter I}}
+{{pseudoheading/subheading|Subtitle}}
+}}
+
+== Pseudoheading/leveled ==
+{{tl|Pseudoheading/leveled}} calls {{tl|pseudoheading}} with the additional classes &lt;code&gt;.wst-heading-leveled&lt;/code&gt; and &lt;code&gt;&lt;nowiki&gt;.wst-heading-leveled-{{{level}}}&lt;/nowiki&gt;&lt;/code&gt;.
+
+=== Parameters ===
+* {{parameter|1}} The content of the header.
+* {{parameter|class}} Optional CSS classes. The div always has the classes &lt;code&gt;.wst-heading&lt;/code&gt;, &lt;code&gt;.wst-heading-leveled&lt;/code&gt; and &lt;code&gt;&lt;nowiki&gt;.wst-heading-leveled-{{{level}}}&lt;/nowiki&gt;&lt;/code&gt; as well as additional classes.
+* {{parameter|id}} Optional ID (used as an anchor).
+* {{parameter|level}} Heading level. Typically an integer between 1 and 6, defaults to 2.
+
+=== Examples ===
+{{doc example|
+&lt;pre&gt;
+{{Pseudoheading/leveled|Text}}
+&lt;/pre&gt;
+{{Pseudoheading/leveled|Text}}
+}}
+
+{{doc example|
+&lt;pre&gt;
+{{Pseudoheading/leveled|Level 1|level=1}}
+{{Pseudoheading/leveled|Level 2|level=2}}
+{{Pseudoheading/leveled|Level 3|level=3}}
+{{Pseudoheading/leveled|Level 4|level=4}}
+{{Pseudoheading/leveled|Level 5|level=5}}
+{{Pseudoheading/leveled|Level 6|level=6}}
+&lt;/pre&gt;
+{{Pseudoheading/leveled|Level 1|level=1}}
+{{Pseudoheading/leveled|Level 2|level=2}}
+{{Pseudoheading/leveled|Level 3|level=3}}
+{{Pseudoheading/leveled|Level 4|level=4}}
+{{Pseudoheading/leveled|Level 5|level=5}}
+{{Pseudoheading/leveled|Level 6|level=6}}
+}}
+
+
+{{doc example|
+&lt;pre&gt;
+{{Pseudoheading/leveled|Text&lt;ref&gt;Demo&lt;/ref&gt;|class=example|id=Text|level=example}}
+&lt;references /&gt;
+&lt;/pre&gt;
+{{Pseudoheading/leveled|Text&lt;ref&gt;Demo&lt;/ref&gt;|class=example|id=Text|level=example}}
+&lt;references /&gt;
+}}
+
+&lt;!--== See also ==--&gt;
+
+&lt;includeonly&gt;
+&lt;!-- PLEASE ADD CATEGORIES BELOW THIS LINE AND INTERWIKIS IN WIKIDATA, THANKS --&gt;
+[[Category:Heading templates]]
+[[Category:Formatting templates]]
+[[Category:Templates applying classes for page styles]]
+&lt;/includeonly&gt;</text>
+      <sha1>2l6guh7elnz9eora7ghj75xrdf9zi3n</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Pseudoheading/styles.css</title>
+    <ns>10</ns>
+    <id>5827</id>
+    <revision>
+      <id>11222</id>
+      <timestamp>2026-03-22T01:58:40Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Pywikibot 11.1.0</comment>
+      <origin>11222</origin>
+      <model>sanitized-css</model>
+      <format>text/css</format>
+      <text bytes="535" sha1="tv8dflzp2q98x7xkma54jyqah3btw6e" xml:space="preserve">/*
+.wst-heading:target {
+	background-color:rgba(100, 149, 237, 0.1);
+	color:inherit;
+	/outline:1px solid cornflowerblue;
+}
+*/
+
+.wst-main-heading, .wst-subheading {
+	text-align:center;
+	margin:0.5em auto;
+}
+.wst-main-heading {
+	font-size:120%;
+}
+
+.wst-heading-leveled {
+	text-align:center;
+	margin-top:0.3em;
+}
+.wst-heading-leveled.wst-heading-leveled-1 {
+	font-size:180%;
+	margin-top:1em;
+}
+.wst-heading-leveled.wst-heading-leveled-2 {
+	font-size:150%;
+	margin-top:1em;
+}
+.wst-heading-leveled.wst-heading-leveled-3 {
+	font-size:120%;
+}</text>
+      <sha1>tv8dflzp2q98x7xkma54jyqah3btw6e</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Pseudoheading/leveled</title>
+    <ns>10</ns>
+    <id>6072</id>
+    <revision>
+      <id>11467</id>
+      <timestamp>2026-03-22T04:31:44Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Pywikibot 11.1.0</comment>
+      <origin>11467</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="275" sha1="em9qf8b49nsbj59jte0ux3xrc1v5xcn" xml:space="preserve">{{pseudoheading
+ | {{{1|}}}
+ | id = {{#if:{{{id}}}&lt;!--NOT {{{id|}}}--&gt;|{{{id|{{{1|}}}}}}}}
+ | class = wst-heading-leveled wst-heading-leveled-{{{level|2}}} {{{class|}}}
+ | attr = aria-level="{{{level|2}}}"
+}}&lt;noinclude&gt;{{documentation|Template:Pseudoheading/doc}}&lt;/noinclude&gt;</text>
+      <sha1>em9qf8b49nsbj59jte0ux3xrc1v5xcn</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Pseudoheading/main</title>
+    <ns>10</ns>
+    <id>6073</id>
+    <revision>
+      <id>11468</id>
+      <timestamp>2026-03-22T04:31:47Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Pywikibot 11.1.0</comment>
+      <origin>11468</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="245" sha1="qx0aawpckd497lbgas8qmeemao1mpg4" xml:space="preserve">{{pseudoheading
+ | {{{1|}}}
+ | id = {{#if:{{{id}}}&lt;!--NOT {{{id|}}}--&gt;|{{{id|{{{1|}}}}}}}}
+ | class = wst-main-heading {{{class|}}}
+ | attr = {{{attr|}}}
+ | noid = {{{noid|}}}
+}}&lt;noinclude&gt;{{documentation|Template:Pseudoheading/doc}}&lt;/noinclude&gt;</text>
+      <sha1>qx0aawpckd497lbgas8qmeemao1mpg4</sha1>
+    </revision>
+  </page>
+  <page>
+    <title>Template:Pseudoheading/subheading</title>
+    <ns>10</ns>
+    <id>6074</id>
+    <revision>
+      <id>11469</id>
+      <timestamp>2026-03-22T04:31:50Z</timestamp>
+      <contributor>
+        <username>Admin</username>
+        <id>1</id>
+      </contributor>
+      <comment>Pywikibot 11.1.0</comment>
+      <origin>11469</origin>
+      <model>wikitext</model>
+      <format>text/x-wiki</format>
+      <text bytes="243" sha1="k1ctmz8z08lkovf3vscqip0ykkwms4y" xml:space="preserve">{{pseudoheading
+ | {{{1|}}}
+ | id = {{#if:{{{id}}}&lt;!--NOT {{{id|}}}--&gt;|{{{id|{{{1|}}}}}}}}
+ | class = wst-subheading {{{class|}}}
+ | attr = {{{attr|}}}
+ | noid = {{{noid|}}}
+}}&lt;noinclude&gt;{{documentation|Template:Pseudoheading/doc}}&lt;/noinclude&gt;</text>
+      <sha1>k1ctmz8z08lkovf3vscqip0ykkwms4y</sha1>
     </revision>
   </page>
   <page>

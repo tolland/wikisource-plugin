@@ -45,11 +45,13 @@ $wgParserCacheType = CACHE_NONE;
 $wgDefaultUserOptions[ 'usecodemirror' ] = true;
 $wgMaxUploadSize = 512 * 1024 * 1024;
 
+wfLoadExtension( 'Cite' );
 wfLoadExtension( 'CodeEditor' );
 wfLoadExtension( 'CodeMirror' );
 wfLoadExtension( 'Gadgets' );
 wfLoadExtension( 'JsonConfig' );
 wfLoadExtension( 'LabeledSectionTransclusion' );
+wfLoadExtension( 'Math' );
 wfLoadExtension( 'ParserFunctions' );
 wfLoadExtension( 'PdfHandler' );
 wfLoadExtension( 'ProofreadPage' );
