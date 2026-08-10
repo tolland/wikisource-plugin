@@ -51,11 +51,14 @@ Module:WikidataIB/titleformats
 Module:Wikt
 Module:Yesno
 Template:((
+Template:All small caps
+Template:All small caps
 Template:AuxTOC
 Template:Auxiliary Table of Contents
 Template:Auxiliary Table of Contents/e
 Template:Auxiliary Table of Contents/s
 Template:Auxiliary Table of Contents/styles.css
+Template:Blackletter
 Template:C
 Template:C/e
 Template:C/s
@@ -74,6 +77,7 @@ Template:Dhr
 Template:Div end
 Template:Div-based-template
 Template:Dl
+Template:Dl
 Template:Doc example
 Template:Doc example/e
 Template:Doc example/s
@@ -82,7 +86,6 @@ Template:Documentation
 Template:Documentation subpage
 Template:Dotted TOC page listing/5
 Template:Double link
-Template:Dl
 Template:Empty TOC
 Template:Empty TOC/styles.css
 Template:Fine
@@ -97,6 +100,7 @@ Template:Font-size-base
 Template:Font-variant normal
 Template:For
 Template:Fvn
+Template:Gap
 Template:High-risk
 Template:High-use
 Template:Hlist
@@ -105,6 +109,7 @@ Template:ISO 639 name
 Template:IsDocSubpage
 Template:L
 Template:Larger
+Template:Larger block
 Template:Larger block
 Template:Larger block/e
 Template:Larger block/s
@@ -164,6 +169,183 @@ Template:Uppercase
 Template:Uppercase/styles.css
 Template:Uses TemplateStyles
 Template:X-larger
+Template:Xx-larger
+Template:Xxx-larger block
+Template:Xxx-larger block/e
+Template:Xxx-larger block/s
+Template:Yesno
+Help:Templates
+MediaWiki:Proofreadpage index data config.json
+Module:Arguments
+Module:CSS unit
+Module:Category handler
+Module:Category handler/blacklist
+Module:Category handler/config
+Module:Category handler/data
+Module:Category handler/shared
+Module:Documentation
+Module:Documentation/config
+Module:Documentation/styles.css
+Module:Error
+Module:Error/doc
+Module:For
+Module:Format link
+Module:GetParameters
+Module:GetParameters/doc
+Module:Greek
+Module:Hatnote
+Module:Hatnote list
+Module:Hatnote/styles.css
+Module:Header/attribution data
+Module:Header/attribution data/doc
+Module:High-use
+Module:ISO 639
+Module:ISO 639/doc
+Module:ISO 639/overrides
+Module:Lang
+Module:List
+Module:Lorem ipsum
+Module:Lua banner
+Module:Message box
+Module:Message box/configuration
+Module:Message box/ombox.css
+Module:Namespace detect/config
+Module:Namespace detect/data
+Module:Namespace other
+Module:Optional style
+Module:Proofreadpage index template/config
+Module:String
+Module:String2
+Module:String2/doc
+Module:TableTools
+Module:Tag
+Module:Uses TemplateStyles
+Module:Warning
+Module:WikidataIB
+Module:WikidataIB/nolinks
+Module:WikidataIB/titleformats
+Module:Wikt
+Module:Yesno
+Template:((
+Template:All small caps
+Template:All small caps
+Template:AuxTOC
+Template:Auxiliary Table of Contents
+Template:Auxiliary Table of Contents/e
+Template:Auxiliary Table of Contents/s
+Template:Auxiliary Table of Contents/styles.css
+Template:Blackletter
+Template:C
+Template:C/e
+Template:C/s
+Template:CSS unit
+Template:Case templates see also
+Template:Category handler
+Template:Center
+Template:Center/doc
+Template:Center/e
+Template:Center/s
+Template:Center/styles.css
+Template:Collapsible box/e
+Template:Collapsible box/s
+Template:Collapsible box/styles.css
+Template:Dhr
+Template:Div end
+Template:Div-based-template
+Template:Dl
+Template:Dl
+Template:Doc example
+Template:Doc example/e
+Template:Doc example/s
+Template:Doc example/styles.css
+Template:Documentation
+Template:Documentation subpage
+Template:Dotted TOC page listing/5
+Template:Double link
+Template:Empty TOC
+Template:Empty TOC/styles.css
+Template:Fine
+Template:Flatlist
+Template:Flatlist/styles.css
+Template:Flex wrap centre
+Template:Flex wrap centre/s
+Template:Flex wrap centre/styles.css
+Template:Font size block/s
+Template:Font size block/styles.css
+Template:Font-size-base
+Template:Font-variant normal
+Template:For
+Template:Fvn
+Template:Gap
+Template:High-risk
+Template:High-use
+Template:Hlist
+Template:Hlist/styles.css
+Template:ISO 639 name
+Template:IsDocSubpage
+Template:L
+Template:Larger
+Template:Larger block
+Template:Larger block
+Template:Larger block/e
+Template:Larger block/s
+Template:Lorem ipsum
+Template:Lua
+Template:Namespace link
+Template:Ne
+Template:Nop
+Template:Nsl
+Template:Ombox
+Template:Optional style
+Template:Para
+Template:Parameter
+Template:Parameter/styles.css
+Template:Pf
+Template:Ph
+Template:Sandbox other
+Template:Sc
+Template:Serif
+Template:Serif block
+Template:Sm
+Template:Small-caps
+Template:Smaller
+Template:Span
+Template:String split
+Template:Stringsplit
+Template:TOC
+Template:TOC begin
+Template:TOC end
+Template:TOC row 1-1-1
+Template:TOC row 1-1-1-1
+Template:TOC row 1-2-1
+Template:TOC row 1-2dot-1
+Template:TOC row 1-2out-1
+Template:TOC row 1-dot-1
+Template:TOC row 1-out-1
+Template:TOC row 2-1
+Template:TOC row 2-1-1
+Template:TOC row 2dot-1
+Template:TOC row 2dot-1-1
+Template:TOC row 2out-1
+Template:TOC row 3-1
+Template:TOC row 3dot-1
+Template:TOC row c
+Template:TOC row r
+Template:TOC row ragged
+Template:TOC templates/doc
+Template:TOC templates/doc/styles.css
+Template:TOC templates/styles.css
+Template:Tag
+Template:Template shortcut
+Template:TemplateDataHeader
+Template:Tl
+Template:Tlx
+Template:Uc
+Template:Uppercase
+Template:Uppercase/styles.css
+Template:Uses TemplateStyles
+Template:X-larger
+Template:Xx-larger
 Template:Xxx-larger block
 Template:Xxx-larger block/e
 Template:Xxx-larger block/s
