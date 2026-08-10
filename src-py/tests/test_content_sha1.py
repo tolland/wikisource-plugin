@@ -26,7 +26,8 @@ storage and the same API surface used by production.
 """
 
 PAGE_2 = "Page:Canadian patent 29537.djvu/2"
-DUMP = "Canadian_patent_29537_all.xml"
+# use the Index+Pages+revisions dump. (i.e. not the _all dump which includes templates)
+DUMP = "Canadian_patent_29537_revisions.xml"
 
 CONTENT_SQL = """
 SELECT r.rev_id, r.rev_len, r.rev_sha1,
