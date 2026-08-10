@@ -15,6 +15,8 @@
     { href: '/links', label: 'Links' },
     { href: '/locator-index', label: 'Locator index' },
     { href: '/sync', label: 'Sync' },
+    { href: '/sync-page', label: 'Promote page' },
+    { href: '/sync/batches', label: 'Batches' },
     { href: '/vfs', label: 'VFS' }
   ];
 </script>

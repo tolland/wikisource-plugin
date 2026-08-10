@@ -622,3 +622,28 @@ export interface StageRequest extends SyncRequest {
   label?: string | null;
   page_numbers?: number[] | null;
 }
+
+/* --- single-page promotion -------------------------------------------------
+ *
+ * The `/sync/page-report` and `/sync/page-batches` counterparts of the above,
+ * for one page and its revisions -- no index, no scan check, no fan-out.
+ * Staging still produces an ordinary `Batch` (of one promotion), so the
+ * review/approve/push screens are shared rather than duplicated.
+ */
+
+export interface PageSyncRequest {
+  source_label?: string | null;
+  target_label?: string | null;
+  source_title: string;
+  target_title?: string | null;
+}
+
+export interface PageSyncReport {
+  source_site: string;
+  target_site: string;
+  page: SyncPage;
+}
+
+export interface StagePageRequest extends PageSyncRequest {
+  label?: string | null;
+}

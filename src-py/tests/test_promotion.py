@@ -454,3 +454,90 @@ def test_a_pushed_batch_is_listed(pushing_client, engine):
 
 def test_an_unknown_batch_is_a_404(pushing_client):
     assert pushing_client.get("/sync/batches/999").status_code == 404
+
+
+# -- single-page promotion: /sync/page-report and /sync/page-batches --------
+#
+# The embarrassment-risk workflow: one page, reviewed and pushed on its own,
+# no fan-out to a whole work. Same rules as the batch path -- only what a push
+# would actually write can be staged -- reusing the same Promotion/Batch rows
+# so the review/approve/push screens need nothing page-specific.
+
+PAGE_TITLE = "Page:Varieties.djvu/1"
+
+
+def page_report(client, **overrides) -> dict:
+    payload = {
+        "source_label": "upstream",
+        "target_label": "local",
+        "source_title": PAGE_TITLE,
+        **overrides,
+    }
+    return client.post("/sync/page-report", json=payload)
+
+
+def stage_page_request(client, **overrides) -> dict:
+    payload = {
+        "source_label": "upstream",
+        "target_label": "local",
+        "source_title": PAGE_TITLE,
+        **overrides,
+    }
+    return client.post("/sync/page-batches", json=payload)
+
+
+def test_page_report_compares_exactly_the_named_page(pushing_client, engine):
+    seed(engine)
+    move_source(engine)
+
+    report = page_report(pushing_client)
+    assert report.status_code == 200, report.text
+    body = report.json()
+    assert body["source_site"] == "upstream"
+    assert body["target_site"] == "local"
+    assert body["page"]["verdict"] == "push"
+    assert body["page"]["actionable"] is True
+
+
+def test_page_report_on_an_uncached_page_is_a_404(pushing_client, engine):
+    seed(engine)
+    missing = page_report(pushing_client, source_title="Page:Nope.djvu/1")
+    assert missing.status_code == 404
+
+
+def test_a_page_batch_stages_exactly_one_promotion(pushing_client, engine):
+    seed(engine)
+    move_source(engine)
+
+    created = stage_page_request(pushing_client)
+    assert created.status_code == 201, created.text
+    batch = created.json()
+    assert batch["status"] == "draft"
+    (promotion,) = batch["promotions"]
+    assert promotion["intent"] == "update"
+    assert promotion["status"] == "staged"
+    assert promotion["base_revid"] == 254
+
+
+def test_an_unlinked_page_cannot_be_staged_as_a_page_batch(pushing_client, engine):
+    seed(engine, linked=False)
+    move_source(engine)
+
+    refused = stage_page_request(pushing_client)
+    assert refused.status_code == 409
+
+
+def test_a_staged_page_batch_pushes_through_the_ordinary_batch_endpoints(
+    pushing_client, engine
+):
+    """No page-specific push path -- a batch of one is still a batch."""
+    seed(engine, target_page=False)
+    batch = stage_page_request(pushing_client).json()
+    pushing_client.post(
+        f"/sync/batches/{batch['pk']}/approve", json={"approved_by": "t"}
+    )
+
+    pushed = pushing_client.post(f"/sync/batches/{batch['pk']}/push").json()
+    assert pushed["status"] == "complete"
+    assert pushed["promotions"][0]["status"] == "pushed"
+    assert pushed["promotions"][0]["result_revid"] == 4242
