@@ -28,7 +28,7 @@ def create_app() -> typer.Typer:
         no_args_is_help=True,
         pretty_exceptions_enable=False,
         pretty_exceptions_short=False,
-        rich_markup_mode=None,
+        # rich_markup_mode=None,
         # @TODO according to doc, this should work. but does not
         # <https://typer.tiangolo.com/tutorial/commands/callback/#adding-a-callback-on-creation>
         # callback=callback,
@@ -36,16 +36,16 @@ def create_app() -> typer.Typer:
 
     cli.callback()(callback)
 
-    cli.add_typer(site.app)
-    cli.add_typer(site_credential.app)
+    cli.add_typer(site.app, rich_help_panel="Model commands")
+    cli.add_typer(site_credential.app, rich_help_panel="Model commands")
+    cli.add_typer(link.app, rich_help_panel="Model commands")
+    cli.add_typer(page.app, rich_help_panel="Model commands")
     cli.add_typer(drain.app)
     cli.add_typer(fetch_page.app)
     cli.add_typer(fetch_refresh.app)
-    cli.add_typer(link.app)
-    cli.add_typer(page.app)
     cli.add_typer(sync.app)
-    cli.add_typer(show_config.app)
-    cli.add_typer(import_svg_annotations.app)
+    cli.add_typer(show_config.app, rich_help_panel="Tools")
+    cli.add_typer(import_svg_annotations.app, rich_help_panel="Tools")
 
     return cli
 
