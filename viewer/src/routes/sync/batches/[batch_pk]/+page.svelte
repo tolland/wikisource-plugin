@@ -9,7 +9,7 @@
   import type { Batch, PromotionRow, PromotionStatus } from '$lib/types';
 
   /**
-   * A staged push run, driven **one page at a time**.
+   * A staged push run, driven one source revision at a time.
    *
    * That is the whole shape of this page. There is no "push everything"
    * button, because a rate-limited wiki should get one request rather than
@@ -71,7 +71,7 @@
     run(() => approveBatch(batchPk, approvedBy), `Approved by ${approvedBy}.`);
 
   const pushNext = () =>
-    run(() => pushBatchPage(batchPk), 'Pushed one page.');
+    run(() => pushBatchPage(batchPk), 'Pushed one revision.');
 
   function unhappy(current: Batch): number {
     return current.promotions.filter(
@@ -180,7 +180,7 @@
         </ActionButton>
       </div>
       <small>
-        One page per request. &ldquo;Push the rest&rdquo; walks the same call and stops
+        One revision per request. &ldquo;Push the rest&rdquo; walks the same call and stops
         the moment a row does not push cleanly &mdash; a conflict means the world
         moved, and the remaining pages are built on the same assumption. Aborting
         skips what is left; pages already pushed stay pushed.
@@ -193,7 +193,7 @@
       <tr>
         <th scope="col">#</th>
         <th scope="col">Status</th>
-        <th scope="col">Page</th>
+        <th scope="col">Page / source revision</th>
         <th scope="col">Intent</th>
         <th scope="col">Base</th>
         <th scope="col">Result</th>
@@ -211,13 +211,13 @@
           </td>
           <td class="title">
             {row.target_title}
-            <small>{row.body_length.toLocaleString()} characters</small>
+            <small>source revision #{row.source_revision_pk} · {row.body_length.toLocaleString()} characters</small>
             {#if row.error_message}
               <small class="why">{row.error_message}</small>
             {/if}
           </td>
           <td>{row.intent}</td>
-          <td class="revs">{row.base_revid ?? '—'}</td>
+          <td class="revs">{row.base_revid ?? (row.predecessor_promotion_pk ? 'previous result' : '—')}</td>
           <td class="revs">{row.result_revid ?? '—'}</td>
           <td>
             {#if row.status === 'staged'}

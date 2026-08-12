@@ -441,6 +441,8 @@ class PushRequest(BaseModel):
 
 class PromotionOut(BaseModel):
     pk: int
+    source_revision_pk: int
+    predecessor_promotion_pk: int | None = None
     page_number: int | None = None
     target_title: str
     intent: PromotionIntent
@@ -470,6 +472,8 @@ class BatchOut(BaseModel):
 def _promotion_out(row: Promotion) -> PromotionOut:
     return PromotionOut(
         pk=row.pk,
+        source_revision_pk=row.source_revision_pk,
+        predecessor_promotion_pk=row.predecessor_promotion_pk,
         page_number=row.page_number,
         target_title=row.target_title,
         intent=row.intent,
@@ -566,9 +570,9 @@ def create_page_batch(
     """Stage a single-page push run: this page, this direction, nothing else.
 
     The ``sync-page`` counterpart of ``POST /sync/batches``, with no fan-out
-    -- the batch this produces holds exactly one promotion. Everything past
-    staging (approve, push, abort) is the same batch machinery, because a
-    batch of one page is still a batch.
+    -- the batch contains one ordered promotion per source revision after the
+    anchor. Everything past staging (approve, push, abort) uses the same batch
+    machinery.
     """
     source_site, target_site = resolve_pair(
         session, payload.source_label, payload.target_label
@@ -631,12 +635,12 @@ def push_batch_page(
     payload: PushRequest | None = None,
     session: Session = Depends(get_session),
 ) -> BatchOut:
-    """Push **one** page of the batch, and return the batch as it now stands.
+    """Push **one revision step** and return the batch as it now stands.
 
     One at a time on purpose: the run can be watched, paused and abandoned
-    between pages, the wiki gets one request rather than three hundred, and a
-    batch that half-succeeds needs no unpicking because each row carries its
-    own outcome.
+    between revisions, the wiki gets one request rather than three hundred,
+    and a batch that half-succeeds needs no unpicking because each row carries
+    its own outcome.
     """
     payload = payload or PushRequest()
     _batch(session, batch_pk)  # 404 before anything else touches the wiki
@@ -666,7 +670,7 @@ def push_batch_page(
 def skip_promotion(
     batch_pk: int, promotion_pk: int, session: Session = Depends(get_session)
 ) -> BatchOut:
-    """Drop one page from a run without abandoning the run."""
+    """Drop one revision and its dependent steps without abandoning the run."""
     batch = _batch(session, batch_pk)
     promotion = session.get(Promotion, promotion_pk)
     if promotion is None or promotion.batch_pk != batch_pk:

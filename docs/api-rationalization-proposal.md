@@ -209,17 +209,7 @@ delete+create, or every remote rename kills the open editor tab).
 - `route_class=DebugLoggingRoute` is applied to 4 routers of 15
   (`vfs`, `preview`, `ocr`, `annotations`) — the rest are invisible to the
   request/response logger.
-- ~~`debug_loggig_route.py` is misspelled.~~ **Fixed**: renamed to
-  `debug_logging_route.py` (the logger name `wtbot.api.debug_logging_route`
-  moved with it — it is what `log_levels` targets).
-- ~~`main.custom_openapi()` overrides the spec's metadata with
-  placeholders.~~ **Fixed**: removed. It replaced the real
-  `FastAPI(title="wtbot", version="0.1.0")` with title `"Custom title"`,
-  version `"2.5.0"` and a FastAPI-tutorial description and logo. It also had
-  a bug worth recording: it closed over the module-global `app` while being
-  assigned to *every* app `create_app()` builds, so any test-built app
-  returned the global app's schema rather than its own — the two happened to
-  agree, so it never surfaced.
+
 ### 2.9 `/viewer/indexes` is misnamed — it is the Index endpoint
 
 `GET /viewer/indexes` and `GET /viewer/indexes/{page_pk}` list Index: pages

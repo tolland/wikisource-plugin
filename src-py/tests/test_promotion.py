@@ -6,15 +6,19 @@ from sqlmodel import Session, select
 
 from wtbot.main import create_app
 from wtbot.model import (
+    FetchRequest,
     FileBlob,
     NsRole,
     Page,
     PageMeta,
     Promotion,
+    Revision,
     Site,
     SiteCredential,
 )
-from wtbot.revision_store import record_head_revision
+from wtbot.promotion_store import materialize_promotion_links
+from wtbot.remote_link_store import ladder
+from wtbot.revision_store import record_head_revision, record_history
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import RemotePage
 
@@ -138,6 +142,23 @@ def _link(engine) -> None:
 
 def move_source(engine) -> None:
     """An edit upstream after the batch was staged."""
+    add_source_revision(
+        engine,
+        revid=999,
+        parent_revid=900,
+        words="Words, changed again.",
+        comment="finish proofreading",
+    )
+
+
+def add_source_revision(
+    engine,
+    *,
+    revid: int,
+    parent_revid: int,
+    words: str,
+    comment: str,
+) -> None:
     with Session(engine) as session:
         upstream = session.exec(select(Site).where(Site.label == "upstream")).one()
         page = session.exec(
@@ -153,25 +174,49 @@ def move_source(engine) -> None:
                 namespace_key=250,
                 namespace_canonical="Page",
                 content_model="proofread-page",
-                text=body(3, "Them", "Words, changed again."),
-                revid=999,
-                parentid=901,
+                text=body(3, "Them", words),
+                revid=revid,
+                parentid=parent_revid,
                 timestamp=WHEN,
+                user="Editor",
+                comment=comment,
             ),
         )
         session.commit()
+
+
+def move_source_twice(engine) -> None:
+    add_source_revision(
+        engine,
+        revid=901,
+        parent_revid=900,
+        words="Words, with punctuation.",
+        comment="correct punctuation",
+    )
+    add_source_revision(
+        engine,
+        revid=902,
+        parent_revid=901,
+        words="Words, fully proofread.",
+        comment="promote proofread status",
+    )
 
 
 class RecordingWiki(FakeWikiClient):
     """A wiki that records what it was asked to save."""
 
     saved: list[tuple] = []
+    comments: list[str | None] = []
+    next_revid = 4242
 
     def save_page(self, title, text, base_revid, comment, *, force=False):
         RecordingWiki.saved.append((title, text, base_revid, force))
+        RecordingWiki.comments.append(comment)
         from wtbot.wiki.wiki_types import SaveResult
 
-        return SaveResult(revid=4242)
+        result = SaveResult(revid=RecordingWiki.next_revid)
+        RecordingWiki.next_revid += 1
+        return result
 
 
 class RefusingWiki(FakeWikiClient):
@@ -184,6 +229,8 @@ class RefusingWiki(FakeWikiClient):
 @pytest.fixture
 def pushing_client(engine):
     RecordingWiki.saved = []
+    RecordingWiki.comments = []
+    RecordingWiki.next_revid = 4242
     wiki = RecordingWiki(pages={})
     return TestClient(create_app(engine=engine, client_factory=lambda site: wiki))
 
@@ -215,6 +262,119 @@ def test_a_batch_stages_only_what_the_report_would_write(pushing_client, engine)
     assert promotion["intent"] == "update"
     assert promotion["status"] == "staged"
     assert promotion["base_revid"] == 254  # the target head it claims to follow
+
+
+def test_each_source_revision_is_an_ordered_promotion(pushing_client, engine):
+    """Revision boundaries are part of the change, not an implementation detail.
+
+    Two edits after the anchor must become two target revisions. The second
+    write is based on the first write's returned revid, and each keeps the
+    source edit summary for review and target history.
+    """
+    seed(engine)
+    move_source_twice(engine)
+
+    batch = stage(pushing_client).json()
+    first, second = batch["promotions"]
+    assert first["predecessor_promotion_pk"] is None
+    assert second["predecessor_promotion_pk"] == first["pk"]
+    assert first["base_revid"] == 254
+    assert second["base_revid"] is None
+
+    with Session(engine) as session:
+        revisions = {row.pk: row.revid for row in session.exec(select(Revision)).all()}
+    assert [revisions[row["source_revision_pk"]] for row in (first, second)] == [
+        901,
+        902,
+    ]
+
+    pushing_client.post(
+        f"/sync/batches/{batch['pk']}/approve", json={"approved_by": "tolland"}
+    )
+    pushing_client.post(f"/sync/batches/{batch['pk']}/push", json={})
+    pushed = pushing_client.post(f"/sync/batches/{batch['pk']}/push", json={}).json()
+
+    assert [save[2] for save in RecordingWiki.saved] == [254, 4242]
+    assert RecordingWiki.comments == [
+        "Sync upstream revid 901 by Editor: correct punctuation",
+        "Sync upstream revid 902 by Editor: promote proofread status",
+    ]
+    assert [row["result_revid"] for row in pushed["promotions"]] == [4242, 4243]
+    assert pushed["status"] == "complete"
+
+    with Session(engine) as session:
+        (refresh,) = session.exec(select(FetchRequest)).all()
+        assert refresh.revisions == 2
+
+        local = session.exec(select(Site).where(Site.label == "local")).one()
+        target = session.exec(
+            select(Page).where(Page.site_pk == local.pk, Page.title == PAGE_TITLE)
+        ).one()
+        record_head_revision(
+            session,
+            target,
+            RemotePage(
+                title=target.title,
+                namespace_key=250,
+                namespace_canonical="Page",
+                content_model="proofread-page",
+                text=body(3, "local-bot", "Words, fully proofread."),
+                revid=4243,
+                parentid=4242,
+                timestamp=WHEN,
+            ),
+        )
+        record_history(
+            session,
+            target,
+            [
+                RemotePage(
+                    title=target.title,
+                    namespace_key=250,
+                    namespace_canonical="Page",
+                    content_model="proofread-page",
+                    text=body(3, "local-bot", "Words, with punctuation."),
+                    revid=4242,
+                    parentid=254,
+                    timestamp=WHEN,
+                )
+            ],
+        )
+        materialize_promotion_links(session, target)
+        session.commit()
+
+        upstream = session.exec(select(Site).where(Site.label == "upstream")).one()
+        source = session.exec(
+            select(Page).where(Page.site_pk == upstream.pk, Page.title == PAGE_TITLE)
+        ).one()
+        pairs = []
+        for rung in ladder(session, page_pk=source.pk, other_page_pk=target.pk)[-2:]:
+            pairs.append(
+                (
+                    session.get(Revision, rung.local_revision_pk).revid,
+                    session.get(Revision, rung.remote_revision_pk).revid,
+                )
+            )
+        assert pairs == [(901, 4242), (902, 4243)]
+
+
+def test_staging_refuses_to_squash_a_gap_in_cached_source_history(
+    pushing_client, engine
+):
+    seed(engine)
+    add_source_revision(
+        engine,
+        revid=999,
+        parent_revid=901,
+        words="The parent revision is not cached.",
+        comment="an edit after an unseen edit",
+    )
+
+    refused = stage(pushing_client)
+
+    assert refused.status_code == 409
+    assert "missing parent revid 901" in refused.json()["detail"]
+    assert "so revisions are not squashed" in refused.json()["detail"]
 
 
 def test_an_unlinked_page_cannot_be_staged(pushing_client, engine):
@@ -441,6 +601,20 @@ def test_aborting_skips_what_is_left_and_keeps_what_went(pushing_client, engine)
     assert after["status"] == "aborted"
     assert after["promotions"][0]["status"] == "skipped"
     assert RecordingWiki.saved == []
+
+
+def test_skipping_a_revision_skips_its_dependent_chain(pushing_client, engine):
+    seed(engine)
+    move_source_twice(engine)
+    batch = stage(pushing_client).json()
+
+    after = pushing_client.post(
+        f"/sync/batches/{batch['pk']}/promotions/"
+        f"{batch['promotions'][0]['pk']}/skip"
+    ).json()
+
+    assert [row["status"] for row in after["promotions"]] == ["skipped", "skipped"]
+    assert after["remaining"] == 0
 
 
 def test_a_pushed_batch_is_listed(pushing_client, engine):

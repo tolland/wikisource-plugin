@@ -1,11 +1,12 @@
 import logging
 
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from wtbot.db_session import detached_site, read_snapshot, write_batch
 from wtbot.model import (
     BatchStatus,
-    LinkOrigin,
+    FetchKind,
+    FetchRequest,
     Promotion,
     PromotionBatch,
     PromotionIntent,
@@ -24,10 +25,9 @@ from wtbot.wiki.wiki_types import EditConflict
 
 """Executing one promotion: the only place this system writes to a target wiki.
 
-**One page per call, by design.** A reviewer can watch it, pause it and abandon
-it between pages; a rate-limited wiki gets one request rather than three
-hundred; and a batch that half-succeeds needs no unpicking, because each row
-already carries its own outcome.
+**One revision per call, by design.** Several source revisions on one page are
+an ordered chain, so each edit summary and correspondence boundary survives on
+the target. A reviewer can still watch, pause and abandon between writes.
 
 **Three checks before the write, and each is a different failure:**
 
@@ -38,13 +38,12 @@ already carries its own outcome.
   ``baserevid``, but checking here first turns a network round trip into a row
   update, and gives the conflict a local explanation.
 
-**The push does not write a link.** A successful push means the target now
-holds our content, which *is* a correspondence -- but the revision it created
-is known here only as a revid, and the revision store is owned by the fetch
-worker (one writer per table). So the promotion records the result and enqueues
-nothing; a later fetch makes the revision concrete, and linking it is the
-ordinary `propose` path over real rows rather than a row invented from a save
-response. See the note in ``wtbot.revision_store``.
+**The push does not invent revision or link rows.** A successful save identifies
+its target revision only by revid, while the fetch worker owns concrete
+Revision rows. The last step therefore enqueues a history refetch. Once those
+revisions are concrete, the fetch worker joins each result revid to the exact
+source revision frozen in its promotion and appends the corresponding `copy`
+rung.
 """
 
 log = logging.getLogger(__name__)
@@ -74,7 +73,6 @@ def push_one(
             promotion.target_title,
             promotion.body,
             promotion.comment,
-            promotion.base_revid,
             promotion.intent,
         )
         status = promotion.status
@@ -94,8 +92,10 @@ def push_one(
     if guard is not None:
         return guard
 
-    _, title, body, comment, base_revid, intent = snapshot
-    pre_push = target_head_revid(session, session.get(Promotion, promotion_pk))
+    _, title, body, comment, intent = snapshot
+    current = session.get(Promotion, promotion_pk)
+    base_revid = _effective_base_revid(session, current)
+    pre_push = target_head_revid(session, current)
 
     try:
         client = client_factory(target_site)
@@ -142,6 +142,7 @@ def _preflight(session: Session, promotion_pk: int, *, force: bool) -> Promotion
     """
     with read_snapshot(session):
         promotion = session.get(Promotion, promotion_pk)
+        _effective_base_revid(session, promotion)
         stale_source = not source_is_unchanged(session, promotion)
         already_there = body_matches_target(session, promotion)
 
@@ -168,6 +169,27 @@ def _preflight(session: Session, promotion_pk: int, *, force: bool) -> Promotion
     return None
 
 
+def _effective_base_revid(session: Session, promotion: Promotion) -> int | None:
+    """Resolve the real target base for this ordered revision step."""
+    if promotion.predecessor_promotion_pk is None:
+        return promotion.base_revid
+    predecessor = session.get(Promotion, promotion.predecessor_promotion_pk)
+    if predecessor is None:  # pragma: no cover - FK holds
+        raise PromotionError(
+            f"promotion {promotion.pk} has no predecessor "
+            f"{promotion.predecessor_promotion_pk}"
+        )
+    if (
+        predecessor.status is not PromotionStatus.pushed
+        or predecessor.result_revid is None
+    ):
+        raise PromotionError(
+            f"promotion {promotion.pk} follows promotion {predecessor.pk}; "
+            "push that revision successfully first"
+        )
+    return predecessor.result_revid
+
+
 def _record(
     session: Session,
     promotion_pk: int,
@@ -188,6 +210,8 @@ def _record(
         if status is not PromotionStatus.skipped:
             promotion.pushed_at = utcnow()
         session.add(promotion)
+        if status is PromotionStatus.pushed:
+            _enqueue_chain_refetch(session, promotion)
         batch = session.get(PromotionBatch, promotion.batch_pk)
         settle_batch(session, batch)
 
@@ -195,8 +219,29 @@ def _record(
         return session.get(Promotion, promotion_pk)
 
 
-#: What a successful push has established, for whoever links it afterwards.
-#: `copy` is the strongest origin available -- the target revision exists
-#: *because* the source one did -- and it is the right claim to record once a
-#: refetch has made that revision concrete.
-PUSHED_LINK_ORIGIN = LinkOrigin.copy
+def _enqueue_chain_refetch(session: Session, promotion: Promotion) -> None:
+    """Fetch a completed target chain so its exact ladder rungs can be stored."""
+    successor = session.exec(
+        select(Promotion).where(Promotion.predecessor_promotion_pk == promotion.pk)
+    ).first()
+    if successor is not None:
+        return
+    chain_size = len(
+        session.exec(
+            select(Promotion).where(
+                Promotion.batch_pk == promotion.batch_pk,
+                Promotion.source_page_pk == promotion.source_page_pk,
+            )
+        ).all()
+    )
+    batch = session.get(PromotionBatch, promotion.batch_pk)
+    session.add(
+        FetchRequest(
+            site_pk=batch.target_site_pk,
+            title=promotion.target_title,
+            kind=FetchKind.single,
+            depth=0,
+            revisions=max(1, chain_size),
+            priority=10,
+        )
+    )

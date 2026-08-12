@@ -120,7 +120,7 @@ class PromotionBatch(SQLModel, table=True):
 
 
 class Promotion(SQLModel, table=True):
-    """One page of a batch: what would be written, onto what, and what happened.
+    """One revision step of a batch: what is written, onto what, and what happened.
 
     The interesting fields are the two that pin the write down. ``base_revid``
     is the target revision this edit claims to follow -- sent as ``baserevid``
@@ -150,6 +150,15 @@ class Promotion(SQLModel, table=True):
 
     intent: PromotionIntent
     source_revision_pk: int = Field(foreign_key="revision.pk")
+    predecessor_promotion_pk: int | None = Field(
+        default=None,
+        foreign_key="promotion.pk",
+        index=True,
+        description=(
+            "The preceding revision step for this page. Its result revid is "
+            "this edit's base; null for the first step."
+        ),
+    )
     anchor_link_pk: int | None = Field(
         default=None,
         foreign_key="remotelink.pk",
@@ -161,7 +170,9 @@ class Promotion(SQLModel, table=True):
         ),
     )
     base_revid: int | None = None
-    """The target revid the write claims to follow; None for a create."""
+    """The target revid the first step claims to follow. Later steps derive
+    their base from ``predecessor_promotion_pk.result_revid``; None for a
+    create or a later step whose target revision does not exist yet."""
 
     body: str
     """The exact text that would be written, frozen at staging time.

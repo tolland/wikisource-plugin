@@ -591,6 +591,8 @@ export type PromotionIntent = 'create' | 'update';
 
 export interface PromotionRow {
   pk: number;
+  source_revision_pk: number;
+  predecessor_promotion_pk?: number | null;
   page_number?: number | null;
   target_title: string;
   intent: PromotionIntent;

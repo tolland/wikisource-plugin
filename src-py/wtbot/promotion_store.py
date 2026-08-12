@@ -6,22 +6,24 @@ from wtbot.model import (
     MAIN_SLOT,
     BatchStatus,
     Content,
+    LinkOrigin,
     Page,
     Promotion,
     PromotionBatch,
     PromotionIntent,
     PromotionStatus,
+    RemoteLink,
     Revision,
     Site,
     Slot,
 )
 from wtbot.page_link_store import find_pair
-from wtbot.remote_link_store import ladder
+from wtbot.remote_link_store import assert_link, ladder
 from wtbot.revision_store import head_revision
 from wtbot.sync import SyncPage, SyncReport, SyncVerdict
 from wtbot.timeutil import utcnow
 
-"""Staging a push run from a sync report, and pushing it one page at a time.
+"""Staging a push run from a sync report, one source revision at a time.
 
 **Staging freezes the report.** A sync report is recomputed on every load, and
 should be -- it describes revisions currently held. But a queued push must not
@@ -35,10 +37,9 @@ Everything else -- an unlinked page a comparison likes, a diverged pair, a page
 the target is ahead on -- is refused rather than staged, because staging is the
 last point at which "we are not sure these correspond" is cheap to say.
 
-**One page at a time.** `push_one` is the unit, because a rate-limited wiki and
-a reviewer both want it that way: the run can be watched, paused and abandoned
-between pages, and a batch that half-succeeds is an ordinary end state rather
-than a failure to unpick.
+**One revision at a time.** Each source revision after the asserted anchor is
+frozen as its own ordered promotion. That preserves both its edit summary and
+the one-to-one correspondence ladder when it is replayed on the target.
 """
 
 
@@ -85,7 +86,7 @@ def stage_batch(
     session.flush()
 
     for page in wanted:
-        session.add(_promotion_for(session, batch, page, source_site, target_site))
+        _stage_promotions_for(session, batch, page, source_site, target_site)
     session.flush()
     return batch
 
@@ -100,12 +101,9 @@ def stage_page(
 ) -> PromotionBatch:
     """Stage a single-page push run: this page, this direction, nothing else.
 
-    The ``sync-page`` counterpart of :func:`stage_batch`, with no fan-out --
-    the batch this produces holds exactly one promotion. Reusing
-    ``PromotionBatch``/``Promotion`` rather than a parallel one-row model
-    means the review, approve and push screens work unchanged: a batch of one
-    is still a batch, and pushing it "one page at a time" is simply pushing
-    its only row.
+    The ``sync-page`` counterpart of :func:`stage_batch`, with no page fan-out.
+    It may hold several ordered promotions when several source revisions lie
+    between the asserted anchor and the source head.
     """
     if not page.actionable:
         raise PromotionError(
@@ -125,18 +123,18 @@ def stage_page(
     session.add(batch)
     session.flush()
 
-    session.add(_promotion_for(session, batch, page, source_site, target_site))
+    _stage_promotions_for(session, batch, page, source_site, target_site)
     session.flush()
     return batch
 
 
-def _promotion_for(
+def _stage_promotions_for(
     session: Session,
     batch: PromotionBatch,
-    page,
+    page: SyncPage,
     source_site: Site,
     target_site: Site,
-) -> Promotion:
+) -> list[Promotion]:
     source_page = session.exec(
         select(Page).where(
             Page.site_pk == source_site.pk, Page.title == page.source_title
@@ -162,8 +160,13 @@ def _promotion_for(
         else PromotionIntent.update
     )
     anchor_pk = None
+    source_anchor: Revision | None = None
     base_revid = None
     if intent is PromotionIntent.update:
+        if target_page is None:  # pragma: no cover - a push verdict implies one
+            raise PromotionError(
+                f"{page.source_title} is staged as an update with no target page"
+            )
         rungs = ladder(session, page_pk=source_page.pk, other_page_pk=target_page.pk)
         if not rungs:  # pragma: no cover - a push verdict implies a ladder
             raise PromotionError(
@@ -171,6 +174,7 @@ def _promotion_for(
                 "anchor; a push replays onto the anchor and cannot invent one"
             )
         anchor_pk = rungs[-1].pk
+        source_anchor = _revision_on_page(session, rungs[-1], source_page)
         target_head = head_revision(session, target_page)
         base_revid = target_head.revid if target_head else None
 
@@ -179,23 +183,97 @@ def _promotion_for(
         if target_page is not None
         else None
     )
-    return Promotion(
-        batch_pk=batch.pk,
-        page_link_pk=pairing.pk if pairing else None,
-        source_page_pk=source_page.pk,
-        target_page_pk=target_page.pk if target_page else None,
-        target_title=page.target_title or page.source_title,
-        page_number=page.page_number,
-        intent=intent,
-        source_revision_pk=source_head.pk,
-        anchor_link_pk=anchor_pk,
-        base_revid=base_revid,
-        body=promoted_body(session, source_head, target_site),
-        comment=(
-            f"Sync from {source_site.label or source_site.family}: "
-            f"{batch.source_index_title}"
-        ),
+    revisions = _revisions_after_anchor(
+        session, source_page, source_head, source_anchor
     )
+    if not revisions:
+        raise PromotionError(
+            f"{page.source_title} has no source revisions after its current anchor"
+        )
+
+    rows: list[Promotion] = []
+    predecessor: Promotion | None = None
+    for revision in revisions:
+        row = Promotion(
+            batch_pk=batch.pk,
+            page_link_pk=pairing.pk if pairing else None,
+            source_page_pk=source_page.pk,
+            target_page_pk=target_page.pk if target_page else None,
+            target_title=page.target_title or page.source_title,
+            page_number=page.page_number,
+            intent=(intent if predecessor is None else PromotionIntent.update),
+            source_revision_pk=revision.pk,
+            predecessor_promotion_pk=predecessor.pk if predecessor else None,
+            anchor_link_pk=anchor_pk,
+            base_revid=base_revid if predecessor is None else None,
+            body=promoted_body(session, revision, target_site),
+            comment=_promotion_comment(source_site, revision),
+        )
+        session.add(row)
+        session.flush()
+        rows.append(row)
+        predecessor = row
+    return rows
+
+
+def _revision_on_page(session: Session, link: RemoteLink, page: Page) -> Revision:
+    """Return the side of a rung belonging to ``page``."""
+    for revision_pk in (link.local_revision_pk, link.remote_revision_pk):
+        revision = session.get(Revision, revision_pk)
+        if revision is not None and revision.page_pk == page.pk:
+            return revision
+    raise PromotionError(f"anchor {link.pk} does not belong to {page.title}")
+
+
+def _revisions_after_anchor(
+    session: Session,
+    page: Page,
+    head: Revision,
+    anchor: Revision | None,
+) -> list[Revision]:
+    """The complete cached ancestry after ``anchor``, oldest first.
+
+    Refusing a gap is essential: treating the oldest revision we happen to
+    hold as the next step would silently squash the missing source edits -- the
+    exact loss this queue exists to prevent.
+    """
+    reverse: list[Revision] = []
+    current = head
+    while anchor is None or current.pk != anchor.pk:
+        reverse.append(current)
+        if current.parent_revid in (None, 0):
+            if anchor is not None:
+                raise PromotionError(
+                    f"cached history for {page.title} reaches its root before "
+                    f"anchor revid {anchor.revid}"
+                )
+            break
+        parent = session.exec(
+            select(Revision).where(
+                Revision.page_pk == page.pk,
+                Revision.revid == current.parent_revid,
+            )
+        ).first()
+        if parent is None:
+            destination = (
+                f"anchor revid {anchor.revid}" if anchor is not None else "the root"
+            )
+            raise PromotionError(
+                f"cached history for {page.title} is missing parent revid "
+                f"{current.parent_revid}; fetch history through {destination} "
+                "before staging so revisions are not squashed"
+            )
+        current = parent
+    return list(reversed(reverse))
+
+
+def _promotion_comment(source_site: Site, revision: Revision) -> str:
+    provenance = (
+        f"Sync {source_site.label or source_site.family} revid {revision.revid}"
+    )
+    if revision.contributor:
+        provenance += f" by {revision.contributor}"
+    return f"{provenance}: {revision.comment}" if revision.comment else provenance
 
 
 def promoted_body(
@@ -263,7 +341,9 @@ def promotions(session: Session, batch_pk: int) -> list[Promotion]:
     rows = list(
         session.exec(select(Promotion).where(Promotion.batch_pk == batch_pk)).all()
     )
-    rows.sort(key=lambda row: (row.page_number is None, row.page_number or 0))
+    rows.sort(
+        key=lambda row: (row.page_number is None, row.page_number or 0, row.pk or 0)
+    )
     return rows
 
 
@@ -301,14 +381,22 @@ def settle_batch(session: Session, batch: PromotionBatch) -> BatchStatus:
 
 
 def skip(session: Session, promotion: Promotion) -> None:
-    """Drop one page from a run without abandoning the run."""
+    """Drop this revision and its dependent steps without abandoning the run."""
     if promotion.status is not PromotionStatus.staged:
         raise PromotionError(
             f"promotion {promotion.pk} is {promotion.status.value}; only a "
             "staged row can be skipped"
         )
-    promotion.status = PromotionStatus.skipped
-    session.add(promotion)
+    current: Promotion | None = promotion
+    while current is not None:
+        current.status = PromotionStatus.skipped
+        session.add(current)
+        current = session.exec(
+            select(Promotion).where(
+                Promotion.predecessor_promotion_pk == current.pk,
+                Promotion.status == PromotionStatus.staged,
+            )
+        ).first()
     session.flush()
 
 
@@ -343,10 +431,24 @@ def source_is_unchanged(session: Session, promotion: Promotion) -> bool:
     """
     source_page = session.get(Page, promotion.source_page_pk)
     head = head_revision(session, source_page)
-    return head is not None and head.pk == promotion.source_revision_pk
+    staged = list(
+        session.exec(
+            select(Promotion).where(
+                Promotion.batch_pk == promotion.batch_pk,
+                Promotion.source_page_pk == promotion.source_page_pk,
+            )
+        ).all()
+    )
+    staged.sort(key=lambda row: row.pk or 0)
+    return (
+        bool(staged) and head is not None and head.pk == staged[-1].source_revision_pk
+    )
 
 
 def target_head_revid(session: Session, promotion: Promotion) -> int | None:
+    if promotion.predecessor_promotion_pk is not None:
+        predecessor = session.get(Promotion, promotion.predecessor_promotion_pk)
+        return predecessor.result_revid if predecessor is not None else None
     if promotion.target_page_pk is None:
         return None
     target = session.get(Page, promotion.target_page_pk)
@@ -361,7 +463,12 @@ def body_matches_target(session: Session, promotion: Promotion) -> bool:
     re-staged twice, otherwise costs a null edit -- which is a revision on
     somebody's watchlist for nothing.
     """
-    if promotion.target_page_pk is None:
+    # The cached target head is deliberately stale between steps in a chain;
+    # the preceding save result, not this row, describes its actual head.
+    if (
+        promotion.target_page_pk is None
+        or promotion.predecessor_promotion_pk is not None
+    ):
         return False
     target = session.get(Page, promotion.target_page_pk)
     head = head_revision(session, target) if target else None
@@ -369,3 +476,50 @@ def body_matches_target(session: Session, promotion: Promotion) -> bool:
         return False
     content = content_of(session, head)
     return content is not None and content.text == promotion.body
+
+
+def materialize_promotion_links(
+    session: Session, target_page: Page
+) -> list[RemoteLink]:
+    """Turn fetched promotion results into their exact one-to-one ladder rungs.
+
+    A save response identifies the new target revision by revid, but the fetch
+    worker owns Revision rows. Once it has made those rows concrete, this joins
+    each one back to the source revision frozen on the corresponding promotion.
+    No content heuristic or head-only proposal is involved.
+    """
+    if target_page.pk is None:
+        return []
+    rows = session.exec(
+        select(Promotion)
+        .join(PromotionBatch, Promotion.batch_pk == PromotionBatch.pk)
+        .where(
+            PromotionBatch.target_site_pk == target_page.site_pk,
+            Promotion.target_title == target_page.title,
+            Promotion.status == PromotionStatus.pushed,
+            Promotion.result_revid.is_not(None),
+        )
+        .order_by(Promotion.pk)
+    ).all()
+    linked: list[RemoteLink] = []
+    for promotion in rows:
+        target_revision = session.exec(
+            select(Revision).where(
+                Revision.page_pk == target_page.pk,
+                Revision.revid == promotion.result_revid,
+            )
+        ).first()
+        if target_revision is None:
+            continue
+        link = assert_link(
+            session,
+            local_revision_pk=promotion.source_revision_pk,
+            remote_revision_pk=target_revision.pk,
+            origin=LinkOrigin.copy,
+            page_link_pk=promotion.page_link_pk,
+        )
+        promotion.target_page_pk = target_page.pk
+        promotion.page_link_pk = link.page_link_pk
+        session.add(promotion)
+        linked.append(link)
+    return linked

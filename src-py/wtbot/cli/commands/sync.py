@@ -25,7 +25,7 @@ is directional and a link is not.
 ``batches``/``batch``/``approve``/``push`` are the CLI side of the push queue
 that ``/sync/batches`` and ``/sync-page`` stage (viewer routes, or
 ``POST /sync/batches`` / ``POST /sync/page-batches`` directly): watching an
-approved run and pushing it one page at a time without a browser open. They
+approved run and pushing it one revision at a time without a browser open. They
 are thin wrappers over that same HTTP contract -- there is no separate CLI-only
 path to a wiki -- so a batch staged from the viewer can be approved there and
 pushed from here, or the reverse.
@@ -218,7 +218,7 @@ def fetch_assets(
     typer.echo(data["note"])
 
 
-# --- the push queue: batches, approval, and pushing one page at a time -----
+# --- the push queue: batches, approval, and pushing one revision at a time -
 
 
 _ROW_COLOUR: dict[str, str | None] = {
@@ -340,7 +340,7 @@ def push_batch(
     ),
     api: ApiClient = Depends(get_api),
 ) -> None:
-    """Push one page of an approved batch -- or, with --all, the rest of it.
+    """Push one revision of an approved batch -- or, with --all, the rest.
 
     One HTTP request per page throughout, the same discipline the viewer's
     "push the next page" button keeps: a rate-limited wiki gets one request

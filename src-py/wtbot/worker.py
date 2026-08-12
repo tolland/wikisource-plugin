@@ -22,6 +22,7 @@ from wtbot.page_processors import (
     ProcessContext,
     processor_for,
 )
+from wtbot.promotion_store import materialize_promotion_links
 from wtbot.revision_store import (
     RemoteIdentityError,
     head_revision,
@@ -176,6 +177,8 @@ def _process(
             # a history walk must not change what "current" means.
             _record_history(session, client, page, req)
 
+        _materialize_promotion_links(session, page)
+
         outcome = processor.postprocess(ctx, page, remote)
         status = outcome.status
         progress_total = outcome.progress_total
@@ -261,6 +264,14 @@ def _record_history(
         raise
     except Exception:  # noqa: BLE001 - ordinary enrichment remains best effort
         log.warning("recording history for %s failed", req.title, exc_info=True)
+
+
+def _materialize_promotion_links(session: Session, page: CachedPage) -> None:
+    """Attach fetched target revisions to the source revisions that created them."""
+    with write_batch(session):
+        target = session.get(Page, page.pk)
+        if target is not None:
+            materialize_promotion_links(session, target)
 
 
 def _load_site_snapshot(session: Session, site_pk: int) -> Site:
