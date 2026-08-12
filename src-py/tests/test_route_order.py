@@ -24,6 +24,7 @@ rather than a comment.
 _SHADOWABLE = [
     "/pages/nav",
     "/pages/resolve",
+    "/pages/query",
     "/pages/annotations",
     "/pages/text-anchors",
     "/pages/box-links",
@@ -69,12 +70,23 @@ def test_no_pages_route_is_added_after_the_catch_all(engine):
 
 
 def test_static_pages_routes_reach_their_own_handler(client):
-    """Behavioural counterpart: called with no query string these answer 422
-    for their own missing `path` param. What must never appear is a 422
-    blaming `page_pk` -- that is {page_pk} having eaten the request."""
+    """Behavioural counterpart to the registration-order assertion.
+
+    Some handlers require query parameters and answer with an error object;
+    others, such as ``/pages/query``, validly return a list without parameters.
+    The forbidden response in either case is a 422 blaming ``page_pk`` -- that
+    means the dynamic catch-all ate the static path.
+    """
     shadowed_loc = ("path", "page_pk")
     for path in _SHADOWABLE:
-        detail = client.get(path).json().get("detail", [])
+        response = client.get(path)
+        if response.status_code != 422:
+            continue
+        response_json = response.json()
+        assert isinstance(
+            response_json, dict
+        ), f"{path} returned a non-object 422 response: {response_json!r}"
+        detail = response_json.get("detail", [])
         if not isinstance(detail, list):  # a handler's own str detail; fine
             continue
         locs = [tuple(item.get("loc", ())) for item in detail]

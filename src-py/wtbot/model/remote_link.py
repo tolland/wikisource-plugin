@@ -72,6 +72,12 @@ class RemoteLink(SQLModel, table=True):
     page pair two ladders and two anchors that could disagree. That is the kind
     of error every layer above would inherit, so it is prevented here rather
     than checked for later.
+
+    One revision may be linked once per *other site*: A may correspond to B on
+    upstream1 and C on upstream2, but never to two different revisions on
+    upstream1. That rule depends on Revision -> Page -> Site joins and therefore
+    cannot be expressed by an index over this table; ``assert_link`` enforces it
+    at the sole writing boundary.
     """
 
     __table_args__ = (

@@ -7,6 +7,10 @@ must *not* happen: a changed credential has to build a new client rather than
 keep using a session authenticated as somebody else.
 """
 
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
+
 from wtbot.model import Site
 from wtbot.settings import WikiSettings
 from wtbot.wiki.client import FakeWikiClient
@@ -50,6 +54,37 @@ def test_same_site_reuses_one_client():
 
     assert len(builder.calls) == 1, "one client per site, not one per request"
     assert all(c is clients[0] for c in clients)
+
+
+def test_concurrent_requests_do_not_build_duplicate_clients():
+    """pywikibot client construction mutates process-global state, so two
+    requests missing the cache together must not construct in parallel."""
+    calls = 0
+    calls_lock = threading.Lock()
+    workers = 12
+    start = threading.Barrier(workers)
+
+    def builder(settings: WikiSettings) -> FakeWikiClient:
+        nonlocal calls
+        with calls_lock:
+            calls += 1
+        # Keep the first build open long enough for every worker to observe
+        # the original race if construction is outside the registry lock.
+        time.sleep(0.05)
+        return FakeWikiClient()
+
+    registry = ClientRegistry(builder=builder)
+    site = _site()
+
+    def get_client() -> FakeWikiClient:
+        start.wait()
+        return registry.get(site, _settings())
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        clients = list(pool.map(lambda _: get_client(), range(workers)))
+
+    assert calls == 1
+    assert all(client is clients[0] for client in clients)
 
 
 def test_distinct_sites_get_distinct_clients():

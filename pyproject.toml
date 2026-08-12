@@ -8,6 +8,7 @@ dependencies = [
     "bs4>=0.0.2",
     "fastapi[standard]==0.140.0",
     "httpx2>=2.9.1",
+#    "mariadb>=1.1.14",
     "pandas-stubs~=3.0.3",
     "pillow>=11.0.0",
     "pydantic>=2.13.4",

@@ -45,6 +45,7 @@ same content model without touching anything another test reads."""
 # Marks a body this harness wrote, so an idempotency check can tell "already
 # applied" from "someone edited it".
 LOCAL_EDIT_MARKER = "<!-- harness: local divergence -->"
+UPSTREAM_EDIT_MARKER = "<!-- harness: upstream advance -->"
 
 
 class NotSeeded(RuntimeError):
@@ -172,6 +173,24 @@ def diverge_locally(local: WikiApi, title: str = SCRATCH_PAGE) -> int:
 
     body = f"{head.content}\n{LOCAL_EDIT_MARKER}\nAn addition made only locally.\n"
     return local.edit(title, body, summary="harness: local divergence").revid
+
+
+def advance_upstream(upstream: WikiApi, title: str = SCRATCH_PAGE) -> int:
+    """Append a new upstream revision for a two-sided reconciliation test.
+
+    A new ladder rung must use a previously unlinked revision on each site.
+    Advancing upstream before copying its body back to local supplies the
+    upstream half of that one-to-one rung.
+    """
+    revisions = upstream.revisions(title, limit=1, with_content=True)
+    if not revisions:
+        raise NotSeeded(f"{title} does not exist upstream")
+    head = revisions[0]
+    if UPSTREAM_EDIT_MARKER in (head.content or ""):
+        return head.revid
+
+    body = f"{head.content}\n{UPSTREAM_EDIT_MARKER}\nAn upstream addition.\n"
+    return upstream.edit(title, body, summary="harness: upstream advance").revid
 
 
 def reconcile_to_upstream(

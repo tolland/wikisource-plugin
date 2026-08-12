@@ -117,6 +117,43 @@ class TestRateLimitPolicy:
 
 
 class TestConfigInjection:
+    def test_api_url_constructs_autofamily_without_scanning_known_families(
+        self, monkeypatch
+    ):
+        """A bad unrelated family must not break construction of this site.
+
+        Passing ``url=`` to pywikibot.Site scans every configured family via
+        ``Family.from_url``.  The explicit AutoFamily path has all the
+        information it needs and never performs that process-global scan.
+        """
+        import pywikibot
+
+        from wtbot.wiki.client import _make_pywikibot_site
+
+        calls = []
+        expected_site = object()
+
+        def site(**kwargs):
+            calls.append(kwargs)
+            return expected_site
+
+        monkeypatch.setattr(pywikibot, "Site", site)
+        result = _make_pywikibot_site(
+            pywikibot,
+            WikiSettings(
+                family="mywikisource",
+                code="en",
+                api_url="https://wikisource-debian-13.lan/w/api.php",
+            ),
+        )
+
+        assert result is expected_site
+        assert "url" not in calls[0]
+        assert calls[0]["code"] == "mywikisource"
+        family = calls[0]["fam"]
+        assert family.name == "mywikisource"
+        assert callable(family.protocol)
+
     def test_configure_sets_env_and_dir(self, tmp_path, monkeypatch):
         monkeypatch.delenv("PYWIKIBOT_NO_USER_CONFIG", raising=False)
         from wtbot.wiki.config import configure_pywikibot

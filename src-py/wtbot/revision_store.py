@@ -20,6 +20,92 @@ us; see docs/proofread-page-sha1-discordance.md for why it cannot replace ours.
 """
 
 
+class RemoteIdentityError(ValueError):
+    """The registered site no longer has the identity the cache recorded.
+
+    MediaWiki's page and revision ids are stable only for the lifetime of one
+    wiki database. Reusing a wtbot cache after restoring/replacing that
+    database must stop at the first contradiction instead of combining two
+    unrelated histories under one Site row.
+    """
+
+
+def validate_remote_identity(session: Session, page: Page, remote: RemotePage) -> None:
+    """Refuse a remote snapshot that contradicts this Site's cached identity."""
+    if remote.pageid is not None:
+        if page.pageid is not None and page.pageid != remote.pageid:
+            raise RemoteIdentityError(
+                f"site {page.site_pk} title {page.title!r} changed pageid "
+                f"from {page.pageid} to {remote.pageid}; the MediaWiki database "
+                "may have been restored or replaced"
+            )
+
+        other_page = session.exec(
+            select(Page).where(
+                Page.site_pk == page.site_pk,
+                Page.pageid == remote.pageid,
+                Page.pk != page.pk,
+            )
+        ).first()
+        if other_page is not None:
+            raise RemoteIdentityError(
+                f"site {page.site_pk} pageid {remote.pageid} is already cached as "
+                f"{other_page.title!r}, not {page.title!r}; the MediaWiki database "
+                "may have been restored or a move needs reconciling"
+            )
+
+    if remote.revid is None:
+        return
+
+    # Cross-page identity requires a complete page snapshot. Production fetches
+    # always carry pageid (see PywikibotClient.get_page/get_history), while
+    # small FakeWikiClient fixtures commonly omit it and use placeholder revids.
+    # Treating those partial snapshots as authoritative site-global identity
+    # records makes unrelated unit tests fail without improving the production
+    # guard. Same-page revision immutability below remains enforceable from a
+    # revid alone.
+    if remote.pageid is not None:
+        other_revision = session.exec(
+            select(Revision)
+            .join(Page, Page.pk == Revision.page_pk)
+            .where(
+                Page.site_pk == page.site_pk,
+                Revision.revid == remote.revid,
+                Revision.page_pk != page.pk,
+            )
+        ).first()
+        if other_revision is not None:
+            other_revision_page = session.get(Page, other_revision.page_pk)
+            other_title = (
+                other_revision_page.title if other_revision_page else "unknown"
+            )
+            raise RemoteIdentityError(
+                f"site {page.site_pk} revid {remote.revid} is already cached for "
+                f"{other_title!r}, not {page.title!r}; the MediaWiki database may "
+                "have been restored or replaced"
+            )
+
+    existing = session.exec(
+        select(Revision).where(
+            Revision.page_pk == page.pk,
+            Revision.revid == remote.revid,
+        )
+    ).first()
+    if existing is None or existing.pk is None:
+        return
+    slot = session.get(Slot, (existing.pk, MAIN_SLOT))
+    content = None if slot is None else session.get(Content, slot.content_pk)
+    digest = content_sha1_base36(remote.text)
+    if content is not None and (
+        content.content_sha1 != digest or content.content_model != remote.content_model
+    ):
+        raise RemoteIdentityError(
+            f"site {page.site_pk} revid {remote.revid} for {page.title!r} "
+            "changed content; revision ids are immutable, so the MediaWiki "
+            "database may have been restored or replaced"
+        )
+
+
 def head_revision(session: Session, page: Page) -> Revision | None:
     """The page's current revision, or None for a placeholder."""
     if page.latest_revision_pk is None:
@@ -111,6 +197,8 @@ def record_head_revision(
     if remote.revid is None or page.pk is None:
         return None
 
+    validate_remote_identity(session, page, remote)
+
     content = upsert_content(
         session,
         remote.text,
@@ -168,6 +256,7 @@ def record_history(
     for remote in remotes:
         if remote.revid is None:
             continue
+        validate_remote_identity(session, page, remote)
         content = upsert_content(
             session,
             remote.text,

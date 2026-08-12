@@ -252,6 +252,96 @@ def test_an_unknown_revision_is_refused(
         )
 
 
+def test_a_revision_has_at_most_one_counterpart_per_other_site(
+    session: Session, pair: tuple[Revision, Revision]
+) -> None:
+    local, remote = pair
+    remote_page = session.get(Page, remote.page_pk)
+    remote_site = session.get(Site, remote_page.site_pk)
+    other_remote = _revision(
+        session,
+        remote_site,
+        "Page:The varieties of religious experience.djvu/13",
+        revid=8815,
+        body=_body(3, "Hesperian"),
+    )
+    assert_link(
+        session,
+        local_revision_pk=local.pk,
+        remote_revision_pk=remote.pk,
+        origin=LinkOrigin.copy,
+    )
+    session.commit()
+
+    with pytest.raises(LinkError, match="already corresponds.*on site"):
+        assert_link(
+            session,
+            local_revision_pk=local.pk,
+            remote_revision_pk=other_remote.pk,
+            origin=LinkOrigin.manual,
+        )
+
+
+def test_cardinality_is_checked_from_both_ends(
+    session: Session, pair: tuple[Revision, Revision]
+) -> None:
+    local, remote = pair
+    local_page = session.get(Page, local.page_pk)
+    local_site = session.get(Site, local_page.site_pk)
+    other_local = _revision(
+        session,
+        local_site,
+        "Page:The varieties of religious experience.djvu/13",
+        revid=4,
+        body=_body(3, "LocalEditor"),
+    )
+    assert_link(
+        session,
+        local_revision_pk=local.pk,
+        remote_revision_pk=remote.pk,
+        origin=LinkOrigin.copy,
+    )
+    session.commit()
+
+    with pytest.raises(LinkError, match="already corresponds.*on site"):
+        assert_link(
+            session,
+            local_revision_pk=other_local.pk,
+            remote_revision_pk=remote.pk,
+            origin=LinkOrigin.manual,
+        )
+
+
+def test_a_revision_may_have_one_counterpart_on_each_of_several_sites(
+    session: Session, pair: tuple[Revision, Revision]
+) -> None:
+    local, upstream_one = pair
+    upstream_two_site = _site(session, "second-wikisource")
+    upstream_two = _revision(
+        session,
+        upstream_two_site,
+        TITLE,
+        revid=1200,
+        body=_body(3, "AnotherEditor"),
+    )
+
+    first = assert_link(
+        session,
+        local_revision_pk=local.pk,
+        remote_revision_pk=upstream_one.pk,
+        origin=LinkOrigin.copy,
+    )
+    second = assert_link(
+        session,
+        local_revision_pk=local.pk,
+        remote_revision_pk=upstream_two.pk,
+        origin=LinkOrigin.copy,
+    )
+    session.commit()
+
+    assert links_for_revision(session, local.pk) == [first, second]
+
+
 def test_the_ladder_grows_and_the_last_rung_is_the_anchor(
     session: Session, pair: tuple[Revision, Revision]
 ) -> None:

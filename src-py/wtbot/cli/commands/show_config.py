@@ -1,5 +1,4 @@
 import typer
-from rich import inspect
 from typer_di import TyperDI
 
 from wtbot.cli.utils import _settings
@@ -22,6 +21,6 @@ def show_config(
     if ctx.invoked_subcommand is not None:
         return
 
-    inspect(ctx.parent, title="inspecting ctx.params in main callback")
+    # inspect(ctx.parent, title="inspecting ctx.params in main callback")
 
     typer.echo(_settings(family, code, api_url, ca_bundle))

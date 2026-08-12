@@ -14,6 +14,9 @@ Three rules, all of them enforced here rather than left to callers:
 - **Cross-site only.** A link between two revisions of the same site is
   meaningless -- within a site, revision ancestry already says everything -- so
   it is refused rather than stored.
+- **One correspondence per other site.** A revision may correspond to one
+  revision on each of several sites, but never to two revisions on the same
+  site. Candidates may be many-valued; asserted links are not.
 - **The pair is unordered.** ``local``/``remote`` name the direction an
   assertion was made from, not a hierarchy, so every read here matches a pair in
   either orientation and ``assert_link`` treats an existing reversed row as the
@@ -67,6 +70,19 @@ def assert_link(
     if existing is not None:
         return existing
 
+    _assert_site_cardinality(
+        session,
+        revision=local,
+        other_revision=remote,
+        other_site_pk=remote_page.site_pk,
+    )
+    _assert_site_cardinality(
+        session,
+        revision=remote,
+        other_revision=local,
+        other_site_pk=local_page.site_pk,
+    )
+
     link = RemoteLink(
         local_revision_pk=local_revision_pk,
         remote_revision_pk=remote_revision_pk,
@@ -76,6 +92,37 @@ def assert_link(
     session.add(link)
     session.flush()
     return link
+
+
+def _assert_site_cardinality(
+    session: Session,
+    *,
+    revision: Revision,
+    other_revision: Revision,
+    other_site_pk: int,
+) -> None:
+    """A revision has zero or one counterpart on any particular other site."""
+    if revision.pk is None or other_revision.pk is None:  # pragma: no cover
+        raise LinkError("cannot link an unpersisted revision")
+
+    for link in links_for_revision(session, revision.pk):
+        linked_pk = (
+            link.remote_revision_pk
+            if link.local_revision_pk == revision.pk
+            else link.local_revision_pk
+        )
+        linked_revision = session.get(Revision, linked_pk)
+        if linked_revision is None:  # pragma: no cover - FK holds
+            continue
+        linked_page = session.get(Page, linked_revision.page_pk)
+        if linked_page is None:  # pragma: no cover - FK holds
+            continue
+        if linked_page.site_pk == other_site_pk and linked_pk != other_revision.pk:
+            raise LinkError(
+                f"revision {revision.pk} already corresponds to revision "
+                f"{linked_pk} on site {other_site_pk}; it cannot also correspond "
+                f"to revision {other_revision.pk} on that site"
+            )
 
 
 def _pairing_for(session: Session, local_page: Page, remote_page: Page):

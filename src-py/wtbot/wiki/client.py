@@ -60,6 +60,23 @@ def _https(url: str | None) -> str | None:
     return url
 
 
+def _make_pywikibot_site(pywikibot, settings: WikiSettings):
+    """Build a Site without asking pywikibot to scan unrelated families.
+
+    ``Site(url=...)`` first calls ``from_url`` on every configured family.  A
+    malformed family loaded into pywikibot's process-global registry can then
+    prevent an otherwise valid AutoFamily site from being constructed.  We
+    already know that an explicit API URL is an AutoFamily, so construct it
+    directly and keep site creation local to these settings.
+    """
+    if settings.api_url:
+        from pywikibot.family import AutoFamily
+
+        family = AutoFamily(settings.family, settings.api_url)
+        return pywikibot.Site(code=family.code, fam=family)
+    return pywikibot.Site(code=settings.code, fam=settings.family)
+
+
 @runtime_checkable
 class WikiClient(Protocol):
     def get_page(self, title: str) -> RemotePage: ...
@@ -160,16 +177,17 @@ class PywikibotClient:
         configure_pywikibot(settings)
         import pywikibot
 
+        # Importing the tap imports pywikibot.  It must therefore happen only
+        # after configure_pywikibot has disabled repository-local user config;
+        # IntelliJ runs with the repository root as its working directory.
+        from wtbot.wiki.http_tap import install_http_tap
+
+        install_http_tap()
+
         self._pwb = pywikibot
-        if settings.api_url:
-            # Supply the configured family as the AutoFamily name.  Deriving
-            # it from the URL is not unique for two wikis on the same host:
-            # pywikibot ignores the port when constructing its Site cache key,
-            # so localhost:18581 and localhost:18582 otherwise share one
-            # APISite and the second client silently talks to the first wiki.
-            self.site = pywikibot.Site(fam=settings.family, url=settings.api_url)
-        else:
-            self.site = pywikibot.Site(code=settings.code, fam=settings.family)
+        # The configured family name also keeps two AutoFamily wikis on the
+        # same host but different ports distinct in pywikibot's Site cache.
+        self.site = _make_pywikibot_site(pywikibot, settings)
 
         # Write the password file entry now that we know the runtime
         # family/code (AutoFamily derives these from the hostname at Site()
@@ -839,4 +857,5 @@ class FakeWikiClient:
 
 def get_wiki_client(settings: WikiSettings) -> WikiClient:
     """Factory used outside tests. Tests inject a FakeWikiClient directly."""
+    # inspect(settings)
     return PywikibotClient(settings)

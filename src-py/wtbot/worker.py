@@ -22,7 +22,13 @@ from wtbot.page_processors import (
     ProcessContext,
     processor_for,
 )
-from wtbot.revision_store import head_revision, record_head_revision, record_history
+from wtbot.revision_store import (
+    RemoteIdentityError,
+    head_revision,
+    record_head_revision,
+    record_history,
+    validate_remote_identity,
+)
 from wtbot.timeutil import utcnow
 from wtbot.wiki.client import WikiClient
 from wtbot.wiki.failures import WikiFailure
@@ -247,7 +253,13 @@ def _record_history(
             record_history(
                 session, row, [rev for rev in history if rev.revid != head_revid]
             )
-    except Exception:  # noqa: BLE001 - enrichment must not fail a fetch
+    except RemoteIdentityError:
+        # Unlike a transient history/API problem, an identity contradiction
+        # means continuing could combine two MediaWiki database epochs. Make
+        # the parent fetch fail loudly so an operator resets/reconciles the
+        # cache instead of trusting a partially corrupt history.
+        raise
+    except Exception:  # noqa: BLE001 - ordinary enrichment remains best effort
         log.warning("recording history for %s failed", req.title, exc_info=True)
 
 
@@ -314,6 +326,12 @@ def _upsert_page(
         ).first()
         if page is None:
             page = Page(site_pk=site.pk, title=remote.title)
+
+        # pageid and revid are identities within one MediaWiki database, not
+        # merely mutable metadata. Check before overwriting the cached values:
+        # a restored wiki paired with a persistent wtbot database otherwise
+        # splices two unrelated histories together under this Page row.
+        validate_remote_identity(session, page, remote)
 
         page.namespace_key = remote.namespace_key
         page.namespace_role = role_for_canonical(remote.namespace_canonical or "")

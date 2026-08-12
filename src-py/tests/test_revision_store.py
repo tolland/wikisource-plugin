@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 
+import pytest
 from sqlmodel import Session, select
 
 from wtbot.model import (
@@ -11,7 +12,12 @@ from wtbot.model import (
     Site,
     Slot,
 )
-from wtbot.revision_store import record_head_revision, upsert_content
+from wtbot.revision_store import (
+    RemoteIdentityError,
+    record_head_revision,
+    upsert_content,
+    validate_remote_identity,
+)
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.sha1 import content_sha1_base36, hex_to_base36
 from wtbot.wiki.wiki_types import RemotePage
@@ -202,6 +208,99 @@ def test_a_new_revision_adds_a_row_and_moves_the_head(session: Session) -> None:
     assert page.latest_revision_pk == second.pk
     assert second.parent_revid == 1
     assert len(session.exec(select(Revision)).all()) == 2
+
+
+def test_a_revid_cannot_move_to_another_page_on_the_same_site(
+    session: Session,
+) -> None:
+    """MediaWiki revids are site-global. Seeing one on a different page means
+    this cache crossed a database restore/replacement boundary."""
+    site = _site(session, family="wikisource")
+    first = _page(session, site, "Page:Work.djvu/1")
+    second = _page(session, site, "Page:Work.djvu/2")
+    record_head_revision(
+        session, first, _remote("one", revid=42, pageid=10, title=first.title)
+    )
+    session.commit()
+
+    with pytest.raises(RemoteIdentityError, match="revid 42.*already cached"):
+        record_head_revision(
+            session,
+            second,
+            _remote("two", revid=42, pageid=11, title=second.title),
+        )
+
+
+def test_partial_snapshots_may_reuse_placeholder_revids_across_pages(
+    session: Session,
+) -> None:
+    """A RemotePage without pageid is deliberately incomplete.
+
+    Fake clients use such snapshots throughout focused tests, often with
+    ``revid=1`` as incidental metadata. They must still record independently;
+    production snapshots carry pageid and exercise the site-global check above.
+    """
+    site = _site(session, family="wikisource")
+    first = _page(session, site, "Page:Work.djvu/1")
+    second = _page(session, site, "Page:Work.djvu/2")
+
+    record_head_revision(session, first, _remote("one", revid=1, title=first.title))
+    record_head_revision(session, second, _remote("two", revid=1, title=second.title))
+    session.commit()
+
+    assert len(session.exec(select(Revision).where(Revision.revid == 1)).all()) == 2
+
+
+def test_the_same_numeric_revid_is_allowed_on_different_sites(
+    session: Session,
+) -> None:
+    local = _site(session, family="mywikisource")
+    upstream = _site(session, family="wikisource")
+    local_page = _page(session, local, "Page:Work.djvu/1")
+    upstream_page = _page(session, upstream, "Page:Work.djvu/1")
+
+    record_head_revision(session, local_page, _remote("local", revid=42))
+    record_head_revision(session, upstream_page, _remote("upstream", revid=42))
+    session.commit()
+
+    assert len(session.exec(select(Revision).where(Revision.revid == 42)).all()) == 2
+
+
+def test_an_existing_revid_cannot_change_content(session: Session) -> None:
+    site = _site(session, family="wikisource")
+    page = _page(session, site, "Page:Work.djvu/1")
+    record_head_revision(session, page, _remote("before", revid=42))
+    session.commit()
+
+    with pytest.raises(RemoteIdentityError, match="revid 42.*changed content"):
+        record_head_revision(session, page, _remote("after", revid=42))
+
+
+def test_a_title_cannot_silently_change_pageid(session: Session) -> None:
+    site = _site(session, family="wikisource")
+    page = _page(session, site, "Page:Work.djvu/1")
+    page.pageid = 10
+    session.add(page)
+    session.commit()
+
+    with pytest.raises(RemoteIdentityError, match="changed pageid from 10 to 11"):
+        validate_remote_identity(session, page, _remote("body", revid=42, pageid=11))
+
+
+def test_a_pageid_cannot_name_two_titles_on_the_same_site(session: Session) -> None:
+    site = _site(session, family="wikisource")
+    first = _page(session, site, "Page:Work.djvu/1")
+    second = _page(session, site, "Page:Work.djvu/2")
+    first.pageid = 10
+    session.add(first)
+    session.commit()
+
+    with pytest.raises(RemoteIdentityError, match="pageid 10.*already cached"):
+        validate_remote_identity(
+            session,
+            second,
+            _remote("body", revid=42, pageid=10, title=second.title),
+        )
 
 
 def test_a_placeholder_records_no_revision(session: Session) -> None:

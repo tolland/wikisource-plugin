@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from wtbot.model import Site
 from wtbot.settings import WikiSettings
 from wtbot.wiki.client import WikiClient, get_wiki_client
-from wtbot.wiki.http_tap import install_http_tap
 
 """Process-wide reuse of wiki clients.
 
@@ -87,16 +86,12 @@ class ClientRegistry:
             if client is not None:
                 return client
 
-        # Built outside the lock: construction does network I/O (site
-        # detection, login) and must not block clients for other sites. A rare
-        # duplicate build under a race is cheaper than serialising every site
-        # behind the slowest one; the loser is discarded below.
-        client = self._build(settings)
-
-        with self._lock:
-            existing = self._clients.get(key)
-            if existing is not None:
-                return existing
+            # Client construction mutates pywikibot's process-global config,
+            # family registry and Site cache.  It must be serialized even for
+            # different keys; allowing duplicate concurrent builds can corrupt
+            # one build with another site's state.  Construction is rare and
+            # every cached lookup above remains a short critical section.
+            client = self._build(settings)
             self._clients[key] = client
         log.info(
             "built wiki client for %s:%s (%s) as %s",
@@ -137,7 +132,6 @@ def make_client_factory(settings_for_site, *, registry: ClientRegistry | None = 
     # one -- and a test that meant to inject a fake would go to the network.
     if registry is None:
         registry = ClientRegistry()
-    install_http_tap()
 
     def factory(site: Site) -> WikiClient:
         return registry.get(site, settings_for_site(site))

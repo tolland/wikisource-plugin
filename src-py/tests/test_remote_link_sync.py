@@ -6,6 +6,7 @@ from wiki_harness import (
     SCRATCH_PAGE,
     PwbHarness,
     WikiApi,
+    advance_upstream,
     create_scratch_pair,
     diverge_locally,
     reconcile_to_upstream,
@@ -264,6 +265,7 @@ def test_reconciling_appends_a_rung_rather_than_editing_the_broken_one(
     seeded_upstream: WikiApi,
     seeded_local: WikiApi,
     local_pwb: PwbHarness,
+    upstream_pwb: PwbHarness,
 ) -> None:
     """Forward re-anchoring, end to end. Remote history is append-only, so a
     broken anchor is superseded by a new one rather than repaired -- and the
@@ -274,6 +276,16 @@ def test_reconciling_appends_a_rung_rather_than_editing_the_broken_one(
     diverge_locally(seeded_local)
     _fetch(session, session.get(Site, local_page.site_pk), local_pwb, SCRATCH_PAGE)
 
+    # A rung is one-to-one. Reconciliation therefore needs a new revision on
+    # both sites; reusing the original upstream revision would branch the
+    # ladder by giving that revision two local counterparts.
+    advance_upstream(seeded_upstream)
+    _fetch(
+        session,
+        session.get(Site, upstream_page.site_pk),
+        upstream_pwb,
+        SCRATCH_PAGE,
+    )
     reconcile_to_upstream(seeded_upstream, seeded_local)
     _fetch(session, session.get(Site, local_page.site_pk), local_pwb, SCRATCH_PAGE)
 

@@ -1,13 +1,3 @@
-"""Draining the fetch queue, as a separate operation from enqueueing it.
-
-The split exists because fetching is slow on purpose: every wiki call is
-throttled to stay inside the rate limit, so a book's worth of pages cannot be
-something an enqueue call waits for. What these tests pin is that the drain is
-a *loop* (a fan-out enqueues children after the first pass began), that it says
-so honestly when it stops early, and that enqueueing on its own fetches
-nothing.
-"""
-
 import pytest
 from conftest import credential_for, drain
 from fastapi.testclient import TestClient
@@ -19,18 +9,34 @@ from wtbot.queue_runner import DrainStop, drain_queue, pending_count, queue_stat
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import RemotePage
 
+"""Draining the fetch queue, as a separate operation from enqueueing it.
+
+The split exists because fetching is slow on purpose: every wiki call is
+throttled to stay inside the rate limit, so a book's worth of pages cannot be
+something an enqueue call waits for. What these tests pin is that the drain is
+a *loop* (a fan-out enqueues children after the first pass began), that it says
+so honestly when it stops early, and that enqueueing on its own fetches
+nothing.
+"""
+
 LABEL = "test"
 _INDEX = "Index:Queue.djvu"
 
 
-def _page(title: str, model: str = "proofread-page", ns: str = "Page") -> RemotePage:
+def _page(
+    title: str,
+    model: str = "proofread-page",
+    ns: str = "Page",
+    *,
+    revid: int,
+) -> RemotePage:
     return RemotePage(
         title=title,
         namespace_key=250,
         namespace_canonical=ns,
         content_model=model,
         text=f"body of {title}",
-        revid=1,
+        revid=revid,
     )
 
 
@@ -52,7 +58,13 @@ def seeded(engine):
     """A site with an Index whose fan-out has three children."""
     pages = {_INDEX: _index_remote(3)}
     pages.update(
-        {f"Page:Queue.djvu/{n}": _page(f"Page:Queue.djvu/{n}") for n in (1, 2, 3)}
+        {
+            f"Page:Queue.djvu/{n}": _page(
+                f"Page:Queue.djvu/{n}",
+                revid=n + 1,
+            )
+            for n in (1, 2, 3)
+        }
     )
     wiki = FakeWikiClient(pages=pages)
     with Session(engine) as session:
@@ -164,7 +176,13 @@ def test_a_drain_stops_when_the_wiki_rate_limits_us(engine, seeded):
     continuing through the queue turns one refusal into hundreds -- and
     retrying is not a fix either, since the throttle is what is wrong."""
     _, site_pk = seeded
-    pages = {f"Page:Queue.djvu/{n}": _page(f"Page:Queue.djvu/{n}") for n in (1, 2, 3)}
+    pages = {
+        f"Page:Queue.djvu/{n}": _page(
+            f"Page:Queue.djvu/{n}",
+            revid=n + 1,
+        )
+        for n in (1, 2, 3)
+    }
     wiki = _RateLimitedClient(pages=pages, allow=1)
     for n in (1, 2, 3):
         _enqueue(engine, site_pk, f"Page:Queue.djvu/{n}")
@@ -183,7 +201,10 @@ def test_a_drain_stops_when_the_wiki_rate_limits_us(engine, seeded):
 
 def test_the_rate_limited_stop_reaches_the_drain_endpoint(engine, seeded):
     _, site_pk = seeded
-    pages = {f"Page:Queue.djvu/{n}": _page(f"Page:Queue.djvu/{n}") for n in (1, 2)}
+    pages = {
+        f"Page:Queue.djvu/{n}": _page(f"Page:Queue.djvu/{n}", revid=n + 1)
+        for n in (1, 2)
+    }
     wiki = _RateLimitedClient(pages=pages, allow=0)
     app = create_app(engine=engine, client_factory=lambda site: wiki)
     with TestClient(app) as c:
