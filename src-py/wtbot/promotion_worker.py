@@ -55,6 +55,7 @@ def push_one(
     client_factory,
     *,
     force: bool = False,
+    require_approval: bool = True,
 ) -> Promotion:
     """Write one staged promotion to its target wiki.
 
@@ -82,7 +83,10 @@ def push_one(
         raise PromotionError(
             f"promotion {promotion_pk} is {status.value}; only a staged row runs"
         )
-    if batch_status not in (BatchStatus.approved, BatchStatus.running):
+    if require_approval and batch_status not in (
+        BatchStatus.approved,
+        BatchStatus.running,
+    ):
         raise PromotionError(
             f"batch {promotion.batch_pk} is {batch_status.value}: approve it "
             "before pushing. An unapproved run has nobody's name on it."
@@ -99,13 +103,10 @@ def push_one(
 
     try:
         client = client_factory(target_site)
-        result = client.save_page(
-            title,
-            body,
-            base_revid if intent is PromotionIntent.update else None,
-            comment,
-            force=force,
-        )
+        if intent is PromotionIntent.create:
+            result = client.create_page(title, body, comment, force=force)
+        else:
+            result = client.save_page(title, body, base_revid, comment, force=force)
     except EditConflict as exc:
         return _record(
             session,
@@ -142,7 +143,8 @@ def _preflight(session: Session, promotion_pk: int, *, force: bool) -> Promotion
     """
     with read_snapshot(session):
         promotion = session.get(Promotion, promotion_pk)
-        _effective_base_revid(session, promotion)
+        expected_base = _effective_base_revid(session, promotion)
+        actual_base = target_head_revid(session, promotion)
         stale_source = not source_is_unchanged(session, promotion)
         already_there = body_matches_target(session, promotion)
 
@@ -165,6 +167,22 @@ def _preflight(session: Session, promotion_pk: int, *, force: bool) -> Promotion
             promotion_pk,
             PromotionStatus.skipped,
             error="the target already holds this exact body",
+        )
+    target_moved = (
+        actual_base is not None
+        if promotion.intent is PromotionIntent.create
+        else actual_base != expected_base
+    )
+    if target_moved and not force:
+        return _record(
+            session,
+            promotion_pk,
+            PromotionStatus.conflict,
+            pre_push=actual_base,
+            error=(
+                "the target has moved since this change was reviewed "
+                f"(expected {expected_base}, found {actual_base})"
+            ),
         )
     return None
 

@@ -221,6 +221,86 @@ def fetch_assets(
 # --- the push queue: batches, approval, and pushing one revision at a time -
 
 
+def _print_change(change: dict) -> None:
+    source = change["source"]
+    target = change["target"]
+    typer.echo(f"change #{change['pk']}  {change['status']}  {change['intent']}")
+    typer.echo(
+        f"  source {source['site']}:{source['title']}  revid {source['revid']} "
+        f"by {source.get('contributor') or 'unknown'}"
+    )
+    if source.get("comment"):
+        typer.echo(f"  source summary: {source['comment']}")
+    base = (
+        f"base revid {target['base_revid']}"
+        if target.get("base_revid") is not None
+        else "create new page"
+    )
+    typer.echo(f"  target {target['site']}:{target['title']}  ({base})")
+    for transformation in change["transformations"]:
+        typer.echo(f"  transformation: {transformation}")
+    for blocker in change["blockers"]:
+        typer.secho(f"  BLOCKED: {blocker}", fg=typer.colors.RED)
+    typer.echo("\nExact submitted body:\n")
+    typer.echo(change["submitted_body"])
+    typer.echo("\nDiff against current target:\n")
+    typer.echo(change["diff"] or "(no textual difference)")
+
+
+@app.command("next")
+def next_exact_change(
+    title: str = typer.Argument(..., help="Source page title."),
+    source: str = typer.Option(..., "--source", help="Registered source site."),
+    target: str = typer.Option(..., "--target", help="Registered target site."),
+    target_title: str | None = typer.Option(
+        None, "--target-title", help="Only when the target title differs."
+    ),
+    api: ApiClient = Depends(get_api),
+) -> None:
+    """Show and freeze the next exact source revision. Writes nothing."""
+    change = api.post(
+        "/sync/changes/next",
+        {
+            "source_site": source,
+            "target_site": target,
+            "source_title": title,
+            "target_title": target_title or title,
+        },
+    )
+    if change is None:
+        typer.echo("no next change")
+        return
+    _print_change(change)
+
+
+@app.command("push")
+def push_exact_change(
+    change_pk: int = typer.Argument(..., help="The reviewed change to push."),
+    api: ApiClient = Depends(get_api),
+) -> None:
+    """Push exactly one reviewed change, then stop."""
+    result = api.post(f"/sync/changes/{change_pk}/push")
+    colour = {
+        "pushed": typer.colors.GREEN,
+        "already_present": typer.colors.GREEN,
+        "conflict": typer.colors.YELLOW,
+        "error": typer.colors.RED,
+    }.get(result["status"])
+    typer.secho(f"change #{change_pk}: {result['status']}", fg=colour)
+    if result.get("new_target_revid") is not None:
+        typer.echo(f"  target revid {result['new_target_revid']}")
+    if result.get("target_revision_url"):
+        typer.echo(f"  {result['target_revision_url']}")
+    typer.echo(f"  edit summary: {result.get('edit_summary') or '(none)'}")
+    typer.echo(f"  verification refetch: {result['verification_refetch']}")
+    typer.echo(
+        "  revision correspondence: "
+        + ("materialized" if result["correspondence_materialized"] else "pending")
+    )
+    if result.get("error"):
+        typer.secho(f"  {result['error']}", fg=colour)
+
+
 _ROW_COLOUR: dict[str, str | None] = {
     "pushed": typer.colors.GREEN,
     "conflict": typer.colors.YELLOW,
@@ -315,7 +395,7 @@ def approve_batch(
     )
 
 
-@app.command("push")
+@app.command("push-batch")
 def push_batch(
     batch_pk: int = typer.Argument(..., help="The batch to push from."),
     promotion_pk: int | None = typer.Option(
@@ -340,7 +420,7 @@ def push_batch(
     ),
     api: ApiClient = Depends(get_api),
 ) -> None:
-    """Push one revision of an approved batch -- or, with --all, the rest.
+    """Legacy bulk workflow: push one approved batch row or use --all.
 
     One HTTP request per page throughout, the same discipline the viewer's
     "push the next page" button keeps: a rate-limited wiki gets one request

@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 import pytest
+from conftest import drain
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -609,8 +610,7 @@ def test_skipping_a_revision_skips_its_dependent_chain(pushing_client, engine):
     batch = stage(pushing_client).json()
 
     after = pushing_client.post(
-        f"/sync/batches/{batch['pk']}/promotions/"
-        f"{batch['promotions'][0]['pk']}/skip"
+        f"/sync/batches/{batch['pk']}/promotions/{batch['promotions'][0]['pk']}/skip"
     ).json()
 
     assert [row["status"] for row in after["promotions"]] == ["skipped", "skipped"]
@@ -715,3 +715,156 @@ def test_a_staged_page_batch_pushes_through_the_ordinary_batch_endpoints(
     assert pushed["status"] == "complete"
     assert pushed["promotions"][0]["status"] == "pushed"
     assert pushed["promotions"][0]["result_revid"] == 4242
+
+
+# -- single granular change: /sync/changes ----------------------------------
+
+
+class GranularWiki(FakeWikiClient):
+    def __init__(self):
+        super().__init__(pages={})
+        self.create_calls: list[tuple[str, str, str | None]] = []
+        self.update_calls: list[tuple[str, str, int | None, str | None]] = []
+
+    def create_page(self, title, text, comment, *, force=False):
+        from wtbot.wiki.wiki_types import EditConflict
+
+        existing = self._pages.get(title)
+        if existing is not None and not force:
+            raise EditConflict(title, 0, existing.revid)
+        self.create_calls.append((title, text, comment))
+        return FakeWikiClient.save_page(self, title, text, None, comment, force=force)
+
+    def save_page(self, title, text, base_revid, comment, *, force=False):
+        self.update_calls.append((title, text, base_revid, comment))
+        return super().save_page(title, text, base_revid, comment, force=force)
+
+
+def granular_request(**overrides) -> dict:
+    return {
+        "source_site": "upstream",
+        "target_site": "local",
+        "source_title": PAGE_TITLE,
+        **overrides,
+    }
+
+
+def test_next_change_reviews_then_create_only_pushes_and_verifies(engine):
+    seed(engine, target_page=False)
+    wiki = GranularWiki()
+    with TestClient(
+        create_app(engine=engine, client_factory=lambda _site: wiki)
+    ) as client:
+        reviewed = client.post("/sync/changes/next", json=granular_request())
+        assert reviewed.status_code == 200, reviewed.text
+        change = reviewed.json()
+        assert change["status"] == "ready"
+        assert change["intent"] == "create"
+        assert change["source"]["revid"] == 900
+        assert change["source"]["revision_pk"] != 900
+        assert change["target"]["base_revid"] is None
+        assert 'user="local-bot"' in change["submitted_body"]
+        assert change["diff"]
+        assert "pagequality user" in change["transformations"][0]
+        assert change["blockers"] == []
+        assert wiki.create_calls == []
+
+        pushed = client.post(f"/sync/changes/{change['pk']}/push")
+        assert pushed.status_code == 200, pushed.text
+        result = pushed.json()
+        assert result["status"] == "pushed"
+        assert result["new_target_revid"] == 1
+        assert result["target_revision_url"].endswith("?oldid=1")
+        assert result["verification_refetch"] == "pending"
+        assert result["correspondence_materialized"] is False
+        assert len(wiki.create_calls) == 1
+        assert wiki.update_calls == []
+
+        drain(client)
+        with Session(engine) as session:
+            promotion = session.get(Promotion, change["pk"])
+            assert _correspondence_exists(session, promotion)
+        assert (
+            client.post("/sync/changes/next", json=granular_request()).status_code
+            == 204
+        )
+
+
+def _correspondence_exists(session: Session, promotion: Promotion) -> bool:
+    target = session.get(Page, promotion.target_page_pk)
+    source = session.get(Page, promotion.source_page_pk)
+    return any(
+        {
+            session.get(Revision, rung.local_revision_pk).revid,
+            session.get(Revision, rung.remote_revision_pk).revid,
+        }
+        == {900, promotion.result_revid}
+        for rung in ladder(session, page_pk=source.pk, other_page_pk=target.pk)
+    )
+
+
+def test_next_change_exposes_only_the_oldest_source_revision(engine):
+    seed(engine)
+    move_source_twice(engine)
+    wiki = GranularWiki()
+    wiki._pages[PAGE_TITLE] = RemotePage(
+        title=PAGE_TITLE,
+        namespace_key=250,
+        namespace_canonical="Page",
+        content_model="proofread-page",
+        text=body(3, "Us", "Words."),
+        revid=254,
+        timestamp=WHEN,
+    )
+    with TestClient(
+        create_app(engine=engine, client_factory=lambda _site: wiki)
+    ) as client:
+        change = client.post("/sync/changes/next", json=granular_request()).json()
+        result = client.post(f"/sync/changes/{change['pk']}/push").json()
+
+    assert change["source"]["revid"] == 901
+    assert result["status"] == "pushed"
+    assert len(wiki.update_calls) == 1
+    assert wiki.update_calls[0][2] == 254
+    assert "with punctuation" in wiki.update_calls[0][1]
+    with Session(engine) as session:
+        assert len(session.exec(select(Promotion)).all()) == 1
+
+
+def test_granular_update_refuses_a_moved_cached_target_without_writing(engine):
+    seed(engine)
+    move_source(engine)
+    wiki = GranularWiki()
+    with TestClient(
+        create_app(engine=engine, client_factory=lambda _site: wiki)
+    ) as client:
+        change = client.post("/sync/changes/next", json=granular_request()).json()
+        assert change["intent"] == "update"
+        assert change["target"]["base_revid"] == 254
+
+        with Session(engine) as session:
+            local = session.exec(select(Site).where(Site.label == "local")).one()
+            target = session.exec(
+                select(Page).where(Page.site_pk == local.pk, Page.title == PAGE_TITLE)
+            ).one()
+            record_head_revision(
+                session,
+                target,
+                RemotePage(
+                    title=PAGE_TITLE,
+                    namespace_key=250,
+                    namespace_canonical="Page",
+                    content_model="proofread-page",
+                    text=body(3, "Else", "Target moved."),
+                    revid=255,
+                    parentid=254,
+                    timestamp=WHEN,
+                ),
+            )
+            session.commit()
+
+        result = client.post(f"/sync/changes/{change['pk']}/push").json()
+        assert result["status"] == "conflict"
+        assert "target has moved" in result["error"]
+        assert wiki.create_calls == []
+        assert wiki.update_calls == []

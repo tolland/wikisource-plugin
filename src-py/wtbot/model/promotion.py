@@ -150,6 +150,13 @@ class Promotion(SQLModel, table=True):
 
     intent: PromotionIntent
     source_revision_pk: int = Field(foreign_key="revision.pk")
+    source_head_revid: int | None = None
+    """Source head observed when this exact change was frozen.
+
+    A granular review may expose an older revision while later source
+    revisions already exist. Pinning the observed head lets push-time safety
+    distinguish that valid case from a source which moved after review.
+    """
     predecessor_promotion_pk: int | None = Field(
         default=None,
         foreign_key="promotion.pk",

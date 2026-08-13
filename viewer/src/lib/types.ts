@@ -649,3 +649,45 @@ export interface PageSyncReport {
 export interface StagePageRequest extends PageSyncRequest {
   label?: string | null;
 }
+
+export interface NextChangeRequest {
+  source_site: string;
+  target_site: string;
+  source_title: string;
+  target_title?: string | null;
+}
+
+export interface ChangeReview {
+  pk: number;
+  status: 'ready' | 'blocked';
+  intent: PromotionIntent;
+  source: {
+    site: string;
+    title: string;
+    revid: number;
+    revision_pk: number;
+    contributor?: string | null;
+    comment?: string | null;
+  };
+  target: {
+    site: string;
+    title: string;
+    base_revid?: number | null;
+    url: string;
+  };
+  submitted_body: string;
+  diff: string;
+  transformations: string[];
+  blockers: string[];
+}
+
+export interface ChangePushResult {
+  pk: number;
+  status: 'pushed' | 'conflict' | 'error' | 'already_present';
+  new_target_revid?: number | null;
+  target_revision_url?: string | null;
+  edit_summary?: string | null;
+  verification_refetch: string;
+  correspondence_materialized: boolean;
+  error?: string | null;
+}

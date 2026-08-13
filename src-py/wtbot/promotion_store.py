@@ -128,12 +128,41 @@ def stage_page(
     return batch
 
 
+def stage_next_change(
+    session: Session,
+    page: SyncPage,
+    *,
+    source_site: Site,
+    target_site: Site,
+) -> Promotion:
+    """Freeze only the oldest source revision beyond the current anchor."""
+    if not page.actionable:
+        raise PromotionError(
+            f"{page.source_title} has no next writable change ({page.verdict.value})"
+        )
+    batch = PromotionBatch(
+        source_site_pk=source_site.pk,
+        target_site_pk=target_site.pk,
+        source_index_title=page.source_title or "",
+        target_index_title=page.target_title or page.source_title or "",
+        label="single-change",
+    )
+    session.add(batch)
+    session.flush()
+    rows = _stage_promotions_for(
+        session, batch, page, source_site, target_site, limit=1
+    )
+    return rows[0]
+
+
 def _stage_promotions_for(
     session: Session,
     batch: PromotionBatch,
     page: SyncPage,
     source_site: Site,
     target_site: Site,
+    *,
+    limit: int | None = None,
 ) -> list[Promotion]:
     source_page = session.exec(
         select(Page).where(
@@ -193,7 +222,7 @@ def _stage_promotions_for(
 
     rows: list[Promotion] = []
     predecessor: Promotion | None = None
-    for revision in revisions:
+    for revision in revisions[:limit]:
         row = Promotion(
             batch_pk=batch.pk,
             page_link_pk=pairing.pk if pairing else None,
@@ -203,6 +232,7 @@ def _stage_promotions_for(
             page_number=page.page_number,
             intent=(intent if predecessor is None else PromotionIntent.update),
             source_revision_pk=revision.pk,
+            source_head_revid=source_head.revid,
             predecessor_promotion_pk=predecessor.pk if predecessor else None,
             anchor_link_pk=anchor_pk,
             base_revid=base_revid if predecessor is None else None,
@@ -431,6 +461,8 @@ def source_is_unchanged(session: Session, promotion: Promotion) -> bool:
     """
     source_page = session.get(Page, promotion.source_page_pk)
     head = head_revision(session, source_page)
+    if promotion.source_head_revid is not None:
+        return head is not None and head.revid == promotion.source_head_revid
     staged = list(
         session.exec(
             select(Promotion).where(
@@ -449,9 +481,19 @@ def target_head_revid(session: Session, promotion: Promotion) -> int | None:
     if promotion.predecessor_promotion_pk is not None:
         predecessor = session.get(Promotion, promotion.predecessor_promotion_pk)
         return predecessor.result_revid if predecessor is not None else None
-    if promotion.target_page_pk is None:
-        return None
-    target = session.get(Page, promotion.target_page_pk)
+    target = (
+        session.get(Page, promotion.target_page_pk)
+        if promotion.target_page_pk is not None
+        else None
+    )
+    if target is None:
+        batch = session.get(PromotionBatch, promotion.batch_pk)
+        target = session.exec(
+            select(Page).where(
+                Page.site_pk == batch.target_site_pk,
+                Page.title == promotion.target_title,
+            )
+        ).first()
     head = head_revision(session, target) if target else None
     return head.revid if head else None
 
@@ -465,12 +507,21 @@ def body_matches_target(session: Session, promotion: Promotion) -> bool:
     """
     # The cached target head is deliberately stale between steps in a chain;
     # the preceding save result, not this row, describes its actual head.
-    if (
-        promotion.target_page_pk is None
-        or promotion.predecessor_promotion_pk is not None
-    ):
+    if promotion.predecessor_promotion_pk is not None:
         return False
-    target = session.get(Page, promotion.target_page_pk)
+    target = (
+        session.get(Page, promotion.target_page_pk)
+        if promotion.target_page_pk is not None
+        else None
+    )
+    if target is None:
+        batch = session.get(PromotionBatch, promotion.batch_pk)
+        target = session.exec(
+            select(Page).where(
+                Page.site_pk == batch.target_site_pk,
+                Page.title == promotion.target_title,
+            )
+        ).first()
     head = head_revision(session, target) if target else None
     if head is None:
         return False

@@ -1,17 +1,25 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+import re
+from difflib import unified_diff
+from urllib.parse import quote, urlsplit, urlunsplit
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from sqlmodel import Session, select
 
 from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.deps import get_session
+from wtbot.matching import content_of
 from wtbot.model import (
     BatchStatus,
     FetchKind,
     FetchRequest,
+    Page,
     Promotion,
     PromotionBatch,
     PromotionIntent,
     PromotionStatus,
+    RemoteLink,
+    Revision,
     Site,
 )
 from wtbot.promotion_store import (
@@ -21,8 +29,11 @@ from wtbot.promotion_store import (
     next_staged,
     promotions,
     skip,
+    source_is_unchanged,
     stage_batch,
+    stage_next_change,
     stage_page,
+    target_head_revid,
 )
 from wtbot.promotion_worker import push_one
 from wtbot.site_store import require_credentialed_site, resolve_pair
@@ -366,6 +377,213 @@ class PageSyncReportOut(BaseModel):
     page: SyncPageOut
 
 
+class NextChangeRequest(BaseModel):
+    source_site: str
+    target_site: str
+    source_title: str
+    target_title: str | None = None
+
+
+class ChangeSourceOut(BaseModel):
+    site: str
+    title: str
+    revid: int
+    revision_pk: int
+    contributor: str | None = None
+    comment: str | None = None
+
+
+class ChangeTargetOut(BaseModel):
+    site: str
+    title: str
+    base_revid: int | None = None
+    url: str
+
+
+class ChangeReviewOut(BaseModel):
+    pk: int
+    status: str
+    intent: PromotionIntent
+    source: ChangeSourceOut
+    target: ChangeTargetOut
+    submitted_body: str
+    diff: str
+    transformations: list[str]
+    blockers: list[str]
+
+
+class ChangePushOut(BaseModel):
+    pk: int
+    status: str
+    new_target_revid: int | None = None
+    target_revision_url: str | None = None
+    edit_summary: str | None = None
+    verification_refetch: str
+    correspondence_materialized: bool
+    error: str | None = None
+
+
+_SINGLE_CHANGE_LABEL = "single-change"
+_PAGEQUALITY_USER = re.compile(
+    r"(<pagequality\b[^>]*\buser\s*=\s*[\"'])([^\"']*)([\"'])",
+    re.IGNORECASE,
+)
+
+
+def _page_url(site: Site, title: str, revid: int | None = None) -> str:
+    if site.api_url:
+        split = urlsplit(site.api_url)
+        origin = urlunsplit((split.scheme, split.netloc, "", "", ""))
+    else:
+        origin = f"https://{site.code}.{site.family}.org"
+    path = site.articlepath.replace("$1", quote(title.replace(" ", "_"), safe=":/"))
+    url = f"{origin}{path}"
+    separator = "&" if "?" in url else "?"
+    return f"{url}{separator}oldid={revid}" if revid is not None else url
+
+
+def _transformations(source_body: str, submitted_body: str) -> list[str]:
+    if source_body == submitted_body:
+        return []
+    before = _PAGEQUALITY_USER.search(source_body)
+    after = _PAGEQUALITY_USER.search(submitted_body)
+    if before and after and before.group(2) != after.group(2):
+        return [
+            "Rewrote pagequality user from "
+            f"{before.group(2)!r} to target push account {after.group(2)!r}."
+        ]
+    return ["Transformed the source body for submission to the target site."]
+
+
+def _correspondence_materialized(session: Session, promotion: Promotion) -> bool:
+    if promotion.result_revid is None or promotion.target_page_pk is None:
+        return False
+    target_revision = session.exec(
+        select(Revision).where(
+            Revision.page_pk == promotion.target_page_pk,
+            Revision.revid == promotion.result_revid,
+        )
+    ).first()
+    if target_revision is None:
+        return False
+    links = session.exec(
+        select(RemoteLink).where(
+            (RemoteLink.local_revision_pk == promotion.source_revision_pk)
+            | (RemoteLink.remote_revision_pk == promotion.source_revision_pk)
+        )
+    ).all()
+    return any(
+        target_revision.pk in (link.local_revision_pk, link.remote_revision_pk)
+        for link in links
+    )
+
+
+def _change_blockers(session: Session, promotion: Promotion) -> list[str]:
+    blockers: list[str] = []
+    source_revision = session.get(Revision, promotion.source_revision_pk)
+    if source_revision is None or source_revision.page_pk != promotion.source_page_pk:
+        blockers.append("The source revision no longer belongs to the source page.")
+    if not source_is_unchanged(session, promotion):
+        blockers.append("The source moved after this change was calculated.")
+    actual_base = target_head_revid(session, promotion)
+    if promotion.intent is PromotionIntent.create:
+        if actual_base is not None:
+            blockers.append(f"The target page now exists at revision {actual_base}.")
+    elif actual_base != promotion.base_revid:
+        blockers.append(
+            "The target moved after this change was calculated "
+            f"(expected {promotion.base_revid}, found {actual_base})."
+        )
+    return blockers
+
+
+def _change_review(session: Session, promotion: Promotion) -> ChangeReviewOut:
+    batch = session.get(PromotionBatch, promotion.batch_pk)
+    source_site = session.get(Site, batch.source_site_pk)
+    target_site = session.get(Site, batch.target_site_pk)
+    source_page = session.get(Page, promotion.source_page_pk)
+    source_revision = session.get(Revision, promotion.source_revision_pk)
+    source_content = content_of(session, source_revision)
+    target_body = ""
+    if promotion.target_page_pk is not None:
+        target_page = session.get(Page, promotion.target_page_pk)
+        from wtbot.revision_store import head_revision
+
+        target_head = head_revision(session, target_page)
+        target_content = content_of(session, target_head) if target_head else None
+        target_body = target_content.text if target_content else ""
+    diff = "".join(
+        unified_diff(
+            target_body.splitlines(keepends=True),
+            promotion.body.splitlines(keepends=True),
+            fromfile=f"{promotion.target_title}@{promotion.base_revid or 'missing'}",
+            tofile=f"{source_page.title}@{source_revision.revid}",
+        )
+    )
+    blockers = _change_blockers(session, promotion)
+    source_body = source_content.text if source_content else ""
+    return ChangeReviewOut(
+        pk=promotion.pk,
+        status="blocked" if blockers else "ready",
+        intent=promotion.intent,
+        source=ChangeSourceOut(
+            site=_site_name(source_site),
+            title=source_page.title,
+            revid=source_revision.revid,
+            revision_pk=source_revision.pk,
+            contributor=source_revision.contributor,
+            comment=source_revision.comment,
+        ),
+        target=ChangeTargetOut(
+            site=_site_name(target_site),
+            title=promotion.target_title,
+            base_revid=promotion.base_revid,
+            url=_page_url(target_site, promotion.target_title),
+        ),
+        submitted_body=promotion.body,
+        diff=diff,
+        transformations=_transformations(source_body, promotion.body),
+        blockers=blockers,
+    )
+
+
+def _verification_status(session: Session, promotion: Promotion) -> str:
+    batch = session.get(PromotionBatch, promotion.batch_pk)
+    requests = session.exec(
+        select(FetchRequest).where(
+            FetchRequest.site_pk == batch.target_site_pk,
+            FetchRequest.title == promotion.target_title,
+        )
+    ).all()
+    if not requests:
+        return "not_queued"
+    return max(requests, key=lambda row: row.pk or 0).status.value
+
+
+def _change_result(session: Session, promotion: Promotion) -> ChangePushOut:
+    batch = session.get(PromotionBatch, promotion.batch_pk)
+    target_site = session.get(Site, batch.target_site_pk)
+    status = (
+        "already_present"
+        if promotion.status is PromotionStatus.skipped
+        else promotion.status.value
+    )
+    return ChangePushOut(
+        pk=promotion.pk,
+        status=status,
+        new_target_revid=promotion.result_revid,
+        target_revision_url=(
+            _page_url(target_site, promotion.target_title, promotion.result_revid)
+            if promotion.result_revid is not None
+            else None
+        ),
+        edit_summary=promotion.comment,
+        verification_refetch=_verification_status(session, promotion),
+        correspondence_materialized=_correspondence_materialized(session, promotion),
+        error=promotion.error_message,
+    )
+
+
 @router.post("/page-report", response_model=PageSyncReportOut)
 def sync_page_report(
     payload: PageSyncRequest, session: Session = Depends(get_session)
@@ -391,6 +609,115 @@ def sync_page_report(
         target_site=_site_name(target_site),
         page=_page_out(page),
     )
+
+
+@router.post("/changes/next", response_model=ChangeReviewOut)
+def next_change(
+    payload: NextChangeRequest,
+    session: Session = Depends(get_session),
+) -> ChangeReviewOut | Response:
+    """Freeze and return one exact source revision for human review."""
+    source_site, target_site = resolve_pair(
+        session, payload.source_site, payload.target_site
+    )
+    try:
+        page = build_page_report(
+            session,
+            source_site=source_site,
+            target_site=target_site,
+            source_title=payload.source_title,
+            target_title=payload.target_title,
+        )
+    except SyncError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+    source_page = session.exec(
+        select(Page).where(
+            Page.site_pk == source_site.pk,
+            Page.title == payload.source_title,
+        )
+    ).one()
+    existing = session.exec(
+        select(Promotion)
+        .join(PromotionBatch, Promotion.batch_pk == PromotionBatch.pk)
+        .where(
+            PromotionBatch.label == _SINGLE_CHANGE_LABEL,
+            PromotionBatch.source_site_pk == source_site.pk,
+            PromotionBatch.target_site_pk == target_site.pk,
+            Promotion.source_page_pk == source_page.pk,
+            Promotion.target_title == (payload.target_title or payload.source_title),
+            Promotion.status == PromotionStatus.staged,
+        )
+        .order_by(Promotion.pk.desc())
+    ).first()
+    if existing is not None:
+        return _change_review(session, existing)
+
+    awaiting_verification = session.exec(
+        select(Promotion)
+        .join(PromotionBatch, Promotion.batch_pk == PromotionBatch.pk)
+        .where(
+            PromotionBatch.label == _SINGLE_CHANGE_LABEL,
+            PromotionBatch.source_site_pk == source_site.pk,
+            PromotionBatch.target_site_pk == target_site.pk,
+            Promotion.source_page_pk == source_page.pk,
+            Promotion.target_title == (payload.target_title or payload.source_title),
+            Promotion.status == PromotionStatus.pushed,
+        )
+        .order_by(Promotion.pk.desc())
+    ).first()
+    if awaiting_verification is not None and not _correspondence_materialized(
+        session, awaiting_verification
+    ):
+        raise HTTPException(
+            409,
+            "the previous change is pushed but its verification fetch and "
+            "source/target correspondence are not complete",
+        )
+
+    if page.verdict is SyncVerdict.in_sync:
+        return Response(status_code=204)
+    try:
+        promotion = stage_next_change(
+            session,
+            page,
+            source_site=source_site,
+            target_site=target_site,
+        )
+    except PromotionError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    session.commit()
+    session.refresh(promotion)
+    return _change_review(session, promotion)
+
+
+@router.post("/changes/{change_pk}/push", response_model=ChangePushOut)
+def push_change(
+    change_pk: int,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> ChangePushOut:
+    """Treat this request as approval and conditionally write once."""
+    promotion = session.get(Promotion, change_pk)
+    if promotion is None:
+        raise HTTPException(404, f"no change {change_pk}")
+    batch = session.get(PromotionBatch, promotion.batch_pk)
+    if batch.label != _SINGLE_CHANGE_LABEL:
+        raise HTTPException(404, f"no single change {change_pk}")
+    client_factory = getattr(request.app.state, "client_factory", None)
+    if client_factory is None:  # pragma: no cover - app construction wires it
+        raise HTTPException(500, "no wiki client factory configured")
+    try:
+        promotion = push_one(
+            session,
+            change_pk,
+            client_factory,
+            require_approval=False,
+        )
+    except PromotionError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    session.commit()
+    return _change_result(session, promotion)
 
 
 # --- the push queue ---------------------------------------------------------

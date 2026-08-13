@@ -4,7 +4,7 @@ from typer.testing import CliRunner
 
 from wtbot.cli.run_cli import create_app
 
-"""The CLI side of the push queue: `sync batches`/`batch`/`approve`/`push`/
+"""The CLI side of the push queue: `sync batches`/`batch`/`approve`/`push-batch`/
 `abort`, wrapping the same `/sync/batches` HTTP contract the viewer drives.
 
 The judgement worth pinning is in `push`: which row it reports (the API
@@ -112,6 +112,75 @@ def test_approve_posts_the_name(api):
     assert payload == {"approved_by": "reviewer"}
 
 
+def test_next_prints_the_exact_granular_change(api):
+    api["post_replies"] = [
+        {
+            "pk": 41,
+            "status": "ready",
+            "intent": "update",
+            "source": {
+                "site": "local",
+                "title": "Page:Foo.pdf/12",
+                "revid": 901,
+                "revision_pk": 7,
+                "contributor": "Tom",
+                "comment": "correct punctuation",
+            },
+            "target": {
+                "site": "en.wikisource",
+                "title": "Page:Foo.pdf/12",
+                "base_revid": 254,
+                "url": "https://en.wikisource.org/wiki/Page:Foo.pdf/12",
+            },
+            "submitted_body": "new body",
+            "diff": "-old\n+new",
+            "transformations": ["rewrote pagequality user"],
+            "blockers": [],
+        }
+    ]
+
+    result = runner.invoke(
+        create_app(),
+        [
+            "sync",
+            "next",
+            "--source",
+            "local",
+            "--target",
+            "en.wikisource",
+            "Page:Foo.pdf/12",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "change #41" in result.output
+    assert "revid 901" in result.output
+    assert "new body" in result.output
+    assert api["posts"][0][0].endswith("/sync/changes/next")
+
+
+def test_push_is_one_granular_change_with_no_all_option(api):
+    api["post_replies"] = [
+        {
+            "pk": 41,
+            "status": "pushed",
+            "new_target_revid": 4242,
+            "target_revision_url": "https://example.test/wiki/Page:X?oldid=4242",
+            "edit_summary": "Sync local revid 901",
+            "verification_refetch": "pending",
+            "correspondence_materialized": False,
+            "error": None,
+        }
+    ]
+
+    result = runner.invoke(create_app(), ["sync", "push", "41"])
+
+    assert result.exit_code == 0, result.output
+    assert "target revid 4242" in result.output
+    assert "correspondence: pending" in result.output
+    assert api["posts"][0][0].endswith("/sync/changes/41/push")
+
+
 def test_push_reports_the_row_it_pushed(api):
     """The row the diff picks out, not just 'something happened'."""
     api["get_reply"] = _batch(1, "approved", [_row(1, "staged")])
@@ -119,7 +188,7 @@ def test_push_reports_the_row_it_pushed(api):
         _batch(1, "complete", [_row(1, "pushed", result_revid=4242)])
     ]
 
-    result = runner.invoke(create_app(), ["sync", "push", "1"])
+    result = runner.invoke(create_app(), ["sync", "push-batch", "1"])
 
     assert result.exit_code == 0, result.output
     assert "#1" in result.output
@@ -136,7 +205,9 @@ def test_push_promotion_names_the_row_explicitly(api):
         _batch(1, "running", [_row(1, "staged"), _row(2, "pushed", result_revid=7)])
     ]
 
-    result = runner.invoke(create_app(), ["sync", "push", "1", "--promotion", "2"])
+    result = runner.invoke(
+        create_app(), ["sync", "push-batch", "1", "--promotion", "2"]
+    )
 
     assert result.exit_code == 0, result.output
     _, payload = api["posts"][0]
@@ -158,7 +229,7 @@ def test_push_all_stops_the_moment_a_row_does_not_push_cleanly(api):
         ),
     ]
 
-    result = runner.invoke(create_app(), ["sync", "push", "1", "--all"])
+    result = runner.invoke(create_app(), ["sync", "push-batch", "1", "--all"])
 
     assert result.exit_code == 0, result.output
     assert len(api["posts"]) == 2  # stopped, did not try a third row
@@ -169,7 +240,7 @@ def test_push_all_stops_the_moment_a_row_does_not_push_cleanly(api):
 def test_push_all_with_nothing_staged_pushes_nothing(api):
     api["get_reply"] = _batch(1, "complete", [_row(1, "pushed", result_revid=1)])
 
-    result = runner.invoke(create_app(), ["sync", "push", "1", "--all"])
+    result = runner.invoke(create_app(), ["sync", "push-batch", "1", "--all"])
 
     assert result.exit_code == 0, result.output
     assert not api["posts"]
@@ -178,7 +249,8 @@ def test_push_all_with_nothing_staged_pushes_nothing(api):
 
 def test_push_refuses_both_a_row_and_all(api):
     result = runner.invoke(
-        create_app(), ["sync", "push", "1", "--promotion", "2", "--all"]
+        create_app(),
+        ["sync", "push-batch", "1", "--promotion", "2", "--all"],
     )
     assert result.exit_code == 2
     assert "mutually exclusive" in result.output

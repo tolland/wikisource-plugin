@@ -30,9 +30,12 @@ import type {
   ProposeWorkResult,
   RungRow,
   Batch,
+  ChangePushResult,
+  ChangeReview,
   FetchAssetsResult,
   PageSyncReport,
   PageSyncRequest,
+  NextChangeRequest,
   StagePageRequest,
   StageRequest,
   SyncReport,
@@ -326,6 +329,24 @@ export function syncPageReport(payload: PageSyncRequest): Promise<PageSyncReport
 
 export function stagePageBatch(payload: StagePageRequest): Promise<Batch> {
   return postJson<Batch>('/sync/page-batches', payload);
+}
+
+export async function nextChange(payload: NextChangeRequest): Promise<ChangeReview | null> {
+  const response = await fetch('/api/sync/changes/next', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (response.status === 204) return null;
+  if (!response.ok) {
+    const problem = (await response.json().catch(() => null)) as { detail?: string } | null;
+    throw new Error(problem?.detail ?? `${response.status} ${response.statusText}`);
+  }
+  return response.json() as Promise<ChangeReview>;
+}
+
+export function pushChange(changePk: number): Promise<ChangePushResult> {
+  return postJson<ChangePushResult>(`/sync/changes/${changePk}/push`, {});
 }
 
 /* --- the push queue -------------------------------------------------------- */

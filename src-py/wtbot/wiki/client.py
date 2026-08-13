@@ -159,6 +159,17 @@ class WikiClient(Protocol):
         force=True."""
         ...
 
+    def create_page(
+        self,
+        title: str,
+        text: str,
+        comment: str | None,
+        *,
+        force: bool = False,
+    ) -> SaveResult:
+        """Create `title`, refusing if it already exists unless forced."""
+        ...
+
     def render_preview(
         self, title: str, wikitext: str, content_model: str | None = None
     ) -> RenderedPreview:
@@ -539,7 +550,53 @@ class PywikibotClient:
             if current_revid != base_revid:
                 raise EditConflict(title, base_revid, current_revid)
         page.text = text
-        page.save(summary=comment or "")
+        save_options = {"baserevid": base_revid} if not force else {}
+        try:
+            page.save(summary=comment or "", **save_options)
+        except Exception as exc:
+            from pywikibot.exceptions import (
+                EditConflictError,
+                PageCreatedConflictError,
+                PageDeletedConflictError,
+            )
+
+            if not isinstance(
+                exc,
+                (
+                    EditConflictError,
+                    PageCreatedConflictError,
+                    PageDeletedConflictError,
+                ),
+            ):
+                raise
+            raise EditConflict(title, base_revid or 0, None) from exc
+        rev = page.latest_revision
+        return SaveResult(revid=rev.revid, timestamp=rev.timestamp)
+
+    def create_page(
+        self,
+        title: str,
+        text: str,
+        comment: str | None,
+        *,
+        force: bool = False,
+    ) -> SaveResult:
+        page = self._pwb.Page(self.site, title)
+        page.text = text
+        try:
+            page.save(summary=comment or "", createonly=not force)
+        except Exception as exc:
+            from pywikibot.exceptions import (
+                ArticleExistsConflictError,
+                PageCreatedConflictError,
+            )
+
+            if not isinstance(
+                exc, (ArticleExistsConflictError, PageCreatedConflictError)
+            ):
+                raise
+            current_revid = page.latest_revision.revid if page.exists() else None
+            raise EditConflict(title, 0, current_revid) from exc
         rev = page.latest_revision
         return SaveResult(revid=rev.revid, timestamp=rev.timestamp)
 
@@ -841,6 +898,19 @@ class FakeWikiClient:
             )
         self._pages[title] = updated
         return SaveResult(revid=new_revid, timestamp=updated.timestamp)
+
+    def create_page(
+        self,
+        title: str,
+        text: str,
+        comment: str | None,
+        *,
+        force: bool = False,
+    ) -> SaveResult:
+        existing = self._pages.get(title)
+        if existing is not None and not force:
+            raise EditConflict(title, 0, existing.revid)
+        return self.save_page(title, text, None, comment, force=force)
 
     def render_preview(
         self, title: str, wikitext: str, content_model: str | None = None
