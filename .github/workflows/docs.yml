@@ -1,0 +1,63 @@
+name: Docs
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - 'docs/**'
+      - 'mkdocs.yml'
+      - 'pyproject.toml'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'mkdocs.yml'
+      - 'pyproject.toml'
+      - '.github/workflows/docs.yml'
+  # So the site can be republished without an empty commit.
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    permissions:
+      # Needed only by the deploy step, which pushes the built site to the
+      # gh-pages branch. Pull requests build but do not publish.
+      contents: write
+
+    steps:
+      - name: Fetch Sources
+        uses: actions/checkout@v6
+        with:
+          # mkdocs gh-deploy commits onto gh-pages; it needs the branch's
+          # history, not just the checked-out ref.
+          fetch-depth: 0
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          python-version: "3.13"
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+
+      - name: Install docs dependencies
+        run: uv sync --group docs
+
+      # --strict fails the build on a broken internal link or a page missing
+      # from the nav, so a bad cross-reference is caught here rather than
+      # published.
+      - name: Build
+        run: uv run mkdocs build --strict
+
+      - name: Publish to gh-pages
+        if: github.event_name != 'pull_request'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          uv run mkdocs gh-deploy --force --no-history

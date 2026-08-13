@@ -16,6 +16,17 @@ both, split it rather than filing it twice.
 Architecture overview lives in the repo root (`CLAUDE.md` / `AGENTS.md`); the
 backend data model and fetch/edit/commit contract live in `src-py/DESIGN.md`.
 
+This folder is also published as a site, from `mkdocs.yml` at the repo root:
+
+```bash
+uv run --group docs mkdocs serve          # live preview on 127.0.0.1:8000
+uv run --group docs mkdocs build --strict # what CI runs
+```
+
+`.github/workflows/docs.yml` builds every PR and publishes `develop` to the
+`gh-pages` branch. `--strict` fails on a page that is not in `mkdocs.yml`'s
+`nav`, so adding a document means adding it there too.
+
 ---
 
 ## `todo/` — actionable work, in priority order
@@ -39,6 +50,7 @@ backend data model and fetch/edit/commit contract live in `src-py/DESIGN.md`.
 
 | Doc | Surface | Status | Next action |
 |---|---|---|---|
+| [`cluster-topology.md`](reference/cluster-topology.md) | all services | current | What a running system is made of, in each of its three arrangements. §4 lists the port conventions the code and `AGENTS.md` currently disagree about. |
 | [`api-contract-inventory.md`](reference/api-contract-inventory.md) | wtbot HTTP | current: 20 routers, 78 paths, 99 operations | Keep in step with the routers; the changes proposed on top of it are in `todo/api-refactoring-plan.md`. |
 | [`preview-design.md`](reference/preview-design.md) | plugin + wtbot | live behaviour | Explains the split editor, the `action=parse` choice and the proofread page form. Consult before changing preview or the editor-by-content-model mapping. |
 | [`ocr-design.md`](reference/ocr-design.md) | plugin + wtbot | live behaviour | Explains the backend contract, engine discovery and the generated favourites menu. |

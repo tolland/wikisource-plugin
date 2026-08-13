@@ -7,6 +7,9 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
+# mkdocs build output (mkdocs.yml -> gh-pages via .github/workflows/docs.yml)
+/site/
+
 ### IntelliJ IDEA ###
 .idea
 *.iws

@@ -12,6 +12,15 @@ An IntelliJ Platform plugin that adds Wikitext language support (`.wt` / `.wiki`
 
 `docs/` is organised by purpose, indexed in `docs/README.md`: `todo/` (actionable unfinished work, in priority order), `design/` (relevant but unscheduled designs), `reference/` (how the system behaves today — architecture, operational notes, empirical findings), `done/` (completed plans, retained for the "why is it like this?" question). Backend data model and the fetch/edit/commit contract stay in `src-py/DESIGN.md`.
 
+`docs/reference/cluster-topology.md` is the map of what a running system is made of — the five services, the three deployment topologies (pure docker, dev-machine, workstation + LAN hosts), which compose file/profile starts what, and where the port conventions currently disagree with the code.
+
+The folder is published as a site via `mkdocs.yml` (Material for MkDocs), built on every PR and pushed to `gh-pages` from `develop` by `.github/workflows/docs.yml`:
+
+```bash
+uv run --group docs mkdocs serve           # live preview on 127.0.0.1:8000
+uv run --group docs mkdocs build --strict  # what CI runs; fails on a page missing from nav
+```
+
 ## Code style
 
 ### Python

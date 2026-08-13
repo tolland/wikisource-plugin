@@ -1,0 +1,76 @@
+site_name: wikisource-plugin
+site_description: Wikitext language support for IntelliJ IDEA, and the wtbot sidecar
+site_url: https://tolland.github.io/wikisource-plugin/
+repo_url: https://github.com/tolland/wikisource-plugin
+repo_name: tolland/wikisource-plugin
+edit_uri: edit/develop/docs/
+
+docs_dir: docs
+
+theme:
+  name: material
+  icon:
+    repo: fontawesome/brands/github
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - content.action.edit
+    - content.code.copy
+    - toc.follow
+  palette:
+    # The published pages follow the reader's system theme, with an explicit
+    # toggle either way — the docs are read on a projector as often as at a desk.
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Follow system theme
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+
+# Mirrors the docs/ folder structure, which is organised by purpose rather than
+# by topic: see docs/README.md. Keep this in step when adding a document —
+# `mkdocs build --strict` fails on a page that is not listed here.
+nav:
+  - Index: README.md
+  - To do:
+      - Upstream sync: todo/upstream-sync-TODO.md
+      - Editing actions: todo/editing-actions-plan.md
+      - API refactoring: todo/api-refactoring-plan.md
+      - Backlog: todo/backlog.md
+  - Design:
+      - Upstream sync — considerations: design/upstream-sync-discussion.md
+      - Scan image modeling: design/scan-image-modeling.md
+      - TemplateData (future): design/templatedata-future.md
+  - Reference:
+      - Cluster topology: reference/cluster-topology.md
+      - API contract inventory: reference/api-contract-inventory.md
+      - Preview design: reference/preview-design.md
+      - OCR design: reference/ocr-design.md
+      - Locator index: reference/locator-index-design.md
+      - Logging and tracing: reference/logging.md
+      - ProofreadPage SHA-1 discordance: reference/proofread-page-sha1-discordance.md
+  - Done:
+      - Upstream sync — built: done/upstream-sync-built.md
+      - Editing actions — built: done/editing-actions-built.md
+      - wtbot base URL switching: done/wtbot-base-url-switching.md
