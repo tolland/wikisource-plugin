@@ -16,7 +16,7 @@ tables rather than a trust decision.
 Content is addressed by *our* hash of the bytes the API served, so identical
 text -- across revisions, and across sites -- collapses to one row. The wiki's
 own hash rides along as ``remote_sha1`` for the cases where it can corroborate
-us; see docs/proofread-page-sha1-discordance.md for why it cannot replace ours.
+us; see docs/reference/proofread-page-sha1-discordance.md for why it cannot replace ours.
 """
 
 

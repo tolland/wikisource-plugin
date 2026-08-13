@@ -1,7 +1,7 @@
 """remote link: asserted cross-site revision correspondence
 
 Adds ``remotelink``, one row per assertion that a local revision and a remote
-one hold the same content (docs/upstream-sync-TODO.md item 1). Purely additive:
+one hold the same content (docs/done/upstream-sync-built.md). Purely additive:
 no existing table is touched, so nothing here can rebuild a table that something
 references.
 

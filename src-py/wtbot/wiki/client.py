@@ -621,7 +621,7 @@ class PywikibotClient:
             "rcdir": "newer",
             "rcstart": _api_timestamp(since),
             # Deliberately not `log`: moves and deletions are real sync events
-            # (see docs/upstream-sync-discussion.md section 5) but they need
+            # (see docs/design/upstream-sync-discussion.md section 5) but they need
             # list=logevents to read properly, and half-reading them here would
             # look like coverage. Edits and creations only.
             "rctype": "edit|new",

@@ -700,7 +700,8 @@ POST /link/{page}/pull       # ff if clean; else return diff for merge
 
 The *push* direction of this — promoting locally proofread pages back up to
 en.wikisource.org, with preflight checks, batching and rollback — is worked out
-in `docs/upstream-sync-TODO.md`.
+in `docs/todo/upstream-sync-TODO.md`, with the completed pieces recorded in
+`docs/done/upstream-sync-built.md`.
 
 ---
 

@@ -7,7 +7,8 @@ from wiki_harness import WikiApi, WikiApiError, WikiStack, scan_dump
 """Harness-level checks for the two-wiki sync fixture.
 
 These assert the *fixture* is sound before anything is built on it, and they
-pin the empirical claims the sync design in docs/upstream-sync-TODO.md rests on:
+pin the empirical claims the sync design rests on (see
+docs/design/upstream-sync-discussion.md):
 
 - an import preserves revision depth and attribution, which an API-level copy
   would flatten;
@@ -185,7 +186,7 @@ def test_basetimestamp_cannot_see_a_same_second_edit(
     only accurate to the second. Two edits over localhost land well inside one
     second, so the guard sees nothing -- while ``baserevid`` catches it.
 
-    This is why section 5.6 of docs/upstream-sync-TODO.md specifies
+    This is why section 8 of docs/design/upstream-sync-discussion.md specifies
     ``baserevid``: a bot pushing quickly is exactly the workload that trips the
     resolution limit.
     """
