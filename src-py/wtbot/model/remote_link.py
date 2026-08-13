@@ -12,7 +12,7 @@ account on one wiki and ``level`` is that wiki's proofreading state. Proofreadin
 a page locally is precisely the act of changing both, so two identical
 transcriptions routinely hash differently, and they diverge further exactly as
 the work progresses. A hash match is strong evidence of sameness; a mismatch is
-no evidence of difference. See docs/upstream-sync-discussion.md section 3.
+no evidence of difference. See docs/design/upstream-sync-discussion.md section 3.
 
 Links are **append-only**. Nothing here is ever updated in place: when a human
 re-anchors two diverged sides by making them identical again, that is a new row

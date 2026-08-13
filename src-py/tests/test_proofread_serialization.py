@@ -34,7 +34,7 @@ This is an artefact of long-lived upstream history, not of the content model:
 a freshly installed wiki hashes the text it is given, which is what
 ``test_import_recomputes_sha1_from_content`` asserts against the harness.
 
-Consequence for docs/upstream-sync-TODO.md section 4.2: cross-wiki base
+Consequence for docs/design/upstream-sync-discussion.md section 3: cross-wiki base
 discovery must intersect on a hash computed from the returned content, never on
 the server-provided ``rev_sha1`` or ``rev_len``. These tests pin the behaviour
 so the conclusion is not quietly re-derived the hard way.

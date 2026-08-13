@@ -1,7 +1,9 @@
 # Switching the wtbot API base URL at runtime
 
-Design note for the backend-switching support in `wikitext-vfs`. Written as an
-implementation plan; kept as the record of why it is shaped this way.
+Status: **implemented.** Design note for the backend-switching support in
+`wikitext-vfs`. Written as an implementation plan; kept as the record of why it
+is shaped this way. The two items it left undone are tracked in
+`docs/todo/backlog.md`, not here.
 
 ## The bug this replaced
 
@@ -110,7 +112,10 @@ files when the new backend is down).
 
 ## Not done
 
-Preview panes keep their last-rendered HTML until the next render; they do not
-subscribe to `BACKEND_SWITCHED`. The old project-level `.idea/wikitext-vfs.xml`
-is not migrated — non-default values there are dropped in favour of the new
-application-level setting.
+Two residual items, now carried in `docs/todo/backlog.md` rather than left as a
+footnote here:
+
+- Preview panes keep their last-rendered HTML until the next render; they do
+  not subscribe to `BACKEND_SWITCHED`.
+- The old project-level `.idea/wikitext-vfs.xml` is not migrated — non-default
+  values there are dropped in favour of the new application-level setting.

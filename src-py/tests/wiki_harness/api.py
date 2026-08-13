@@ -153,8 +153,8 @@ class WikiApi:
         """Newest-first revision metadata, optionally with content.
 
         ``sha1`` is MediaWiki's base-36 encoded hash of the raw revision text --
-        the token the cross-wiki base discovery in docs/upstream-sync-TODO.md
-        section 4.2 intersects on.
+        the token cross-wiki base discovery would intersect on -- and must not;
+        see docs/design/upstream-sync-discussion.md section 3.
         """
         props = ["ids", "timestamp", "user", "comment", "sha1"]
         if with_content:

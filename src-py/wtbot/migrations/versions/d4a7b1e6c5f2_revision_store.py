@@ -1,7 +1,7 @@
 """revision store: content, revision, slot
 
 Adds the page -> revision -> slot -> content chain, mirroring MediaWiki's own
-schema (see docs/upstream-sync-TODO.md section 4.5).
+schema (see docs/done/upstream-sync-built.md).
 
 Purely additive: no existing table is dropped or rewritten, so every ``page.pk``
 survives and the eleven tables that reference it (annotations, box range links,

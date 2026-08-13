@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
     plugins: [sveltekit()],
     server: {
       host: '127.0.0.1',
-      // Dev-convention ports (see docs/logging.md): 18563 viewer, 18564 wtbot.
+      // Dev-convention ports (see docs/reference/logging.md): 18563 viewer, 18564 wtbot.
       port: 18563,
       proxy: {
         '/api': {

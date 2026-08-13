@@ -9,7 +9,7 @@ in SQLite, so the two are merged here -- the indirection buys nothing.
 
 The one place this deliberately diverges from MediaWiki is that it carries
 **three** hashes, because for ``proofread-page`` they are genuinely different
-quantities (see docs/proofread-page-sha1-discordance.md):
+quantities (see docs/reference/proofread-page-sha1-discordance.md):
 
 - ``content_sha1`` is ours, over the bytes the API actually served us. It is
   the portable identity token for the *bytes*, and what dedups rows.

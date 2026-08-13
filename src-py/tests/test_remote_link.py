@@ -23,7 +23,7 @@ The thing under test is a *claim*, not a computation. These tests deliberately
 link revisions whose content differs and revisions whose content is identical,
 and expect the same outcome from both: a proofread-page body embeds a
 site-specific ``pagequality user=``, so hash agreement is neither necessary nor
-sufficient for correspondence (docs/upstream-sync-discussion.md section 3).
+sufficient for correspondence (docs/design/upstream-sync-discussion.md section 3).
 """
 
 PROOFREAD = "proofread-page"

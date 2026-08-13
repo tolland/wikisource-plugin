@@ -8,6 +8,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 An IntelliJ Platform plugin that adds Wikitext language support (`.wt` / `.wiki` files) to IntelliJ IDEA, paired with a Python sidecar (`wtbot`) that fetches content from MediaWiki via pywikibot and exchanges it with the plugin exclusively through a FastAPI HTTP contract backed by a shared SQLite database. There is also a SvelteKit app (`./viewer`) that is not part of the main workflow but is convenient for inspecting/debugging sidecar state and for out-of-band approval of edits.
 
+## Documentation
+
+`docs/` is organised by purpose, indexed in `docs/README.md`: `todo/` (actionable unfinished work, in priority order), `design/` (relevant but unscheduled designs), `reference/` (how the system behaves today — architecture, operational notes, empirical findings), `done/` (completed plans, retained for the "why is it like this?" question). Backend data model and the fetch/edit/commit contract stay in `src-py/DESIGN.md`.
+
 ## Code style
 
 ### Python
@@ -54,7 +58,7 @@ A single test class/method can be run the normal Gradle way, e.g. `GRADLE_USER_H
 Dependencies are managed with `uv` (`pyproject.toml` + `uv.lock`).
 
 ```bash
-uv run fastapi dev src-py/wtbot/main.py --port 18564   # start FastAPI dev server (dev-convention port, see docs/logging.md)
+uv run fastapi dev src-py/wtbot/main.py --port 18564   # start FastAPI dev server (dev-convention port, see docs/reference/logging.md)
 uv run pytest                              # run Python tests (uses pythonpath=src-py, testpaths=src-py/tests)
 uv run pytest src-py/tests/test_fetch.py -k some_case  # single test
 uv run pytest -m slow                      # incl. the docker-backed harness suites (deselected by default)
@@ -122,7 +126,7 @@ Which sidecar that is lives in `WtbotAppSettings` (application-scoped: wtbot its
 
 ### Split-editor preview (`wikitext-ui/.../preview/`)
 
-`WtEditorWithPreview` pairs the raw wikitext editor with `WtRenderPreviewBrowser`, a live HTML preview rendered server-side. Rather than parsing wikitext client-side or hitting MediaWiki's `action=parse` directly from Kotlin, the preview is proxied through wtbot (`POST /preview/render`, see `src-py/wtbot/api/preview.py`) so that content-model awareness (plain `wikitext` vs ProofreadPage's `proofread-page`), credentials, and the LAN CA bundle all stay server-side. See `docs/preview-design.md` for the full rationale and the two rejected alternatives (classic `EditPage` form-post preview, Parsoid). `WtProofreadPageEditor`/`WtProofreadIndexEditor` add ProofreadPage-specific chrome (page-quality header, reference scan pane via `ReferenceImagePane`, prev/next page navigation via `WtPageNavToolbar`).
+`WtEditorWithPreview` pairs the raw wikitext editor with `WtRenderPreviewBrowser`, a live HTML preview rendered server-side. Rather than parsing wikitext client-side or hitting MediaWiki's `action=parse` directly from Kotlin, the preview is proxied through wtbot (`POST /preview/render`, see `src-py/wtbot/api/preview.py`) so that content-model awareness (plain `wikitext` vs ProofreadPage's `proofread-page`), credentials, and the LAN CA bundle all stay server-side. See `docs/reference/preview-design.md` for the full rationale and the two rejected alternatives (classic `EditPage` form-post preview, Parsoid). `WtProofreadPageEditor`/`WtProofreadIndexEditor` add ProofreadPage-specific chrome (page-quality header, reference scan pane via `ReferenceImagePane`, prev/next page navigation via `WtPageNavToolbar`).
 
 ### SQLite IPC contract
 

@@ -14,8 +14,9 @@ cross-wiki comparison:
   column store **31-char base-36**, zero-padded.
 
 They are the same digest. Comparing one against the other silently never
-matches, which would make the cross-wiki base discovery in
-docs/upstream-sync-TODO.md section 4.2 conclude "unrelated histories" for pages
+matches, which would make cross-wiki base discovery (see
+docs/design/upstream-sync-discussion.md section 3) conclude "unrelated
+histories" for pages
 that are in fact identical.
 """
 

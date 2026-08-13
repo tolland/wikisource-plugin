@@ -111,7 +111,8 @@ def linked(
 ) -> tuple[Page, Page]:
     """Both sides fetched into wtbot and linked `origin=copy`.
 
-    This is the `wtctl adopt` step of upstream-sync-TODO item 7: the copy is a
+    This is the `wtctl adopt` step of docs/todo/upstream-sync-TODO.md priority 2:
+    the copy is a
     fact known at the moment it happens, so it is recorded rather than
     re-derived by title matching later.
     """

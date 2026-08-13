@@ -12,7 +12,7 @@ has a name for "the scan this transcription is being made against". Making it
 expressible later is cheap; retrofitting it after a few thousand annotations
 exist is not.
 
-Split out of `docs/api-rationalization-proposal.md` §2.10, which raised the
+Split out of `docs/reference/api-contract-inventory.md` §3.8, which raised the
 narrower version of this (annotations keyed to a page rather than an image).
 
 ## 1. What exists today
