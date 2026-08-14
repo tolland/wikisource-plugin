@@ -1,3 +1,11 @@
+import re
+
+import httpx
+import pytest
+from typer.testing import CliRunner
+
+from wtbot.cli.run_cli import create_app
+
 """The drain CLI.
 
 ``fetch-page`` and ``fetch-refresh`` queue work; this is the command that
@@ -5,12 +13,6 @@ performs it. The judgement worth testing is in the reporting: a drain that
 stopped early must not read like one that finished, or an operator walks away
 from a half-fetched book.
 """
-
-import httpx
-import pytest
-from typer.testing import CliRunner
-
-from wtbot.cli.run_cli import create_app
 
 runner = CliRunner()
 
@@ -68,7 +70,9 @@ def test_base_url_is_not_accepted_after_the_subcommand(api):
     )
 
     assert result.exit_code == 2
-    assert "No such option: --base-url" in result.output
+    # remove any ANSI escape codes that appoear in GitHub Actions terminal
+    reaesc = re.compile(r"\x1b[^m]*m")
+    assert "No such option: --base-url" in reaesc.sub("", result.output)
     assert "get_url" not in api
 
 

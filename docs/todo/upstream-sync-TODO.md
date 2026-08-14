@@ -11,12 +11,6 @@ lives in `docs/reference/proofread-page-sha1-discordance.md`.
 
 ## Priority 1 — blocks mass promotion
 
-- [ ] **Rollback**, per item and per batch. Discussion §10 is explicit:
-      *do not ship mass promotion before rollback exists*. Per item, restore
-      the revision preceding our push via `undo`/`undoafter` so it registers
-      as a proper revert; refuse to roll back blind when the target head is no
-      longer our `result_revid`. Batch rollback is itself a batch — same
-      machinery, same audit trail, honest partial results.
 - [ ] **Push-path safety** (discussion §8), worth doing independently of sync
       because the silent-overwrite-on-create gap exists today:
       `baserevid` + `createonly` on every create / `nocreate` on every update

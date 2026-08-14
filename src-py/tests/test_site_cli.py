@@ -1,3 +1,11 @@
+import re
+
+import httpx
+import pytest
+from typer.testing import CliRunner
+
+from wtbot.cli.run_cli import create_app
+
 """The site and site-credential commands, and the shared TyperDI options.
 
 Two things worth pinning. First, that registering a wiki says what is still
@@ -7,11 +15,6 @@ the dependency-injected options are really on each command -- a shared option
 that silently stops being accepted is worse than one that was never shared.
 """
 
-import httpx
-import pytest
-from typer.testing import CliRunner
-
-from wtbot.cli.run_cli import create_app
 
 runner = CliRunner()
 
@@ -279,7 +282,8 @@ def test_an_api_error_is_reported_without_a_traceback(api, monkeypatch):
 def test_api_location_is_global_and_command_dependencies_remain_local():
     root_help = runner.invoke(create_app(), ["--help"])
     assert root_help.exit_code == 0
-    assert "--base-url" in root_help.output
+    reaesc = re.compile(r"\x1b[^m]*m")
+    assert "--base-url" in reaesc.sub("", root_help.output)
 
     for argv in (
         ["site", "add", "--help"],

@@ -257,7 +257,8 @@ def _out(report: SyncReport) -> SyncReportOut:
 
 @router.post("/report", response_model=SyncReportOut)
 def sync_report(
-    payload: SyncRequest, session: Session = Depends(get_session)
+    payload: SyncRequest,
+    session: Session = Depends(get_session),
 ) -> SyncReportOut:
     """Compare a work across two sites and report what a sync would do.
 
