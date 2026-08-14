@@ -1,5 +1,6 @@
 import logging
 import os
+import shutil
 import subprocess
 import time
 from collections.abc import Iterator
@@ -10,7 +11,7 @@ import pytest
 import requests
 from fastapi.testclient import TestClient
 from sqlalchemy.engine import Engine
-from sqlmodel import Session
+from sqlmodel import Session, func, select
 from wiki_harness import (
     CANADIAN_PATENT_INDEX,
     CANADIAN_PATENT_SCAN,
@@ -25,6 +26,7 @@ from wiki_harness import (
 
 from wtbot.db import create_db_engine, init_db
 from wtbot.main import create_app
+from wtbot.model import NsRole, Page, ProofreadPageMeta
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 COMPOSE_FILE = REPO_ROOT / "compose.seeded.yml"
@@ -32,6 +34,44 @@ COMPOSE_FILE = REPO_ROOT / "compose.seeded.yml"
 # Re-exported: several tests import these from conftest, and wiki_harness owns
 # them so `python -m wiki_harness` builds the same fixture the tests assert on.
 __all__ = ["CANADIAN_PATENT_INDEX", "CANADIAN_PATENT_SCAN"]
+
+
+def add_proofread_meta(
+    session: Session,
+    *,
+    page_pk: int,
+    index_title: str,
+    page_number: int | None = None,
+    **values,
+) -> ProofreadPageMeta:
+    """Test fixture helper that models keyed Index identity faithfully."""
+    page = session.get(Page, page_pk)
+    assert page is not None
+    canonical = index_title.replace("_", " ")
+    index = session.exec(
+        select(Page).where(
+            Page.site_pk == page.site_pk,
+            Page.namespace_role == NsRole.index,
+            func.replace(Page.title, "_", " ") == canonical,
+        )
+    ).first()
+    if index is None:
+        index = Page(
+            site_pk=page.site_pk,
+            title=index_title,
+            namespace_role=NsRole.index,
+            content_model="proofread-index",
+        )
+        session.add(index)
+        session.flush()
+    meta = ProofreadPageMeta(
+        page_pk=page_pk,
+        index_page_pk=index.pk,
+        page_number=page_number,
+        **values,
+    )
+    session.add(meta)
+    return meta
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -68,14 +108,36 @@ class WikisourceInstance:
     password: str
 
 
+@pytest.fixture(scope="session")
+def migrated_db_template(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """An empty database migrated once for cheap per-test copies.
+
+    Replaying the complete Alembic history for every test made adding a
+    migration permanently slow the whole suite. Migration behavior itself is
+    covered by ``test_migrations.py``, whose fixtures deliberately build and
+    upgrade their own databases.
+    """
+    db_path = tmp_path_factory.mktemp("db-template") / "head.db"
+    engine = create_db_engine(f"sqlite:///{db_path}")
+    try:
+        init_db(engine)
+    finally:
+        # Closing the final SQLite connection checkpoints and removes the WAL,
+        # leaving one self-contained database file safe to copy.
+        engine.dispose()
+    return db_path
+
+
 @pytest.fixture
-def engine(tmp_path) -> Engine:
-    """A throwaway file-backed SQLite engine (file-backed so WAL behaves like
-    production, not :memory:). Tables are created fresh per test."""
+def engine(tmp_path, migrated_db_template: Path) -> Iterator[Engine]:
+    """An isolated file-backed SQLite engine at the current schema revision."""
     db_path = tmp_path / "test.db"
+    shutil.copyfile(migrated_db_template, db_path)
     eng = create_db_engine(f"sqlite:///{db_path}")
-    init_db(eng)
-    return eng
+    try:
+        yield eng
+    finally:
+        eng.dispose()
 
 
 @pytest.fixture

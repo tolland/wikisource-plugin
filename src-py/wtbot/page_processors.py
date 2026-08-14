@@ -3,12 +3,13 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from sqlalchemy import func
 from sqlmodel import Session, select
 
 from wtbot.model import FetchState, FileBlob, Page, Site, role_for_canonical
 from wtbot.model.fetch_request import FetchKind, FetchRequest, FetchStatus
 from wtbot.model.wiki.namespace import NsRole
-from wtbot.model.wikisource.page_meta import PageMeta
+from wtbot.model.wikisource.proofread_page_meta import ProofreadPageMeta
 from wtbot.timeutil import utcnow
 from wtbot.vfs.store import PageStore
 from wtbot.wiki.client import WikiClient
@@ -22,9 +23,9 @@ The worker fetches a RemotePage and upserts the common Page fields; what
 happens *around* that differs by page type. Each type gets a processor
 class implementing [PageProcessor]:
 
-  ProofreadPageProcessor   Page:  — derive PageMeta.index_title/page_number,
+  ProofreadPageProcessor   Page:  — resolve Index key/page number,
                            pull the scan image URLs + quality
-                           (prop=imageforpage) into PageMeta
+                           (prop=imageforpage) into ProofreadPageMeta
   ProofreadIndexProcessor  Index: — IndexMeta.page_count, File: blob, fan-out
   IndexAssetProcessor      Index:Foo.djvu/styles.css — link to its index
   FilePageProcessor        File:  — download the binary blob
@@ -96,13 +97,6 @@ class PageProcessor:
         """Adjust type-specific Page columns. Runs inside the upsert
         transaction; must not touch the network or the session."""
 
-    def enrich_meta(self, meta: PageMeta, remote: RemotePage) -> bool:
-        """Adjust type-specific PageMeta columns; return True when the row
-        carries data worth persisting (the upsert only inserts a new PageMeta
-        row on True). Runs inside the upsert transaction; must not touch the
-        network or the session."""
-        return False
-
     def postprocess(
         self, ctx: ProcessContext, cached: CachedPage, remote: RemotePage
     ) -> ProcessOutcome:
@@ -116,17 +110,6 @@ class DefaultProcessor(PageProcessor):
 
 
 class ProofreadPageProcessor(PageProcessor):
-    def enrich_meta(self, meta: PageMeta, remote: RemotePage) -> bool:
-        # Title is always "Page:{basename}/{n}"; rsplit gives (basename, n).
-        if meta.index_title is None:
-            after_ns = remote.title.split(":", 1)[-1]  # "Foo.pdf/3"
-            base, _, num = after_ns.rpartition("/")
-            if base and num.isdigit():
-                meta.index_title = f"Index:{base}"
-                meta.page_number = int(num)
-                return True
-        return False
-
     def postprocess(
         self, ctx: ProcessContext, cached: CachedPage, remote: RemotePage
     ) -> ProcessOutcome:
@@ -134,6 +117,15 @@ class ProofreadPageProcessor(PageProcessor):
         if images is not None:
             _store_page_images(ctx.session, cached.pk, images)
         return _DONE
+
+
+def proofread_index_identity(title: str) -> tuple[str, int] | None:
+    """Derive the conventional owning Index title and scan position."""
+    after_ns = title.split(":", 1)[-1]
+    base, _, num = after_ns.rpartition("/")
+    if not base or not num.isdigit():
+        return None
+    return f"Index:{base}", int(num)
 
 
 def _page_images(ctx: ProcessContext, title: str) -> RemotePageImages | None:
@@ -188,16 +180,7 @@ class ProofreadIndexProcessor(PageProcessor):
 
 
 class IndexAssetProcessor(PageProcessor):
-    """Index namespace subpages such as Index:Foo.pdf/styles.css are assets
-    of the proofread index, not proofread indexes themselves."""
-
-    def enrich_meta(self, meta: PageMeta, remote: RemotePage) -> bool:
-        if meta.index_title is None:
-            parent_title, _, _ = remote.title.rpartition("/")
-            if parent_title:
-                meta.index_title = parent_title
-                return True
-        return False
+    """Index subpages are related by ordinary MediaWiki subpage semantics."""
 
 
 class FilePageProcessor(PageProcessor):
@@ -264,11 +247,15 @@ def _record_index_page_count(
 def _store_page_images(
     session: Session, page_pk: int, images: RemotePageImages
 ) -> None:
-    """Upsert PageMeta scan-image URLs and proofread quality."""
+    """Upsert ProofreadPageMeta scan-image URLs and proofread quality."""
     try:
-        meta = session.exec(select(PageMeta).where(PageMeta.page_pk == page_pk)).first()
+        meta = session.exec(
+            select(ProofreadPageMeta).where(ProofreadPageMeta.page_pk == page_pk)
+        ).first()
         if meta is None:
-            meta = PageMeta(page_pk=page_pk)
+            # A proofread fetch creates structural metadata during its page
+            # upsert, before image enrichment runs.
+            return
         if images.thumbnail_url is not None:
             meta.thumb_url = images.thumbnail_url
             meta.thumb_width = images.size
@@ -463,8 +450,12 @@ def _gather_placeholder_enrichment(
         return {}
     try:
         rows = session.exec(
-            select(Page, PageMeta)
-            .join(PageMeta, PageMeta.page_pk == Page.pk, isouter=True)
+            select(Page, ProofreadPageMeta)
+            .join(
+                ProofreadPageMeta,
+                ProofreadPageMeta.page_pk == Page.pk,
+                isouter=True,
+            )
             .where(Page.site_pk == site_pk, Page.title.in_(titles))
         ).all()
     finally:
@@ -487,7 +478,7 @@ def _gather_placeholder_enrichment(
 
 
 def _apply_placeholder_enrichment(
-    meta: PageMeta, enrichment: PlaceholderEnrichment
+    meta: ProofreadPageMeta, enrichment: PlaceholderEnrichment
 ) -> None:
     """Fill only fields still unset — the stub may carry values from an
     earlier fan-out or a partial enrichment."""
@@ -521,18 +512,21 @@ def _ensure_placeholder_page(
         select(Page).where(Page.site_pk == site_pk, Page.title == title)
     ).first()
     if existing is not None:
+        meta = session.exec(
+            select(ProofreadPageMeta).where(ProofreadPageMeta.page_pk == existing.pk)
+        ).first()
+        if meta is None:
+            index_page = ensure_index_page(session, site_pk, index_title)
+            meta = ProofreadPageMeta(
+                page_pk=existing.pk,
+                index_page_pk=index_page.pk,
+                page_number=page_number,
+            )
+        else:
+            meta.page_number = page_number
         if existing.revid is None and enrichment is not None:
-            meta = session.exec(
-                select(PageMeta).where(PageMeta.page_pk == existing.pk)
-            ).first()
-            if meta is None:
-                meta = PageMeta(
-                    page_pk=existing.pk,
-                    index_title=index_title,
-                    page_number=page_number,
-                )
             _apply_placeholder_enrichment(meta, enrichment)
-            session.add(meta)
+        session.add(meta)
         return
     page = Page(
         site_pk=site_pk,
@@ -544,10 +538,41 @@ def _ensure_placeholder_page(
     )
     session.add(page)
     session.flush()
-    meta = PageMeta(page_pk=page.pk, index_title=index_title, page_number=page_number)
+    index_page = ensure_index_page(session, site_pk, index_title)
+    meta = ProofreadPageMeta(
+        page_pk=page.pk,
+        index_page_pk=index_page.pk,
+        page_number=page_number,
+    )
     if enrichment is not None:
         _apply_placeholder_enrichment(meta, enrichment)
     session.add(meta)
+
+
+def ensure_index_page(session: Session, site_pk: int, title: str) -> Page:
+    """Return the keyed Index identity, creating an unfetched placeholder."""
+    canonical = title.replace("_", " ")
+    index = session.exec(
+        select(Page).where(
+            Page.site_pk == site_pk,
+            func.replace(Page.title, "_", " ") == canonical,
+        )
+    ).first()
+    if index is not None:
+        if index.namespace_role != NsRole.index:
+            raise RuntimeError(
+                f"owning Index title {title!r} resolves to non-Index page {index.pk}"
+            )
+        return index
+    index = Page(
+        site_pk=site_pk,
+        title=title,
+        namespace_role=NsRole.index,
+        content_model="proofread-index",
+    )
+    session.add(index)
+    session.flush()
+    return index
 
 
 # ---------------------------------------------------------------------------

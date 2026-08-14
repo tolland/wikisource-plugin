@@ -28,7 +28,7 @@ pairings stay one table and the work-level ones hang off this.
 
 **Children are pointed at their work.** ``PageLink.index_link_pk`` is set when
 a work is linked, so the viewer drills work -> page pairs with a join rather
-than by matching ``PageMeta.index_title`` back through titles. Membership is
+than by matching copied titles. Membership is
 still *derived* from the index at pairing time -- this is a materialised
 shortcut, not a second source of truth -- and a page pair with no work (a
 mainspace or Portal pairing, or one asserted by hand) is a legitimate row with

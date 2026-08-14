@@ -73,9 +73,69 @@ def test_upgrade_to_head_survives_referenced_rows(populated_engine) -> None:
     with Session(populated_engine) as session:
         counts = {
             table: session.exec(text(f"SELECT count(*) FROM {table}")).one()[0]
-            for table in ("page", "revision", "slot", "content", "pagemeta")
+            for table in (
+                "page",
+                "revision",
+                "slot",
+                "content",
+                "proofreadpagemeta",
+            )
         }
-    assert counts == {"page": 1, "revision": 1, "slot": 1, "content": 1, "pagemeta": 1}
+    # The backfill materializes the previously title-only Index identity.
+    assert counts == {
+        "page": 2,
+        "revision": 1,
+        "slot": 1,
+        "content": 1,
+        "proofreadpagemeta": 1,
+    }
+
+
+def test_proofread_meta_copy_is_inspectable_before_old_table_drop(
+    populated_engine,
+) -> None:
+    _upgrade(populated_engine, "2f6a8c1d9e40")
+
+    with Session(populated_engine) as session:
+        old = session.exec(
+            text("SELECT page_pk, index_title, page_number FROM pagemeta")
+        ).one()
+        new = session.exec(
+            text(
+                "SELECT m.page_pk, i.title, m.page_number"
+                " FROM proofreadpagemeta m JOIN page i ON i.pk = m.index_page_pk"
+            )
+        ).one()
+    assert old == new == (1, "Index:Work.djvu", 1)
+
+
+def test_index_assets_are_not_misclassified_as_proofread_metadata(
+    populated_engine,
+) -> None:
+    with Session(populated_engine) as session:
+        session.exec(
+            text(
+                "INSERT INTO page (pk, site_pk, title, namespace_role,"
+                " content_model, dirty, fetch_status)"
+                " VALUES (2, 1, 'Index:Work.djvu/styles.css', 'index',"
+                " 'sanitized-css', 0, 'done')"
+            )
+        )
+        session.exec(
+            text(
+                "INSERT INTO pagemeta (pk, page_pk, index_title)"
+                " VALUES (2, 2, 'Index:Work.djvu')"
+            )
+        )
+        session.commit()
+
+    _upgrade(populated_engine, "2f6a8c1d9e40")
+
+    with Session(populated_engine) as session:
+        assert session.exec(text("SELECT count(*) FROM pagemeta")).one()[0] == 2
+        assert (
+            session.exec(text("SELECT count(*) FROM proofreadpagemeta")).one()[0] == 1
+        )
 
 
 def test_the_chain_still_joins_after_upgrading(populated_engine) -> None:
@@ -95,7 +155,7 @@ def test_the_chain_still_joins_after_upgrading(populated_engine) -> None:
     assert body == "body"
 
 
-def test_the_migrated_remotelink_rejects_a_reversed_pair(populated_engine) -> None:
+def test_the_migrated_revisionlink_rejects_a_reversed_pair(populated_engine) -> None:
     """The unordered-pair guarantee has to survive the migration path, not just
     ``create_all``. A schema where a fresh database enforces it and a migrated
     one does not is worse than neither."""
@@ -105,38 +165,38 @@ def test_the_migrated_remotelink_rejects_a_reversed_pair(populated_engine) -> No
         session.exec(
             text(
                 "INSERT INTO page (pk, site_pk, title, namespace_role, dirty,"
-                " fetch_status) VALUES (2, 1, 'Page:Work.djvu/1 (upstream)',"
+                " fetch_status) VALUES (3, 1, 'Page:Work.djvu/1 (upstream)',"
                 " 'page', 0, 'done')"
             )
         )
         session.exec(
             text(
                 "INSERT INTO revision (pk, page_pk, revid, minor, observed_at)"
-                " VALUES (2, 2, 9, 0, CURRENT_TIMESTAMP)"
+                " VALUES (2, 3, 9, 0, CURRENT_TIMESTAMP)"
             )
         )
         session.exec(
             text(
-                "INSERT INTO remotelink (local_revision_pk, remote_revision_pk,"
+                "INSERT INTO revisionlink (local_revision_pk, remote_revision_pk,"
                 " origin) VALUES (1, 2, 'copy')"
             )
         )
         session.commit()
 
-        with pytest.raises(IntegrityError, match="uq_remotelink_pair"):
+        with pytest.raises(IntegrityError, match="uq_revisionlink_pair"):
             session.exec(
                 text(
-                    "INSERT INTO remotelink (local_revision_pk,"
+                    "INSERT INTO revisionlink (local_revision_pk,"
                     " remote_revision_pk, origin) VALUES (2, 1, 'manual')"
                 )
             )
             session.commit()
 
 
-def test_dropping_remotelink_leaves_the_revisions_it_referenced(
+def test_dropping_revisionlink_leaves_the_revisions_it_referenced(
     populated_engine,
 ) -> None:
-    """`remotelink` points at `revision`, so its downgrade is the direction
+    """`revisionlink` points at `revision`, so its downgrade is the direction
     that can go wrong: a rebuild of `revision` would fail with `slot` rows
     referencing it. Seeded after the upgrade because the table does not exist
     before it."""
@@ -145,19 +205,19 @@ def test_dropping_remotelink_leaves_the_revisions_it_referenced(
         session.exec(
             text(
                 "INSERT INTO page (pk, site_pk, title, namespace_role, dirty,"
-                " fetch_status) VALUES (2, 1, 'Page:Work.djvu/1 (upstream)',"
+                " fetch_status) VALUES (3, 1, 'Page:Work.djvu/1 (upstream)',"
                 " 'page', 0, 'done')"
             )
         )
         session.exec(
             text(
                 "INSERT INTO revision (pk, page_pk, revid, minor, observed_at)"
-                " VALUES (2, 2, 9, 0, CURRENT_TIMESTAMP)"
+                " VALUES (2, 3, 9, 0, CURRENT_TIMESTAMP)"
             )
         )
         session.exec(
             text(
-                "INSERT INTO remotelink (local_revision_pk, remote_revision_pk,"
+                "INSERT INTO revisionlink (local_revision_pk, remote_revision_pk,"
                 " origin) VALUES (1, 2, 'copy')"
             )
         )
@@ -206,5 +266,7 @@ def test_downgrade_also_survives_referenced_rows(populated_engine) -> None:
     _downgrade(populated_engine, REVISION_STORE)
 
     with Session(populated_engine) as session:
-        assert session.exec(text("SELECT count(*) FROM page")).one()[0] == 1
+        # Downgrading leaves the harmless Index placeholder created by the
+        # keyed backfill; it cannot be identified safely as migration-owned.
+        assert session.exec(text("SELECT count(*) FROM page")).one()[0] == 2
         assert session.exec(text("SELECT count(*) FROM pagemeta")).one()[0] == 1

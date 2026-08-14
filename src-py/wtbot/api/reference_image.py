@@ -12,7 +12,6 @@ from fastapi import (
     Request,
     Response,
 )
-from sqlalchemy import func
 from sqlmodel import Session, select
 
 from wtbot.api.debug_logging_route import DebugLoggingRoute
@@ -20,9 +19,9 @@ from wtbot.api.errors import ApiError
 from wtbot.api.targets import resolve_target
 from wtbot.deps import get_session
 from wtbot.model import Page
-from wtbot.model.wikisource.page_meta import PageMeta
+from wtbot.model.wikisource.proofread_page_meta import ProofreadPageMeta
 from wtbot.settings import WikiSettings
-from wtbot.vfs.store import PageStore, canonical_title
+from wtbot.vfs.store import PageStore
 
 """The reference image: the scan of the page being transcribed.
 
@@ -35,7 +34,7 @@ returns pixels of a scanned page. Two different things, and the split editor
 shows them in different panes.
 
 `serve_reference_image()` streams a page's scan rendition from a local bytes
-cache under blob_root, filling it from the wiki-side URLs in PageMeta on
+cache under blob_root, filling it from the wiki-side URLs in ProofreadPageMeta on
 first request. The client never needs a wiki URL (or the wiki's
 CA/credentials): the image for an open editor is addressable from the path
 the editor already holds. When the raster cache lands (local ddjvu/pdftoppm
@@ -82,7 +81,7 @@ def fetch_image_bytes(url: str) -> bytes:
     return resp.content
 
 
-def _rendition_url(meta: PageMeta | None, width: int | None) -> str | None:
+def _rendition_url(meta: ProofreadPageMeta | None, width: int | None) -> str | None:
     if meta is None:
         return None
     base = meta.source_image_url or meta.thumb_url
@@ -117,7 +116,7 @@ def serve_reference_image(
     known — the caller decides what a miss means (the route below answers with
     a placeholder SVG)."""
     store = PageStore(session)
-    meta = store.page_meta(page)
+    meta = store.proofread_page_meta(page)
     url = _rendition_url(meta, width)
     if url is None:
         return None
@@ -139,7 +138,7 @@ def serve_reference_image(
         request.app.state.engine,
         blob_root,
         page.site_pk,
-        meta.index_title if meta is not None else None,
+        meta.index_page_pk if meta is not None else None,
         meta.page_number if meta is not None else None,
         width,
     )
@@ -152,29 +151,28 @@ def _warm_next_page(
     engine,
     blob_root: Path,
     site_pk: int,
-    index_title: str | None,
+    index_page_pk: int | None,
     page_number: int | None,
     width: int | None,
 ) -> None:
     """Best-effort pre-fetch of the next page's rendition — sequential
     transcription assumes that is the page opened next."""
-    if index_title is None or page_number is None:
+    if index_page_pk is None or page_number is None:
         return
     try:
         with Session(engine) as session:
             nxt = session.exec(
                 select(Page)
-                .join(PageMeta, PageMeta.page_pk == Page.pk)
+                .join(ProofreadPageMeta, ProofreadPageMeta.page_pk == Page.pk)
                 .where(
                     Page.site_pk == site_pk,
-                    func.replace(PageMeta.index_title, "_", " ")
-                    == canonical_title(index_title),
-                    PageMeta.page_number == page_number + 1,
+                    ProofreadPageMeta.index_page_pk == index_page_pk,
+                    ProofreadPageMeta.page_number == page_number + 1,
                 )
             ).first()
             if nxt is None or nxt.pk is None:
                 return
-            url = _rendition_url(PageStore(session).page_meta(nxt), width)
+            url = _rendition_url(PageStore(session).proofread_page_meta(nxt), width)
             cache = _cache_path(blob_root, nxt.pk, width, url) if url else None
         if url is None or cache is None or cache.exists():
             return

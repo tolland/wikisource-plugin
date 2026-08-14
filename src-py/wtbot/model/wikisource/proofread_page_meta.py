@@ -1,6 +1,5 @@
 import re
 
-from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 """Per-role attribute extensions for Page.
@@ -40,24 +39,26 @@ SHORT_NAME_RE = re.compile(r"^[\w\-]+$", re.ASCII)
 File: titles (no spaces, slashes, colons or other reserved characters)."""
 
 
-class PageMeta(SQLModel, table=True):
-    """Per-Page: ProofreadPage metadata — the structural link to the owning
-    Index: (also used by Index-namespace assets like styles.css), the
-    proofread quality, and the (scan page) source-image values for showing
-    the page scan and its thumbnail next to the transcription in the client.
+class ProofreadPageMeta(SQLModel, table=True):
+    """Optional Wikisource metadata for one proofread ``Page:``.
+
+    ``page_pk`` is both identity and ownership: this row cannot exist apart
+    from its vanilla MediaWiki Page. ``index_page_pk`` is the authoritative
+    structural link to the owning ``Index:`` Page; titles are presentation,
+    not relational identity.
+
+    The remaining fields hold proofread quality and scan-page image values for
+    showing the page scan and its thumbnail next to the transcription.
 
     Remote URLs come from imageinfo/ProofreadPage at fetch time; local paths
     are filled by the (future) raster cache that extracts page N from the
     backing DjVu/PDF into blob_root.
     """
 
-    __table_args__ = (UniqueConstraint("page_pk", name="uq_pagemeta_page"),)
+    page_pk: int = Field(foreign_key="page.pk", primary_key=True)
 
-    pk: int | None = Field(default=None, primary_key=True)
-    page_pk: int = Field(foreign_key="page.pk", index=True)
-
-    # ProofreadPage structure (derived from the title / Index fan-out)
-    index_title: str | None = Field(default=None, index=True)
+    # ProofreadPage structure (resolved from the title / Index fan-out)
+    index_page_pk: int = Field(foreign_key="page.pk", index=True)
     page_number: int | None = None
     quality_level: int | None = None  # ProofreadPage <pagequality level="N"/>, 0-4
 

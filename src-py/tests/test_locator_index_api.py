@@ -1,9 +1,9 @@
 import pytest
+from conftest import add_proofread_meta
 from sqlmodel import Session, select
 
 from wtbot.model import EditJournal, Page, Site
 from wtbot.model.wiki.namespace import NsRole
-from wtbot.model.wikisource.page_meta import PageMeta
 
 """Tests for GET /locator-index/{page-numbers,sections} — resolving a
 back-of-book locator to the Page: that holds it. Mirrors test_page_nav.py's
@@ -52,7 +52,7 @@ def _seed(engine) -> None:
         )
         s.add(page_155)
         s.flush()
-        s.add(PageMeta(page_pk=page_155.pk, index_title=INDEX, page_number=155))
+        add_proofread_meta(s, page_pk=page_155.pk, index_title=INDEX, page_number=155)
 
         page_163 = Page(
             site_pk=site.pk,
@@ -63,7 +63,7 @@ def _seed(engine) -> None:
         )
         s.add(page_163)
         s.flush()
-        s.add(PageMeta(page_pk=page_163.pk, index_title=INDEX, page_number=163))
+        add_proofread_meta(s, page_pk=page_163.pk, index_title=INDEX, page_number=163)
 
         page_164 = Page(
             site_pk=site.pk,
@@ -74,7 +74,7 @@ def _seed(engine) -> None:
         )
         s.add(page_164)
         s.flush()
-        s.add(PageMeta(page_pk=page_164.pk, index_title=INDEX, page_number=164))
+        add_proofread_meta(s, page_pk=page_164.pk, index_title=INDEX, page_number=164)
         s.commit()
 
 
@@ -112,7 +112,9 @@ def _seed_bare_pagelist(engine) -> None:
             )
             s.add(page)
             s.flush()
-            s.add(PageMeta(page_pk=page.pk, index_title=BARE_INDEX, page_number=n))
+            add_proofread_meta(
+                s, page_pk=page.pk, index_title=BARE_INDEX, page_number=n
+            )
         s.commit()
 
 

@@ -1,8 +1,9 @@
 from datetime import datetime, timedelta, timezone
 
+from conftest import add_proofread_meta
 from sqlmodel import Session, select
 
-from wtbot.model import NsRole, Page, PageMeta, RevisionLink, Site
+from wtbot.model import NsRole, Page, RevisionLink, Site
 from wtbot.revision_store import record_head_revision, record_history
 from wtbot.wiki.wiki_types import RemotePage
 
@@ -59,7 +60,7 @@ def build_page(session: Session, site: Site, revisions: list[RemotePage]) -> Pag
     session.add(page)
     session.commit()
     session.refresh(page)
-    session.add(PageMeta(page_pk=page.pk, index_title=INDEX, page_number=9))
+    add_proofread_meta(session, page_pk=page.pk, index_title=INDEX, page_number=9)
     session.commit()
 
     record_head_revision(session, page, revisions[0])
@@ -94,7 +95,7 @@ def seed_diverged_pair(engine) -> int:
                 remote_page(body(2, "Us", "Older."), 11, None, 1),
             ],
         )
-        build_page(
+        remote_page_row = build_page(
             session,
             remote,
             [
@@ -105,9 +106,6 @@ def seed_diverged_pair(engine) -> int:
 
         from wtbot.page_link_store import pair_pages
 
-        remote_page_row = session.exec(
-            select(Page).where(Page.site_pk == remote.pk)
-        ).first()
         pairing = pair_pages(session, local_page, remote_page_row)
         session.commit()
         return pairing.pk
@@ -245,7 +243,7 @@ def test_matches_are_ordered_by_how_little_would_replay(client, engine) -> None:
                 remote_page(body(2, "Us", "Words."), 10, None, 1),
             ],
         )
-        build_page(
+        remote_page_row = build_page(
             session,
             remote,
             [
@@ -256,8 +254,7 @@ def test_matches_are_ordered_by_how_little_would_replay(client, engine) -> None:
         )
         from wtbot.page_link_store import pair_pages
 
-        other = session.exec(select(Page).where(Page.site_pk == remote.pk)).first()
-        pair_pk = pair_pages(session, local_page, other).pk
+        pair_pk = pair_pages(session, local_page, remote_page_row).pk
         session.commit()
 
     matches = client.get(f"/links/pairs/{pair_pk}/revisions").json()["matches"]
@@ -276,7 +273,7 @@ def test_incomplete_history_is_reported_rather_than_implied(client, engine) -> N
         local_page = build_page(
             session, local, [remote_page(body(3, "Us", "Ours."), 12, None, 1)]
         )
-        build_page(
+        remote_page_row = build_page(
             session,
             remote,
             # A head whose parent we do not hold: the history stops short.
@@ -284,8 +281,7 @@ def test_incomplete_history_is_reported_rather_than_implied(client, engine) -> N
         )
         from wtbot.page_link_store import pair_pages
 
-        other = session.exec(select(Page).where(Page.site_pk == remote.pk)).first()
-        pair_pk = pair_pages(session, local_page, other).pk
+        pair_pk = pair_pages(session, local_page, remote_page_row).pk
         session.commit()
 
     data = client.get(f"/links/pairs/{pair_pk}/revisions").json()

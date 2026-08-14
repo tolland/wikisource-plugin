@@ -141,7 +141,7 @@ class WikisourceVfs:
                     path=path.raw, exists=True, name="Pages", kind=NodeKind.directory
                 )
             case PageLeaf(path, _, page):
-                meta = self.store.page_meta(page)
+                meta = self.store.proofread_page_meta(page)
                 state = self._state_with_placeholder_default(
                     page, self.store.effective_state(page), meta
                 )
@@ -210,7 +210,7 @@ class WikisourceVfs:
             pages_by_title = {p.title: p for p in pages}
             page_pks = [p.pk for p in pages if p.pk is not None]
             uncommitted = self.store.latest_uncommitted_bodies(page_pks)
-            metas = self.store.page_metas_by_pks(page_pks)
+            metas = self.store.proofread_page_metas_by_pks(page_pks)
             # For every page, not just those without local edits: a page can
             # have an uncommitted save (which supplies the body) *and* an
             # earlier push whose refetch is still queued (which supplies the
@@ -301,16 +301,12 @@ class WikisourceVfs:
         return ListChildrenResponse(parent_path=parent, children=children)
 
     def _index_assets(self, site: Site, index: Page) -> list[Page]:
-        """Non-index-content pages belonging to the index dir: title-wise
-        subpages (per the mediawiki layer's namespace subpage rule) plus
-        pages tied to it via their index_title link, deduplicated."""
+        """Non-index-content title-wise subpages of the Index page."""
         assets = {
             p.pk: p
             for p in self.mw.subpages(site, index.title)
             if p.content_model != PROOFREAD_INDEX_CONTENT_MODEL
         }
-        for p in self.store.index_linked_assets(site, index.title):
-            assets.setdefault(p.pk, p)
         return sorted(assets.values(), key=lambda p: p.title)
 
     def _pages_children(
@@ -318,7 +314,9 @@ class WikisourceVfs:
     ) -> ListChildrenResponse:
         parent = path.normalized
         pages = self.store.proofread_pages(site, index.title)
-        metas = self.store.page_metas_by_pks([p.pk for p in pages if p.pk is not None])
+        metas = self.store.proofread_page_metas_by_pks(
+            [p.pk for p in pages if p.pk is not None]
+        )
 
         def page_number(p: Page) -> int:
             meta = metas.get(p.pk)
@@ -383,7 +381,7 @@ class WikisourceVfs:
                     path.raw,
                     page,
                     default_body=self._placeholder_default(
-                        page, self.store.page_meta(page)
+                        page, self.store.proofread_page_meta(page)
                     ),
                 )
             case (

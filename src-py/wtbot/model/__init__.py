@@ -23,7 +23,7 @@ from wtbot.model.sync.promotion import (
     PromotionIntent,
     PromotionStatus,
 )
-from wtbot.model.sync.remote_link import LinkOrigin, RevisionLink
+from wtbot.model.sync.revision_link import LinkOrigin, RevisionLink
 from wtbot.model.wiki.content import Content
 from wtbot.model.wiki.namespace import Namespace, NsRole, role_for_canonical
 from wtbot.model.wiki.page import FetchState, Page
@@ -34,8 +34,8 @@ from wtbot.model.wiki.slot import MAIN_SLOT, Slot
 from wtbot.model.wiki.transclusion import Transclusion
 from wtbot.model.wikisource.file_meta import FileMeta, FileOrigin
 from wtbot.model.wikisource.index_meta import IndexMeta
-from wtbot.model.wikisource.page_meta import (
-    PageMeta,
+from wtbot.model.wikisource.proofread_page_meta import (
+    ProofreadPageMeta,
     default_short_name,
 )
 
@@ -66,7 +66,7 @@ __all__ = [
     "Content",
     "IndexLink",
     "IndexMeta",
-    "PageMeta",
+    "ProofreadPageMeta",
     "FileMeta",
     "FileOrigin",
     "default_short_name",

@@ -1,16 +1,15 @@
 import pytest
+from conftest import add_proofread_meta
 
 from wtbot.model import Page, Site
 from wtbot.model.wiki.namespace import Namespace, NsRole
-from wtbot.model.wikisource.page_meta import PageMeta
 from wtbot.vfs.mediawiki import MediaWikiVfs, title_namespace_name
 from wtbot.vfs.store import PageStore
 from wtbot.vfs.wikisource import WikisourceVfs
 
 """Tests for the mediawiki layer: title namespace parsing and the
 Namespace.subpages rule, including how the rule surfaces in the wikisource
-overlay's Index listing (subpage-only assets follow the flag; assets linked
-via index_title are listed regardless).
+overlay's Index listing (assets follow the ordinary subpage flag).
 """
 
 FAMILY = "wikisource"
@@ -18,9 +17,7 @@ CODE = "en"
 INDEX = "Index:Foo.djvu"
 _INDEX_PATH = f"/{FAMILY}/{CODE}/{INDEX}"
 
-# Linked via index_title AND a title-wise subpage — the common case.
 LINKED_SUBPAGE = f"{INDEX}/styles.css"
-# A title-wise subpage with no index_title link.
 UNLINKED_SUBPAGE = f"{INDEX}/legacy.css"
 
 
@@ -46,8 +43,6 @@ def site(session) -> Site:
         content_model="sanitized-css",
     )
     session.add(linked)
-    session.flush()
-    session.add(PageMeta(page_pk=linked.pk, index_title=INDEX))
     session.add(
         Page(
             site_pk=site.pk,
@@ -104,12 +99,11 @@ def test_subpages_enabled_namespace_lists_them(session, site):
 
 
 def test_overlay_index_children_follow_subpage_flag(session, site):
-    """With subpages disabled, a subpage-only asset disappears from the
-    Index dir, but an asset explicitly linked via index_title stays."""
+    """With subpages disabled, Index assets disappear from the Index dir."""
     _add_index_namespace(session, site, subpages=False)
     names = [c.name for c in WikisourceVfs(session).list_children(_INDEX_PATH).children]
-    assert "styles.css" in names  # linked via index_title
-    assert "legacy.css" not in names  # subpage-only
+    assert "styles.css" not in names
+    assert "legacy.css" not in names
 
 
 def test_overlay_index_children_include_subpages_when_enabled(session, site):
@@ -122,8 +116,7 @@ def test_overlay_index_children_include_subpages_when_enabled(session, site):
 def test_proofread_pages_match_across_underscore_space(session):
     """MediaWiki treats '_' and ' ' as equivalent in titles, so a fetched
     Page: (wiki's literal spaced title) and a fan-out stub (generated from the
-    underscore request title) can carry different index_title spellings for
-    the same Index. The membership query must match both."""
+    underscore request title) still resolve to the same Index key."""
     site = Site(family=FAMILY, code=CODE)
     session.add(site)
     session.commit()
@@ -147,9 +140,9 @@ def test_proofread_pages_match_across_underscore_space(session):
     session.add(real)
     session.add(stub)
     session.flush()
-    # Real page linked with spaces; stub linked with underscores.
-    session.add(PageMeta(page_pk=real.pk, index_title=spaced, page_number=5))
-    session.add(PageMeta(page_pk=stub.pk, index_title=underscored, page_number=1))
+    # Both title spellings resolve to one Index Page identity.
+    add_proofread_meta(session, page_pk=real.pk, index_title=spaced, page_number=5)
+    add_proofread_meta(session, page_pk=stub.pk, index_title=underscored, page_number=1)
     session.commit()
 
     store = PageStore(session)

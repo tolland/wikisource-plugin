@@ -17,7 +17,7 @@ from wtbot.model import (
     FileBlob,
     IndexMeta,
     Page,
-    PageMeta,
+    ProofreadPageMeta,
     Site,
 )
 from wtbot.revision_store import head_content
@@ -386,10 +386,9 @@ def test_worker_index_fanout_queues_index_subpages(
     }
     styles = session.exec(select(Page).where(Page.title == asset_title)).one()
     styles_meta = session.exec(
-        select(PageMeta).where(PageMeta.page_pk == styles.pk)
-    ).one()
-    assert styles_meta.index_title == _INDEX_TITLE
-    assert styles_meta.page_number is None
+        select(ProofreadPageMeta).where(ProofreadPageMeta.page_pk == styles.pk)
+    ).first()
+    assert styles_meta is None
 
 
 def test_proofread_page_metadata_uses_content_model(session):
@@ -414,14 +413,16 @@ def test_proofread_page_metadata_uses_content_model(session):
 
     assert run_pending(session, lambda _: wiki) == 1
     page = session.exec(select(Page).where(Page.title == remote.title)).one()
-    meta = session.exec(select(PageMeta).where(PageMeta.page_pk == page.pk)).one()
-    assert meta.index_title == "Index:Tractatus.djvu"
+    meta = session.exec(
+        select(ProofreadPageMeta).where(ProofreadPageMeta.page_pk == page.pk)
+    ).one()
+    assert session.get(Page, meta.index_page_pk).title == "Index:Tractatus.djvu"
     assert meta.page_number == 7
 
 
 def test_proofread_page_fetch_populates_page_meta(session):
     """Fetching a proofread-page pulls the ProofreadPage scan-image URLs and
-    quality (prop=imageforpage|proofread) into PageMeta."""
+    quality (prop=imageforpage|proofread) into ProofreadPageMeta."""
     title = "Page:Tractatus.djvu/45"
     remote = RemotePage(
         title=title,
@@ -455,7 +456,9 @@ def test_proofread_page_fetch_populates_page_meta(session):
     assert run_pending(session, lambda _: wiki) == 1
 
     page = session.exec(select(Page).where(Page.title == title)).one()
-    meta = session.exec(select(PageMeta).where(PageMeta.page_pk == page.pk)).one()
+    meta = session.exec(
+        select(ProofreadPageMeta).where(ProofreadPageMeta.page_pk == page.pk)
+    ).one()
     assert meta.quality_level == 1
     assert meta.thumb_url == "https://upload.example/thumb/page45-500px.jpg"
     assert meta.source_image_url == "https://upload.example/full/page45.jpg"
@@ -463,7 +466,7 @@ def test_proofread_page_fetch_populates_page_meta(session):
 
 def test_proofread_page_fetch_without_images_leaves_image_fields_empty(session):
     """A wiki without the ProofreadPage image API (FakeWikiClient default)
-    must not fail the fetch; the PageMeta row still carries the structural
+    must not fail the fetch; the ProofreadPageMeta row still carries the structural
     index link but no image values."""
     title = "Page:Tractatus.djvu/46"
     remote = RemotePage(
@@ -487,8 +490,10 @@ def test_proofread_page_fetch_without_images_leaves_image_fields_empty(session):
 
     page = session.exec(select(Page).where(Page.title == title)).one()
     assert page.fetch_status == "done"
-    meta = session.exec(select(PageMeta).where(PageMeta.page_pk == page.pk)).one()
-    assert meta.index_title == "Index:Tractatus.djvu"
+    meta = session.exec(
+        select(ProofreadPageMeta).where(ProofreadPageMeta.page_pk == page.pk)
+    ).one()
+    assert session.get(Page, meta.index_page_pk).title == "Index:Tractatus.djvu"
     assert meta.page_number == 46
     assert meta.quality_level is None
     assert meta.thumb_url is None
@@ -496,7 +501,7 @@ def test_proofread_page_fetch_without_images_leaves_image_fields_empty(session):
 
 
 def test_refetch_updates_existing_page_meta(session):
-    """A second fetch with new image data updates the PageMeta row in place
+    """A second fetch with new image data updates the ProofreadPageMeta row in place
     rather than duplicating it."""
     title = "Page:Tractatus.djvu/47"
     remote = RemotePage(
@@ -530,7 +535,9 @@ def test_refetch_updates_existing_page_meta(session):
         assert run_pending(session, lambda _: wiki) == 1
 
     page = session.exec(select(Page).where(Page.title == title)).one()
-    metas = session.exec(select(PageMeta).where(PageMeta.page_pk == page.pk)).all()
+    metas = session.exec(
+        select(ProofreadPageMeta).where(ProofreadPageMeta.page_pk == page.pk)
+    ).all()
     assert len(metas) == 1
     assert metas[0].quality_level == 3
     assert metas[0].thumb_url == "https://upload.example/thumb/q3.jpg"

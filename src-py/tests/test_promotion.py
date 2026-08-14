@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 import pytest
-from conftest import drain
+from conftest import add_proofread_meta, drain
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -11,7 +11,6 @@ from wtbot.model import (
     FileBlob,
     NsRole,
     Page,
-    PageMeta,
     Promotion,
     Revision,
     Site,
@@ -98,7 +97,9 @@ def seed(engine, *, target_page: bool = True, linked: bool = True) -> None:
             session.add(row)
             session.commit()
             session.refresh(row)
-            session.add(PageMeta(page_pk=row.pk, index_title=INDEX, page_number=1))
+            add_proofread_meta(
+                session, page_pk=row.pk, index_title=INDEX, page_number=1
+            )
             session.commit()
             record_head_revision(
                 session,

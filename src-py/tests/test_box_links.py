@@ -1,4 +1,5 @@
 import pytest
+from conftest import add_proofread_meta
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
@@ -7,7 +8,6 @@ from wtbot.main import create_app
 from wtbot.model import BoxRangeLink, Page, Site
 from wtbot.model.wiki.namespace import NsRole
 from wtbot.model.wikisource.index_meta import IndexMeta
-from wtbot.model.wikisource.page_meta import PageMeta
 
 """Tests for box→range links: the SQL-backed store and the /pages/box-links
 API surface, including the cascades that keep a link from outliving either
@@ -51,13 +51,12 @@ def _seed(engine) -> int:
         )
         s.add(page)
         s.flush()
-        s.add(
-            PageMeta(
-                page_pk=page.pk,
-                index_title=INDEX,
-                page_number=1,
-                source_image_url="https://wiki.example/img/Tractatus.djvu/page1.jpg",
-            )
+        add_proofread_meta(
+            s,
+            page_pk=page.pk,
+            index_title=INDEX,
+            page_number=1,
+            source_image_url="https://wiki.example/img/Tractatus.djvu/page1.jpg",
         )
         s.commit()
         return page.pk

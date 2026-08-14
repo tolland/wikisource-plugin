@@ -28,7 +28,7 @@ from wtbot.model import (
     NsRole,
     Page,
     PageLink,
-    PageMeta,
+    ProofreadPageMeta,
     RevisionLink,
     Site,
 )
@@ -488,10 +488,10 @@ def list_candidates(
 
     counts = dict(
         session.exec(
-            select(PageMeta.index_title, func.count())
-            .join(Page, Page.pk == PageMeta.page_pk)
+            select(ProofreadPageMeta.index_page_pk, func.count())
+            .join(Page, Page.pk == ProofreadPageMeta.page_pk)
             .where(Page.site_pk == site.pk, Page.namespace_role == NsRole.page)
-            .group_by(PageMeta.index_title)
+            .group_by(ProofreadPageMeta.index_page_pk)
         ).all()
     )
 
@@ -513,8 +513,7 @@ def list_candidates(
                 page_pk=page.pk,
                 title=page.title,
                 page_count=None,
-                cached_pages=counts.get(page.title, 0)
-                or counts.get(page.title.replace("_", " "), 0),
+                cached_pages=counts.get(page.pk, 0),
                 work_pk=work.pk if work else None,
                 paired_with=paired_with,
             )

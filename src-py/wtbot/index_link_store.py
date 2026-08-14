@@ -109,7 +109,7 @@ def children_of(session: Session, work: IndexLink) -> list[PageLink]:
     """The page pairs claimed by a work, in no particular order.
 
     Ordering is the caller's business: the viewer wants reading order, which
-    means page number, which lives on ``PageMeta`` -- a join this module has no
+    means page number, which lives on ``ProofreadPageMeta`` -- a join this module has no
     reason to force on every reader.
     """
     return list(

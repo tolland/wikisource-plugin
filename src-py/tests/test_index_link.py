@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 
+from conftest import add_proofread_meta
 from sqlmodel import Session, select
 
 from wtbot.index_link_store import link_indexes, work_for_index_page
@@ -9,7 +10,6 @@ from wtbot.model import (
     NsRole,
     Page,
     PageLink,
-    PageMeta,
     RevisionLink,
     Site,
     SiteCredential,
@@ -21,8 +21,8 @@ from wtbot.wiki.wiki_types import RemotePage
 
 The page surface answers questions about a pair you can already name. A
 reviewer arrives knowing only "we track this book against upstream", so the
-entry point has to be the work -- and the work has to know its pages without
-matching titles back through `PageMeta.index_title`.
+entry point has to be the work -- and the work has to know its pages through
+an explicit Page-key relationship.
 
 The cases these tests are built around are the two the page listing reports and
 could not act on:
@@ -91,7 +91,9 @@ def build_page(
     session.add(page)
     session.commit()
     session.refresh(page)
-    session.add(PageMeta(page_pk=page.pk, index_title=index_title, page_number=number))
+    add_proofread_meta(
+        session, page_pk=page.pk, index_title=index_title, page_number=number
+    )
     session.commit()
     record_head_revision(
         session,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from conftest import add_proofread_meta
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -10,7 +11,6 @@ from wtbot.api.schemas import WriteContentRequest
 from wtbot.api.vfs import list_children, read_content, write_content
 from wtbot.model import EditJournal, FileBlob, Page, Site
 from wtbot.model.wiki.namespace import NsRole
-from wtbot.model.wikisource.page_meta import PageMeta
 from wtbot.vfs import WikisourceVfs
 
 FAMILY = "wikisource"
@@ -53,8 +53,6 @@ def _add_index_asset_tree(session: Session) -> None:
         revid=5005,
     )
     session.add(styles)
-    session.flush()
-    session.add(PageMeta(page_pk=styles.pk, index_title=INDEX))
     session.commit()
 
 
@@ -91,9 +89,6 @@ def vfs_client(engine, tmp_path) -> TestClient:
             revid=5005,
         )
         s.add(index_styles)
-        s.flush()
-        s.add(PageMeta(page_pk=index_styles.pk, index_title=INDEX))
-
         file_page = Page(
             site_pk=site.pk,
             title=FILE,
@@ -138,18 +133,17 @@ def vfs_client(engine, tmp_path) -> TestClient:
         s.commit()
         s.refresh(p1)
         s.refresh(p2)
-        s.add(
-            PageMeta(
-                page_pk=p1.pk,
-                index_title=INDEX,
-                page_number=1,
-                quality_level=1,
-                thumb_url="https://ws.example/thumb/page1-240px.jpg",
-                source_image_url="https://ws.example/thumb/page1-2419px.jpg",
-                thumb_width=240,
-            )
+        add_proofread_meta(
+            s,
+            page_pk=p1.pk,
+            index_title=INDEX,
+            page_number=1,
+            quality_level=1,
+            thumb_url="https://ws.example/thumb/page1-240px.jpg",
+            source_image_url="https://ws.example/thumb/page1-2419px.jpg",
+            thumb_width=240,
         )
-        s.add(PageMeta(page_pk=p2.pk, index_title=INDEX, page_number=2))
+        add_proofread_meta(s, page_pk=p2.pk, index_title=INDEX, page_number=2)
         s.commit()
 
     with TestClient(app) as c:
@@ -268,7 +262,7 @@ def test_stat_carries_decoration_fields(vfs_client):
     assert r["dirty"] is False
     assert r["has_reference_image"] is True
 
-    # No PageMeta row for page 2 -- no scan image known (yet).
+    # No ProofreadPageMeta row for page 2 -- no scan image known (yet).
     r = vfs_client.get("/vfs/stat", params={"path": f"{_PAGES_PATH}/{PAGE_2}"}).json()
     assert r["quality_level"] is None
     assert r["has_reference_image"] is False

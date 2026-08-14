@@ -1,9 +1,9 @@
 import pytest
+from conftest import add_proofread_meta
 from sqlmodel import Session
 
 from wtbot.model import Page, Site
 from wtbot.model.wiki.namespace import NsRole
-from wtbot.model.wikisource.page_meta import PageMeta
 from wtbot.vfs.nodes import (
     FileBlobLeaf,
     FileDir,
@@ -74,8 +74,7 @@ def store(engine):
         )
         s.add(page_1)
         s.flush()
-        s.add(PageMeta(page_pk=styles.pk, index_title=INDEX))
-        s.add(PageMeta(page_pk=page_1.pk, index_title=INDEX, page_number=1))
+        add_proofread_meta(s, page_pk=page_1.pk, index_title=INDEX, page_number=1)
         s.commit()
         yield PageStore(s)
 

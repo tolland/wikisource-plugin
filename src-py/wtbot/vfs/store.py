@@ -15,7 +15,10 @@ from wtbot.model import (
     Site,
 )
 from wtbot.model.wiki.namespace import Namespace, NsRole
-from wtbot.model.wikisource.page_meta import PageMeta, default_short_name
+from wtbot.model.wikisource.proofread_page_meta import (
+    ProofreadPageMeta,
+    default_short_name,
+)
 
 """PageStore — all SQL for the VFS layers.
 
@@ -52,17 +55,11 @@ def canonical_title(title: str) -> str:
     the same Index: can reach us in either form — a fetched Page: keeps the
     wiki's literal title (spaces), while a fan-out stub is generated from the
     request title (often underscores). We preserve whatever was stored and
-    normalize only for comparison. See `_index_title_matches`."""
+    normalize only while resolving a title to its Page key."""
     return title.replace("_", " ")
 
 
-def _index_title_matches(index_title: str):
-    """SQL predicate comparing PageMeta.index_title to [index_title] with the
-    underscore/space normalization applied to both sides."""
-    return func.replace(PageMeta.index_title, "_", " ") == canonical_title(index_title)
-
-
-def meta_has_image(meta: PageMeta | None) -> bool:
+def meta_has_image(meta: ProofreadPageMeta | None) -> bool:
     return meta is not None and (
         meta.thumb_url is not None
         or meta.source_image_url is not None
@@ -102,6 +99,16 @@ class PageStore:
             select(Page).where(Page.site_pk == site.pk, Page.title == title)
         ).first()
 
+    def index_page(self, site: Site, title: str) -> Page | None:
+        """Resolve an Index title with MediaWiki underscore normalization."""
+        return self.session.exec(
+            select(Page).where(
+                Page.site_pk == site.pk,
+                Page.namespace_role == NsRole.index,
+                func.replace(Page.title, "_", " ") == canonical_title(title),
+            )
+        ).first()
+
     def indexes(self, site: Site) -> list[Page]:
         return list(
             self.session.exec(
@@ -113,16 +120,18 @@ class PageStore:
         )
 
     def proofread_pages(self, site: Site, index_title: str) -> list[Page]:
-        """All Page:-namespace members of one index (linked via
-        PageMeta.index_title)."""
+        """All Page:-namespace members linked to one Index Page key."""
+        index = self.index_page(site, index_title)
+        if index is None:
+            return []
         return list(
             self.session.exec(
                 select(Page)
-                .join(PageMeta, PageMeta.page_pk == Page.pk)
+                .join(ProofreadPageMeta, ProofreadPageMeta.page_pk == Page.pk)
                 .where(
                     Page.site_pk == site.pk,
                     Page.namespace_role == NsRole.page,
-                    _index_title_matches(index_title),
+                    ProofreadPageMeta.index_page_pk == index.pk,
                 )
             ).all()
         )
@@ -130,14 +139,17 @@ class PageStore:
     def proofread_page(self, site: Site, title: str, index_title: str) -> Page | None:
         """One Page: title, required to be a member of [index_title] — an
         arbitrary title must not resolve just because it exists on the site."""
+        index = self.index_page(site, index_title)
+        if index is None:
+            return None
         return self.session.exec(
             select(Page)
-            .join(PageMeta, PageMeta.page_pk == Page.pk)
+            .join(ProofreadPageMeta, ProofreadPageMeta.page_pk == Page.pk)
             .where(
                 Page.site_pk == site.pk,
                 Page.title == title,
                 Page.namespace_role == NsRole.page,
-                _index_title_matches(index_title),
+                ProofreadPageMeta.index_page_pk == index.pk,
             )
         ).first()
 
@@ -146,34 +158,19 @@ class PageStore:
     ) -> list[Page]:
         """Batched [proofread_page] with identical membership filters — bulk
         and individual stat must never disagree."""
+        index = self.index_page(site, index_title)
+        if index is None:
+            return []
         return list(
             self.session.exec(
                 select(Page)
-                .join(PageMeta, PageMeta.page_pk == Page.pk)
+                .join(ProofreadPageMeta, ProofreadPageMeta.page_pk == Page.pk)
                 .where(
                     Page.site_pk == site.pk,
                     Page.title.in_(titles),
                     Page.namespace_role == NsRole.page,
-                    _index_title_matches(index_title),
+                    ProofreadPageMeta.index_page_pk == index.pk,
                 )
-            ).all()
-        )
-
-    def index_linked_assets(self, site: Site, index_title: str) -> list[Page]:
-        """Index-namespace pages tied to [index_title] via their
-        PageMeta.index_title link (as opposed to being title-wise subpages —
-        see MediaWikiVfs.subpages for that half)."""
-        return list(
-            self.session.exec(
-                select(Page)
-                .join(PageMeta, PageMeta.page_pk == Page.pk)
-                .where(
-                    Page.site_pk == site.pk,
-                    Page.namespace_role == NsRole.index,
-                    Page.content_model != PROOFREAD_INDEX_CONTENT_MODEL,
-                    _index_title_matches(index_title),
-                )
-                .order_by(Page.title)
             ).all()
         )
 
@@ -243,25 +240,27 @@ class PageStore:
             meta.page_count = page_count
             self.session.add(meta)
 
-    def page_meta(self, page: Page) -> PageMeta | None:
+    def proofread_page_meta(self, page: Page) -> ProofreadPageMeta | None:
         return self.session.exec(
-            select(PageMeta).where(PageMeta.page_pk == page.pk)
+            select(ProofreadPageMeta).where(ProofreadPageMeta.page_pk == page.pk)
         ).first()
 
-    def page_metas_by_pks(self, page_pks: list[int]) -> dict[int, PageMeta]:
-        """Batched PageMeta lookup for listing/bulk-stat paths that already
+    def proofread_page_metas_by_pks(
+        self, page_pks: list[int]
+    ) -> dict[int, ProofreadPageMeta]:
+        """Batched proofread metadata lookup for callers that already
         batch their Page query."""
         if not page_pks:
             return {}
         rows = self.session.exec(
-            select(PageMeta).where(PageMeta.page_pk.in_(page_pks))
+            select(ProofreadPageMeta).where(ProofreadPageMeta.page_pk.in_(page_pks))
         ).all()
         return {row.page_pk: row for row in rows}
 
     def has_reference_image(self, page: Page) -> bool:
         """A scan reference image is known once the fetch worker stored a
         thumb/source URL (or the raster cache filled a local path)."""
-        meta = self.page_meta(page)
+        meta = self.proofread_page_meta(page)
         return meta_has_image(meta)
 
     def file_meta(self, page: Page) -> FileMeta | None:

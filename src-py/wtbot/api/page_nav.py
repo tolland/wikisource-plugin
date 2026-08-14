@@ -5,7 +5,7 @@ from sqlmodel import Session
 from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.deps import get_session
 from wtbot.model import Page
-from wtbot.model.wikisource.page_meta import PageMeta
+from wtbot.model.wikisource.proofread_page_meta import ProofreadPageMeta
 from wtbot.vfs.nodes import PageLeaf, resolve
 from wtbot.vfs.paths import WikiPath
 from wtbot.vfs.store import PageStore
@@ -83,12 +83,12 @@ def get_page_nav(
 
 def _ordered_siblings(
     store: PageStore, node: PageLeaf
-) -> tuple[list[Page], dict[int, PageMeta]]:
+) -> tuple[list[Page], dict[int, ProofreadPageMeta]]:
     """All Page: members of the leaf's index in Pages/-listing order —
     ascending page_number, missing numbers sorting first (as 0) — plus
-    their PageMeta rows keyed by page pk."""
+    their ProofreadPageMeta rows keyed by page pk."""
     pages = store.proofread_pages(node.site, node.path.index_title)
-    metas = store.page_metas_by_pks([p.pk for p in pages if p.pk is not None])
+    metas = store.proofread_page_metas_by_pks([p.pk for p in pages if p.pk is not None])
 
     def page_number(p: Page) -> int:
         meta = metas.get(p.pk)

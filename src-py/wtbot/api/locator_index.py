@@ -119,7 +119,7 @@ def _pages_dir(path: str) -> str:
 
 
 def _page_ref(store: PageStore, page: Page, pages_dir: str) -> PageRef | None:
-    meta = store.page_meta(page)
+    meta = store.proofread_page_meta(page)
     if meta is None or meta.page_number is None:
         return None
     return PageRef(

@@ -23,7 +23,7 @@ from wtbot.model import (
     LinkOrigin,
     Page,
     PageLink,
-    PageMeta,
+    ProofreadPageMeta,
     Revision,
     RevisionLink,
     Site,
@@ -383,7 +383,7 @@ def _pair_out(session: Session, link: PageLink) -> PairOut:
     remote_head = head_revision(session, remote_page)
 
     meta = session.exec(
-        select(PageMeta).where(PageMeta.page_pk == link.local_page_pk)
+        select(ProofreadPageMeta).where(ProofreadPageMeta.page_pk == link.local_page_pk)
     ).first()
 
     return PairOut(

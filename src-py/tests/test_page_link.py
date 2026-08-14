@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 import pytest
+from conftest import add_proofread_meta
 from sqlmodel import Session, select
 
 from wtbot.matching import compare_pages, confirm_proposals
@@ -9,7 +10,6 @@ from wtbot.model import (
     NsRole,
     Page,
     PageLink,
-    PageMeta,
     RevisionLink,
     Site,
 )
@@ -50,7 +50,7 @@ def build_page(
     session.add(page)
     session.commit()
     session.refresh(page)
-    session.add(PageMeta(page_pk=page.pk, index_title=INDEX, page_number=number))
+    add_proofread_meta(session, page_pk=page.pk, index_title=INDEX, page_number=number)
     session.commit()
     if body is not None:
         record_head_revision(

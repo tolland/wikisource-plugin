@@ -6,7 +6,7 @@ from sqlmodel import Session, select
 
 from wtbot.main import create_app
 from wtbot.model import EditJournal, FetchRequest, FetchStatus, IndexMeta, Page, Site
-from wtbot.model.wikisource.page_meta import PageMeta
+from wtbot.model.wikisource.proofread_page_meta import ProofreadPageMeta
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import IndexPageEntry, RemotePage, RemotePageImages
 from wtbot.worker import run_pending
@@ -113,11 +113,12 @@ def _unb64(s: str) -> str:
 def test_fanout_creates_stubs_and_fetches_only_existing(engine, tmp_path):
     _seed_and_fan_out(engine, tmp_path)
     with Session(engine) as s:
+        index = s.exec(select(Page).where(Page.title == INDEX)).one()
         rows = s.exec(
-            select(Page, PageMeta)
-            .join(PageMeta, PageMeta.page_pk == Page.pk)
-            .where(PageMeta.index_title == INDEX)
-            .order_by(PageMeta.page_number)
+            select(Page, ProofreadPageMeta)
+            .join(ProofreadPageMeta, ProofreadPageMeta.page_pk == Page.pk)
+            .where(ProofreadPageMeta.index_page_pk == index.pk)
+            .order_by(ProofreadPageMeta.page_number)
         ).all()
         assert [meta.page_number for _, meta in rows] == [1, 2, 3, 4, 5]
         stubs = [(page, meta) for page, meta in rows if page.revid is None]
@@ -160,12 +161,16 @@ def test_fanout_creates_stubs_and_fetches_only_existing(engine, tmp_path):
 def test_fanout_enriches_placeholders_with_scan_and_ocr(engine, tmp_path):
     _seed_and_fan_out(engine, tmp_path)
     with Session(engine) as s:
+        index = s.exec(select(Page).where(Page.title == INDEX)).one()
         metas = {
             meta.page_number: meta
             for meta in s.exec(
-                select(PageMeta)
-                .join(Page, Page.pk == PageMeta.page_pk)
-                .where(PageMeta.index_title == INDEX, Page.revid.is_(None))
+                select(ProofreadPageMeta)
+                .join(Page, Page.pk == ProofreadPageMeta.page_pk)
+                .where(
+                    ProofreadPageMeta.index_page_pk == index.pk,
+                    Page.revid.is_(None),
+                )
             ).all()
         }
         assert sorted(metas) == [1, 2, 3, 4]

@@ -1,13 +1,13 @@
 import base64
 
 import pytest
+from conftest import add_proofread_meta
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from wtbot.main import create_app
 from wtbot.model import Page, Site
 from wtbot.model.wiki.namespace import NsRole
-from wtbot.model.wikisource.page_meta import PageMeta
 from wtbot.wiki.client import FakeWikiClient
 
 """Tests for the /preview/render endpoint (plugin split-editor live preview)."""
@@ -66,7 +66,7 @@ def preview_client(engine, wiki_client) -> TestClient:
         )
         s.add(page)
         s.flush()
-        s.add(PageMeta(page_pk=page.pk, index_title=INDEX))
+        add_proofread_meta(s, page_pk=page.pk, index_title=INDEX)
         s.commit()
     with TestClient(app) as c:
         yield c
@@ -103,8 +103,13 @@ def test_render_index_wikitext_path(preview_client, wiki_client):
     )
     assert resp.status_code == 200
     assert resp.json()["title"] == INDEX
-    # not in the Page cache → content model left for the wiki to infer
-    assert wiki_client.render_calls[-1] == (INDEX, "<pagelist />", None)
+    # The keyed proofread-page relationship materializes its owning Index page,
+    # so preview can pass the cached content model explicitly.
+    assert wiki_client.render_calls[-1] == (
+        INDEX,
+        "<pagelist />",
+        "proofread-index",
+    )
 
 
 def test_render_by_bare_title_uses_first_site(preview_client, wiki_client):

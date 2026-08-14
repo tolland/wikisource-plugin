@@ -1,10 +1,10 @@
 import pytest
+from conftest import add_proofread_meta
 from sqlmodel import Session
 
 from wtbot.model import Page, Site
 from wtbot.model.wiki.namespace import NsRole
 from wtbot.model.wikisource.index_meta import IndexMeta
-from wtbot.model.wikisource.page_meta import PageMeta
 
 """Tests for GET /pages/nav — the split editor's page-navigation metadata:
 prev/next sibling resolution in Pages/-listing order, first/last edges, and
@@ -50,7 +50,7 @@ def _seed(engine, page_numbers: list[int]) -> None:
             )
             s.add(page)
             s.flush()
-            s.add(PageMeta(page_pk=page.pk, index_title=INDEX, page_number=n))
+            add_proofread_meta(s, page_pk=page.pk, index_title=INDEX, page_number=n)
         s.commit()
 
 

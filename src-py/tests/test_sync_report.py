@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 
+from conftest import add_proofread_meta
 from sqlmodel import Session, select
 
 from wtbot.model import (
@@ -9,7 +10,6 @@ from wtbot.model import (
     NsRole,
     Page,
     PageLink,
-    PageMeta,
     RevisionLink,
     Site,
     SiteCredential,
@@ -115,7 +115,9 @@ def build_page(
     session.add(page)
     session.commit()
     session.refresh(page)
-    session.add(PageMeta(page_pk=page.pk, index_title=index_title, page_number=number))
+    add_proofread_meta(
+        session, page_pk=page.pk, index_title=index_title, page_number=number
+    )
     session.commit()
     if text is not None:
         record_head_revision(

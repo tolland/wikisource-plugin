@@ -5,14 +5,13 @@ from __future__ import annotations
 
 import base64
 
-from conftest import drain
+from conftest import add_proofread_meta, drain
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
 from wtbot.main import create_app
 from wtbot.model import Commit, CommitStatus, EditJournal, Page, Site
 from wtbot.model.wiki.namespace import NsRole
-from wtbot.model.wikisource.page_meta import PageMeta
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import RemotePage
 
@@ -53,7 +52,7 @@ def _setup(engine):
         )
         s.add(page)
         s.flush()
-        s.add(PageMeta(page_pk=page.pk, index_title=INDEX_TITLE))
+        add_proofread_meta(s, page_pk=page.pk, index_title=INDEX_TITLE)
         s.commit()
         s.refresh(page)
         return site, page

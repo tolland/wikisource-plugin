@@ -322,8 +322,8 @@ def run_page_ocr(
     scope = _scope_for(leaf.site.family, leaf.site.code)
 
     # Translate to the backend-reachable image URL: the wiki-side rendition
-    # from PageMeta, never the sidecar's localhost image endpoint.
-    meta = PageStore(session).page_meta(leaf.page)
+    # from ProofreadPageMeta, never the sidecar's localhost image endpoint.
+    meta = PageStore(session).proofread_page_meta(leaf.page)
     image_url = (meta.source_image_url or meta.thumb_url) if meta is not None else None
 
     crop = None

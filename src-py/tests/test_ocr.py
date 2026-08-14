@@ -1,4 +1,5 @@
 import pytest
+from conftest import add_proofread_meta
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
@@ -7,7 +8,6 @@ from wtbot.main import create_app
 from wtbot.model import Page, Site
 from wtbot.model.wiki.namespace import NsRole
 from wtbot.model.wikisource.index_meta import IndexMeta
-from wtbot.model.wikisource.page_meta import PageMeta
 from wtbot.ocrapi.client import FakeOcrClient, OcrError
 
 """Tests for wtbot's /pages/ocr routes: resolving a page path to a site
@@ -50,13 +50,12 @@ def _seed(engine) -> int:
         )
         s.add(page)
         s.flush()
-        s.add(
-            PageMeta(
-                page_pk=page.pk,
-                index_title=INDEX,
-                page_number=103,
-                source_image_url=SOURCE_URL,
-            )
+        add_proofread_meta(
+            s,
+            page_pk=page.pk,
+            index_title=INDEX,
+            page_number=103,
+            source_image_url=SOURCE_URL,
         )
         s.commit()
         return page.pk
@@ -130,7 +129,7 @@ def test_run_translates_image_url_and_threads_box_as_crop(client, page_pk, fake_
     assert out["text"] == "Die Principien der Mechanik"
 
     sent = fake_ocr.last_request
-    # The backend gets the wiki-side URL from PageMeta, not a localhost one.
+    # The backend gets the wiki-side URL from ProofreadPageMeta, not a localhost one.
     assert sent.image_url == SOURCE_URL
     crop = sent.crop
     assert (crop.x, crop.y, crop.width, crop.height) == (233, 556, 322, 77)

@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import Index, text
 from sqlmodel import Field, SQLModel
 
-from wtbot.model.sync.remote_link import LinkOrigin
+from wtbot.model.sync.revision_link import LinkOrigin
 from wtbot.timeutil import utcnow
 
 """An assertion that two pages, one per site, are the same page.
@@ -62,7 +62,7 @@ class PageLink(SQLModel, table=True):
 
     A materialised shortcut for the drill-down the viewer opens on: work ->
     its page pairs, as a join rather than a walk back through
-    ``PageMeta.index_title``. Membership is still derived from the index when
+    ``ProofreadPageMeta.index_page_pk``. Membership is still derived from the index when
     the work is linked; this records the answer.
 
     Null is ordinary, not missing data. A pairing outside any tracked work --

@@ -11,7 +11,7 @@ from wtbot.model import (
     LinkOrigin,
     NsRole,
     Page,
-    PageMeta,
+    ProofreadPageMeta,
     Revision,
     RevisionLink,
     Site,
@@ -516,19 +516,25 @@ def index_children(
 ) -> list[tuple[int | None, Page]]:
     """A work's Page: rows with their page numbers.
 
-    Membership comes from ``PageMeta.index_title`` rather than a title prefix,
-    and is compared with underscores normalised to spaces -- MediaWiki treats
-    the two as equivalent, and a fetched page keeps the wiki's spelling while a
-    fan-out stub keeps the request's (see wtbot.vfs.store.canonical_title).
+    Membership comes from ``ProofreadPageMeta.index_page_pk``. The title is
+    used only to resolve the Index Page identity.
     """
+    index_page = session.exec(
+        select(Page).where(
+            Page.site_pk == site.pk,
+            Page.namespace_role == NsRole.index,
+            func.replace(Page.title, "_", " ") == canonical_title(index_title),
+        )
+    ).first()
+    if index_page is None:
+        return []
     rows = session.exec(
-        select(PageMeta.page_number, Page)
-        .join(Page, Page.pk == PageMeta.page_pk)
+        select(ProofreadPageMeta.page_number, Page)
+        .join(Page, Page.pk == ProofreadPageMeta.page_pk)
         .where(
             Page.site_pk == site.pk,
             Page.namespace_role == NsRole.page,
-            func.replace(PageMeta.index_title, "_", " ")
-            == canonical_title(index_title),
+            ProofreadPageMeta.index_page_pk == index_page.pk,
         )
     ).all()
     return [(number, page) for number, page in rows]

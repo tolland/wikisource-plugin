@@ -619,7 +619,7 @@ a recorded merge base.
 ### The link object
 
 ```python
-# wtbot/sqlmodel/remote_link.py  (proposed, future)
+# wtbot/sqlmodel/revision_link.py  (proposed, future)
 from datetime import datetime
 from sqlmodel import SQLModel, Field
 from sqlalchemy import UniqueConstraint

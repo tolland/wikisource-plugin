@@ -11,7 +11,7 @@ from wtbot.api.schemas import (
     WriteStatus,
 )
 from wtbot.model import Page, Site
-from wtbot.model.wikisource.page_meta import PageMeta
+from wtbot.model.wikisource.proofread_page_meta import ProofreadPageMeta
 from wtbot.vfs.store import EffectiveState, PageStore, meta_has_image
 
 """mediawiki:// — the title-addressed layer.
@@ -47,7 +47,7 @@ def _b64(body: str) -> str:
 
 _UNRESOLVED = object()
 """Sentinel default for the `meta` parameters below: None is a legitimate
-precomputed answer (page has no PageMeta row), so absence needs its own
+precomputed answer (page has no ProofreadPageMeta row), so absence needs its own
 marker."""
 
 
@@ -82,20 +82,20 @@ class MediaWikiVfs:
     # -- per-page content operations ------------------------------------------
 
     def _resolve_meta(
-        self, page: Page, meta: PageMeta | None | object
-    ) -> PageMeta | None:
-        """`meta` may be precomputed by batched callers (one PageMeta query
+        self, page: Page, meta: ProofreadPageMeta | None | object
+    ) -> ProofreadPageMeta | None:
+        """`meta` may be precomputed by batched callers (one metadata query
         per listing); the _UNRESOLVED default means look it up here."""
         if meta is _UNRESOLVED:
-            return self.store.page_meta(page)
-        return meta if isinstance(meta, PageMeta) else None
+            return self.store.proofread_page_meta(page)
+        return meta if isinstance(meta, ProofreadPageMeta) else None
 
     def page_node(
         self,
         path: str,
         page: Page,
         name: str | None = None,
-        meta: PageMeta | None | object = _UNRESOLVED,
+        meta: ProofreadPageMeta | None | object = _UNRESOLVED,
         state: EffectiveState | None = None,
     ) -> Node:
         state = state or self.store.effective_state(page)
@@ -125,7 +125,7 @@ class MediaWikiVfs:
         page: Page,
         name: str,
         state: EffectiveState | None = None,
-        meta: PageMeta | None | object = _UNRESOLVED,
+        meta: ProofreadPageMeta | None | object = _UNRESOLVED,
     ) -> Stat:
         state = state or self.store.effective_state(page)
         body = state.body

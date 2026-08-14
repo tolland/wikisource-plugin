@@ -14,13 +14,15 @@ from wtbot.model import (
     Site,
     role_for_canonical,
 )
-from wtbot.model.wikisource.page_meta import PageMeta
+from wtbot.model.wikisource.proofread_page_meta import ProofreadPageMeta
 from wtbot.page_processors import (
     CachedPage,
     ClaimedFetchRequest,
     PageProcessor,
     ProcessContext,
+    ensure_index_page,
     processor_for,
+    proofread_index_identity,
 )
 from wtbot.promotion_store import materialize_promotion_links
 from wtbot.revision_store import (
@@ -369,9 +371,17 @@ def _upsert_page(
         # columns above stay as the denormalisation of what this records.
         record_head_revision(session, page, remote)
 
-        meta = session.exec(select(PageMeta).where(PageMeta.page_pk == page.pk)).first()
-        target = meta if meta is not None else PageMeta(page_pk=page.pk)
-        if processor.enrich_meta(target, remote) and meta is None:
+        identity = proofread_index_identity(remote.title)
+        if remote.content_model == "proofread-page" and identity is not None:
+            index_title, page_number = identity
+            index_page = ensure_index_page(session, site.pk, index_title)
+            meta = session.get(ProofreadPageMeta, page.pk)
+            target = meta or ProofreadPageMeta(
+                page_pk=page.pk,
+                index_page_pk=index_page.pk,
+            )
+            target.index_page_pk = index_page.pk
+            target.page_number = page_number
             session.add(target)
 
         return CachedPage(

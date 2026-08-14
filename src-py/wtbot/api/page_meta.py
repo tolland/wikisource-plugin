@@ -10,9 +10,9 @@ from wtbot.model import (
     IndexMeta,
     NsRole,
     Page,
-    PageMeta,
+    ProofreadPageMeta,
 )
-from wtbot.model.wikisource.page_meta import SHORT_NAME_RE
+from wtbot.model.wikisource.proofread_page_meta import SHORT_NAME_RE
 from wtbot.vfs.nodes import (
     FileBlobLeaf,
     FileDir,
@@ -25,7 +25,7 @@ from wtbot.vfs.nodes import (
 )
 from wtbot.vfs.store import PROOFREAD_INDEX_CONTENT_MODEL, PageStore
 
-"""Per-role Page metadata extensions (IndexMeta / PageMeta / FileMeta).
+"""Per-role Page metadata extensions (IndexMeta / ProofreadPageMeta / FileMeta).
 
 GET returns 404 while no row exists; PUT upserts with partial-update
 semantics (only fields present in the request body are applied).
@@ -92,8 +92,8 @@ class IndexMetaUpdate(BaseModel):
     short_name: str
 
 
-class PageMetaUpdate(BaseModel):
-    index_title: str | None = None
+class ProofreadPageMetaUpdate(BaseModel):
+    index_page_pk: int | None = None
     page_number: int | None = None
     quality_level: int | None = None
     source_image_url: str | None = None
@@ -176,31 +176,53 @@ def put_index_meta(
     return meta
 
 
-# -- PageMeta ------------------------------------------------------------------
+# -- ProofreadPageMeta ---------------------------------------------------------
 
 
-@router.get("/{page_pk}/page-meta", response_model=PageMeta)
-def get_page_meta(page_pk: int, session: Session = Depends(get_session)) -> PageMeta:
+@router.get("/{page_pk}/page-meta", response_model=ProofreadPageMeta)
+def get_page_meta(
+    page_pk: int, session: Session = Depends(get_session)
+) -> ProofreadPageMeta:
     page = _get_page(session, page_pk)
-    meta = PageStore(session).page_meta(page)
+    meta = PageStore(session).proofread_page_meta(page)
     if meta is None:
         raise HTTPException(status_code=404, detail="no page meta yet")
     return meta
 
 
-@router.put("/{page_pk}/page-meta", response_model=PageMeta)
+@router.put("/{page_pk}/page-meta", response_model=ProofreadPageMeta)
 def put_page_meta(
     page_pk: int,
-    update: PageMetaUpdate,
+    update: ProofreadPageMetaUpdate,
     session: Session = Depends(get_session),
-) -> PageMeta:
+) -> ProofreadPageMeta:
     page = _get_page(session, page_pk)
     if page.namespace_role != NsRole.page:
         raise HTTPException(
             status_code=400, detail=f"not a Page:-namespace page: {page.title}"
         )
-    meta = PageStore(session).page_meta(page) or PageMeta(page_pk=page.pk)
-    for field, value in update.model_dump(exclude_unset=True).items():
+    meta = PageStore(session).proofread_page_meta(page)
+    values = update.model_dump(exclude_unset=True)
+    index_page_pk = values.get("index_page_pk")
+    if meta is None and index_page_pk is None:
+        raise HTTPException(
+            status_code=400,
+            detail="index_page_pk is required when creating proofread page metadata",
+        )
+    if index_page_pk is not None:
+        index_page = _get_page(session, index_page_pk)
+        if (
+            index_page.site_pk != page.site_pk
+            or index_page.namespace_role != NsRole.index
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="index_page_pk must identify an Index page on the same site",
+            )
+    if meta is None:
+        assert index_page_pk is not None  # guarded above; narrows the model input
+        meta = ProofreadPageMeta(page_pk=page.pk, index_page_pk=index_page_pk)
+    for field, value in values.items():
         setattr(meta, field, value)
     session.add(meta)
     session.commit()

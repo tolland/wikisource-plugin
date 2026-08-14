@@ -22,7 +22,7 @@ Three rules, all of them enforced here rather than left to callers:
   either orientation and ``assert_link`` treats an existing reversed row as the
   same link. A page pair has exactly one ladder and therefore one anchor, no
   matter which way round the caller asks. The database enforces the same thing
-  (``uq_remotelink_pair``), because a convention only the store honours is one
+  (``uq_revisionlink_pair``), because a convention only the store honours is one
   raw ``session.add`` away from being untrue.
 - **Page correspondence is derived.** ``corresponding_page`` walks
   ``link -> revision -> page``; no page-pair table exists, because a target

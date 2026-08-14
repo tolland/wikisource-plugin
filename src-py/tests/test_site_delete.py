@@ -14,7 +14,7 @@ from wtbot.model import (
     SiteCredential,
     Slot,
 )
-from wtbot.model.sync.remote_link import LinkOrigin
+from wtbot.model.sync.revision_link import LinkOrigin
 
 """Deleting a site through the API: previewed exactly, executed completely.
 
@@ -98,7 +98,7 @@ def test_the_plan_names_every_table_and_deletes_nothing(client, engine, seeded):
     assert plan["label"] == "doomed"
     counted = {entry["table"]: entry["rows"] for entry in plan["counts"]}
     assert counted == {
-        "remotelink": 1,
+        "revisionlink": 1,
         "slot": 2,
         "content": 1,  # the private body only; the shared one is not orphaned
         "revision": 2,

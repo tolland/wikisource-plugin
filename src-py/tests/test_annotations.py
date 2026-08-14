@@ -1,4 +1,5 @@
 import pytest
+from conftest import add_proofread_meta
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -13,7 +14,6 @@ from wtbot.model import (
 )
 from wtbot.model.wiki.namespace import NsRole
 from wtbot.model.wikisource.index_meta import IndexMeta
-from wtbot.model.wikisource.page_meta import PageMeta
 
 """Tests for scan annotations: the SQL-backed stores (boxes and text anchors
 as independent halves joined by annotation_id) and the /pages/annotations +
@@ -57,13 +57,12 @@ def _seed(engine) -> int:
         )
         s.add(page)
         s.flush()
-        s.add(
-            PageMeta(
-                page_pk=page.pk,
-                index_title=INDEX,
-                page_number=1,
-                source_image_url="https://wiki.example/img/Tractatus.djvu/page1.jpg",
-            )
+        add_proofread_meta(
+            s,
+            page_pk=page.pk,
+            index_title=INDEX,
+            page_number=1,
+            source_image_url="https://wiki.example/img/Tractatus.djvu/page1.jpg",
         )
         s.commit()
         return page.pk

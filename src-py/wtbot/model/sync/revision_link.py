@@ -80,13 +80,15 @@ class RevisionLink(SQLModel, table=True):
     at the sole writing boundary.
     """
 
+    __tablename__ = "revisionlink"
+
     __table_args__ = (
         # Unique on the *unordered* pair. A plain UniqueConstraint over
         # (local, remote) would happily admit the same link reversed; SQLite
         # indexes expressions, so min/max canonicalises the pair for the index
         # without the columns having to lie about which side is which.
         Index(
-            "uq_remotelink_pair",
+            "uq_revisionlink_pair",
             text("min(local_revision_pk, remote_revision_pk)"),
             text("max(local_revision_pk, remote_revision_pk)"),
             unique=True,
@@ -112,6 +114,6 @@ class RevisionLink(SQLModel, table=True):
 
     def __repr__(self) -> str:  # pragma: no cover - convenience only
         return (
-            f"RemoteLink(pk={self.pk}, local={self.local_revision_pk}, "
+            f"RevisionLink(pk={self.pk}, local={self.local_revision_pk}, "
             f"remote={self.remote_revision_pk}, origin={self.origin.value})"
         )

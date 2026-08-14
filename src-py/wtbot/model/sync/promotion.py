@@ -168,7 +168,7 @@ class Promotion(SQLModel, table=True):
     )
     anchor_link_pk: int | None = Field(
         default=None,
-        foreign_key="remotelink.pk",
+        foreign_key="revisionlink.pk",
         index=True,
         description=(
             "The asserted correspondence this push replays on top of. Null "

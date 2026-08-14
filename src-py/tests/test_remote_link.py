@@ -178,7 +178,7 @@ def test_the_database_itself_rejects_a_reversed_duplicate(
             origin=LinkOrigin.manual,
         )
     )
-    with pytest.raises(IntegrityError, match="uq_remotelink_pair"):
+    with pytest.raises(IntegrityError, match="uq_revisionlink_pair"):
         session.commit()
     session.rollback()
 
