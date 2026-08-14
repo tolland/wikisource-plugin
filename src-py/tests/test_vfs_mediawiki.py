@@ -1,8 +1,8 @@
 import pytest
 
 from wtbot.model import Page, Site
-from wtbot.model.namespace import Namespace, NsRole
-from wtbot.model.page_meta import PageMeta
+from wtbot.model.wiki.namespace import Namespace, NsRole
+from wtbot.model.wikisource.page_meta import PageMeta
 from wtbot.vfs.mediawiki import MediaWikiVfs, title_namespace_name
 from wtbot.vfs.store import PageStore
 from wtbot.vfs.wikisource import WikisourceVfs

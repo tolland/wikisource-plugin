@@ -10,7 +10,7 @@ from wtbot.model import (
     Page,
     PageLink,
     PageMeta,
-    RemoteLink,
+    RevisionLink,
     Site,
     SiteCredential,
 )
@@ -473,7 +473,7 @@ def test_the_report_writes_nothing_to_the_local_model(client, engine):
 
     with Session(engine) as session:
         assert session.exec(select(PageLink)).all() == []
-        assert session.exec(select(RemoteLink)).all() == []
+        assert session.exec(select(RevisionLink)).all() == []
 
 
 def test_a_tracked_work_is_named_on_the_report(client, engine):

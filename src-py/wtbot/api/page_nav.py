@@ -5,7 +5,7 @@ from sqlmodel import Session
 from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.deps import get_session
 from wtbot.model import Page
-from wtbot.model.page_meta import PageMeta
+from wtbot.model.wikisource.page_meta import PageMeta
 from wtbot.vfs.nodes import PageLeaf, resolve
 from wtbot.vfs.paths import WikiPath
 from wtbot.vfs.store import PageStore

@@ -5,9 +5,9 @@ from sqlmodel import Session
 from wtbot.annotation_store import SqlBoxLinkStore
 from wtbot.main import create_app
 from wtbot.model import BoxRangeLink, Page, Site
-from wtbot.model.index_meta import IndexMeta
-from wtbot.model.namespace import NsRole
-from wtbot.model.page_meta import PageMeta
+from wtbot.model.wiki.namespace import NsRole
+from wtbot.model.wikisource.index_meta import IndexMeta
+from wtbot.model.wikisource.page_meta import PageMeta
 
 """Tests for box→range links: the SQL-backed store and the /pages/box-links
 API surface, including the cascades that keep a link from outliving either

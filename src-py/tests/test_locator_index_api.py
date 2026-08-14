@@ -2,8 +2,8 @@ import pytest
 from sqlmodel import Session, select
 
 from wtbot.model import EditJournal, Page, Site
-from wtbot.model.namespace import NsRole
-from wtbot.model.page_meta import PageMeta
+from wtbot.model.wiki.namespace import NsRole
+from wtbot.model.wikisource.page_meta import PageMeta
 
 """Tests for GET /locator-index/{page-numbers,sections} — resolving a
 back-of-book locator to the Page: that holds it. Mirrors test_page_nav.py's

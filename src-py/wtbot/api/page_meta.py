@@ -12,7 +12,7 @@ from wtbot.model import (
     Page,
     PageMeta,
 )
-from wtbot.model.page_meta import SHORT_NAME_RE
+from wtbot.model.wikisource.page_meta import SHORT_NAME_RE
 from wtbot.vfs.nodes import (
     FileBlobLeaf,
     FileDir,

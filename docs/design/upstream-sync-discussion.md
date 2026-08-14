@@ -78,7 +78,7 @@ two pages that are the same transcription will routinely hash differently, and
 the divergence grows exactly as the work progresses. A hash match is strong
 evidence of sameness; a mismatch is no evidence of difference at all.
 
-This is why correspondence is **asserted and recorded** (`RemoteLink`) rather
+This is why correspondence is **asserted and recorded** (`RevisionLink`) rather
 than computed, and why comparison has to be **content-model aware** — comparing
 body text while treating the pagequality header as metadata with its own
 rules (level is significant and directional; user is required but not

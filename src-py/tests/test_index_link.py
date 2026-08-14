@@ -10,7 +10,7 @@ from wtbot.model import (
     Page,
     PageLink,
     PageMeta,
-    RemoteLink,
+    RevisionLink,
     Site,
     SiteCredential,
 )
@@ -443,7 +443,7 @@ def test_untracking_a_work_releases_its_pairs(client, engine) -> None:
         pairs = session.exec(select(PageLink)).all()
         assert len(pairs) == 3  # the index pairing went; the page pairs stayed
         assert all(pair.index_link_pk is None for pair in pairs)
-        assert len(session.exec(select(RemoteLink)).all()) == 1
+        assert len(session.exec(select(RevisionLink)).all()) == 1
 
 
 def test_untracking_with_cascade_discards_the_pairs(client, engine) -> None:
@@ -458,7 +458,7 @@ def test_untracking_with_cascade_discards_the_pairs(client, engine) -> None:
 
     with Session(engine) as session:
         assert session.exec(select(PageLink)).all() == []
-        assert session.exec(select(RemoteLink)).all() == []
+        assert session.exec(select(RevisionLink)).all() == []
 
 
 def test_untracking_an_unknown_work_is_a_404(client) -> None:

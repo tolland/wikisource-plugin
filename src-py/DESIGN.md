@@ -658,7 +658,7 @@ wikictl clone --src wikisource:en --dest mywikisource:en \
 ```
 
 `clone` fetches the work from `--src`, writes it into `--dest`, and builds the
-`RemoteLink` rows (Index + each Page) as it goes — so correspondence is asserted
+`RevisionLink` rows (Index + each Page) as it goes — so correspondence is asserted
 at creation time, when titles and structure are known, and survives later
 renames in staging. Links attach at the page level; an Index-level link plus
 matching `page_number`s lets the whole work be tracked from one clone.
@@ -694,8 +694,8 @@ POST /link/{page}/pull       # ff if clean; else return diff for merge
 - **Now:** keep `sha1` populated on every fetched revision (already in the
   schema), keep titles and Index→Page structure intact, and don't assume ids are
   global. That alone keeps the door open.
-- **Later:** add the `RemoteLink` table and the link/pull endpoints. No change to
-  the core `pages`/journal model is required to get there — `RemoteLink` is purely
+- **Later:** add the `RevisionLink` table and the link/pull endpoints. No change to
+  the core `pages`/journal model is required to get there — `RevisionLink` is purely
   additive.
 
 The *push* direction of this — promoting locally proofread pages back up to

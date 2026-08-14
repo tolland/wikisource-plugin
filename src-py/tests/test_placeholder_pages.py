@@ -6,7 +6,7 @@ from sqlmodel import Session, select
 
 from wtbot.main import create_app
 from wtbot.model import EditJournal, FetchRequest, FetchStatus, IndexMeta, Page, Site
-from wtbot.model.page_meta import PageMeta
+from wtbot.model.wikisource.page_meta import PageMeta
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import IndexPageEntry, RemotePage, RemotePageImages
 from wtbot.worker import run_pending

@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import Index, text
 from sqlmodel import Field, SQLModel
 
-from wtbot.model.remote_link import LinkOrigin
+from wtbot.model.sync.remote_link import LinkOrigin
 from wtbot.timeutil import utcnow
 
 """An assertion that two pages, one per site, are the same page.

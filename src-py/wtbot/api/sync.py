@@ -18,8 +18,8 @@ from wtbot.model import (
     PromotionBatch,
     PromotionIntent,
     PromotionStatus,
-    RemoteLink,
     Revision,
+    RevisionLink,
     Site,
 )
 from wtbot.promotion_store import (
@@ -468,9 +468,9 @@ def _correspondence_materialized(session: Session, promotion: Promotion) -> bool
     if target_revision is None:
         return False
     links = session.exec(
-        select(RemoteLink).where(
-            (RemoteLink.local_revision_pk == promotion.source_revision_pk)
-            | (RemoteLink.remote_revision_pk == promotion.source_revision_pk)
+        select(RevisionLink).where(
+            (RevisionLink.local_revision_pk == promotion.source_revision_pk)
+            | (RevisionLink.remote_revision_pk == promotion.source_revision_pk)
         )
     ).all()
     return any(

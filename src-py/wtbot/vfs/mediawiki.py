@@ -11,7 +11,7 @@ from wtbot.api.schemas import (
     WriteStatus,
 )
 from wtbot.model import Page, Site
-from wtbot.model.page_meta import PageMeta
+from wtbot.model.wikisource.page_meta import PageMeta
 from wtbot.vfs.store import EffectiveState, PageStore, meta_has_image
 
 """mediawiki:// — the title-addressed layer.

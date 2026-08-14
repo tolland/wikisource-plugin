@@ -14,7 +14,7 @@ from wtbot.model import (
     Site,
     role_for_canonical,
 )
-from wtbot.model.page_meta import PageMeta
+from wtbot.model.wikisource.page_meta import PageMeta
 from wtbot.page_processors import (
     CachedPage,
     ClaimedFetchRequest,

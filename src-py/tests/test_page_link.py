@@ -10,7 +10,7 @@ from wtbot.model import (
     Page,
     PageLink,
     PageMeta,
-    RemoteLink,
+    RevisionLink,
     Site,
 )
 from wtbot.page_link_store import find_pair, pair_pages, unpair
@@ -84,7 +84,7 @@ def test_a_diverged_pair_can_still_be_paired(session: Session) -> None:
 
     assert link.pk is not None
     # Paired, with nothing linked under it -- which is the honest state.
-    assert session.exec(select(RemoteLink)).all() == []
+    assert session.exec(select(RevisionLink)).all() == []
 
 
 def test_an_unfetched_side_can_still_be_paired(session: Session) -> None:
@@ -162,7 +162,7 @@ def test_unpairing_takes_its_rungs_with_it(session: Session) -> None:
 
     assert removed == 1
     assert session.exec(select(PageLink)).all() == []
-    assert session.exec(select(RemoteLink)).all() == []
+    assert session.exec(select(RevisionLink)).all() == []
 
 
 def test_a_pairing_survives_a_rename(session: Session) -> None:
@@ -273,7 +273,7 @@ def test_a_single_rung_can_be_removed_as_a_mistake(client, engine) -> None:
     }
     client.post("/links/propose", json={**body, "confirm": True})
     with Session(engine) as session:
-        (link,) = session.exec(select(RemoteLink)).all()
+        (link,) = session.exec(select(RevisionLink)).all()
 
     removed = client.delete(f"/links/{link.pk}").json()
     assert removed == {"deleted": link.pk, "pairing": link.page_link_pk}

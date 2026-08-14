@@ -20,7 +20,7 @@ from wtbot.api.errors import ApiError
 from wtbot.api.targets import resolve_target
 from wtbot.deps import get_session
 from wtbot.model import Page
-from wtbot.model.page_meta import PageMeta
+from wtbot.model.wikisource.page_meta import PageMeta
 from wtbot.settings import WikiSettings
 from wtbot.vfs.store import PageStore, canonical_title
 

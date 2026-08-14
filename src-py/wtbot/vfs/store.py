@@ -14,8 +14,8 @@ from wtbot.model import (
     Page,
     Site,
 )
-from wtbot.model.namespace import Namespace, NsRole
-from wtbot.model.page_meta import PageMeta, default_short_name
+from wtbot.model.wiki.namespace import Namespace, NsRole
+from wtbot.model.wikisource.page_meta import PageMeta, default_short_name
 
 """PageStore — all SQL for the VFS layers.
 

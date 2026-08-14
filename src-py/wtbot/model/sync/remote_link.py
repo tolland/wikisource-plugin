@@ -54,7 +54,7 @@ class LinkOrigin(str, Enum):
     past. See discussion section 2."""
 
 
-class RemoteLink(SQLModel, table=True):
+class RevisionLink(SQLModel, table=True):
     """One asserted correspondence between a local and a remote revision.
 
     Deliberately narrow. An earlier sketch carried ``confidence``,

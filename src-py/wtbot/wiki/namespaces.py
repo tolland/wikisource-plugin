@@ -3,7 +3,7 @@
 from sqlmodel import Session, select
 
 from wtbot.model import Namespace, Site
-from wtbot.model.namespace import role_for_canonical
+from wtbot.model.wiki.namespace import role_for_canonical
 
 
 def sync_namespaces(session: Session, site: Site, namespaces) -> None:

@@ -1,7 +1,7 @@
 from sqlalchemy import func
 from sqlmodel import Session, select
 
-from wtbot.model import LinkOrigin, Page, PageLink, RemoteLink, Site
+from wtbot.model import LinkOrigin, Page, PageLink, RevisionLink, Site
 from wtbot.remote_link_store import LinkError
 
 """Reading and writing page pairings.
@@ -136,7 +136,7 @@ def retract_rungs(session: Session, link: PageLink) -> int:
     Returns how many rungs went.
     """
     rungs = session.exec(
-        select(RemoteLink).where(RemoteLink.page_link_pk == link.pk)
+        select(RevisionLink).where(RevisionLink.page_link_pk == link.pk)
     ).all()
     for rung in rungs:
         session.delete(rung)

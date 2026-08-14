@@ -2,8 +2,8 @@ import pytest
 from sqlmodel import Session
 
 from wtbot.model import Page, Site
-from wtbot.model.namespace import NsRole
-from wtbot.model.page_meta import PageMeta
+from wtbot.model.wiki.namespace import NsRole
+from wtbot.model.wikisource.page_meta import PageMeta
 from wtbot.vfs.nodes import (
     FileBlobLeaf,
     FileDir,

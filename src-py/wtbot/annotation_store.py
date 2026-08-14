@@ -3,9 +3,9 @@ from typing import Protocol
 
 from sqlmodel import Session, select
 
-from wtbot.model.box_range_link import BoxRangeLink
-from wtbot.model.scan_annotation import ScanAnnotation
-from wtbot.model.text_target_anchor import TextTargetAnchor
+from wtbot.model.annotation.box_range_link import BoxRangeLink
+from wtbot.model.annotation.scan_annotation import ScanAnnotation
+from wtbot.model.annotation.text_target_anchor import TextTargetAnchor
 
 """Storage seams for scan annotations, their text anchors, and the links
 between them.

@@ -50,7 +50,7 @@ behaviour is in `docs/reference/proofread-page-sha1-discordance.md`.
   scope from them, looking a site up by them (a lookup returns None where a
   create would have invented one).
 
-- **`RemoteLink`** — the assertion that **two revisions, one per site, are the
+- **`RevisionLink`** — the assertion that **two revisions, one per site, are the
   same content**. Asserted and recorded, never computed from hashes (discussion
   §3: a `pagequality` header makes cross-site hashes disagree precisely as
   proofreading progresses).
@@ -107,7 +107,7 @@ behaviour is in `docs/reference/proofread-page-sha1-discordance.md`.
 
   The two are different kinds of claim, and the split follows. `PageLink` —
   "these two pages are the same page" — is about the present, can be wrong, and
-  has a `DELETE` that takes its rungs with it. `RemoteLink` — "these two
+  has a `DELETE` that takes its rungs with it. `RevisionLink` — "these two
   revisions hold the same content" — is about two immutable objects, so it is
   superseded, never edited. Both are unique on the unordered pair, and a rung
   follows its pairing's orientation so a ladder reads one way round.

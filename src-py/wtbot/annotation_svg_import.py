@@ -7,8 +7,8 @@ from sqlalchemy.engine import Engine
 from sqlmodel import Session
 
 from wtbot.annotation_store import SqlAnnotationStore
-from wtbot.model.page import Page
-from wtbot.model.scan_annotation import ScanAnnotation
+from wtbot.model.annotation.scan_annotation import ScanAnnotation
+from wtbot.model.wiki.page import Page
 
 """One-shot import of legacy per-page SVG annotation documents.
 

@@ -12,8 +12,8 @@ from wtbot.model import (
     NsRole,
     Page,
     PageMeta,
-    RemoteLink,
     Revision,
+    RevisionLink,
     Site,
     Slot,
 )
@@ -482,7 +482,7 @@ def confirm_proposals(
     proposals: list[LinkProposal],
     *,
     origin: LinkOrigin = LinkOrigin.title_match,
-) -> list[RemoteLink]:
+) -> list[RevisionLink]:
     """Write links for the proposals given -- and only those.
 
     The caller decides what to pass; nothing here filters on the caller's

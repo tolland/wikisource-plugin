@@ -13,9 +13,9 @@ from wtbot.annotation_store import (
 from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.deps import get_session
 from wtbot.model import Page
-from wtbot.model.box_range_link import BoxRangeLink
-from wtbot.model.scan_annotation import AnnotationCategory, ScanAnnotation
-from wtbot.model.text_target_anchor import TextTargetAnchor
+from wtbot.model.annotation.box_range_link import BoxRangeLink
+from wtbot.model.annotation.scan_annotation import AnnotationCategory, ScanAnnotation
+from wtbot.model.annotation.text_target_anchor import TextTargetAnchor
 from wtbot.vfs.nodes import PageLeaf, resolve
 from wtbot.vfs.store import PageStore
 

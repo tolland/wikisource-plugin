@@ -9,8 +9,8 @@ from sqlmodel import Session, select
 from wtbot.api.schemas import WriteContentRequest
 from wtbot.api.vfs import list_children, read_content, write_content
 from wtbot.model import EditJournal, FileBlob, Page, Site
-from wtbot.model.namespace import NsRole
-from wtbot.model.page_meta import PageMeta
+from wtbot.model.wiki.namespace import NsRole
+from wtbot.model.wikisource.page_meta import PageMeta
 from wtbot.vfs import WikisourceVfs
 
 FAMILY = "wikisource"

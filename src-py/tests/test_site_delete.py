@@ -8,13 +8,13 @@ from wtbot.model import (
     FetchRequest,
     Namespace,
     Page,
-    RemoteLink,
     Revision,
+    RevisionLink,
     Site,
     SiteCredential,
     Slot,
 )
-from wtbot.model.remote_link import LinkOrigin
+from wtbot.model.sync.remote_link import LinkOrigin
 
 """Deleting a site through the API: previewed exactly, executed completely.
 
@@ -65,7 +65,7 @@ def seeded(engine):
                 Slot(revision_pk=doomed_rev.pk, content_pk=shared.pk),
                 Slot(revision_pk=doomed_rev2.pk, content_pk=private.pk),
                 Slot(revision_pk=survivor_rev.pk, content_pk=shared.pk),
-                RemoteLink(
+                RevisionLink(
                     local_revision_pk=doomed_rev.pk,
                     remote_revision_pk=survivor_rev.pk,
                     origin=LinkOrigin.manual,
@@ -136,7 +136,7 @@ def test_delete_removes_the_site_and_only_the_site(client, engine, seeded):
     # The shared body survives -- the content store is cross-site by design --
     # while the body only the doomed site referenced is gone.
     assert [c.content_sha1 for c in _rows(engine, Content)] == ["aaa"]
-    assert _rows(engine, RemoteLink) == []
+    assert _rows(engine, RevisionLink) == []
     assert _rows(engine, FetchRequest) == []
     assert _rows(engine, Namespace) == []
     assert _rows(engine, SiteCredential) == []

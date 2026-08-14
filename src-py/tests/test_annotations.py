@@ -11,9 +11,9 @@ from wtbot.model import (
     Site,
     TextTargetAnchor,
 )
-from wtbot.model.index_meta import IndexMeta
-from wtbot.model.namespace import NsRole
-from wtbot.model.page_meta import PageMeta
+from wtbot.model.wiki.namespace import NsRole
+from wtbot.model.wikisource.index_meta import IndexMeta
+from wtbot.model.wikisource.page_meta import PageMeta
 
 """Tests for scan annotations: the SQL-backed stores (boxes and text anchors
 as independent halves joined by annotation_id) and the /pages/annotations +

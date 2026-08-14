@@ -7,8 +7,8 @@ from sqlmodel import Session, select
 
 from wtbot.model import FetchState, FileBlob, Page, Site, role_for_canonical
 from wtbot.model.fetch_request import FetchKind, FetchRequest, FetchStatus
-from wtbot.model.namespace import NsRole
-from wtbot.model.page_meta import PageMeta
+from wtbot.model.wiki.namespace import NsRole
+from wtbot.model.wikisource.page_meta import PageMeta
 from wtbot.timeutil import utcnow
 from wtbot.vfs.store import PageStore
 from wtbot.wiki.client import WikiClient

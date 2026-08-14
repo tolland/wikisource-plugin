@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 from sqlmodel import Session, select
 
-from wtbot.model import NsRole, Page, PageMeta, RemoteLink, Site
+from wtbot.model import NsRole, Page, PageMeta, RevisionLink, Site
 from wtbot.revision_store import record_head_revision, record_history
 from wtbot.wiki.wiki_types import RemotePage
 
@@ -194,7 +194,7 @@ def test_the_asserted_rung_belongs_to_the_pairing(client, engine) -> None:
     )
 
     with Session(engine) as session:
-        (rung,) = session.exec(select(RemoteLink)).all()
+        (rung,) = session.exec(select(RevisionLink)).all()
         assert rung.page_link_pk == pair_pk
 
     cleared = client.delete(f"/links/pairs/{pair_pk}/rungs").json()

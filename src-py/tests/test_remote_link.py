@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
-from wtbot.model import LinkOrigin, Page, RemoteLink, Revision, Site
+from wtbot.model import LinkOrigin, Page, Revision, RevisionLink, Site
 from wtbot.remote_link_store import (
     LinkError,
     assert_link,
@@ -98,7 +98,7 @@ def test_a_link_is_recorded_despite_differing_hashes(
 
     assert link.pk is not None
     assert link.origin is LinkOrigin.copy
-    assert session.exec(select(RemoteLink)).all() == [link]
+    assert session.exec(select(RevisionLink)).all() == [link]
 
 
 def test_re_asserting_a_pair_keeps_the_original_row(
@@ -125,7 +125,7 @@ def test_re_asserting_a_pair_keeps_the_original_row(
 
     assert first.pk == second.pk
     assert second.origin is LinkOrigin.copy
-    assert len(session.exec(select(RemoteLink)).all()) == 1
+    assert len(session.exec(select(RevisionLink)).all()) == 1
 
 
 def test_the_same_link_reversed_is_the_same_link(
@@ -153,7 +153,7 @@ def test_the_same_link_reversed_is_the_same_link(
 
     assert reversed_assertion.pk == first.pk
     assert reversed_assertion.origin is LinkOrigin.copy
-    assert len(session.exec(select(RemoteLink)).all()) == 1
+    assert len(session.exec(select(RevisionLink)).all()) == 1
 
 
 def test_the_database_itself_rejects_a_reversed_duplicate(
@@ -172,7 +172,7 @@ def test_the_database_itself_rejects_a_reversed_duplicate(
     session.commit()
 
     session.add(
-        RemoteLink(
+        RevisionLink(
             local_revision_pk=remote.pk,
             remote_revision_pk=local.pk,
             origin=LinkOrigin.manual,

@@ -2,8 +2,8 @@ import pytest
 from sqlmodel import Session
 
 from wtbot.model import Page, Site
-from wtbot.model.namespace import NsRole
-from wtbot.model.page_meta import PageMeta, default_short_name
+from wtbot.model.wiki.namespace import NsRole
+from wtbot.model.wikisource.page_meta import PageMeta, default_short_name
 from wtbot.vfs.store import PageStore
 
 """Tests for the per-role Page metadata extensions (IndexMeta / PageMeta /

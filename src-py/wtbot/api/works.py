@@ -29,7 +29,7 @@ from wtbot.model import (
     Page,
     PageLink,
     PageMeta,
-    RemoteLink,
+    RevisionLink,
     Site,
 )
 from wtbot.page_link_store import find_pair, pair_pages
@@ -326,9 +326,9 @@ def _summary(session: Session, work: IndexLink) -> WorkSummary:
         .where(PageLink.index_link_pk == work.pk)
     ).one()
     linked = session.exec(
-        select(func.count(func.distinct(RemoteLink.page_link_pk)))
-        .select_from(RemoteLink)
-        .join(PageLink, PageLink.pk == RemoteLink.page_link_pk)
+        select(func.count(func.distinct(RevisionLink.page_link_pk)))
+        .select_from(RevisionLink)
+        .join(PageLink, PageLink.pk == RevisionLink.page_link_pk)
         .where(PageLink.index_link_pk == work.pk)
     ).one()
     local_site = session.get(Site, local_page.site_pk)

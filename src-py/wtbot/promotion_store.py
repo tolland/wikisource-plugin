@@ -12,8 +12,8 @@ from wtbot.model import (
     PromotionBatch,
     PromotionIntent,
     PromotionStatus,
-    RemoteLink,
     Revision,
+    RevisionLink,
     Site,
     Slot,
 )
@@ -246,7 +246,7 @@ def _stage_promotions_for(
     return rows
 
 
-def _revision_on_page(session: Session, link: RemoteLink, page: Page) -> Revision:
+def _revision_on_page(session: Session, link: RevisionLink, page: Page) -> Revision:
     """Return the side of a rung belonging to ``page``."""
     for revision_pk in (link.local_revision_pk, link.remote_revision_pk):
         revision = session.get(Revision, revision_pk)
@@ -531,7 +531,7 @@ def body_matches_target(session: Session, promotion: Promotion) -> bool:
 
 def materialize_promotion_links(
     session: Session, target_page: Page
-) -> list[RemoteLink]:
+) -> list[RevisionLink]:
     """Turn fetched promotion results into their exact one-to-one ladder rungs.
 
     A save response identifies the new target revision by revid, but the fetch
@@ -552,7 +552,7 @@ def materialize_promotion_links(
         )
         .order_by(Promotion.pk)
     ).all()
-    linked: list[RemoteLink] = []
+    linked: list[RevisionLink] = []
     for promotion in rows:
         target_revision = session.exec(
             select(Revision).where(

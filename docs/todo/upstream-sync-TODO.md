@@ -1,6 +1,6 @@
 # Upstream sync — TODO
 
-Only unfinished work. What is already built — the revision store, `RemoteLink`
+Only unfinished work. What is already built — the revision store, `RevisionLink`
 / `PageLink` / `IndexLink`, the content-model comparison, the sync report, the
 proposal endpoint, `Promotion`/`PromotionBatch` and the incremental-fetch
 planner — is recorded in `docs/done/upstream-sync-built.md`.

@@ -2,9 +2,9 @@ import pytest
 from sqlmodel import Session
 
 from wtbot.model import Page, Site
-from wtbot.model.index_meta import IndexMeta
-from wtbot.model.namespace import NsRole
-from wtbot.model.page_meta import PageMeta
+from wtbot.model.wiki.namespace import NsRole
+from wtbot.model.wikisource.index_meta import IndexMeta
+from wtbot.model.wikisource.page_meta import PageMeta
 
 """Tests for GET /pages/nav — the split editor's page-navigation metadata:
 prev/next sibling resolution in Pages/-listing order, first/last edges, and

@@ -1,7 +1,7 @@
 from sqlalchemy.orm import aliased
 from sqlmodel import Session, select
 
-from wtbot.model import LinkOrigin, Page, RemoteLink, Revision
+from wtbot.model import LinkOrigin, Page, Revision, RevisionLink
 
 """Reading and writing asserted cross-site revision correspondence.
 
@@ -41,7 +41,7 @@ def assert_link(
     remote_revision_pk: int,
     origin: LinkOrigin,
     page_link_pk: int | None = None,
-) -> RemoteLink:
+) -> RevisionLink:
     """Record that two revisions hold the same content.
 
     Idempotent on the *unordered* pair: re-asserting an existing link returns
@@ -83,7 +83,7 @@ def assert_link(
         other_site_pk=local_page.site_pk,
     )
 
-    link = RemoteLink(
+    link = RevisionLink(
         local_revision_pk=local_revision_pk,
         remote_revision_pk=remote_revision_pk,
         origin=origin,
@@ -140,13 +140,13 @@ def _pairing_for(session: Session, local_page: Page, remote_page: Page):
 
 def find_link(
     session: Session, *, revision_pk: int, other_revision_pk: int
-) -> RemoteLink | None:
+) -> RevisionLink | None:
     """The link between two revisions, whichever way round it was stored."""
     return session.exec(
-        select(RemoteLink).where(
+        select(RevisionLink).where(
             _either_way(
-                RemoteLink.local_revision_pk,
-                RemoteLink.remote_revision_pk,
+                RevisionLink.local_revision_pk,
+                RevisionLink.remote_revision_pk,
                 revision_pk,
                 other_revision_pk,
             )
@@ -154,7 +154,7 @@ def find_link(
     ).first()
 
 
-def ladder(session: Session, *, page_pk: int, other_page_pk: int) -> list[RemoteLink]:
+def ladder(session: Session, *, page_pk: int, other_page_pk: int) -> list[RevisionLink]:
     """Every link asserted between two pages, oldest first.
 
     The two arguments are interchangeable: a page pair has one ladder, not one
@@ -168,14 +168,14 @@ def ladder(session: Session, *, page_pk: int, other_page_pk: int) -> list[Remote
     remote_revision = aliased(Revision)
     return list(
         session.exec(
-            select(RemoteLink)
+            select(RevisionLink)
             .join(
                 local_revision,
-                RemoteLink.local_revision_pk == local_revision.pk,
+                RevisionLink.local_revision_pk == local_revision.pk,
             )
             .join(
                 remote_revision,
-                RemoteLink.remote_revision_pk == remote_revision.pk,
+                RevisionLink.remote_revision_pk == remote_revision.pk,
             )
             .where(
                 _either_way(
@@ -185,14 +185,14 @@ def ladder(session: Session, *, page_pk: int, other_page_pk: int) -> list[Remote
                     other_page_pk,
                 )
             )
-            .order_by(RemoteLink.pk)
+            .order_by(RevisionLink.pk)
         ).all()
     )
 
 
 def current_anchor(
     session: Session, *, page_pk: int, other_page_pk: int
-) -> RemoteLink | None:
+) -> RevisionLink | None:
     """The most recent link for a page pair -- the base a push works from.
 
     None means the pair has never been linked, which is a different state from
@@ -217,8 +217,8 @@ def corresponding_page(
     side is a pairing question, answered by title matching, not by this table.
     """
     for near, far in (
-        (RemoteLink.local_revision_pk, RemoteLink.remote_revision_pk),
-        (RemoteLink.remote_revision_pk, RemoteLink.local_revision_pk),
+        (RevisionLink.local_revision_pk, RevisionLink.remote_revision_pk),
+        (RevisionLink.remote_revision_pk, RevisionLink.local_revision_pk),
     ):
         near_revision = aliased(Revision)
         far_revision = aliased(Revision)
@@ -228,7 +228,7 @@ def corresponding_page(
             # From the link outwards, not from the page: selecting the page as
             # the lead entity would put it in the FROM clause and then join it
             # a second time under the same alias.
-            .select_from(RemoteLink)
+            .select_from(RevisionLink)
             .join(near_revision, near == near_revision.pk)
             .join(far_revision, far == far_revision.pk)
             .join(far_page, far_revision.page_pk == far_page.pk)
@@ -236,23 +236,23 @@ def corresponding_page(
                 near_revision.page_pk == page_pk,
                 far_page.site_pk == other_site_pk,
             )
-            .order_by(RemoteLink.pk.desc())
+            .order_by(RevisionLink.pk.desc())
         ).first()
         if found is not None:
             return found
     return None
 
 
-def links_for_revision(session: Session, revision_pk: int) -> list[RemoteLink]:
+def links_for_revision(session: Session, revision_pk: int) -> list[RevisionLink]:
     """Every link touching a revision, from either side."""
     return list(
         session.exec(
-            select(RemoteLink)
+            select(RevisionLink)
             .where(
-                (RemoteLink.local_revision_pk == revision_pk)
-                | (RemoteLink.remote_revision_pk == revision_pk)
+                (RevisionLink.local_revision_pk == revision_pk)
+                | (RevisionLink.remote_revision_pk == revision_pk)
             )
-            .order_by(RemoteLink.pk)
+            .order_by(RevisionLink.pk)
         ).all()
     )
 

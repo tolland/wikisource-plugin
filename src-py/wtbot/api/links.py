@@ -24,8 +24,8 @@ from wtbot.model import (
     Page,
     PageLink,
     PageMeta,
-    RemoteLink,
     Revision,
+    RevisionLink,
     Site,
     Slot,
 )
@@ -699,7 +699,7 @@ def pair_revisions(
     remote_head = head_revision(session, remote_page)
 
     rungs = ladder(session, page_pk=local_page.pk, other_page_pk=remote_page.pk)
-    linked_pairs: dict[tuple[int, int], RemoteLink] = {}
+    linked_pairs: dict[tuple[int, int], RevisionLink] = {}
     linked_from: dict[int, list[int]] = {}
     for rung in rungs:
         for near, far in (
@@ -849,7 +849,7 @@ def delete_link(link_pk: int, session: Session = Depends(get_session)) -> dict:
     The pairing is untouched, and the response names it: retracting a rung says
     the two *revisions* do not correspond, never that the two pages do not.
     """
-    link = session.get(RemoteLink, link_pk)
+    link = session.get(RevisionLink, link_pk)
     if link is None:
         raise HTTPException(404, f"no link {link_pk}")
     pairing = link.page_link_pk

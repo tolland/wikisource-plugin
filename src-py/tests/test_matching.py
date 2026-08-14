@@ -14,8 +14,8 @@ from wtbot.model import (
     NsRole,
     Page,
     PageMeta,
-    RemoteLink,
     Revision,
+    RevisionLink,
     Site,
 )
 from wtbot.remote_link_store import assert_link, current_anchor
@@ -264,7 +264,7 @@ def test_confirming_writes_links_and_refuses_the_unproposable(
     confirm_proposals(session, [good], origin=LinkOrigin.title_match)
     session.commit()
 
-    assert len(session.exec(select(RemoteLink)).all()) == 1
+    assert len(session.exec(select(RevisionLink)).all()) == 1
     anchor = current_anchor(
         session, page_pk=local_page.pk, other_page_pk=remote_page.pk
     )
@@ -294,12 +294,12 @@ def test_the_propose_endpoint_writes_nothing_by_default(client, engine) -> None:
     assert response.json()["counts"] == {"same": 1}
     assert response.json()["confirmed"] == 0
     with Session(engine) as session:
-        assert session.exec(select(RemoteLink)).all() == []
+        assert session.exec(select(RevisionLink)).all() == []
 
     confirmed = client.post("/links/propose", json={**body, "confirm": True})
     assert confirmed.json()["confirmed"] == 1
     with Session(engine) as session:
-        assert len(session.exec(select(RemoteLink)).all()) == 1
+        assert len(session.exec(select(RevisionLink)).all()) == 1
 
 
 def test_linking_a_diverged_pair_needs_force(client, engine) -> None:

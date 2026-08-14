@@ -14,8 +14,8 @@ from wtbot.model import (
     Namespace,
     Page,
     PageMeta,
-    RemoteLink,
     Revision,
+    RevisionLink,
     ScanAnnotation,
     Site,
     SiteCredential,
@@ -103,10 +103,10 @@ def _predicates(site_pk: int) -> list[tuple[type, object]]:
     revisions = _revision_pks(site_pk)
     return [
         (
-            RemoteLink,
+            RevisionLink,
             or_(
-                RemoteLink.local_revision_pk.in_(revisions),
-                RemoteLink.remote_revision_pk.in_(revisions),
+                RevisionLink.local_revision_pk.in_(revisions),
+                RevisionLink.remote_revision_pk.in_(revisions),
             ),
         ),
         (Slot, Slot.revision_pk.in_(revisions)),
