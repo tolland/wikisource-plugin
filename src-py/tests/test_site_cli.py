@@ -293,8 +293,8 @@ def test_api_location_is_global_and_command_dependencies_remain_local():
     ):
         result = runner.invoke(create_app(), argv)
         assert result.exit_code == 0, argv
-        assert "--base-url" not in result.output, argv
+        assert "--base-url" not in reaesc.sub("", result.output), argv
 
     for argv in (["site-credential", "add", "--help"], ["fetch-page", "--help"]):
         result = runner.invoke(create_app(), argv)
-        assert "--label" in result.output, argv
+        assert "--label" in reaesc.sub("", result.output), argv
