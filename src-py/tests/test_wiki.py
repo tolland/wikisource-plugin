@@ -225,6 +225,87 @@ class TestConfigInjection:
         assert policy.put_throttle == 10.0
         assert policy.maxlag == 2
 
+    def test_site_read_throttle_overrides_only_the_global_read_pacing(
+        self, monkeypatch
+    ):
+        from wtbot.model import Site
+
+        monkeypatch.setenv("WTBOT_WIKI_READ_THROTTLE", "1.5")
+        monkeypatch.setenv("WTBOT_WIKI_PUT_THROTTLE", "10")
+
+        inherited = WikiSettings.from_site(Site(family="w", code="en"))
+        local = WikiSettings.from_site(
+            Site(family="local", code="en", read_throttle=0.01)
+        )
+
+        assert inherited.rate_limits.read_throttle == 1.5
+        assert local.rate_limits.read_throttle == 0.01
+        assert local.rate_limits.put_throttle == 10.0
+
+    def test_site_read_throttle_reaches_pywikibot(self, tmp_path):
+        import pywikibot.config as pwbconfig
+
+        from wtbot.model import Site
+        from wtbot.wiki.config import configure_pywikibot
+
+        settings = WikiSettings.from_site(
+            Site(family="local", code="en", read_throttle=0.01),
+            config_dir=str(tmp_path / "local-pwb"),
+        )
+        configure_pywikibot(settings)
+
+        assert settings.read_throttle == 0.01
+        assert pwbconfig.minthrottle == 0.01
+
+    def test_each_client_captures_its_site_policy_before_global_config_changes(
+        self, tmp_path, monkeypatch
+    ):
+        import pywikibot
+        import pywikibot.config as pwbconfig
+
+        from wtbot.wiki.client import PywikibotClient
+
+        class LazySite:
+            def __init__(self):
+                self._throttle = None
+
+            @property
+            def throttle(self):
+                if self._throttle is None:
+                    self._throttle = type(
+                        "CapturedThrottle",
+                        (),
+                        {"mindelay": pwbconfig.minthrottle},
+                    )()
+                return self._throttle
+
+            def __str__(self):
+                return "fake-site"
+
+        monkeypatch.setattr(pywikibot, "Site", lambda **kwargs: LazySite())
+
+        fast = PywikibotClient(
+            WikiSettings(
+                family="local-fast",
+                code="en",
+                api_url="http://local-fast/api.php",
+                config_dir=str(tmp_path / "pwb"),
+                rate_limits=RateLimitPolicy(read_throttle=0.01),
+            )
+        )
+        slow = PywikibotClient(
+            WikiSettings(
+                family="remote-slow",
+                code="en",
+                api_url="http://remote-slow/api.php",
+                config_dir=str(tmp_path / "pwb"),
+                rate_limits=RateLimitPolicy(read_throttle=0.7),
+            )
+        )
+
+        assert fast.site.throttle.mindelay == 0.01
+        assert slow.site.throttle.mindelay == 0.7
+
     def test_user_agent_states_contact_information(self, tmp_path):
         """Wikimedia's policy requires a contact URL or email and throttles
         non-conforming clients harder, so this costs request budget when wrong.
@@ -401,6 +482,7 @@ class _FakeSiteRow:
     family = "mywikisource"
     code = "en"
     api_url = "https://wikisource-debian-13.lan/w/api.php"
+    read_throttle = None
 
 
 def test_from_site_has_no_credentials_without_overrides(monkeypatch):

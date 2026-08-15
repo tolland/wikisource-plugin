@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from wtbot.model import Site
 from wtbot.settings import WikiSettings
 from wtbot.wiki.client import WikiClient, get_wiki_client
+from wtbot.wiki.rate_limits import RateLimitPolicy
 
 """Process-wide reuse of wiki clients.
 
@@ -44,6 +45,7 @@ class ClientKey:
     username: str | None
     bot_name: str | None
     secret_digest: str  # never the password itself, only a change detector
+    rate_limits: RateLimitPolicy
 
     @classmethod
     def of(cls, site: Site, settings: WikiSettings) -> "ClientKey":
@@ -55,6 +57,7 @@ class ClientKey:
             username=settings.username,
             bot_name=settings.bot_name,
             secret_digest=_digest(settings.password),
+            rate_limits=settings.rate_limits,
         )
 
 

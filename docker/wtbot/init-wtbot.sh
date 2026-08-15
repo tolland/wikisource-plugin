@@ -20,6 +20,14 @@ uv run wtbot site show "${site}" ||
         --username admin \
         --password "AdminPassword123!"
 
+uv run wtbot site update "${site}" --read-throttle 0.01
+
+uv run wtbot fetch-page  \
+    --revisions 5 \
+    --label "${site}" \
+    --drain \
+    "File:The principles of mechanics presented in a new form (Hertz, 1894).pdf"
+
 uv run wtbot fetch-page  \
     --revisions 5 \
     --label "${site}" \

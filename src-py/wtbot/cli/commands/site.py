@@ -39,6 +39,15 @@ def add(
         ),
     ),
     articlepath: str = typer.Option("/wiki/$1"),
+    read_throttle: float | None = typer.Option(
+        None,
+        "--read-throttle",
+        min=0,
+        help=(
+            "Minimum seconds between API reads for this site. Defaults to the "
+            "process policy (0.35s); local Docker wikis can use e.g. 0.01."
+        ),
+    ),
     username: str | None = typer.Option(
         None, help="Wiki account to log in as. Without it the site cannot be used."
     ),
@@ -64,6 +73,7 @@ def add(
             "code": code,
             "api_url": api_url,
             "articlepath": articlepath,
+            "read_throttle": read_throttle,
         },
     )
     typer.echo(
@@ -112,7 +122,9 @@ def list_sites(api: ApiClient = Depends(get_api)) -> None:
         typer.echo(
             f"{site['label'] or '(unlabelled)':<24} "
             f"{site['family']}:{site['code']:<8} "
-            f"{site['api_url'] or 'family file':<48} {who}"
+            f"{site['api_url'] or 'family file':<48} {who} "
+            "read-throttle="
+            f"{site.get('read_throttle') if site.get('read_throttle') is not None else 'default'}"
         )
 
 
@@ -123,7 +135,15 @@ def show(
 ) -> None:
     """One wiki's registration, as stored."""
     site = api.get(f"/sites/by-label/{label}")
-    for key in ("pk", "label", "family", "code", "api_url", "articlepath"):
+    for key in (
+        "pk",
+        "label",
+        "family",
+        "code",
+        "api_url",
+        "articlepath",
+        "read_throttle",
+    ):
         typer.echo(f"{key:<16} {site.get(key)}")
     credential = api.get_optional(f"/sites/{site['pk']}/credential")
     typer.echo(
@@ -135,6 +155,33 @@ def show(
             else "none (reads only)"
         )
     )
+
+
+@app.command("update")
+def update(
+    label: str = typer.Argument(..., help="Site label"),
+    read_throttle: float = typer.Option(
+        ...,
+        "--read-throttle",
+        min=0,
+        help="Minimum seconds between reads; use 0 to disable pacing.",
+    ),
+    api: ApiClient = Depends(get_api),
+) -> None:
+    """Update the per-site request pacing without re-registering the wiki."""
+    site = api.get(f"/sites/by-label/{label}")
+    updated = api.put(
+        f"/sites/{site['pk']}",
+        {
+            "label": site["label"],
+            "family": site["family"],
+            "code": site["code"],
+            "api_url": site.get("api_url"),
+            "articlepath": site.get("articlepath") or "/wiki/$1",
+            "read_throttle": read_throttle,
+        },
+    )
+    typer.echo(f"updated {updated['label']}: read throttle {updated['read_throttle']}s")
 
 
 @app.command("delete")

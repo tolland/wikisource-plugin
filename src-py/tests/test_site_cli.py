@@ -25,6 +25,7 @@ SITE = {
     "code": "en",
     "api_url": "https://wikisource-debian-13.lan/w/api.php",
     "articlepath": "/wiki/$1",
+    "read_throttle": None,
 }
 CREDENTIAL = {
     "site_pk": 1,
@@ -114,6 +115,8 @@ def test_site_add_registers_and_says_what_is_missing(api):
             "en",
             "--api-url",
             "https://wikisource-debian-13.lan/w/api.php",
+            "--read-throttle",
+            "0.01",
         ],
     )
 
@@ -122,6 +125,7 @@ def test_site_add_registers_and_says_what_is_missing(api):
     assert url.endswith("/sites/")
     assert payload["label"] == "local"
     assert payload["api_url"] == "https://wikisource-debian-13.lan/w/api.php"
+    assert payload["read_throttle"] == 0.01
     # The blocker, stated as a blocker: this wiki is registered but cannot be
     # used until it can log in.
     assert "will be refused" in result.output
@@ -159,6 +163,19 @@ def test_site_add_can_take_the_credential_in_the_same_step(api):
     assert payload["bot_name"] == "wtbot"
     assert "logs in as Admin@wtbot" in result.output
     assert "no credential" not in result.output
+
+
+def test_site_update_changes_the_read_throttle(api):
+    result = runner.invoke(
+        create_app(),
+        ["site", "update", "local", "--read-throttle", "0.01"],
+    )
+
+    assert result.exit_code == 0, result.output
+    url, payload = api["put"][0]
+    assert url.endswith("/sites/1")
+    assert payload["read_throttle"] == 0.01
+    assert "0.01s" in result.output
 
 
 def test_site_delete_without_force_is_the_dry_run(api):

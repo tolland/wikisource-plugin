@@ -19,6 +19,7 @@ export interface Site {
   articlepath?: string | null;
   api_url?: string | null;
   label?: string | null;
+  read_throttle?: number | null;
   created_at?: string | null;
 }
 
@@ -40,6 +41,7 @@ export interface SitePayload {
   articlepath?: string;
   api_url?: string | null;
   label?: string | null;
+  read_throttle?: number | null;
 }
 
 export interface SiteCredential {

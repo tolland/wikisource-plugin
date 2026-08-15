@@ -1,5 +1,5 @@
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from wtbot.wiki.rate_limits import RateLimitPolicy
 
@@ -62,6 +62,12 @@ class WikiSettings:
         limits) still come from env since those are global/infrastructure, not
         per-site secrets."""
         env = cls.from_env()
+        rate_limits = env.rate_limits
+        if site.read_throttle is not None:
+            rate_limits = replace(
+                rate_limits,
+                read_throttle=site.read_throttle,
+            )
         base = dict(
             family=site.family,
             code=site.code,
@@ -69,7 +75,7 @@ class WikiSettings:
             # No credential fallback to env -- callers pass them as overrides
             ca_bundle=env.ca_bundle,
             config_dir=env.config_dir,
-            rate_limits=env.rate_limits,
+            rate_limits=rate_limits,
         )
         base.update(overrides)
         return cls(**base)

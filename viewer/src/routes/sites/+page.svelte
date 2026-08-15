@@ -65,7 +65,8 @@
       code: 'en',
       articlepath: '/wiki/$1',
       api_url: '',
-      label: ''
+      label: '',
+      read_throttle: null
     };
   }
 
@@ -96,7 +97,11 @@
       code: siteForm.code.trim(),
       articlepath: siteForm.articlepath?.trim() || '/wiki/$1',
       api_url: siteForm.api_url?.trim() || null,
-      label: siteForm.label?.trim() || null
+      label: siteForm.label?.trim() || null,
+      read_throttle:
+        siteForm.read_throttle === null || siteForm.read_throttle === undefined
+          ? null
+          : Number(siteForm.read_throttle)
     };
   }
 
@@ -127,7 +132,8 @@
       code: site.code,
       articlepath: site.articlepath ?? '/wiki/$1',
       api_url: site.api_url ?? '',
-      label: site.label ?? ''
+      label: site.label ?? '',
+      read_throttle: site.read_throttle ?? null
     };
     message = '';
     error = '';
@@ -383,6 +389,14 @@
           bind:value={siteForm.articlepath}
           required
           placeholder="/wiki/$1"
+        />
+        <TextField
+          label="Read throttle (seconds)"
+          bind:value={siteForm.read_throttle}
+          type="number"
+          min="0"
+          step="0.01"
+          placeholder="0.35 (0.01 for local Docker)"
         />
       </FormRow>
 

@@ -48,6 +48,14 @@ class Site(SQLModel, table=True):
     # surface requires one.
     label: str | None = None  # 'local', 'en.wikisource', 'staging'
 
+    read_throttle: float | None = None
+    """Per-site minimum seconds between API reads.
+
+    None inherits the process-wide ``RateLimitPolicy``. A local Docker wiki
+    can use a much smaller value without weakening the conservative Wikimedia
+    policy for every other registered site.
+    """
+
     changes_seen_through: datetime | None = None
     """Newest ``recentchanges`` timestamp we have acted on for this site.
 

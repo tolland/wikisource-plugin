@@ -104,6 +104,44 @@ def test_registering_requires_a_label(http):
     assert resp.status_code == 422
 
 
+def test_site_read_throttle_round_trips_and_can_be_updated(http):
+    created = http.post(
+        "/sites/",
+        json={
+            "label": "local",
+            "family": "mywikisource",
+            "code": "en",
+            "read_throttle": 0.01,
+        },
+    )
+    assert created.status_code == 201
+    site = created.json()
+    assert site["read_throttle"] == 0.01
+
+    updated = http.put(
+        f"/sites/{site['pk']}",
+        json={
+            "label": "local",
+            "family": "mywikisource",
+            "code": "en",
+            "read_throttle": 0.02,
+        },
+    )
+    assert updated.status_code == 200
+    assert updated.json()["read_throttle"] == 0.02
+
+    invalid = http.put(
+        f"/sites/{site['pk']}",
+        json={
+            "label": "local",
+            "family": "mywikisource",
+            "code": "en",
+            "read_throttle": -1,
+        },
+    )
+    assert invalid.status_code == 422
+
+
 def test_fetching_a_site_that_cannot_log_in_is_refused(http):
     """wtbot authenticates by default.
 

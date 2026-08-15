@@ -15,6 +15,7 @@ from wtbot.model import Site
 from wtbot.settings import WikiSettings
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.client_registry import ClientKey, ClientRegistry, make_client_factory
+from wtbot.wiki.rate_limits import RateLimitPolicy
 
 
 def _site(pk: int = 1) -> Site:
@@ -112,6 +113,22 @@ def test_changed_credentials_build_a_new_client():
     assert anonymous is not logged_in
     assert logged_in is not rotated
     assert len(builder.calls) == 3
+
+
+def test_changed_rate_policy_builds_a_new_client():
+    builder = _CountingBuilder()
+    registry = ClientRegistry(builder=builder)
+    site = _site()
+
+    conservative = registry.get(site, _settings())
+    local = registry.get(
+        site,
+        _settings(rate_limits=RateLimitPolicy(read_throttle=0.01)),
+    )
+
+    assert conservative is not local
+    assert len(builder.calls) == 2
+    assert builder.calls[-1].read_throttle == 0.01
 
 
 def test_client_key_never_holds_the_password():

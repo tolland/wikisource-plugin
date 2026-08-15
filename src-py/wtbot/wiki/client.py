@@ -199,6 +199,11 @@ class PywikibotClient:
         # The configured family name also keeps two AutoFamily wikis on the
         # same host but different ports distinct in pywikibot's Site cache.
         self.site = _make_pywikibot_site(pywikibot, settings)
+        # BaseSite.throttle is lazy and snapshots process-global
+        # config.minthrottle on first access. Capture it now, while this site's
+        # policy is active, so another registered site's client cannot decide
+        # this site's pacing merely by being used first.
+        _ = self.site.throttle
 
         # Write the password file entry now that we know the runtime
         # family/code (AutoFamily derives these from the hostname at Site()

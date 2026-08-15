@@ -31,6 +31,14 @@ class SiteRequest(BaseModel):
     )
     articlepath: str = "/wiki/$1"
     api_url: str | None = None
+    read_throttle: float | None = Field(
+        default=None,
+        ge=0,
+        description=(
+            "Minimum seconds between API reads for this site. Null inherits "
+            "the process policy; small values are appropriate for local wikis."
+        ),
+    )
 
 
 @router.get("/", response_model=list[Site])
@@ -97,6 +105,7 @@ def update_site(
     site.articlepath = body.articlepath
     site.api_url = body.api_url
     site.label = body.label
+    site.read_throttle = body.read_throttle
     session.add(site)
     session.commit()
     session.refresh(site)
