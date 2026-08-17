@@ -161,8 +161,11 @@ target page 101 and every promotion in the work is silently off by an offset.
 
 The local body cannot be pushed verbatim:
 
-- **`<pagequality>` header** — rewrite `user=` to the account performing the
-  push; the local username may not exist on the target.
+- **`<pagequality>` header** — conservatively map the source site's configured
+  credential username to the target site's configured credential username.
+  Empty and unknown users remain unchanged. The reasoning, ambiguity, and
+  possible account-link/content/slot metadata extensions are recorded in
+  `proofread-page-user-mapping.md`.
 - **Quality level** — cap promoted levels at 3 (Proofread). Wikisource requires
   validation be done by a *different* user than the proofreader, so asserting
   level 4 via automation from a staging wiki is the wrong look. Never downgrade

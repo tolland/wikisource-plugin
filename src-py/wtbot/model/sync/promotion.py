@@ -5,7 +5,7 @@ from sqlmodel import Field, SQLModel
 
 from wtbot.timeutil import utcnow
 
-"""The push queue: reviewable, cancellable intent, one row per page.
+"""The push queue: one reviewable page, replayed one revision at a time.
 
 Deliberately **not** a status column on an audit log (discussion §12), and
 deliberately **not** ``EditJournal`` + the commit worker (TODO §7). The journal
@@ -14,11 +14,11 @@ cross-site intent is a different claim with a different lifecycle: it is
 proposed, reviewed, possibly abandoned, and only then written. Putting one in
 the other is the overloading §12 identifies in ``Commit``.
 
-Two tables because there are two lifetimes. A ``PromotionBatch`` is a run: this
-work, this direction, approved by this person, at this moment. A ``Promotion``
-is one page inside it, with its own outcome -- a batch that half-succeeds is
-the normal case, not an error state, and each row has to say which half it was
-in.
+Two tables because there are two lifetimes. A ``PromotionBatch`` is one page:
+this correspondence, this direction, approved by this person, at this moment.
+A ``Promotion`` is one ordered source revision inside it. Several pages do not
+share an ordering constraint, approval decision, or conflict boundary, so they
+do not share a batch.
 
 **A promotion is built from a sync report and freezes what that report said.**
 The report is recomputed on every load, and rightly: it describes revisions
@@ -32,9 +32,9 @@ is a conflict, which is a state, not a surprise.
 class BatchStatus(str, Enum):
     """Where a run is in its life.
 
-    ``partial`` is a first-class end state, not a failure: pushing 300 pages
-    through a rate-limited wiki and having 12 refused is Tuesday, and a status
-    that could not say so would force the whole run to read as broken.
+    ``partial`` is a first-class end state: an earlier revision may have been
+    written before a later step conflicted or was refused. The page then holds
+    part of the reviewed chain, which is neither complete nor a total failure.
     """
 
     draft = "draft"
@@ -90,7 +90,7 @@ class PromotionIntent(str, Enum):
 
 
 class PromotionBatch(SQLModel, table=True):
-    """One push run: a work, a direction, and an approval."""
+    """One page push: its correspondence, direction, and approval."""
 
     pk: int | None = Field(default=None, primary_key=True)
 
@@ -102,9 +102,25 @@ class PromotionBatch(SQLModel, table=True):
         index=True,
         description="The tracked work, when the pair is tracked.",
     )
+    page_link_pk: int | None = Field(
+        default=None,
+        foreign_key="pagelink.pk",
+        index=True,
+        description="The page correspondence; null only while creating the target.",
+    )
+    source_page_pk: int = Field(foreign_key="page.pk", index=True)
+    target_page_pk: int | None = Field(default=None, foreign_key="page.pk", index=True)
 
-    source_index_title: str
-    target_index_title: str
+    source_title: str
+    target_title: str
+    page_number: int | None = None
+    source_head_revid: int | None = None
+    anchor_link_pk: int | None = Field(
+        default=None,
+        foreign_key="revisionlink.pk",
+        index=True,
+        description="The correspondence this page's revision chain builds upon.",
+    )
     label: str | None = None
     """A human's name for the run, for telling two of them apart in a list."""
 
@@ -134,29 +150,8 @@ class Promotion(SQLModel, table=True):
     pk: int | None = Field(default=None, primary_key=True)
     batch_pk: int = Field(foreign_key="promotionbatch.pk", index=True)
 
-    page_link_pk: int | None = Field(
-        default=None, foreign_key="pagelink.pk", index=True
-    )
-    """The pairing this promotion acts within. Null for a create, which has no
-    target page to have been paired with yet."""
-
-    source_page_pk: int = Field(foreign_key="page.pk", index=True)
-    target_page_pk: int | None = Field(default=None, foreign_key="page.pk", index=True)
-    target_title: str
-    """Held as text as well as a pk: a create has no target row to point at,
-    and the title is what the write is addressed to either way."""
-
-    page_number: int | None = None
-
     intent: PromotionIntent
     source_revision_pk: int = Field(foreign_key="revision.pk")
-    source_head_revid: int | None = None
-    """Source head observed when this exact change was frozen.
-
-    A granular review may expose an older revision while later source
-    revisions already exist. Pinning the observed head lets push-time safety
-    distinguish that valid case from a source which moved after review.
-    """
     predecessor_promotion_pk: int | None = Field(
         default=None,
         foreign_key="promotion.pk",
@@ -164,16 +159,6 @@ class Promotion(SQLModel, table=True):
         description=(
             "The preceding revision step for this page. Its result revid is "
             "this edit's base; null for the first step."
-        ),
-    )
-    anchor_link_pk: int | None = Field(
-        default=None,
-        foreign_key="revisionlink.pk",
-        index=True,
-        description=(
-            "The asserted correspondence this push replays on top of. Null "
-            "only for a create, which has nothing to replay onto -- a staged "
-            "update without one is the bug this column exists to make visible."
         ),
     )
     base_revid: int | None = None
@@ -204,5 +189,5 @@ class Promotion(SQLModel, table=True):
     def __repr__(self) -> str:  # pragma: no cover - convenience only
         return (
             f"Promotion(pk={self.pk}, batch={self.batch_pk}, "
-            f"{self.intent.value} {self.target_title!r}, {self.status.value})"
+            f"{self.intent.value}, {self.status.value})"
         )

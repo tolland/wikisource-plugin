@@ -351,15 +351,14 @@ Built: `wtbot.model.promotion`, `wtbot.promotion_store`,
 `wtbot.promotion_worker`, `POST /sync/batches*`, and the `/sync/batches/{pk}`
 viewer route.
 
-- `PromotionBatch`: source site, target site, work, label, status
+- `PromotionBatch` (one per page): source and target page keys and titles,
+  their page/work links, direction, frozen source head and anchor, label, status
   (`draft → approved → running → complete | partial | aborted`), and the
-  approval record. `partial` is a first-class end state, not a failure:
-  pushing 300 pages through a rate-limited wiki and having 12 refused is
-  Tuesday, and a status that could not say so would make every real run
-  read as broken. `preflight` and `rolled_back` are absent until something
-  performs them — rollback is still its own item.
-- `Promotion` (one per page): the pairing, the source revision, the anchor
-  link, the base revid, the **frozen body**, the outcome, and the
+  approval record. `partial` means some earlier revisions were written before
+  a later step conflicted or failed. `preflight` and `rolled_back` are absent
+  until something performs them — rollback is still its own item.
+- `Promotion` (one per source revision): its predecessor, source revision,
+  base revid, **frozen body**, outcome, and the
   **pre-push target revid** — persisted because it is what a rollback
   targets and it is unrecoverable once the push has appended a revision.
 - Intent (`create` | `update`) recorded explicitly, never inferred from
@@ -371,16 +370,20 @@ viewer route.
   execution. Body, base revid and anchor are copied in at staging and
   re-checked at push time — a source that moved is a `conflict`, which is a
   state rather than a surprise.
+- **ProofreadPage users are mapped conservatively.** A `pagequality user=` that
+  equals the source site's configured credential username is mapped to the
+  target credential username. Empty and unknown names remain unchanged; see
+  `docs/design/proofread-page-user-mapping.md` for the decision and escalation
+  path.
 - **Only writable rows stage.** An unlinked page a comparison likes is
   refused: staging is the last point at which "we are not sure these
   correspond" is cheap to say.
 - **Nothing runs unapproved**, and the approver's name is stored rather
   than assumed from the fact that a request arrived.
-- **One page per call.** `POST /sync/batches/{pk}/push` writes exactly one
+- **One revision per call.** `POST /sync/batches/{pk}/push` writes exactly one
   promotion. The viewer's "push the rest" walks the same call and halts on
-  the first row that does not push cleanly — a conflict means the world
-  moved under the batch, and the remaining rows were staged on the same
-  assumption.
+  the first row that does not push cleanly — later rows depend on the preceding
+  result and cannot run through a broken chain.
 - The push writes **no link**. A successful push creates a revision known
   here only as a revid, and the revision store has one writer (the fetch
   worker); a later refetch makes it concrete and the ordinary `propose`

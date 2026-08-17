@@ -7,6 +7,7 @@ from wtbot.model import (
     FetchRequest,
     FetchState,
     FileBlob,
+    IndexMeta,
     NsRole,
     Page,
     PageLink,
@@ -74,6 +75,14 @@ def build_index(session: Session, site: Site, title: str, *, sha1: str | None) -
     session.add(page)
     session.commit()
     session.refresh(page)
+    session.add(
+        IndexMeta(
+            page_pk=page.pk,
+            site_pk=site.pk,
+            short_name=f"index-{page.pk}",
+        )
+    )
+    session.commit()
     if sha1 is not None:
         _, _, basename = title.partition(":")
         file_page = Page(

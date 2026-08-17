@@ -2,6 +2,7 @@ import typer
 
 from wtbot.cli.callbacks import get_callback
 from wtbot.cli.commands import (
+    dev,
     drain,
     fetch_page,
     fetch_refresh,
@@ -40,6 +41,7 @@ def create_app() -> typer.Typer:
     cli.add_typer(site_credential.app, rich_help_panel="Model commands")
     cli.add_typer(link.app, rich_help_panel="Model commands")
     cli.add_typer(page.app, rich_help_panel="Model commands")
+    cli.add_typer(dev.app, rich_help_panel="Development")
     cli.add_typer(drain.app)
     cli.add_typer(fetch_page.app)
     cli.add_typer(fetch_refresh.app)

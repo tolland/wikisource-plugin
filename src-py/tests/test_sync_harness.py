@@ -37,6 +37,34 @@ def test_pair_starts_as_two_independent_wikis(
 
 
 @pytest.mark.slow
+def test_seeded_contributor_account_matrix(
+    wiki_pair: WikiStack, upstream_api: WikiApi, local_api: WikiApi
+) -> None:
+    """One ordinary account is shared and one is unique to each wiki."""
+    shared = wiki_pair.config.shared_user
+    upstream_only = wiki_pair.config.upstream_user
+    local_only = wiki_pair.config.local_user
+
+    assert upstream_api.user_exists(shared)
+    assert local_api.user_exists(shared)
+    assert upstream_api.user_exists(upstream_only)
+    assert not local_api.user_exists(upstream_only)
+    assert local_api.user_exists(local_only)
+    assert not upstream_api.user_exists(local_only)
+
+    privileged = {"sysop", "bureaucrat", "interface-admin"}
+    for api, username in (
+        (upstream_api, shared),
+        (local_api, shared),
+        (upstream_api, upstream_only),
+        (local_api, local_only),
+    ):
+        groups = api.user_groups(username)
+        assert groups is not None
+        assert groups.isdisjoint(privileged)
+
+
+@pytest.mark.slow
 def test_seeded_upstream_has_the_work_and_its_scan(seeded_upstream: WikiApi) -> None:
     assert seeded_upstream.exists(CANADIAN_PATENT_INDEX)
     assert seeded_upstream.exists(CANADIAN_PATENT_SCAN)

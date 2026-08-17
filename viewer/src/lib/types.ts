@@ -595,8 +595,6 @@ export interface PromotionRow {
   pk: number;
   source_revision_pk: number;
   predecessor_promotion_pk?: number | null;
-  page_number?: number | null;
-  target_title: string;
   intent: PromotionIntent;
   status: PromotionStatus;
   base_revid?: number | null;
@@ -612,8 +610,9 @@ export interface Batch {
   status: BatchStatus;
   source_site: string;
   target_site: string;
-  source_index_title: string;
-  target_index_title: string;
+  source_title: string;
+  target_title: string;
+  page_number?: number | null;
   approved_by?: string | null;
   work_pk?: number | null;
   counts: Record<string, number>;
@@ -624,14 +623,14 @@ export interface Batch {
 
 export interface StageRequest extends SyncRequest {
   label?: string | null;
-  page_numbers?: number[] | null;
+  page_number: number;
 }
 
 /* --- single-page promotion -------------------------------------------------
  *
  * The `/sync/page-report` and `/sync/page-batches` counterparts of the above,
  * for one page and its revisions -- no index, no scan check, no fan-out.
- * Staging still produces an ordinary `Batch` (of one promotion), so the
+ * Staging still produces an ordinary page `Batch`, so the
  * review/approve/push screens are shared rather than duplicated.
  */
 

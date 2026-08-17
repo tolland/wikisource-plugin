@@ -457,11 +457,12 @@ def _transformations(source_body: str, submitted_body: str) -> list[str]:
 
 
 def _correspondence_materialized(session: Session, promotion: Promotion) -> bool:
-    if promotion.result_revid is None or promotion.target_page_pk is None:
+    batch = session.get(PromotionBatch, promotion.batch_pk)
+    if promotion.result_revid is None or batch.target_page_pk is None:
         return False
     target_revision = session.exec(
         select(Revision).where(
-            Revision.page_pk == promotion.target_page_pk,
+            Revision.page_pk == batch.target_page_pk,
             Revision.revid == promotion.result_revid,
         )
     ).first()
@@ -481,8 +482,9 @@ def _correspondence_materialized(session: Session, promotion: Promotion) -> bool
 
 def _change_blockers(session: Session, promotion: Promotion) -> list[str]:
     blockers: list[str] = []
+    batch = session.get(PromotionBatch, promotion.batch_pk)
     source_revision = session.get(Revision, promotion.source_revision_pk)
-    if source_revision is None or source_revision.page_pk != promotion.source_page_pk:
+    if source_revision is None or source_revision.page_pk != batch.source_page_pk:
         blockers.append("The source revision no longer belongs to the source page.")
     if not source_is_unchanged(session, promotion):
         blockers.append("The source moved after this change was calculated.")
@@ -502,12 +504,12 @@ def _change_review(session: Session, promotion: Promotion) -> ChangeReviewOut:
     batch = session.get(PromotionBatch, promotion.batch_pk)
     source_site = session.get(Site, batch.source_site_pk)
     target_site = session.get(Site, batch.target_site_pk)
-    source_page = session.get(Page, promotion.source_page_pk)
+    source_page = session.get(Page, batch.source_page_pk)
     source_revision = session.get(Revision, promotion.source_revision_pk)
     source_content = content_of(session, source_revision)
     target_body = ""
-    if promotion.target_page_pk is not None:
-        target_page = session.get(Page, promotion.target_page_pk)
+    if batch.target_page_pk is not None:
+        target_page = session.get(Page, batch.target_page_pk)
         from wtbot.revision_store import head_revision
 
         target_head = head_revision(session, target_page)
@@ -517,7 +519,7 @@ def _change_review(session: Session, promotion: Promotion) -> ChangeReviewOut:
         unified_diff(
             target_body.splitlines(keepends=True),
             promotion.body.splitlines(keepends=True),
-            fromfile=f"{promotion.target_title}@{promotion.base_revid or 'missing'}",
+            fromfile=f"{batch.target_title}@{promotion.base_revid or 'missing'}",
             tofile=f"{source_page.title}@{source_revision.revid}",
         )
     )
@@ -537,9 +539,9 @@ def _change_review(session: Session, promotion: Promotion) -> ChangeReviewOut:
         ),
         target=ChangeTargetOut(
             site=_site_name(target_site),
-            title=promotion.target_title,
+            title=batch.target_title,
             base_revid=promotion.base_revid,
-            url=_page_url(target_site, promotion.target_title),
+            url=_page_url(target_site, batch.target_title),
         ),
         submitted_body=promotion.body,
         diff=diff,
@@ -553,7 +555,7 @@ def _verification_status(session: Session, promotion: Promotion) -> str:
     requests = session.exec(
         select(FetchRequest).where(
             FetchRequest.site_pk == batch.target_site_pk,
-            FetchRequest.title == promotion.target_title,
+            FetchRequest.title == batch.target_title,
         )
     ).all()
     if not requests:
@@ -574,7 +576,7 @@ def _change_result(session: Session, promotion: Promotion) -> ChangePushOut:
         status=status,
         new_target_revid=promotion.result_revid,
         target_revision_url=(
-            _page_url(target_site, promotion.target_title, promotion.result_revid)
+            _page_url(target_site, batch.target_title, promotion.result_revid)
             if promotion.result_revid is not None
             else None
         ),
@@ -645,8 +647,9 @@ def next_change(
             PromotionBatch.label == _SINGLE_CHANGE_LABEL,
             PromotionBatch.source_site_pk == source_site.pk,
             PromotionBatch.target_site_pk == target_site.pk,
-            Promotion.source_page_pk == source_page.pk,
-            Promotion.target_title == (payload.target_title or payload.source_title),
+            PromotionBatch.source_page_pk == source_page.pk,
+            PromotionBatch.target_title
+            == (payload.target_title or payload.source_title),
             Promotion.status == PromotionStatus.staged,
         )
         .order_by(Promotion.pk.desc())
@@ -661,8 +664,9 @@ def next_change(
             PromotionBatch.label == _SINGLE_CHANGE_LABEL,
             PromotionBatch.source_site_pk == source_site.pk,
             PromotionBatch.target_site_pk == target_site.pk,
-            Promotion.source_page_pk == source_page.pk,
-            Promotion.target_title == (payload.target_title or payload.source_title),
+            PromotionBatch.source_page_pk == source_page.pk,
+            PromotionBatch.target_title
+            == (payload.target_title or payload.source_title),
             Promotion.status == PromotionStatus.pushed,
         )
         .order_by(Promotion.pk.desc())
@@ -733,14 +737,7 @@ class StageRequest(SyncRequest):
     label: str | None = Field(
         default=None, description="A name for this run, to tell it from others."
     )
-    page_numbers: list[int] | None = Field(
-        default=None,
-        description=(
-            "Stage only these pages. The usual case: a reviewer works down a "
-            "list and stages what they actually looked at. Omit for every "
-            "writable page in the report."
-        ),
-    )
+    page_number: int = Field(description="The one report row this page batch freezes.")
 
 
 class ApproveRequest(BaseModel):
@@ -755,7 +752,7 @@ class ApproveRequest(BaseModel):
 class PushRequest(BaseModel):
     promotion_pk: int | None = Field(
         default=None,
-        description="Which page to push. Omit to take the next staged one.",
+        description="Which revision to push. Omit to take the next staged one.",
     )
     force: bool = Field(
         default=False,
@@ -771,8 +768,6 @@ class PromotionOut(BaseModel):
     pk: int
     source_revision_pk: int
     predecessor_promotion_pk: int | None = None
-    page_number: int | None = None
-    target_title: str
     intent: PromotionIntent
     status: PromotionStatus
     base_revid: int | None = None
@@ -788,8 +783,9 @@ class BatchOut(BaseModel):
     status: BatchStatus
     source_site: str
     target_site: str
-    source_index_title: str
-    target_index_title: str
+    source_title: str
+    target_title: str
+    page_number: int | None = None
     approved_by: str | None = None
     work_pk: int | None = None
     counts: dict[str, int] = Field(description="Promotions per status.")
@@ -802,8 +798,6 @@ def _promotion_out(row: Promotion) -> PromotionOut:
         pk=row.pk,
         source_revision_pk=row.source_revision_pk,
         predecessor_promotion_pk=row.predecessor_promotion_pk,
-        page_number=row.page_number,
-        target_title=row.target_title,
         intent=row.intent,
         status=row.status,
         base_revid=row.base_revid,
@@ -829,8 +823,9 @@ def _batch_out(session: Session, batch: PromotionBatch) -> BatchOut:
         status=batch.status,
         source_site=_site_name(session.get(Site, batch.source_site_pk)),
         target_site=_site_name(session.get(Site, batch.target_site_pk)),
-        source_index_title=batch.source_index_title,
-        target_index_title=batch.target_index_title,
+        source_title=batch.source_title,
+        target_title=batch.target_title,
+        page_number=batch.page_number,
         approved_by=batch.approved_by,
         work_pk=batch.index_link_pk,
         counts=counts,
@@ -850,12 +845,11 @@ def _batch(session: Session, batch_pk: int) -> PromotionBatch:
 def create_batch(
     payload: StageRequest, session: Session = Depends(get_session)
 ) -> BatchOut:
-    """Stage a push run from what the report says is writable.
+    """Stage one page from a work report as an ordered revision batch.
 
-    Refuses anything else. An unlinked page a comparison likes, a diverged
-    pair, a page the target is ahead on -- staging is the last point at which
-    "we are not sure these correspond" is cheap to say, and a queue that
-    accepted them would make it expensive.
+    The selected page must be writable. An unlinked page a comparison likes, a
+    diverged pair, or a page the target is ahead on is refused before any
+    frozen revision rows are created.
     """
     source_site, target_site = resolve_pair(
         session, payload.source_label, payload.target_label
@@ -874,7 +868,7 @@ def create_batch(
             source_site=source_site,
             target_site=target_site,
             label=payload.label,
-            page_numbers=payload.page_numbers,
+            page_number=payload.page_number,
         )
     except SyncError as exc:
         raise HTTPException(404, str(exc)) from exc

@@ -81,9 +81,8 @@
 
   async function pushRest(): Promise<void> {
     // The same one-page call in a loop, stopping the moment a row does not
-    // push cleanly. A conflict means the world moved under the batch, and the
-    // remaining pages were staged on the same assumption -- grinding through
-    // them is how one bad assumption gets written three hundred times.
+    // push cleanly. Every later revision depends on the preceding result, so a
+    // conflict stops the chain rather than attempting descendants of a failed edit.
     busy = true;
     error = '';
     message = '';
@@ -96,11 +95,11 @@
         batch = current;
         pushed += 1;
         if (unhappy(current) > failuresBefore) {
-          message = `Stopped after ${pushed} page(s): a row did not push cleanly.`;
+          message = `Stopped after ${pushed} revision(s): a row did not push cleanly.`;
           return;
         }
       }
-      message = `Pushed ${pushed} page(s).`;
+      message = `Pushed ${pushed} revision(s).`;
     } catch (err) {
       error = err instanceof Error ? err.message : 'The run stopped on an error';
     } finally {
@@ -109,10 +108,10 @@
   }
 
   const skip = (row: PromotionRow) =>
-    run(() => skipPromotion(batchPk, row.pk), `Skipped ${row.target_title}.`);
+    run(() => skipPromotion(batchPk, row.pk), `Skipped source revision ${row.source_revision_pk}.`);
 
   const abort = () =>
-    run(() => abortBatch(batchPk), 'Run aborted. Pages already pushed stay pushed.');
+    run(() => abortBatch(batchPk), 'Run aborted. Revisions already pushed stay pushed.');
 
   onMount(load);
 </script>
@@ -127,7 +126,7 @@
     title={batch.label ?? `Batch #${batch.pk}`}
     count={`${batch.status}${batch.approved_by ? ` · approved by ${batch.approved_by}` : ''}`}
   >
-    <p class="other">{batch.source_index_title}</p>
+    <p class="other">{batch.source_title} &rarr; {batch.target_title}</p>
   </PageHeading>
 
   {#if error}
@@ -166,7 +165,7 @@
     <section class="run" aria-label="Push">
       <div class="row">
         <ActionButton disabled={busy || !canPush} onclick={pushNext}>
-          Push the next page
+          Push the next revision
         </ActionButton>
         <ActionButton variant="secondary" disabled={busy || !canPush} onclick={pushRest}>
           Push the rest
@@ -182,8 +181,8 @@
       <small>
         One revision per request. &ldquo;Push the rest&rdquo; walks the same call and stops
         the moment a row does not push cleanly &mdash; a conflict means the world
-        moved, and the remaining pages are built on the same assumption. Aborting
-        skips what is left; pages already pushed stay pushed.
+        moved, and the remaining revisions depend on that failed step. Aborting
+        skips what is left; revisions already pushed stay pushed.
       </small>
     </section>
   {/if}
@@ -193,7 +192,7 @@
       <tr>
         <th scope="col">#</th>
         <th scope="col">Status</th>
-        <th scope="col">Page / source revision</th>
+        <th scope="col">Target / source revision</th>
         <th scope="col">Intent</th>
         <th scope="col">Base</th>
         <th scope="col">Result</th>
@@ -203,14 +202,14 @@
     <tbody>
       {#each batch.promotions as row}
         <tr>
-          <td>{row.page_number ?? '?'}</td>
+          <td>{batch.page_number ?? '?'}</td>
           <td>
             <span class="chip {STATUSES[row.status]?.tone ?? 'quiet'}">
               {STATUSES[row.status]?.label ?? row.status}
             </span>
           </td>
           <td class="title">
-            {row.target_title}
+            {batch.target_title}
             <small>source revision #{row.source_revision_pk} · {row.body_length.toLocaleString()} characters</small>
             {#if row.error_message}
               <small class="why">{row.error_message}</small>

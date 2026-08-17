@@ -58,6 +58,10 @@ class StackConfig:
     local_port: int
     username: str = "Admin"
     password: str = "AdminPassword123!"
+    shared_user: str = "SharedContributor"
+    upstream_user: str = "UpstreamContributor"
+    local_user: str = "LocalContributor"
+    contributor_password: str = "ContributorPassword123!"
     with_pair: bool = False
     with_api: bool = False
     """Also run the wtbot API (compose.wtbot.yml, `api` profile).
@@ -97,6 +101,12 @@ def pair_config() -> StackConfig:
         local_port=int(os.environ.get("SYNC_LOCAL_PORT", PAIR_LOCAL_PORT)),
         username=os.environ.get("MW_ADMIN_USER", "Admin"),
         password=os.environ.get("MW_ADMIN_PASSWORD", "AdminPassword123!"),
+        shared_user=os.environ.get("SEED_SHARED_USER", "SharedContributor"),
+        upstream_user=os.environ.get("SEED_UPSTREAM_USER", "UpstreamContributor"),
+        local_user=os.environ.get("SEED_LOCAL_USER", "LocalContributor"),
+        contributor_password=os.environ.get(
+            "SEED_USER_PASSWORD", "ContributorPassword123!"
+        ),
         with_pair=True,
         with_api=os.environ.get("SYNC_WITH_API", "") not in ("", "0", "false"),
         wtbot_port=int(os.environ.get("SYNC_WTBOT_PORT", PAIR_WTBOT_PORT)),

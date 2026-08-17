@@ -143,6 +143,20 @@ class WikiApi:
         pages = payload["query"]["pages"]
         return not pages[0].get("missing", False)
 
+    def user_exists(self, username: str) -> bool:
+        """Whether this wiki has a local account with exactly this name."""
+        return self.user_groups(username) is not None
+
+    def user_groups(self, username: str) -> set[str] | None:
+        """A local account's groups, or None when the account is absent."""
+        payload = self._request(
+            "GET", action="query", list="users", ususers=username, usprop="groups"
+        )
+        user = payload["query"]["users"][0]
+        if user.get("missing", False):
+            return None
+        return set(user.get("groups", []))
+
     def page_text(self, title: str) -> str | None:
         revisions = self.revisions(title, limit=1, with_content=True)
         return revisions[0].content if revisions else None

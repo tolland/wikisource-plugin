@@ -1,7 +1,7 @@
 from sqlalchemy.orm import aliased
 from sqlmodel import Session, select
 
-from wtbot.model import IndexLink, LinkOrigin, NsRole, Page, PageLink, Site
+from wtbot.model import IndexLink, IndexMeta, LinkOrigin, Page, PageLink, Site
 from wtbot.page_link_store import find_pair, pair_pages, unpair
 from wtbot.remote_link_store import LinkError
 
@@ -40,11 +40,17 @@ def link_indexes(
     information, and a second row would give one work two identities.
     """
     for page in (local_index, remote_index):
-        if page.namespace_role is not NsRole.index:
+        meta = session.exec(
+            select(IndexMeta).where(
+                IndexMeta.page_pk == page.pk,
+                IndexMeta.site_pk == page.site_pk,
+            )
+        ).first()
+        if meta is None:
             raise LinkError(
-                f"{page.title} is not an Index: page (role {page.namespace_role}). "
-                "A work is tracked by its index; pair other namespaces with "
-                "`link add`."
+                f"{page.title} has no IndexMeta row and is not a fetched "
+                "ProofreadPage Index. A work can only be tracked through its "
+                "proofread Index."
             )
 
     pairing = pair_pages(session, local_index, remote_index, origin=origin)

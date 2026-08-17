@@ -37,6 +37,11 @@ x-mediawiki-common: &mediawiki-common
 x-seed-env: &seed-env
   SEED_SCANS: "${SEED_SCANS-djvu}"
   SEED_DUMPS: "${SEED_DUMPS-Canadian_patent_29537_all.xml}"
+  # Ordinary accounts for cross-wiki contributor tests. SharedContributor
+  # exists on both wikis; each side also gets one account deliberately absent
+  # from the other. Empty a value to skip creating that account.
+  SEED_SHARED_USER: "${SEED_SHARED_USER-SharedContributor}"
+  SEED_USER_PASSWORD: "${SEED_USER_PASSWORD-ContributorPassword123!}"
 
 x-db-common: &db-common
   image: mariadb:11.4
@@ -90,10 +95,10 @@ services:
       MW_SERVER: "http://localhost:${WIKISOURCE_PORT:-18571}"
       MW_SITE_NAME: "${WIKISOURCE_SITE_NAME:-Test Wikisource}"
       <<: *seed-env
+      SEED_SIDE_USER: "${SEED_UPSTREAM_USER-UpstreamContributor}"
       SEED_REVID_BURN: "0"
     ports:
       - "${WIKISOURCE_PORT:-18571}:80"
-
 
   seed-restore-local:
     profiles: ["pair"]
@@ -135,6 +140,7 @@ services:
       MW_SERVER: "http://localhost:${WIKISOURCE_LOCAL_PORT:-18572}"
       MW_SITE_NAME: "${WIKISOURCE_LOCAL_SITE_NAME:-Test Wikisource (local)}"
       <<: *seed-env
+      SEED_SIDE_USER: "${SEED_LOCAL_USER-LocalContributor}"
       # The one deliberate asymmetry, and it is not content: throwaway
       # revisions so the two wikis do not assign the same revids to the same
       # pages. See the burn loop in start-wikisource.sh.

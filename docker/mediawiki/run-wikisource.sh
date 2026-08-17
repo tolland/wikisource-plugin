@@ -20,6 +20,9 @@ set -euo pipefail
 : "${SEED_SCANS:=}"       # file extension for importImages, e.g. 'djvu'
 : "${SEED_DUMPS:=}"       # space-separated XML dumps under /fixtures/scans
 : "${SEED_REVID_BURN:=0}" # throwaway revisions, to desynchronise revids
+: "${SEED_SHARED_USER:=}" # ordinary account created on both sides
+: "${SEED_SIDE_USER:=}"   # ordinary account created only on this side
+: "${SEED_USER_PASSWORD:=ContributorPassword123!}"
 
 # Written last, removed first: the healthcheck waits on it so that
 # `compose up --wait` cannot return while an import is still running.
@@ -103,6 +106,27 @@ sleep 1
 printf "running maintenance update\n"
 
 php maintenance/run.php update --quick
+
+# Keep account creation outside the content-seeding guard: restored snapshots
+# and warm database volumes need to converge on the configured users too.
+# createAndPromote creates an ordinary account when no group flags are passed;
+# --force makes restarts idempotent and refreshes the configured test password.
+seed_user() {
+  local username="$1"
+  if [ -z "$username" ]; then
+    return
+  fi
+  php maintenance/run.php createAndPromote \
+    "$username" \
+    "$SEED_USER_PASSWORD" \
+    --force \
+    --reason "Wikisource test fixture account"
+}
+
+seed_user "$SEED_SHARED_USER"
+if [ "$SEED_SIDE_USER" != "$SEED_SHARED_USER" ]; then
+  seed_user "$SEED_SIDE_USER"
+fi
 
 
 # Content seeding. Guarded on the database so a warm volume restarts fast and,

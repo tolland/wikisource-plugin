@@ -88,6 +88,9 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "slow: mark test as slow to run")
+    import uvloop
+
+    uvloop.install()
 
 
 def pytest_collection_modifyitems(config, items):
@@ -296,6 +299,43 @@ def local_api(wiki_pair: WikiStack) -> WikiApi:
     api = WikiApi(wiki_pair.endpoint("local"))
     api.login()
     return api
+
+
+def _seeded_contributor(wiki_pair: WikiStack, role: str, username: str) -> WikiApi:
+    """Log in as an ordinary account created by ``run-wikisource``."""
+    api = WikiApi(
+        replace(
+            wiki_pair.endpoint(role),
+            username=username,
+            password=wiki_pair.config.contributor_password,
+        )
+    )
+    api.login()
+    return api
+
+
+@pytest.fixture(scope="session")
+def upstream_shared_contributor(wiki_pair: WikiStack) -> WikiApi:
+    """The shared ordinary account, authenticated against upstream."""
+    return _seeded_contributor(wiki_pair, "upstream", wiki_pair.config.shared_user)
+
+
+@pytest.fixture(scope="session")
+def local_shared_contributor(wiki_pair: WikiStack) -> WikiApi:
+    """The shared ordinary account, authenticated against local."""
+    return _seeded_contributor(wiki_pair, "local", wiki_pair.config.shared_user)
+
+
+@pytest.fixture(scope="session")
+def upstream_only_contributor(wiki_pair: WikiStack) -> WikiApi:
+    """Ordinary account which deliberately does not exist on local."""
+    return _seeded_contributor(wiki_pair, "upstream", wiki_pair.config.upstream_user)
+
+
+@pytest.fixture(scope="session")
+def local_only_contributor(wiki_pair: WikiStack) -> WikiApi:
+    """Ordinary account which deliberately does not exist on upstream."""
+    return _seeded_contributor(wiki_pair, "local", wiki_pair.config.local_user)
 
 
 # Ordinary accounts for edit tests. The admin is a sysop and carries rights

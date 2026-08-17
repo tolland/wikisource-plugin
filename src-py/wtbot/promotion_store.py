@@ -1,6 +1,6 @@
 from sqlmodel import Session, select
 
-from wtbot.content_model import parse_document
+from wtbot.content_model import ProofreadPageDocument, parse_document
 from wtbot.matching import content_of
 from wtbot.model import (
     MAIN_SLOT,
@@ -15,6 +15,7 @@ from wtbot.model import (
     Revision,
     RevisionLink,
     Site,
+    SiteCredential,
     Slot,
 )
 from wtbot.page_link_store import find_pair
@@ -54,41 +55,23 @@ def stage_batch(
     source_site: Site,
     target_site: Site,
     label: str | None = None,
-    page_numbers: list[int] | None = None,
+    page_number: int,
 ) -> PromotionBatch:
-    """Build a draft batch from a report's actionable rows.
-
-    ``page_numbers`` narrows it to a chosen subset -- the usual case, because a
-    reviewer works down a list and stages what they have actually looked at.
-    """
+    """Build one page batch from the selected row of a work report."""
     if report.blocked:
         raise PromotionError("the report is blocked: " + "; ".join(report.blockers))
 
-    wanted = [page for page in report.pages if page.actionable]
-    if page_numbers is not None:
-        chosen = set(page_numbers)
-        wanted = [page for page in wanted if page.page_number in chosen]
-    if not wanted:
-        raise PromotionError(
-            "nothing to stage: no page in this report is writable in this "
-            "direction. An unlinked page needs linking first."
-        )
-
-    batch = PromotionBatch(
-        source_site_pk=source_site.pk,
-        target_site_pk=target_site.pk,
-        index_link_pk=report.work_pk,
-        source_index_title=report.source.index_title,
-        target_index_title=report.target.index_title,
+    wanted = [page for page in report.pages if page.page_number == page_number]
+    if len(wanted) != 1:
+        raise PromotionError(f"page {page_number} is not unique in this work report")
+    return stage_page(
+        session,
+        wanted[0],
+        source_site=source_site,
+        target_site=target_site,
         label=label,
+        index_link_pk=report.work_pk,
     )
-    session.add(batch)
-    session.flush()
-
-    for page in wanted:
-        _stage_promotions_for(session, batch, page, source_site, target_site)
-    session.flush()
-    return batch
 
 
 def stage_page(
@@ -98,6 +81,8 @@ def stage_page(
     source_site: Site,
     target_site: Site,
     label: str | None = None,
+    index_link_pk: int | None = None,
+    limit: int | None = None,
 ) -> PromotionBatch:
     """Stage a single-page push run: this page, this direction, nothing else.
 
@@ -106,24 +91,52 @@ def stage_page(
     between the asserted anchor and the source head.
     """
     if not page.actionable:
+        if page.verdict is SyncVerdict.unlinked:
+            raise PromotionError(
+                f"{page.source_title} needs linking first; staging cannot infer "
+                "page correspondence from a comparison"
+            )
         raise PromotionError(
             f"{page.source_title} is not writable in this direction "
             f"({page.verdict.value}); a push replays onto an asserted anchor "
             "and cannot invent one"
         )
 
+    source_page = session.exec(
+        select(Page).where(
+            Page.site_pk == source_site.pk, Page.title == page.source_title
+        )
+    ).one()
+    target_page = (
+        session.exec(
+            select(Page).where(
+                Page.site_pk == target_site.pk, Page.title == page.target_title
+            )
+        ).first()
+        if page.target_title
+        else None
+    )
+    pairing = (
+        find_pair(session, source_page.pk, target_page.pk)
+        if target_page is not None
+        else None
+    )
     batch = PromotionBatch(
         source_site_pk=source_site.pk,
         target_site_pk=target_site.pk,
-        index_link_pk=None,
-        source_index_title=page.source_title or "",
-        target_index_title=page.target_title or page.source_title or "",
+        index_link_pk=index_link_pk,
+        page_link_pk=pairing.pk if pairing else None,
+        source_page_pk=source_page.pk,
+        target_page_pk=target_page.pk if target_page else None,
+        source_title=page.source_title or "",
+        target_title=page.target_title or page.source_title or "",
+        page_number=page.page_number,
         label=label,
     )
     session.add(batch)
     session.flush()
 
-    _stage_promotions_for(session, batch, page, source_site, target_site)
+    _stage_promotions_for(session, batch, page, source_site, target_site, limit=limit)
     session.flush()
     return batch
 
@@ -140,19 +153,15 @@ def stage_next_change(
         raise PromotionError(
             f"{page.source_title} has no next writable change ({page.verdict.value})"
         )
-    batch = PromotionBatch(
-        source_site_pk=source_site.pk,
-        target_site_pk=target_site.pk,
-        source_index_title=page.source_title or "",
-        target_index_title=page.target_title or page.source_title or "",
+    batch = stage_page(
+        session,
+        page,
+        source_site=source_site,
+        target_site=target_site,
         label="single-change",
+        limit=1,
     )
-    session.add(batch)
-    session.flush()
-    rows = _stage_promotions_for(
-        session, batch, page, source_site, target_site, limit=1
-    )
-    return rows[0]
+    return promotions(session, batch.pk)[0]
 
 
 def _stage_promotions_for(
@@ -164,22 +173,14 @@ def _stage_promotions_for(
     *,
     limit: int | None = None,
 ) -> list[Promotion]:
-    source_page = session.exec(
-        select(Page).where(
-            Page.site_pk == source_site.pk, Page.title == page.source_title
-        )
-    ).one()
+    source_page = session.get(Page, batch.source_page_pk)
     source_head = head_revision(session, source_page)
     if source_head is None:  # pragma: no cover - actionable implies a head
         raise PromotionError(f"{page.source_title} has no cached revision to push")
 
     target_page = (
-        session.exec(
-            select(Page).where(
-                Page.site_pk == target_site.pk, Page.title == page.target_title
-            )
-        ).first()
-        if page.target_title
+        session.get(Page, batch.target_page_pk)
+        if batch.target_page_pk is not None
         else None
     )
 
@@ -206,12 +207,9 @@ def _stage_promotions_for(
         source_anchor = _revision_on_page(session, rungs[-1], source_page)
         target_head = head_revision(session, target_page)
         base_revid = target_head.revid if target_head else None
-
-    pairing = (
-        find_pair(session, source_page.pk, target_page.pk)
-        if target_page is not None
-        else None
-    )
+    batch.source_head_revid = source_head.revid
+    batch.anchor_link_pk = anchor_pk
+    session.add(batch)
     revisions = _revisions_after_anchor(
         session, source_page, source_head, source_anchor
     )
@@ -225,18 +223,11 @@ def _stage_promotions_for(
     for revision in revisions[:limit]:
         row = Promotion(
             batch_pk=batch.pk,
-            page_link_pk=pairing.pk if pairing else None,
-            source_page_pk=source_page.pk,
-            target_page_pk=target_page.pk if target_page else None,
-            target_title=page.target_title or page.source_title,
-            page_number=page.page_number,
             intent=(intent if predecessor is None else PromotionIntent.update),
             source_revision_pk=revision.pk,
-            source_head_revid=source_head.revid,
             predecessor_promotion_pk=predecessor.pk if predecessor else None,
-            anchor_link_pk=anchor_pk,
             base_revid=base_revid if predecessor is None else None,
-            body=promoted_body(session, revision, target_site),
+            body=promoted_body(session, revision, source_site, target_site),
             comment=_promotion_comment(source_site, revision),
         )
         session.add(row)
@@ -307,14 +298,19 @@ def _promotion_comment(source_site: Site, revision: Revision) -> str:
 
 
 def promoted_body(
-    session: Session, source_revision: Revision, target_site: Site
+    session: Session,
+    source_revision: Revision,
+    source_site: Site,
+    target_site: Site,
 ) -> str:
     """The source body as it would be written to the target.
 
-    One transformation today, and it is not cosmetic: ``pagequality user=``
-    names an account on the *source* wiki, and writing it to the target
-    attributes a proofreading assessment to a username that may not exist there
-    (discussion §7). It is rewritten to the account performing the push.
+    The MVP transformation maps only the configured account used by this tool:
+    when ``pagequality user=`` names the source site's credential username, it
+    is replaced by the target site's credential username. Empty and unknown
+    users are preserved exactly. This is deliberately conservative: the tag is
+    serialized content, not a foreign key to a wiki account, so an unconfigured
+    name carries no evidence that it should be translated (discussion §7).
 
     The rest of §7's chain -- capping promoted levels at 3, blocking local-only
     templates, local-only `File:` references and absolute staging-host URLs --
@@ -327,26 +323,26 @@ def promoted_body(
     content = session.get(Content, slot.content_pk)
 
     document = parse_document(content.text, content.content_model)
-    with_user = getattr(document, "with_user", None)
-    if with_user is None:
+    if not isinstance(document, ProofreadPageDocument):
         return content.text
-    account = _push_account(session, target_site)
-    return with_user(account).serialize()
+    source_credential = session.get(SiteCredential, source_site.pk)
+    if source_credential is None or document.user != source_credential.username:
+        return content.text
+
+    target_credential = _push_credential(session, target_site)
+    if target_credential.username == source_credential.username:
+        return content.text
+    return document.with_user(target_credential.username).serialize()
 
 
-def _push_account(session: Session, target_site: Site) -> str:
-    from wtbot.model import SiteCredential
-
-    credential = session.exec(
-        select(SiteCredential).where(SiteCredential.site_pk == target_site.pk)
-    ).first()
+def _push_credential(session: Session, target_site: Site) -> SiteCredential:
+    credential = session.get(SiteCredential, target_site.pk)
     if credential is None:
         raise PromotionError(
             f"no credential for {target_site.label or target_site.family}: a "
-            "push needs an account, and the body records which one made the "
-            "assessment"
+            "mapped pagequality user needs a target account"
         )
-    return credential.username
+    return credential
 
 
 def approve(session: Session, batch: PromotionBatch, *, approved_by: str) -> None:
@@ -371,14 +367,12 @@ def promotions(session: Session, batch_pk: int) -> list[Promotion]:
     rows = list(
         session.exec(select(Promotion).where(Promotion.batch_pk == batch_pk)).all()
     )
-    rows.sort(
-        key=lambda row: (row.page_number is None, row.page_number or 0, row.pk or 0)
-    )
+    rows.sort(key=lambda row: row.pk or 0)
     return rows
 
 
 def next_staged(session: Session, batch_pk: int) -> Promotion | None:
-    """The next page to push, in reading order."""
+    """The next source revision to push, in ancestry order."""
     return next(
         (
             row
@@ -459,16 +453,14 @@ def source_is_unchanged(session: Session, promotion: Promotion) -> bool:
     write something nobody looked at *and* record a correspondence to a
     revision that is no longer current.
     """
-    source_page = session.get(Page, promotion.source_page_pk)
+    batch = session.get(PromotionBatch, promotion.batch_pk)
+    source_page = session.get(Page, batch.source_page_pk)
     head = head_revision(session, source_page)
-    if promotion.source_head_revid is not None:
-        return head is not None and head.revid == promotion.source_head_revid
+    if batch.source_head_revid is not None:
+        return head is not None and head.revid == batch.source_head_revid
     staged = list(
         session.exec(
-            select(Promotion).where(
-                Promotion.batch_pk == promotion.batch_pk,
-                Promotion.source_page_pk == promotion.source_page_pk,
-            )
+            select(Promotion).where(Promotion.batch_pk == promotion.batch_pk)
         ).all()
     )
     staged.sort(key=lambda row: row.pk or 0)
@@ -481,17 +473,17 @@ def target_head_revid(session: Session, promotion: Promotion) -> int | None:
     if promotion.predecessor_promotion_pk is not None:
         predecessor = session.get(Promotion, promotion.predecessor_promotion_pk)
         return predecessor.result_revid if predecessor is not None else None
+    batch = session.get(PromotionBatch, promotion.batch_pk)
     target = (
-        session.get(Page, promotion.target_page_pk)
-        if promotion.target_page_pk is not None
+        session.get(Page, batch.target_page_pk)
+        if batch.target_page_pk is not None
         else None
     )
     if target is None:
-        batch = session.get(PromotionBatch, promotion.batch_pk)
         target = session.exec(
             select(Page).where(
                 Page.site_pk == batch.target_site_pk,
-                Page.title == promotion.target_title,
+                Page.title == batch.target_title,
             )
         ).first()
     head = head_revision(session, target) if target else None
@@ -509,17 +501,17 @@ def body_matches_target(session: Session, promotion: Promotion) -> bool:
     # the preceding save result, not this row, describes its actual head.
     if promotion.predecessor_promotion_pk is not None:
         return False
+    batch = session.get(PromotionBatch, promotion.batch_pk)
     target = (
-        session.get(Page, promotion.target_page_pk)
-        if promotion.target_page_pk is not None
+        session.get(Page, batch.target_page_pk)
+        if batch.target_page_pk is not None
         else None
     )
     if target is None:
-        batch = session.get(PromotionBatch, promotion.batch_pk)
         target = session.exec(
             select(Page).where(
                 Page.site_pk == batch.target_site_pk,
-                Page.title == promotion.target_title,
+                Page.title == batch.target_title,
             )
         ).first()
     head = head_revision(session, target) if target else None
@@ -546,7 +538,7 @@ def materialize_promotion_links(
         .join(PromotionBatch, Promotion.batch_pk == PromotionBatch.pk)
         .where(
             PromotionBatch.target_site_pk == target_page.site_pk,
-            Promotion.target_title == target_page.title,
+            PromotionBatch.target_title == target_page.title,
             Promotion.status == PromotionStatus.pushed,
             Promotion.result_revid.is_not(None),
         )
@@ -554,6 +546,7 @@ def materialize_promotion_links(
     ).all()
     linked: list[RevisionLink] = []
     for promotion in rows:
+        batch = session.get(PromotionBatch, promotion.batch_pk)
         target_revision = session.exec(
             select(Revision).where(
                 Revision.page_pk == target_page.pk,
@@ -567,10 +560,10 @@ def materialize_promotion_links(
             local_revision_pk=promotion.source_revision_pk,
             remote_revision_pk=target_revision.pk,
             origin=LinkOrigin.copy,
-            page_link_pk=promotion.page_link_pk,
+            page_link_pk=batch.page_link_pk,
         )
-        promotion.target_page_pk = target_page.pk
-        promotion.page_link_pk = link.page_link_pk
-        session.add(promotion)
+        batch.target_page_pk = target_page.pk
+        batch.page_link_pk = link.page_link_pk
+        session.add(batch)
         linked.append(link)
     return linked

@@ -18,10 +18,11 @@ lives in `docs/reference/proofread-page-sha1-discordance.md`.
       `editconflict`, `protectedpage`, `abusefilter-*`, `spamblacklist`) to
       distinct outcomes + post-push content verification (MediaWiki may
       auto-merge, which is a content change nobody reviewed).
-- [ ] **The rest of the §7 transform chain.** Only the `pagequality user=`
-      rewrite is implemented. Level capping, local-only templates/`File:`s and
-      staging-host URLs are named checks that want their own `pass`/`warn`/
-      `block` verdicts.
+- [ ] **The rest of the §7 transform chain.** Only the conservative configured
+      credential mapping for `pagequality user=` is implemented. Level capping,
+      local-only templates/`File:`s and staging-host URLs are named checks that
+      want their own `pass`/`warn`/`block` verdicts. See
+      `docs/design/proofread-page-user-mapping.md` for the user-mapping policy.
 
 ## Priority 2 — seeding a work that exists only upstream
 

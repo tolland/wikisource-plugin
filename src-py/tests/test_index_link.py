@@ -7,6 +7,7 @@ from wtbot.index_link_store import link_indexes, work_for_index_page
 from wtbot.model import (
     FetchRequest,
     IndexLink,
+    IndexMeta,
     NsRole,
     Page,
     PageLink,
@@ -66,6 +67,14 @@ def build_index(session: Session, site: Site, title: str) -> Page:
     session.add(page)
     session.commit()
     session.refresh(page)
+    session.add(
+        IndexMeta(
+            page_pk=page.pk,
+            site_pk=site.pk,
+            short_name=f"index-{page.pk}",
+        )
+    )
+    session.commit()
     return page
 
 
@@ -227,11 +236,19 @@ def test_a_work_adopts_page_pairs_made_before_it(session: Session) -> None:
     assert pairing.index_link_pk == work.pk
 
 
-def test_only_index_pages_can_be_a_work(session: Session) -> None:
+def test_only_pages_with_index_meta_can_be_a_work(session: Session) -> None:
     local, remote = build_site(session, "mywikisource"), build_site(
         session, "wikisource"
     )
-    local_page = build_page(session, local, INDEX, 1, text="a", revid=5)
+    local_page = Page(
+        site_pk=local.pk,
+        title=f"{INDEX}/styles.css",
+        namespace_role=NsRole.index,
+        content_model="sanitized-css",
+    )
+    session.add(local_page)
+    session.commit()
+    session.refresh(local_page)
     remote_index = build_index(session, remote, REMOTE_INDEX)
 
     from wtbot.remote_link_store import LinkError
@@ -239,9 +256,9 @@ def test_only_index_pages_can_be_a_work(session: Session) -> None:
     try:
         link_indexes(session, local_page, remote_index)
     except LinkError as exc:
-        assert "not an Index: page" in str(exc)
+        assert "has no IndexMeta row" in str(exc)
     else:  # pragma: no cover - the assertion is the test
-        raise AssertionError("a Page: was accepted as a work")
+        raise AssertionError("an Index namespace subresource was accepted as a work")
 
 
 # -- level 1 -----------------------------------------------------------------
@@ -312,6 +329,30 @@ def test_candidates_show_which_indexes_are_already_tracked(client, engine) -> No
     assert candidate["work_pk"] is not None
     assert candidate["paired_with"] == REMOTE_INDEX
     assert candidate["cached_pages"] == 3
+
+
+def test_candidates_exclude_index_namespace_pages_without_index_meta(engine) -> None:
+    """Namespace membership is not the work discriminator: Index subresources
+    such as styles.css are pages too, but only a fetched ProofreadPage Index has
+    the keyed IndexMeta extension."""
+    seed_work(engine)
+    with Session(engine) as session:
+        site = session.exec(select(Site).where(Site.label == "mywikisource")).one()
+        session.add(
+            Page(
+                site_pk=site.pk,
+                title=f"{INDEX}/styles.css",
+                namespace_role=NsRole.index,
+                content_model="sanitized-css",
+            )
+        )
+        session.commit()
+
+    from wtbot.api.works import list_candidates
+
+    with Session(engine) as session:
+        listed = list_candidates(label="mywikisource", session=session)
+        assert [candidate.title for candidate in listed.indexes] == [INDEX]
 
 
 def test_candidates_need_a_site(client) -> None:

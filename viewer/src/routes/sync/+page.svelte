@@ -3,8 +3,7 @@
   import { page as routePage } from '$app/state';
   import {
     fetchSyncAssets,
-    listIndexCandidates,
-    listSites,
+    listWorks,
     stageBatch,
     syncReport
   } from '$lib/api';
@@ -13,9 +12,14 @@
   import Notice from '$lib/components/Notice.svelte';
   import PageHeading from '$lib/components/PageHeading.svelte';
   import SelectField from '$lib/components/SelectField.svelte';
-  import SiteSelect from '$lib/components/SiteSelect.svelte';
   import TextField from '$lib/components/TextField.svelte';
-  import type { Site, SyncPage, SyncReport, SyncVerdict } from '$lib/types';
+  import type {
+    SyncPage,
+    SyncReport,
+    SyncRequest,
+    SyncVerdict,
+    WorkSummary
+  } from '$lib/types';
 
   /**
    * `sync --from Index:X [--to Index:Y]`, with somewhere to look at the answer.
@@ -30,26 +34,39 @@
    * be re-run as often as it takes without consequences.
    */
 
-  let sites: Site[] = $state([]);
-  let sourcePk: number | null = $state(null);
-  let targetPk: number | null = $state(null);
-  let sourceIndexes: string[] = $state([]);
-  let targetIndexes: string[] = $state([]);
-  let indexTitle = $state('');
-  let targetIndexTitle = $state('');
+  let works: WorkSummary[] = $state([]);
+  let selectedWorkPk: number | null = $state(null);
+  let reversed = $state(false);
   let show: 'actionable' | 'all' | 'problems' = $state('actionable');
 
   let report: SyncReport | null = $state(null);
   let loading = $state(true);
   let running = $state(false);
   let fetching = $state(false);
-  let staging = $state(false);
+  let stagingPage: number | null = $state(null);
   let batchLabel = $state('');
   let error = $state('');
   let message = $state('');
 
-  const sourceSite = $derived(sites.find((site) => site.pk === sourcePk) ?? null);
-  const targetSite = $derived(sites.find((site) => site.pk === targetPk) ?? null);
+  const selectedWork = $derived(
+    works.find((work) => work.pk === selectedWorkPk) ?? null
+  );
+  const selectedRequest = $derived.by((): SyncRequest | null => {
+    if (selectedWork === null) return null;
+    return reversed
+      ? {
+          source_label: selectedWork.remote_site,
+          target_label: selectedWork.local_site,
+          index_title: selectedWork.remote_title,
+          target_index_title: selectedWork.local_title
+        }
+      : {
+          source_label: selectedWork.local_site,
+          target_label: selectedWork.remote_site,
+          index_title: selectedWork.local_title,
+          target_index_title: selectedWork.remote_title
+        };
+  });
 
   /** Label, tone, and what the verdict means for whoever is reading. */
   const VERDICTS: Record<SyncVerdict, { label: string; tone: string; note: string }> = {
@@ -102,51 +119,34 @@
     return report.pages;
   });
 
-  function label(site: Site | null): string | null {
-    return site?.label ?? null;
-  }
-
-  async function loadIndexes(which: 'source' | 'target'): Promise<void> {
-    const pk = which === 'source' ? sourcePk : targetPk;
-    if (pk === null) return;
-    const titles = (await listIndexCandidates(pk)).indexes.map((item) => item.title);
-    if (which === 'source') {
-      sourceIndexes = titles;
-      if (!indexTitle) indexTitle = titles[0] ?? '';
-    } else {
-      targetIndexes = titles;
-    }
-  }
-
   async function load(): Promise<void> {
     loading = true;
     error = '';
     try {
-      sites = await listSites();
-      sourcePk = sites[0]?.pk ?? null;
-      targetPk = sites[1]?.pk ?? sites[0]?.pk ?? null;
-      await Promise.all([loadIndexes('source'), loadIndexes('target')]);
-      const requested = routePage.url.searchParams.get('index');
-      if (requested) indexTitle = requested;
+      works = (await listWorks()).works;
+      const requestedWork = Number(routePage.url.searchParams.get('work'));
+      const requestedIndex = routePage.url.searchParams.get('index');
+      selectedWorkPk =
+        works.find((work) => work.pk === requestedWork)?.pk ??
+        works.find(
+          (work) =>
+            work.local_title === requestedIndex || work.remote_title === requestedIndex
+        )?.pk ??
+        works[0]?.pk ??
+        null;
     } catch (err) {
-      error = err instanceof Error ? err.message : 'Failed to load sites';
+      error = err instanceof Error ? err.message : 'Failed to load tracked works';
     } finally {
       loading = false;
     }
   }
 
   async function run(): Promise<void> {
-    if (!indexTitle) return;
+    if (selectedRequest === null) return;
     running = true;
     error = '';
     try {
-      report = await syncReport({
-        source_label: label(sourceSite),
-        target_label: label(targetSite),
-        index_title: indexTitle,
-        // Empty means "the same title on both sides", which is the common case.
-        target_index_title: targetIndexTitle || null
-      });
+      report = await syncReport(selectedRequest);
     } catch (err) {
       error = err instanceof Error ? err.message : 'The report failed';
       report = null;
@@ -159,16 +159,12 @@
     // The answer to "the scan check could not run" and "is the work even
     // there": both are questions nobody has asked the wiki yet. Queued only --
     // draining stays the separate, throttled step.
+    if (selectedRequest === null) return;
     fetching = true;
     error = '';
     message = '';
     try {
-      const result = await fetchSyncAssets({
-        source_label: label(sourceSite),
-        target_label: label(targetSite),
-        index_title: indexTitle,
-        target_index_title: targetIndexTitle || null
-      });
+      const result = await fetchSyncAssets(selectedRequest);
       message = result.queued.length
         ? `Queued ${result.queued.map((item) => `${item.title} on ${item.label}`).join(', ')}. ${result.note}`
         : 'Nothing to fetch: both assets are already held.';
@@ -179,34 +175,38 @@
     }
   }
 
-  async function stage(): Promise<void> {
+  async function stage(row: SyncPage): Promise<void> {
     // Only what the report calls writable goes in, and the server refuses
     // anything else -- staging is the last cheap moment to say "we are not
     // sure these correspond".
-    staging = true;
+    if (selectedRequest === null || row.page_number == null) return;
+    stagingPage = row.page_number;
     error = '';
     message = '';
     try {
       const batch = await stageBatch({
-        source_label: label(sourceSite),
-        target_label: label(targetSite),
-        index_title: indexTitle,
-        target_index_title: targetIndexTitle || null,
+        ...selectedRequest,
+        page_number: row.page_number,
         label: batchLabel || null
       });
       await goto(`/sync/batches/${batch.pk}`);
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to stage the batch';
     } finally {
-      staging = false;
+      stagingPage = null;
     }
   }
 
   function swap(): void {
-    [sourcePk, targetPk] = [targetPk, sourcePk];
-    [sourceIndexes, targetIndexes] = [targetIndexes, sourceIndexes];
-    [indexTitle, targetIndexTitle] = [targetIndexTitle || indexTitle, indexTitle];
+    reversed = !reversed;
     report = null;
+    message = '';
+  }
+
+  function chooseWork(): void {
+    reversed = false;
+    report = null;
+    message = '';
   }
 
   onMount(load);
@@ -235,50 +235,53 @@
 {#if loading}
   <p class="state">Loading...</p>
 {:else}
-  <section class="controls" aria-label="Direction">
-    <div class="side">
-      <SiteSelect
-        {sites}
-        label="From (source)"
-        bind:value={sourcePk}
-        onchange={() => loadIndexes('source')}
-      />
-      <SelectField label="Index" bind:value={indexTitle}>
-        {#each sourceIndexes as title}
-          <option value={title}>{title}</option>
+  {#if works.length === 0}
+    <p class="state">
+      No Index links exist yet. <a href="/links">Link the two Index pages</a> before
+      running a work-level sync report.
+    </p>
+  {:else}
+    <section class="work-picker" aria-label="Tracked work">
+      <SelectField label="Index link" bind:value={selectedWorkPk} onchange={chooseWork}>
+        {#each works as work}
+          <option value={work.pk}>
+            #{work.pk} · {work.local_title} ↔ {work.remote_title}
+          </option>
         {/each}
       </SelectField>
-    </div>
+      {#if selectedWork}
+        <a class="drill" href={`/links/${selectedWork.pk}`}>Open tracked work &rarr;</a>
+      {/if}
+    </section>
 
-    <button type="button" class="swap" onclick={swap} title="Reverse the direction">
-      &rarr;&nbsp;&larr;
-    </button>
+    {#if selectedRequest}
+      <section class="controls" aria-label="Direction">
+        <div class="side">
+          <p class="eyebrow">From (source) · {selectedRequest.source_label}</p>
+          <strong>{selectedRequest.index_title}</strong>
+        </div>
 
-    <div class="side">
-      <SiteSelect
-        {sites}
-        label="To (target)"
-        bind:value={targetPk}
-        onchange={() => loadIndexes('target')}
-      />
-      <SelectField label="Index (only if the title differs)" bind:value={targetIndexTitle}>
-        <option value="">same title</option>
-        {#each targetIndexes as title}
-          <option value={title}>{title}</option>
-        {/each}
-      </SelectField>
-    </div>
-  </section>
+        <button type="button" class="swap" onclick={swap} title="Reverse the direction">
+          &rarr;&nbsp;&larr;
+        </button>
 
-  <div class="run-row">
-    <ActionButton disabled={running || !indexTitle} onclick={run}>
-      {running ? 'Comparing...' : 'Run the report'}
-    </ActionButton>
-    <span class="hint">
-      The target index does not have to exist &mdash; that is the case this is most
-      useful for, and every page then reports <code>create</code>.
-    </span>
-  </div>
+        <div class="side">
+          <p class="eyebrow">To (target) · {selectedRequest.target_label}</p>
+          <strong>{selectedRequest.target_index_title}</strong>
+        </div>
+      </section>
+
+      <div class="run-row">
+        <ActionButton disabled={running} onclick={run}>
+          {running ? 'Comparing...' : 'Run the report'}
+        </ActionButton>
+        <span class="hint">
+          Direction belongs to this report, not to Index link #{selectedWorkPk}. Reverse it
+          to compare or stage the same tracked work the other way.
+        </span>
+      </div>
+    {/if}
+  {/if}
 {/if}
 
 {#if report}
@@ -393,20 +396,13 @@
   </section>
 
   {#if report.actionable > 0}
-    <section class="stage" aria-label="Stage a push">
-      <h2>Stage these {report.actionable} page(s)</h2>
+    <section class="stage" aria-label="Stage a page">
+      <h2>Stage one page at a time</h2>
       <p>
-        Freezes what this report says into a reviewable run: the body, the base
-        revision and the anchor, so what gets approved is what gets written. Nothing
-        is pushed until you approve it on the next screen, and then one page at a
-        time.
+        Each page becomes its own review and approval batch. Its promotions are the
+        source revisions that will be replayed, in order, onto that one target page.
       </p>
-      <div class="row">
-        <TextField label="Name this run (optional)" bind:value={batchLabel} />
-        <ActionButton disabled={staging} onclick={stage}>
-          {staging ? 'Staging...' : 'Stage a push run'}
-        </ActionButton>
-      </div>
+      <TextField label="Batch label (optional)" bind:value={batchLabel} />
     </section>
   {/if}
 
@@ -459,6 +455,14 @@
               {/if}
             </td>
             <td>
+              {#if row.actionable && row.page_number != null}
+                <ActionButton
+                  disabled={stagingPage !== null}
+                  onclick={() => stage(row)}
+                >
+                  {stagingPage === row.page_number ? 'Staging...' : 'Stage page'}
+                </ActionButton>
+              {/if}
               {#if row.pair_pk}
                 <a class="drill" href={`/links/pairs/${row.pair_pk}`}>Revisions</a>
               {/if}
@@ -471,8 +475,8 @@
 
   <p class="footnote">
     This is a report. Nothing has been written to {report.target.site}, and nothing to
-    the local model &mdash; pairing the work is a separate, deliberate act on the
-    <a href="/links">Links</a> page.
+    the local model. It uses tracked Index link #{report.work_pk}; reversing the report
+    does not change that stored correspondence.
   </p>
 {/if}
 
@@ -485,6 +489,18 @@
   .state,
   .hint {
     color: #73583d;
+  }
+
+  .state a {
+    color: #9c5632;
+  }
+
+  .work-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1rem;
+    align-items: end;
+    margin-top: 1.5rem;
   }
 
   .controls {
@@ -795,13 +811,6 @@
     max-width: 50rem;
     color: #24543f;
     font-size: 0.88rem;
-  }
-
-  .stage .row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.6rem;
-    align-items: end;
   }
 
   .filter {

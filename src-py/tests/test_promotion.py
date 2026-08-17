@@ -12,18 +12,20 @@ from wtbot.model import (
     NsRole,
     Page,
     Promotion,
+    PromotionBatch,
     Revision,
     Site,
     SiteCredential,
 )
-from wtbot.promotion_store import materialize_promotion_links
+from wtbot.promotion_store import materialize_promotion_links, stage_batch
 from wtbot.remote_link_store import ladder
 from wtbot.revision_store import record_head_revision, record_history
+from wtbot.sync import build_report
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import RemotePage
 
 """The push queue: staging what a sync report says is writable, then writing it
-one page at a time.
+one revision at a time.
 
 The three things this pins are the three that make a push safe to press:
 
@@ -36,9 +38,8 @@ The three things this pins are the three that make a push safe to press:
   execution is a conflict, because the body under review is no longer the body
   that would be written.
 
-One page per call throughout: a rate-limited wiki gets one request, a reviewer
-can stop between pages, and a batch that half-succeeds carries its outcome per
-row rather than as a single verdict over three hundred.
+One revision per call throughout: a rate-limited wiki gets one request, a
+reviewer can stop between edits, and the ordered chain records each outcome.
 """
 
 INDEX = "Index:Varieties.djvu"
@@ -53,7 +54,13 @@ def body(level: int, user: str, words: str) -> str:
     )
 
 
-def seed(engine, *, target_page: bool = True, linked: bool = True) -> None:
+def seed(
+    engine,
+    *,
+    target_page: bool = True,
+    linked: bool = True,
+    source_user: str = "Them",
+) -> None:
     """A one-page work. `target_page` off makes it a create; `linked` off
     leaves the pair matching but unasserted."""
     with Session(engine) as session:
@@ -118,7 +125,7 @@ def seed(engine, *, target_page: bool = True, linked: bool = True) -> None:
             session.commit()
             return row
 
-        page("upstream", body(3, "Them", "Words."), 900)
+        page("upstream", body(3, source_user, "Words."), 900)
         if target_page:
             page("local", body(3, "Us", "Words."), 254)
 
@@ -242,12 +249,48 @@ def stage(client, **overrides) -> dict:
         "source_label": "upstream",
         "target_label": "local",
         "index_title": INDEX,
+        "page_number": 1,
         **overrides,
     }
     return client.post("/sync/batches", json=payload)
 
 
 # -- staging ------------------------------------------------------------------
+
+
+def test_a_work_report_stages_one_page_batch_with_ordered_revisions(engine):
+    seed(engine)
+    move_source_twice(engine)
+
+    with Session(engine) as session:
+        source = session.exec(select(Site).where(Site.label == "upstream")).one()
+        target = session.exec(select(Site).where(Site.label == "local")).one()
+        report = build_report(
+            session,
+            source_site=source,
+            target_site=target,
+            index_title=INDEX,
+        )
+        batch = stage_batch(
+            session,
+            report,
+            source_site=source,
+            target_site=target,
+            page_number=1,
+        )
+        session.commit()
+
+        rows = session.exec(
+            select(Promotion)
+            .where(Promotion.batch_pk == batch.pk)
+            .order_by(Promotion.pk)
+        ).all()
+        assert batch.source_title == "Page:Varieties.djvu/1"
+        assert batch.target_title == "Page:Varieties.djvu/1"
+        assert batch.page_number == 1
+        assert len(rows) == 2
+        assert rows[0].predecessor_promotion_pk is None
+        assert rows[1].predecessor_promotion_pk == rows[0].pk
 
 
 def test_a_batch_stages_only_what_the_report_would_write(pushing_client, engine):
@@ -400,28 +443,55 @@ def test_a_missing_target_page_stages_as_a_create(pushing_client, engine):
     assert promotion["base_revid"] is None
 
 
-def test_staging_rewrites_the_pagequality_user_to_the_pushing_account(
+def test_staging_maps_the_source_credential_user_to_the_target_credential_user(
     pushing_client, engine
 ):
-    """`user=` names an account on the *source* wiki. Writing it to the target
-    attributes somebody's proofreading assessment to a username that may not
-    exist there (discussion section 7)."""
-    seed(engine, target_page=False)
+    seed(engine, target_page=False, source_user="upstream-bot")
     stage(pushing_client)
 
     with Session(engine) as session:
         (promotion,) = session.exec(select(Promotion)).all()
     assert 'user="local-bot"' in promotion.body
-    assert "Them" not in promotion.body
+    assert "upstream-bot" not in promotion.body
     assert 'level="3"' in promotion.body  # the level is not touched
 
 
-def test_staging_can_be_narrowed_to_chosen_pages(pushing_client, engine):
+@pytest.mark.parametrize("source_user", ["", "SomeValidRemoteUser"])
+def test_staging_preserves_empty_and_unmapped_pagequality_users(
+    pushing_client, engine, source_user: str
+):
+    seed(engine, target_page=False, source_user=source_user)
+    stage(pushing_client)
+
+    with Session(engine) as session:
+        (promotion,) = session.exec(select(Promotion)).all()
+    assert f'user="{source_user}"' in promotion.body
+
+
+def test_staging_leaves_an_identical_credential_username_unchanged(
+    pushing_client, engine
+):
+    seed(engine, target_page=False, source_user="Admin")
+    with Session(engine) as session:
+        credentials = session.exec(select(SiteCredential)).all()
+        for credential in credentials:
+            credential.username = "Admin"
+            session.add(credential)
+        session.commit()
+
+    stage(pushing_client)
+
+    with Session(engine) as session:
+        (promotion,) = session.exec(select(Promotion)).all()
+    assert promotion.body == body(3, "Admin", "Words.")
+
+
+def test_staging_requires_one_writable_page(pushing_client, engine):
     seed(engine, target_page=False)
 
-    empty = stage(pushing_client, page_numbers=[99])
+    empty = stage(pushing_client, page_number=99)
     assert empty.status_code == 409
-    assert stage(pushing_client, page_numbers=[1]).status_code == 201
+    assert stage(pushing_client, page_number=1).status_code == 201
 
 
 # -- approval ------------------------------------------------------------------
@@ -471,7 +541,7 @@ def test_pushing_writes_one_page_and_records_the_result(pushing_client, engine):
 
     title, text, base_revid, _ = RecordingWiki.saved[0]
     assert title == "Page:Varieties.djvu/1"
-    assert 'user="local-bot"' in text
+    assert 'user="Them"' in text
     assert base_revid is None  # a create claims no base
 
     (promotion,) = after["promotions"]
@@ -543,7 +613,8 @@ def test_a_target_that_already_holds_the_body_is_skipped(pushing_client, engine)
     # Make the target hold exactly the staged body.
     with Session(engine) as session:
         (promotion,) = session.exec(select(Promotion)).all()
-        target = session.get(Page, promotion.target_page_pk)
+        batch = session.get(PromotionBatch, promotion.batch_pk)
+        target = session.get(Page, batch.target_page_pk)
         record_head_revision(
             session,
             target,
@@ -751,7 +822,7 @@ def granular_request(**overrides) -> dict:
 
 
 def test_next_change_reviews_then_create_only_pushes_and_verifies(engine):
-    seed(engine, target_page=False)
+    seed(engine, target_page=False, source_user="upstream-bot")
     wiki = GranularWiki()
     with TestClient(
         create_app(engine=engine, client_factory=lambda _site: wiki)
@@ -792,8 +863,9 @@ def test_next_change_reviews_then_create_only_pushes_and_verifies(engine):
 
 
 def _correspondence_exists(session: Session, promotion: Promotion) -> bool:
-    target = session.get(Page, promotion.target_page_pk)
-    source = session.get(Page, promotion.source_page_pk)
+    batch = session.get(PromotionBatch, promotion.batch_pk)
+    target = session.get(Page, batch.target_page_pk)
+    source = session.get(Page, batch.source_page_pk)
     return any(
         {
             session.get(Revision, rung.local_revision_pk).revid,

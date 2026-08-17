@@ -310,8 +310,8 @@ _ROW_COLOUR: dict[str, str | None] = {
 }
 
 
-def _print_row(row: dict) -> None:
-    line = f"    #{row['pk']:<4} {row['status']:<9} {row['target_title']}"
+def _print_row(row: dict, target_title: str) -> None:
+    line = f"    #{row['pk']:<4} {row['status']:<9} {target_title}"
     if row["result_revid"]:
         line += f"  -> revid {row['result_revid']}"
     typer.secho(line, fg=_ROW_COLOUR.get(row["status"]))
@@ -330,7 +330,7 @@ def _print_batch(batch: dict) -> None:
     if batch["approved_by"]:
         typer.echo(f"  approved by {batch['approved_by']}")
     for row in batch["promotions"]:
-        _print_row(row)
+        _print_row(row, batch["target_title"])
     typer.echo(f"  {batch['remaining']} still staged")
 
 
@@ -351,7 +351,7 @@ def _diff_pushed(before: list[dict], after: list[dict]) -> dict | None:
 
 @app.command("batches")
 def list_batches(api: ApiClient = Depends(get_api)) -> None:
-    """List every staged push run, newest first -- work-level or single-page.
+    """List every staged page batch, newest first.
 
     What is pending, and whether any promotion came back with an error,
     without opening a batch to look.
@@ -366,7 +366,7 @@ def list_batches(api: ApiClient = Depends(get_api)) -> None:
         typer.echo(
             f"  #{batch['pk']:<4} {batch['status']:<9} "
             f"{batch['source_site']} -> {batch['target_site']}  "
-            f"{batch['label'] or batch['source_index_title']}  [{summary}]"
+            f"{batch['label'] or batch['source_title']}  [{summary}]"
         )
 
 
@@ -423,8 +423,8 @@ def push_batch(
     """Legacy bulk workflow: push one approved batch row or use --all.
 
     One HTTP request per page throughout, the same discipline the viewer's
-    "push the next page" button keeps: a rate-limited wiki gets one request
-    rather than the whole batch, and a run can be watched, paused and picked
+    "push the next revision" button keeps: a rate-limited wiki gets one request
+    rather than the whole chain, and a run can be watched, paused and picked
     up again between calls -- ``wtbot sync batch <pk>`` shows where it stands
     without pushing anything further. A batch staged from ``sync-page`` has
     exactly one row, so a bare ``wtbot sync push <pk>`` is the whole thing.
@@ -450,13 +450,13 @@ def push_batch(
 
         row = _diff_pushed(before_rows, batch["promotions"])
         if row is not None:
-            _print_row(row)
+            _print_row(row, batch["target_title"])
 
         if not all_rows:
             break
         if row is not None and row["status"] in ("conflict", "error"):
             typer.secho(
-                f"stopped after {pushed} page(s): a row did not push cleanly",
+                f"stopped after {pushed} revision(s): a row did not push cleanly",
                 fg=typer.colors.YELLOW,
             )
             break

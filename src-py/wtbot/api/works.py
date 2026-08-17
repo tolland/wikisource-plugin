@@ -24,6 +24,7 @@ from wtbot.model import (
     FetchKind,
     FetchRequest,
     IndexLink,
+    IndexMeta,
     LinkOrigin,
     NsRole,
     Page,
@@ -306,12 +307,6 @@ def _index_page(session: Session, site: Site, title: str) -> Page:
             f"{title} is not cached for {_site_name(site)}. Fetch the index "
             "before tracking the work.",
         )
-    if page.namespace_role is not NsRole.index:
-        raise HTTPException(
-            409,
-            f"{title} is not an Index: page. A work is tracked by its index; "
-            "pair other namespaces with POST /links/pairs.",
-        )
     return page
 
 
@@ -464,11 +459,13 @@ def list_candidates(
     label: str | None = None,
     session: Session = Depends(get_session),
 ) -> CandidateList:
-    """Every cached ``Index:`` page on one site, tracked or not.
+    """Every cached ProofreadPage Index on one site, tracked or not.
 
     One column of the two-column picker. Addressable by pk or by label because
     the viewer holds sites as rows and the CLI holds them as names, and making
-    either translate first is a round trip for nothing.
+    either translate first is a round trip for nothing. ``IndexMeta`` is the
+    model-level discriminator: namespace membership alone also admits Index
+    subpages and stylesheets, which are not works.
     """
     if site_pk is None and label is None:
         raise HTTPException(400, "name the site: pass site_pk or label")
@@ -481,8 +478,9 @@ def list_candidates(
         raise HTTPException(404, f"no site {site_pk if site_pk is not None else label}")
 
     pages = session.exec(
-        select(Page)
-        .where(Page.site_pk == site.pk, Page.namespace_role == NsRole.index)
+        select(Page, IndexMeta)
+        .join(IndexMeta, IndexMeta.page_pk == Page.pk)
+        .where(Page.site_pk == site.pk, IndexMeta.site_pk == site.pk)
         .order_by(Page.title)
     ).all()
 
@@ -496,7 +494,7 @@ def list_candidates(
     )
 
     out: list[IndexCandidate] = []
-    for page in pages:
+    for page, meta in pages:
         work = work_for_index_page(session, page.pk)
         paired_with = None
         if work is not None:
@@ -512,7 +510,7 @@ def list_candidates(
             IndexCandidate(
                 page_pk=page.pk,
                 title=page.title,
-                page_count=None,
+                page_count=meta.page_count,
                 cached_pages=counts.get(page.pk, 0),
                 work_pk=work.pk if work else None,
                 paired_with=paired_with,

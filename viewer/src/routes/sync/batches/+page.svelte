@@ -51,9 +51,9 @@
 
 <PageHeading eyebrow="Every run" title="Push batches">
   <p class="description">
-    Every run staged so far, work-level or single-page, newest first. A batch
-    that half-succeeds is the normal case, not an error state &mdash; this is
-    where to see which rows in a <code>partial</code> run still need a look.
+    Every page staged so far, newest first. A batch is one page and its ordered
+    source revisions; <code>partial</code> means part of that revision chain needs
+    a look.
   </p>
 </PageHeading>
 
@@ -90,8 +90,8 @@
             </span>
           </td>
           <td class="title">
-            {batch.label ?? batch.source_index_title}
-            <small>{batch.source_index_title}</small>
+            {batch.label ?? batch.source_title}
+            <small>{batch.source_title}</small>
             {#if batch.approved_by}
               <small>approved by {batch.approved_by}</small>
             {/if}

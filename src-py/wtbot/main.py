@@ -8,6 +8,7 @@ from sqlmodel import Session, select
 
 from wtbot.api import (
     annotations,
+    dev,
     edit_journal,
     fetch,
     file_blob,
@@ -125,6 +126,7 @@ def create_app(
     )
 
     app.include_router(health.router)
+    app.include_router(dev.router)
     app.include_router(commit_api.router)
     app.include_router(edit_journal.router)
     app.include_router(fetch.router)

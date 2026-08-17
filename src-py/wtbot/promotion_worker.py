@@ -17,6 +17,7 @@ from wtbot.promotion_store import (
     PromotionError,
     body_matches_target,
     settle_batch,
+    skip,
     source_is_unchanged,
     target_head_revid,
 )
@@ -71,7 +72,7 @@ def push_one(
         target_site = detached_site(session.get(Site, batch.target_site_pk))
         snapshot = (
             promotion.pk,
-            promotion.target_title,
+            batch.target_title,
             promotion.body,
             promotion.comment,
             promotion.intent,
@@ -166,6 +167,7 @@ def _preflight(session: Session, promotion_pk: int, *, force: bool) -> Promotion
             session,
             promotion_pk,
             PromotionStatus.skipped,
+            result_revid=actual_base,
             error="the target already holds this exact body",
         )
     target_moved = (
@@ -198,7 +200,11 @@ def _effective_base_revid(session: Session, promotion: Promotion) -> int | None:
             f"{promotion.predecessor_promotion_pk}"
         )
     if (
-        predecessor.status is not PromotionStatus.pushed
+        predecessor.status
+        not in (
+            PromotionStatus.pushed,
+            PromotionStatus.skipped,
+        )
         or predecessor.result_revid is None
     ):
         raise PromotionError(
@@ -230,6 +236,15 @@ def _record(
         session.add(promotion)
         if status is PromotionStatus.pushed:
             _enqueue_chain_refetch(session, promotion)
+        elif status in (PromotionStatus.conflict, PromotionStatus.error):
+            successor = session.exec(
+                select(Promotion).where(
+                    Promotion.predecessor_promotion_pk == promotion.pk,
+                    Promotion.status == PromotionStatus.staged,
+                )
+            ).first()
+            if successor is not None:
+                skip(session, successor)
         batch = session.get(PromotionBatch, promotion.batch_pk)
         settle_batch(session, batch)
 
@@ -246,17 +261,14 @@ def _enqueue_chain_refetch(session: Session, promotion: Promotion) -> None:
         return
     chain_size = len(
         session.exec(
-            select(Promotion).where(
-                Promotion.batch_pk == promotion.batch_pk,
-                Promotion.source_page_pk == promotion.source_page_pk,
-            )
+            select(Promotion).where(Promotion.batch_pk == promotion.batch_pk)
         ).all()
     )
     batch = session.get(PromotionBatch, promotion.batch_pk)
     session.add(
         FetchRequest(
             site_pk=batch.target_site_pk,
-            title=promotion.target_title,
+            title=batch.target_title,
             kind=FetchKind.single,
             depth=0,
             revisions=max(1, chain_size),

@@ -132,6 +132,9 @@
     count={`${detail.work.linked}/${detail.work.pairs} page pairs linked`}
   >
     <p class="other">{detail.work.remote_title}</p>
+    <p class="sync-link">
+      <a href={`/sync?work=${detail.work.pk}`}>Compare this work for sync &rarr;</a>
+    </p>
   </PageHeading>
 
   {#if error}
@@ -279,6 +282,14 @@
 
   .other {
     color: #73583d;
+  }
+
+  .sync-link a {
+    color: #9c5632;
+    font-family: "Avenir Next", "Gill Sans", sans-serif;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
   }
 
   .state {
