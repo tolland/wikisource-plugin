@@ -1,35 +1,38 @@
 <templateSet group="Wikitext">
-    <template name="{" value="[$TEXT$]($LINK$)$END$" description="SDK: New link reference" toReformat="false"
-              toShortenFQNames="false">
-        <variable name="TEXT" expression="" defaultValue="" alwaysStopAt="true"/>
-        <variable name="LINK" expression="complete()" defaultValue="" alwaysStopAt="true"/>
-        <context/>
-    </template>
-    <template name="{{" value="{{$NAME$|$PARAM$|$TEXT$}}$END$" description="open template transclusion" toReformat="false" toShortenFQNames="true">
-        <variable name="NAME" expression="" defaultValue="" alwaysStopAt="true" />
-        <variable name="PARAM" expression="" defaultValue="" alwaysStopAt="true" />
-        <variable name="TEXT" expression="" defaultValue="" alwaysStopAt="true" />
-        <context>
-            <option name="WIKITEXT" value="true"/>
-        </context>
-    </template>
     <template name="{{ne" value="{{ne&#10;|1=$LEFTITEM$&#10;|2=&lt;math&gt;$MIDITEM$&lt;/math&gt;&#10;|3=$RIGHTITEM$&#10;}}&#10;$END$" description="insert numerical equation template" toReformat="false" toShortenFQNames="true">
-        <variable name="LEFTITEM" expression="" defaultValue="" alwaysStopAt="true" />
+        <variable name="LEFTITEM" expression="" defaultValue="&quot;mptjogm&quot;" alwaysStopAt="true" />
         <variable name="MIDITEM" expression="complete()" defaultValue="" alwaysStopAt="true" />
         <variable name="RIGHTITEM" expression="" defaultValue="" alwaysStopAt="true" />
-        <context>
-            <option name="WIKITEXT" value="true" />
-        </context>
+        <context />
     </template>
-    <template name="{{ne-surround" value="{{ne&#10;|1=$LEFTITEM$&#10;|2=$SELECTION$&#10;|3=$RIGHTITEM$&#10;}}&#10;$END$" description="insert numerical equation template" toReformat="false" toShortenFQNames="true">
+    <template name="{{ne2" value="{{ne&#10;|1=$LEFTITEM$&#10;|2=$SELECTION$&#10;|3=$RIGHTITEM$&#10;}}&#10;$END$" description="insert numerical equation template" toReformat="false" toShortenFQNames="true">
         <variable name="LEFTITEM" expression="" defaultValue="" alwaysStopAt="true" />
         <variable name="RIGHTITEM" expression="" defaultValue="" alwaysStopAt="true" />
         <context>
             <option name="WIKITEXT" value="true" />
         </context>
     </template>
-    <template name="&lt;ma" value="&lt;math&gt;$EQU$&lt;/math&gt; $END$" description="open a math tag" toReformat="false" toShortenFQNames="true">
-        <variable name="EQU" expression="" defaultValue="" alwaysStopAt="true" />
+    <template name="sump" value="\sum_{$INDEX$=1}^{$MAX$} \frac{\partial ds}{\partial dp_{$INDEX$}}$END$" description="sum of partials" toReformat="false" toShortenFQNames="true">
+        <variable name="INDEX" expression="" defaultValue="" alwaysStopAt="true" />
+        <variable name="MAX" expression="" defaultValue="" alwaysStopAt="true" />
+        <context>
+            <option name="LATEX" value="true" />
+        </context>
+    </template>
+    <template name="\su" value="\sum_{$FROM$}^{$TO$} $END$" description="Sum with sub- and superscript" toReformat="false" toShortenFQNames="true">
+        <variable name="FROM" expression="" defaultValue="" alwaysStopAt="true" />
+        <variable name="TO" expression="" defaultValue="" alwaysStopAt="true" />
+        <context>
+            <option name="LATEX_MATH" value="true" />
+        </context>
+    </template>
+    <template name="matf" value="\mathfrak{$END$}" description="start a mathfrak" toReformat="false" toShortenFQNames="true">
+        <context>
+            <option name="LATEX_MATH" value="true" />
+        </context>
+    </template>
+    <template name="inline-mathfrak" value="&lt;math&gt;\mathfrak{$SELECTION$}$VAR1$&lt;/math&gt; $END$" description="start a mathfrak" toReformat="false" toShortenFQNames="true">
+        <variable name="VAR1" expression="" defaultValue="" alwaysStopAt="true" />
         <context>
             <option name="WIKITEXT" value="true" />
         </context>
