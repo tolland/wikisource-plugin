@@ -13,7 +13,7 @@ from wtbot.model import (
     PromotionStatus,
     Site,
 )
-from wtbot.promotion_store import (
+from wtbot.promotion.promotion_store import (
     PromotionError,
     body_matches_target,
     settle_batch,
@@ -32,7 +32,7 @@ the target. A reviewer can still watch, pause and abandon between writes.
 
 **Three checks before the write, and each is a different failure:**
 
-- the batch is approved -- an unapproved run has nobody's name on it;
+- the promotion is still staged and its batch has not ended;
 - the source still holds the revision that was staged -- otherwise the frozen
   body is not what anybody reviewed;
 - the target still holds the base revid -- which the wiki re-checks itself via
@@ -56,7 +56,6 @@ def push_one(
     client_factory,
     *,
     force: bool = False,
-    require_approval: bool = True,
 ) -> Promotion:
     """Write one staged promotion to its target wiki.
 
@@ -84,16 +83,14 @@ def push_one(
         raise PromotionError(
             f"promotion {promotion_pk} is {status.value}; only a staged row runs"
         )
-    if require_approval and batch_status not in (
-        BatchStatus.approved,
-        BatchStatus.running,
-    ):
+
+    if batch_status not in (BatchStatus.draft, BatchStatus.running):
         raise PromotionError(
-            f"batch {promotion.batch_pk} is {batch_status.value}: approve it "
-            "before pushing. An unapproved run has nobody's name on it."
+            f"batch {promotion.batch_pk} is {batch_status.value}; it cannot push"
         )
 
     guard = _preflight(session, promotion_pk, force=force)
+
     if guard is not None:
         return guard
 
@@ -105,9 +102,20 @@ def push_one(
     try:
         client = client_factory(target_site)
         if intent is PromotionIntent.create:
-            result = client.create_page(title, body, comment, force=force)
+            result = client.create_page(
+                title,
+                body,
+                comment,
+                force=force,
+            )
         else:
-            result = client.save_page(title, body, base_revid, comment, force=force)
+            result = client.save_page(
+                title,
+                body,
+                base_revid,
+                comment,
+                force=force,
+            )
     except EditConflict as exc:
         return _record(
             session,

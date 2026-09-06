@@ -557,7 +557,7 @@ class PywikibotClient:
         page.text = text
         save_options = {"baserevid": base_revid} if not force else {}
         try:
-            page.save(summary=comment or "", **save_options)
+            _save_with_exact_summary(page, comment or "", **save_options)
         except Exception as exc:
             from pywikibot.exceptions import (
                 EditConflictError,
@@ -589,7 +589,7 @@ class PywikibotClient:
         page = self._pwb.Page(self.site, title)
         page.text = text
         try:
-            page.save(summary=comment or "", createonly=not force)
+            _save_with_exact_summary(page, comment or "", createonly=not force)
         except Exception as exc:
             from pywikibot.exceptions import (
                 ArticleExistsConflictError,
@@ -754,6 +754,18 @@ def _change_from_api(entry: dict) -> RemoteChange | None:
         old_revid=entry.get("old_revid") or None,
         namespace_key=entry.get("ns"),
     )
+
+
+def _save_with_exact_summary(page, summary: str, **save_options) -> None:
+    """Save without Pywikibot replacing an empty summary with its version.
+
+    ``BasePage.save`` treats an empty string as absent and substitutes
+    ``config.default_edit_summary`` (for example, ``Pywikibot 11.4.2``).
+    MediaWiki itself accepts an empty summary, so enter Pywikibot one layer
+    lower to preserve the caller's deliberate value. ``_save`` still uses the
+    normal ``APISite.editpage`` path, including its default minor-edit flag.
+    """
+    page._save(summary=summary, **save_options)  # noqa: SLF001
 
 
 class FakeWikiClient:

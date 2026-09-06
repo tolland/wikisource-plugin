@@ -5,7 +5,7 @@ import pytest
 from fastapi import APIRouter, FastAPI, Response
 
 from wtbot.api.debug_logging_route import DebugLoggingRoute
-from wtbot.log_levels import TRACE, TRACE_LEVEL_NAME
+from wtbot.log.log_levels import TRACE, TRACE_LEVEL_NAME
 
 router = APIRouter(route_class=DebugLoggingRoute)
 

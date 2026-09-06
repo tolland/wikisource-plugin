@@ -6,7 +6,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from wtbot.log_levels import TRACE, install_trace_logging
+from wtbot.log.log_levels import TRACE, install_trace_logging
 
 DEFAULT_LOG_FORMAT = "%(asctime)s %(levelname)s [%(name)s] %(message)s"
 DEFAULT_LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
@@ -157,7 +157,7 @@ def configure_logging(config: LoggingConfig = LOGGING_CONFIG) -> None:
 
     # Imported here rather than at module scope: failure_log pulls in the
     # wiki package, and logging_config is imported by nearly everything.
-    from wtbot.failure_log import configure_failure_log
+    from wtbot.log.failure_log import configure_failure_log
 
     configure_failure_log(
         config.failure_log_path,

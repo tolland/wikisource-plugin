@@ -35,8 +35,6 @@ def _create_page_batch_table(name: str) -> None:
         sa.Column("anchor_link_pk", sa.Integer(), nullable=True),
         sa.Column("label", sa.String(), nullable=True),
         sa.Column("status", sa.String(), nullable=False),
-        sa.Column("approved_by", sa.String(), nullable=True),
-        sa.Column("approved_at", sa.DateTime(), nullable=True),
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(["source_site_pk"], ["site.pk"]),
         sa.ForeignKeyConstraint(["target_site_pk"], ["site.pk"]),
@@ -72,7 +70,7 @@ def _create_revision_promotion_table(name: str, batch_table: str) -> None:
 
 
 def _page_status(batch_status: str, rows: list[RowMapping]) -> str:
-    if batch_status in {"draft", "approved", "aborted"}:
+    if batch_status in {"draft", "aborted"}:
         return batch_status
     statuses = {row["status"] for row in rows}
     if "staged" in statuses:
@@ -144,13 +142,13 @@ def upgrade() -> None:
                         page_link_pk, source_page_pk, target_page_pk,
                         source_title, target_title, page_number,
                         source_head_revid, anchor_link_pk, label, status,
-                        approved_by, approved_at, created_at
+                        created_at
                     ) VALUES (
                         :pk, :source_site_pk, :target_site_pk, :index_link_pk,
                         :page_link_pk, :source_page_pk, :target_page_pk,
                         :source_title, :target_title, :page_number,
                         :source_head_revid, :anchor_link_pk, :label, :status,
-                        :approved_by, :approved_at, :created_at
+                        :created_at
                     )
                     """),
                 {
@@ -168,8 +166,6 @@ def upgrade() -> None:
                     "anchor_link_pk": anchor_link_pk,
                     "label": batch["label"],
                     "status": _page_status(batch["status"], page_rows),
-                    "approved_by": batch["approved_by"],
-                    "approved_at": batch["approved_at"],
                     "created_at": batch["created_at"],
                 },
             )
@@ -224,8 +220,6 @@ def downgrade() -> None:
         sa.Column("target_index_title", sa.String(), nullable=False),
         sa.Column("label", sa.String(), nullable=True),
         sa.Column("status", sa.String(), nullable=False),
-        sa.Column("approved_by", sa.String(), nullable=True),
-        sa.Column("approved_at", sa.DateTime(), nullable=True),
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(["source_site_pk"], ["site.pk"]),
         sa.ForeignKeyConstraint(["target_site_pk"], ["site.pk"]),
@@ -264,7 +258,7 @@ def downgrade() -> None:
             INSERT INTO promotionbatch_old
             SELECT pk, source_site_pk, target_site_pk, index_link_pk,
                    source_title, target_title, label, status,
-                   approved_by, approved_at, created_at
+                   created_at
             FROM promotionbatch
             """))
     bind.execute(sa.text("""

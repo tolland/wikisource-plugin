@@ -1,11 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page as routePage } from '$app/state';
-  import { abortBatch, approveBatch, getBatch, pushBatchPage, skipPromotion } from '$lib/api';
+  import { abortBatch, getBatch, pushBatchPage, skipPromotion } from '$lib/api';
   import ActionButton from '$lib/components/ActionButton.svelte';
+  import DiffView from '$lib/components/DiffView.svelte';
   import Notice from '$lib/components/Notice.svelte';
   import PageHeading from '$lib/components/PageHeading.svelte';
-  import TextField from '$lib/components/TextField.svelte';
+  import { buildLineDiff } from '$lib/diff';
   import type { Batch, PromotionRow, PromotionStatus } from '$lib/types';
 
   /**
@@ -25,7 +26,6 @@
   let busy = $state(false);
   let error = $state('');
   let message = $state('');
-  let approvedBy = $state('');
 
   const STATUSES: Record<PromotionStatus, { label: string; tone: string }> = {
     staged: { label: 'staged', tone: 'quiet' },
@@ -38,7 +38,16 @@
   const canPush = $derived.by((): boolean => {
     if (batch === null) return false;
     if (batch.remaining === 0) return false;
-    return batch.status === 'approved' || batch.status === 'running';
+    return batch.status === 'draft' || batch.status === 'running';
+  });
+  const diffs = $derived.by(() => {
+    const result = new Map<number, ReturnType<typeof buildLineDiff>>();
+    for (const row of batch?.promotions ?? []) {
+      if (row.submitted_body != null) {
+        result.set(row.pk, buildLineDiff(row.base_body ?? '', row.submitted_body));
+      }
+    }
+    return result;
   });
 
   async function load(): Promise<void> {
@@ -66,9 +75,6 @@
       busy = false;
     }
   }
-
-  const approve = () =>
-    run(() => approveBatch(batchPk, approvedBy), `Approved by ${approvedBy}.`);
 
   const pushNext = () =>
     run(() => pushBatchPage(batchPk), 'Pushed one revision.');
@@ -108,7 +114,7 @@
   }
 
   const skip = (row: PromotionRow) =>
-    run(() => skipPromotion(batchPk, row.pk), `Skipped source revision ${row.source_revision_pk}.`);
+    run(() => skipPromotion(batchPk, row.pk), `Skipped source revision ${row.source_revid}.`);
 
   const abort = () =>
     run(() => abortBatch(batchPk), 'Run aborted. Revisions already pushed stay pushed.');
@@ -124,7 +130,7 @@
   <PageHeading
     eyebrow={`${batch.source_site} → ${batch.target_site}`}
     title={batch.label ?? `Batch #${batch.pk}`}
-    count={`${batch.status}${batch.approved_by ? ` · approved by ${batch.approved_by}` : ''}`}
+    count={batch.status}
   >
     <p class="other">{batch.source_title} &rarr; {batch.target_title}</p>
   </PageHeading>
@@ -146,22 +152,7 @@
     <span class="total">{batch.remaining} still to push</span>
   </section>
 
-  {#if batch.status === 'draft'}
-    <section class="approve" aria-label="Approval">
-      <h2>Approve this run</h2>
-      <p>
-        Nothing is written until somebody signs it off, and the name is stored with
-        the batch &mdash; "did a person agree to this" is exactly the fact an audit
-        wants, and a convenient default would erase it.
-      </p>
-      <div class="row">
-        <TextField label="Approved by" bind:value={approvedBy} placeholder="your name" />
-        <ActionButton disabled={busy || !approvedBy.trim()} onclick={approve}>
-          Approve
-        </ActionButton>
-      </div>
-    </section>
-  {:else}
+  {#if batch.status === 'draft' || batch.status === 'running'}
     <section class="run" aria-label="Push">
       <div class="row">
         <ActionButton disabled={busy || !canPush} onclick={pushNext}>
@@ -187,48 +178,61 @@
     </section>
   {/if}
 
-  <table class="promotions">
-    <thead>
-      <tr>
-        <th scope="col">#</th>
-        <th scope="col">Status</th>
-        <th scope="col">Target / source revision</th>
-        <th scope="col">Intent</th>
-        <th scope="col">Base</th>
-        <th scope="col">Result</th>
-        <th scope="col"></th>
-      </tr>
-    </thead>
-    <tbody>
-      {#each batch.promotions as row}
-        <tr>
-          <td>{batch.page_number ?? '?'}</td>
-          <td>
+  <section class="promotions" aria-label="Revision changes">
+    <h2>Changes to push</h2>
+    <p class="diff-intro">
+      Each source revision is shown against the exact preceding state in this frozen
+      batch. The first update starts at the linked target anchor; later revisions start
+      at the preceding change below.
+    </p>
+    {#each batch.promotions as row, index}
+      {@const diff = diffs.get(row.pk)}
+      <article class="promotion">
+        <header class="promotion-header">
+          <div>
+            <p class="revision-title">
+              Revision {index + 1} of {batch.promotions.length}
+              <span class="source-revid">source r{row.source_revid}</span>
+            </p>
+            <p class="revision-meta">
+              {row.intent}
+              &middot; base {row.base_revid ?? (row.predecessor_promotion_pk ? 'previous result' : 'new page')}
+              {#if row.result_revid != null}&middot; result r{row.result_revid}{/if}
+              &middot; {row.body_length.toLocaleString()} characters
+            </p>
+            <p class="comment">Edit summary: {row.comment || '(empty)'}</p>
+          </div>
+          <div class="promotion-actions">
             <span class="chip {STATUSES[row.status]?.tone ?? 'quiet'}">
               {STATUSES[row.status]?.label ?? row.status}
             </span>
-          </td>
-          <td class="title">
-            {batch.target_title}
-            <small>source revision #{row.source_revision_pk} · {row.body_length.toLocaleString()} characters</small>
-            {#if row.error_message}
-              <small class="why">{row.error_message}</small>
-            {/if}
-          </td>
-          <td>{row.intent}</td>
-          <td class="revs">{row.base_revid ?? (row.predecessor_promotion_pk ? 'previous result' : '—')}</td>
-          <td class="revs">{row.result_revid ?? '—'}</td>
-          <td>
             {#if row.status === 'staged'}
               <button type="button" class="link" disabled={busy} onclick={() => skip(row)}>
                 Skip
               </button>
             {/if}
-          </td>
-        </tr>
-      {/each}
-    </tbody>
-  </table>
+          </div>
+        </header>
+        {#if row.error_message}
+          <p class="why">{row.error_message}</p>
+        {/if}
+        {#if row.submitted_body != null && row.base_body == null && row.intent === 'update'}
+          <p class="why">The cached target anchor body is unavailable; the whole submitted body is shown as added.</p>
+        {/if}
+        {#if row.submitted_body == null}
+          <p class="why">Diff bodies are unavailable. Reload after the wtbot service has restarted.</p>
+        {/if}
+        {#if diff}
+          <div class="diff-summary">
+            <span class="added">+{diff.added.toLocaleString()}</span>
+            <span class="removed">-{diff.removed.toLocaleString()}</span>
+            <span>{diff.unchanged.toLocaleString()} unchanged lines</span>
+          </div>
+          <DiffView {diff} />
+        {/if}
+      </article>
+    {/each}
+  </section>
 {:else}
   <Notice>{error || 'No such batch.'}</Notice>
 {/if}
@@ -244,11 +248,6 @@
   .state,
   .other {
     color: #73583d;
-  }
-
-  h2 {
-    margin: 0 0 0.4rem;
-    font-size: 1rem;
   }
 
   .summary {
@@ -303,20 +302,12 @@
     color: #73583d;
   }
 
-  .approve,
   .run {
     border: 1px solid rgba(72, 49, 31, 0.18);
     border-radius: 20px;
     background: rgba(255, 248, 230, 0.72);
     margin-bottom: 1.5rem;
     padding: 1.1rem 1.2rem;
-  }
-
-  .approve p {
-    margin: 0 0 0.8rem;
-    max-width: 46rem;
-    color: #73583d;
-    font-size: 0.88rem;
   }
 
   .row {
@@ -335,44 +326,87 @@
   }
 
   .promotions {
-    width: 100%;
-    border-collapse: collapse;
+    display: grid;
+    gap: 1rem;
   }
 
-  .promotions th,
-  .promotions td {
-    border-bottom: 1px solid rgba(72, 49, 31, 0.14);
-    padding: 0.55rem 0.5rem;
-    text-align: left;
-    vertical-align: top;
+  .promotions h2 {
+    margin: 0;
+    font-size: 1.2rem;
   }
 
-  .promotions th {
+  .diff-intro {
+    max-width: 60rem;
+    margin: -0.5rem 0 0;
     color: #73583d;
-    font-family: "Avenir Next", "Gill Sans", sans-serif;
-    font-size: 0.72rem;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+    font-size: 0.86rem;
   }
 
-  .promotions .title {
+  .promotion {
+    min-width: 0;
+    border: 1px solid rgba(72, 49, 31, 0.18);
+    border-radius: 16px;
+    background: rgba(255, 252, 240, 0.7);
+    padding: 1rem;
+  }
+
+  .promotion-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .revision-title {
+    margin: 0;
+    font-family: "Avenir Next", "Gill Sans", sans-serif;
+    font-weight: 700;
+  }
+
+  .source-revid {
+    margin-left: 0.5rem;
+    color: #9c5632;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.82rem;
+  }
+
+  .revision-meta,
+  .comment {
+    margin: 0.25rem 0 0;
+    color: #73583d;
+    font-size: 0.8rem;
+  }
+
+  .comment {
     overflow-wrap: anywhere;
   }
 
-  .promotions small {
-    display: block;
-    margin-top: 0.2rem;
+  .promotion-actions {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+  }
+
+  .why {
+    margin: 0.75rem 0;
+    color: #7d5510;
+    font-size: 0.82rem;
+  }
+
+  .diff-summary {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
     color: #73583d;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 0.76rem;
   }
 
-  .promotions small.why {
-    color: #7d5510;
+  .diff-summary .added {
+    color: #286b4c;
   }
 
-  .promotions .revs {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 0.82rem;
+  .diff-summary .removed {
+    color: #a13c22;
   }
 
   .link {

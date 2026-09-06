@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from conftest import add_proofread_meta
 from sqlmodel import Session, select
 
+from wtbot.fetch.revision_store import record_head_revision
 from wtbot.model import (
     FetchRequest,
     FetchState,
@@ -15,7 +16,6 @@ from wtbot.model import (
     Site,
     SiteCredential,
 )
-from wtbot.revision_store import record_head_revision
 from wtbot.wiki.wiki_types import RemotePage
 
 """``sync --from Index:X [--to Index:Y]``: the report before any push.

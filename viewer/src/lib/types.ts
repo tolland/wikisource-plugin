@@ -190,7 +190,7 @@ export interface Commit {
   pk: number;
   page_pk: number;
   base_revid: number;
-  submitted_body: string;
+  submitted_body?: string | null;
   comment?: string | null;
   status: CommitStatus;
   result_revid?: number | null;
@@ -576,13 +576,11 @@ export interface LocatorIndexDump {
 /* --- the push queue -------------------------------------------------------
  *
  * A report says what would happen; a batch is somebody deciding it should.
- * Separate surfaces because the boundary between them is the only place a
- * person's judgement is recorded.
+ * Staging freezes a reviewable proposal; pushing is the explicit go/no-go.
  */
 
 export type BatchStatus =
   | 'draft'
-  | 'approved'
   | 'running'
   | 'complete'
   | 'partial'
@@ -594,6 +592,7 @@ export type PromotionIntent = 'create' | 'update';
 export interface PromotionRow {
   pk: number;
   source_revision_pk: number;
+  source_revid: number;
   predecessor_promotion_pk?: number | null;
   intent: PromotionIntent;
   status: PromotionStatus;
@@ -602,6 +601,9 @@ export interface PromotionRow {
   result_revid?: number | null;
   error_message?: string | null;
   body_length: number;
+  comment?: string | null;
+  base_body?: string | null;
+  submitted_body: string;
 }
 
 export interface Batch {
@@ -613,7 +615,6 @@ export interface Batch {
   source_title: string;
   target_title: string;
   page_number?: number | null;
-  approved_by?: string | null;
   work_pk?: number | null;
   counts: Record<string, number>;
   /** Rows still staged. */
@@ -626,12 +627,21 @@ export interface StageRequest extends SyncRequest {
   page_number: number;
 }
 
+export interface StageManyRequest extends SyncRequest {
+  label?: string | null;
+  page_numbers: number[];
+}
+
+export interface StageManyResponse {
+  batches: Batch[];
+}
+
 /* --- single-page promotion -------------------------------------------------
  *
  * The `/sync/page-report` and `/sync/page-batches` counterparts of the above,
  * for one page and its revisions -- no index, no scan check, no fan-out.
  * Staging still produces an ordinary page `Batch`, so the
- * review/approve/push screens are shared rather than duplicated.
+ * review/push screens are shared rather than duplicated.
  */
 
 export interface PageSyncRequest {

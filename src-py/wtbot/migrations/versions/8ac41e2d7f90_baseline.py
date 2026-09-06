@@ -292,7 +292,6 @@ def upgrade() -> None:
             "status",
             sa.Enum(
                 "draft",
-                "approved",
                 "running",
                 "complete",
                 "partial",
@@ -301,8 +300,6 @@ def upgrade() -> None:
             ),
             nullable=False,
         ),
-        sa.Column("approved_by", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
-        sa.Column("approved_at", sa.DateTime(), nullable=True),
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(
             ["index_link_pk"],

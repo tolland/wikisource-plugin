@@ -69,7 +69,7 @@ def get_callback() -> Callable[..., None]:
 
 
 def local_file_parser(local_file: str):
-    print("in the local file parser")
+    # print("in the local file parser")
     if local_file.startswith("file:///"):
         print("stripping prefix")
         return local_file.removeprefix("file://")

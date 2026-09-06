@@ -245,6 +245,10 @@
                 {#if row.user}&middot; {row.user}{/if}
                 {#if when(row)}&middot; {when(row)}{/if}
               </span>
+              <span class="digest">
+                comparable_sha1
+                <code>{row.comparable_sha1 ?? 'not computed'}</code>
+              </span>
               {#if row.linked_to.length}
                 <span class="linked">linked</span>
               {/if}
@@ -276,6 +280,10 @@
                 {#if row.level !== null && row.level !== undefined}level {row.level}{/if}
                 {#if row.user}&middot; {row.user}{/if}
                 {#if when(row)}&middot; {when(row)}{/if}
+              </span>
+              <span class="digest">
+                comparable_sha1
+                <code>{row.comparable_sha1 ?? 'not computed'}</code>
               </span>
               {#if row.linked_to.length}
                 <span class="linked">linked</span>
@@ -446,6 +454,26 @@
     grid-column: 1 / -1;
     color: #73583d;
     font-size: 0.78rem;
+  }
+
+  .digest {
+    display: grid;
+    grid-column: 1 / -1;
+    gap: 0.1rem;
+    color: #8a6a45;
+    font-family: "Avenir Next", "Gill Sans", sans-serif;
+    font-size: 0.62rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .digest code {
+    color: #48311f;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0;
+    overflow-wrap: anywhere;
+    text-transform: none;
   }
 
   .linked {

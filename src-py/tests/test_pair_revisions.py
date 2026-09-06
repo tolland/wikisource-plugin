@@ -3,8 +3,8 @@ from datetime import datetime, timedelta, timezone
 from conftest import add_proofread_meta
 from sqlmodel import Session, select
 
+from wtbot.fetch.revision_store import record_head_revision, record_history
 from wtbot.model import NsRole, Page, RevisionLink, Site
-from wtbot.revision_store import record_head_revision, record_history
 from wtbot.wiki.wiki_types import RemotePage
 
 """The revision drill-down: resolving a pair the anchor search will not propose.
@@ -104,7 +104,7 @@ def seed_diverged_pair(engine) -> int:
             ],
         )
 
-        from wtbot.page_link_store import pair_pages
+        from wtbot.linking.page_link_store import pair_pages
 
         pairing = pair_pages(session, local_page, remote_page_row)
         session.commit()
@@ -252,7 +252,7 @@ def test_matches_are_ordered_by_how_little_would_replay(client, engine) -> None:
                 remote_page(body(2, "Them", "Words."), 900, None, 1),
             ],
         )
-        from wtbot.page_link_store import pair_pages
+        from wtbot.linking.page_link_store import pair_pages
 
         pair_pk = pair_pages(session, local_page, remote_page_row).pk
         session.commit()
@@ -279,7 +279,7 @@ def test_incomplete_history_is_reported_rather_than_implied(client, engine) -> N
             # A head whose parent we do not hold: the history stops short.
             [remote_page(body(3, "Them", "Theirs."), 902, 800, 1)],
         )
-        from wtbot.page_link_store import pair_pages
+        from wtbot.linking.page_link_store import pair_pages
 
         pair_pk = pair_pages(session, local_page, remote_page_row).pk
         session.commit()

@@ -1,7 +1,7 @@
 import logging
 
-from wtbot.log_levels import TRACE
-from wtbot.logging_config import (
+from wtbot.log.log_levels import TRACE
+from wtbot.log.logging_config import (
     LoggingConfig,
     body_limit_bytes,
     configure_logging,

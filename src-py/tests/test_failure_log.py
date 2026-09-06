@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from wtbot.failure_log import (
+from wtbot.log.failure_log import (
     FailureContext,
     configure_failure_log,
     record_failure,

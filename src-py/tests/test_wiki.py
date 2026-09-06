@@ -4,7 +4,7 @@ import pytest
 
 from wtbot.model import NsRole
 from wtbot.settings import WikiSettings
-from wtbot.wiki.client import FakeWikiClient
+from wtbot.wiki.client import FakeWikiClient, _save_with_exact_summary
 from wtbot.wiki.dispatch import Handling, classify, classify_remote
 from wtbot.wiki.rate_limits import TIER_LIMITS, RateLimitPolicy, RateLimitTier
 from wtbot.wiki.wiki_types import PageNotFound, RemotePage
@@ -66,6 +66,20 @@ class TestFakeClient:
     def test_missing_file_raises(self, tmp_path):
         with pytest.raises(PageNotFound):
             FakeWikiClient().download_file("File:Nope.djvu", tmp_path / "x")
+
+
+def test_exact_empty_edit_summary_bypasses_pywikibot_default():
+    class RecordingPage:
+        def __init__(self):
+            self.calls = []
+
+        def _save(self, **kwargs):
+            self.calls.append(kwargs)
+
+    page = RecordingPage()
+    _save_with_exact_summary(page, "", baserevid=123)
+
+    assert page.calls == [{"summary": "", "baserevid": 123}]
 
 
 class TestRateLimitPolicy:

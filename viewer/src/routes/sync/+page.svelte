@@ -4,10 +4,9 @@
   import {
     fetchSyncAssets,
     listWorks,
-    stageBatch,
+    stageManyBatches,
     syncReport
   } from '$lib/api';
-  import { goto } from '$app/navigation';
   import ActionButton from '$lib/components/ActionButton.svelte';
   import Notice from '$lib/components/Notice.svelte';
   import PageHeading from '$lib/components/PageHeading.svelte';
@@ -29,9 +28,8 @@
    * way round they are read, and a page that hid that would be answering a
    * different question from the one asked.
    *
-   * Read-only, deliberately and visibly. Nothing here writes to either wiki or
-   * to the local model -- not even the pairings it reads -- so the report can
-   * be re-run as often as it takes without consequences.
+   * Running the report is read-only. Staging selected results only freezes
+   * local batches; pushing remains a separate, explicit action.
    */
 
   let works: WorkSummary[] = $state([]);
@@ -43,7 +41,8 @@
   let loading = $state(true);
   let running = $state(false);
   let fetching = $state(false);
-  let stagingPage: number | null = $state(null);
+  let staging = $state(false);
+  let selectedPages: number[] = $state([]);
   let batchLabel = $state('');
   let error = $state('');
   let message = $state('');
@@ -118,6 +117,13 @@
     }
     return report.pages;
   });
+  const selectableVisible = $derived(
+    visible.filter((row) => row.actionable && row.page_number != null)
+  );
+  const allVisibleSelected = $derived(
+    selectableVisible.length > 0 &&
+      selectableVisible.every((row) => selectedPages.includes(row.page_number as number))
+  );
 
   async function load(): Promise<void> {
     loading = true;
@@ -147,6 +153,7 @@
     error = '';
     try {
       report = await syncReport(selectedRequest);
+      selectedPages = [];
     } catch (err) {
       error = err instanceof Error ? err.message : 'The report failed';
       report = null;
@@ -175,37 +182,50 @@
     }
   }
 
-  async function stage(row: SyncPage): Promise<void> {
-    // Only what the report calls writable goes in, and the server refuses
-    // anything else -- staging is the last cheap moment to say "we are not
-    // sure these correspond".
-    if (selectedRequest === null || row.page_number == null) return;
-    stagingPage = row.page_number;
+  async function stageSelected(): Promise<void> {
+    if (selectedRequest === null || selectedPages.length === 0) return;
+    staging = true;
     error = '';
     message = '';
     try {
-      const batch = await stageBatch({
+      const result = await stageManyBatches({
         ...selectedRequest,
-        page_number: row.page_number,
+        page_numbers: [...selectedPages].sort((a, b) => a - b),
         label: batchLabel || null
       });
-      await goto(`/sync/batches/${batch.pk}`);
+      message = `Staged ${result.batches.length} batch(es). Open Batches to review or push them individually.`;
+      selectedPages = [];
     } catch (err) {
-      error = err instanceof Error ? err.message : 'Failed to stage the batch';
+      error = err instanceof Error ? err.message : 'Failed to stage the selected batches';
     } finally {
-      stagingPage = null;
+      staging = false;
     }
+  }
+
+  function togglePage(pageNumber: number): void {
+    selectedPages = selectedPages.includes(pageNumber)
+      ? selectedPages.filter((value) => value !== pageNumber)
+      : [...selectedPages, pageNumber];
+  }
+
+  function toggleVisible(): void {
+    const visibleNumbers = selectableVisible.map((row) => row.page_number as number);
+    selectedPages = allVisibleSelected
+      ? selectedPages.filter((value) => !visibleNumbers.includes(value))
+      : [...new Set([...selectedPages, ...visibleNumbers])];
   }
 
   function swap(): void {
     reversed = !reversed;
     report = null;
+    selectedPages = [];
     message = '';
   }
 
   function chooseWork(): void {
     reversed = false;
     report = null;
+    selectedPages = [];
     message = '';
   }
 
@@ -215,8 +235,8 @@
 <PageHeading eyebrow="Dry run" title="Sync report">
   <p class="description">
     What copying a work from one wiki to the other would change &mdash; page by page,
-    with the scan check first. Nothing here writes to either wiki, or to the local
-    model.
+    with the scan check first. Running the report writes nothing; staging only
+    creates local batches and never writes to either wiki.
   </p>
   <p class="description">
     Pushing back to a public wiki one page at a time, without waiting on the
@@ -396,13 +416,21 @@
   </section>
 
   {#if report.actionable > 0}
-    <section class="stage" aria-label="Stage a page">
-      <h2>Stage one page at a time</h2>
+    <section class="stage" aria-label="Stage selected pages">
+      <h2>Stage selected pages</h2>
       <p>
-        Each page becomes its own review and approval batch. Its promotions are the
-        source revisions that will be replayed, in order, onto that one target page.
+        Select one or more writable rows below. Each page becomes its own batch, with
+        source revisions replayed in order onto that target page. This report is for
+        choosing pages; each batch shows the exact revision-by-revision diff before
+        anything is pushed.
       </p>
-      <TextField label="Batch label (optional)" bind:value={batchLabel} />
+      <div class="stage-actions">
+        <TextField label="Batch label prefix (optional)" bind:value={batchLabel} />
+        <ActionButton disabled={staging || selectedPages.length === 0} onclick={stageSelected}>
+          {staging ? 'Staging...' : `Stage ${selectedPages.length} selected`}
+        </ActionButton>
+        <a class="drill" href="/sync/batches">Open Batches &rarr;</a>
+      </div>
     </section>
   {/if}
 
@@ -423,6 +451,15 @@
     <table class="pages">
       <thead>
         <tr>
+          <th scope="col" class="select-col">
+            <input
+              type="checkbox"
+              aria-label="Select all writable rows in this view"
+              checked={allVisibleSelected}
+              disabled={selectableVisible.length === 0 || staging}
+              onchange={toggleVisible}
+            />
+          </th>
           <th scope="col">#</th>
           <th scope="col">Verdict</th>
           <th scope="col">Page</th>
@@ -433,6 +470,17 @@
       <tbody>
         {#each visible as row}
           <tr>
+            <td class="select-col">
+              {#if row.actionable && row.page_number != null}
+                <input
+                  type="checkbox"
+                  aria-label={`Select page ${row.page_number}`}
+                  checked={selectedPages.includes(row.page_number)}
+                  disabled={staging}
+                  onchange={() => togglePage(row.page_number as number)}
+                />
+              {/if}
+            </td>
             <td>{row.page_number ?? '?'}</td>
             <td>
               <span class="chip {VERDICTS[row.verdict]?.tone ?? 'warn'}">
@@ -455,14 +503,6 @@
               {/if}
             </td>
             <td>
-              {#if row.actionable && row.page_number != null}
-                <ActionButton
-                  disabled={stagingPage !== null}
-                  onclick={() => stage(row)}
-                >
-                  {stagingPage === row.page_number ? 'Staging...' : 'Stage page'}
-                </ActionButton>
-              {/if}
               {#if row.pair_pk}
                 <a class="drill" href={`/links/pairs/${row.pair_pk}`}>Revisions</a>
               {/if}
@@ -474,9 +514,9 @@
   {/if}
 
   <p class="footnote">
-    This is a report. Nothing has been written to {report.target.site}, and nothing to
-    the local model. It uses tracked Index link #{report.work_pk}; reversing the report
-    does not change that stored correspondence.
+    Nothing on this page writes to {report.target.site}. Staging freezes selected
+    rows as local batches; pushing happens from each batch. This report uses tracked
+    Index link #{report.work_pk}; reversing it does not change that correspondence.
   </p>
 {/if}
 
@@ -813,6 +853,13 @@
     font-size: 0.88rem;
   }
 
+  .stage-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1rem;
+    align-items: end;
+  }
+
   .filter {
     display: flex;
     flex-wrap: wrap;
@@ -840,6 +887,18 @@
     font-size: 0.72rem;
     letter-spacing: 0.06em;
     text-transform: uppercase;
+  }
+
+  .pages .select-col {
+    width: 2rem;
+    padding-right: 0.15rem;
+    text-align: center;
+  }
+
+  .pages input[type='checkbox'] {
+    width: 1rem;
+    height: 1rem;
+    accent-color: #286b4c;
   }
 
   .pages .title {

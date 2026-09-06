@@ -14,15 +14,15 @@ from wiki_harness import (
 )
 
 from wtbot.content_model import Significance, parse_document
-from wtbot.model import FetchRequest, LinkOrigin, Page, Revision, Site
-from wtbot.remote_link_store import (
+from wtbot.fetch.revision_store import head_content
+from wtbot.linking.remote_link_store import (
     assert_link,
     corresponding_page,
     current_anchor,
     find_link,
     ladder,
 )
-from wtbot.revision_store import head_content
+from wtbot.model import FetchRequest, LinkOrigin, Page, Revision, Site
 from wtbot.worker import run_pending
 
 """RemoteLink against two real wikis.

@@ -10,6 +10,7 @@ from conftest import fetch_and_drain, register_site
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
+from wtbot.fetch.revision_store import head_content
 from wtbot.main import create_app
 from wtbot.model import (
     FetchRequest,
@@ -20,7 +21,6 @@ from wtbot.model import (
     ProofreadPageMeta,
     Site,
 )
-from wtbot.revision_store import head_content
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.sha1 import normalize_sha1
 from wtbot.wiki.wiki_types import RemotePage, RemotePageImages

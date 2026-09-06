@@ -6,13 +6,16 @@ from sqlmodel import Session, func, select
 
 from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.deps import get_session
-from wtbot.index_link_store import (
+from wtbot.fetch.revision_store import head_revision
+from wtbot.linking.index_link_store import (
     adopt_children,
     link_indexes,
     unlink_index,
     work_for_index_page,
     works_for_sites,
 )
+from wtbot.linking.page_link_store import find_pair, pair_pages
+from wtbot.linking.remote_link_store import LinkError, ladder
 from wtbot.matching import (
     LinkProposal,
     MatchOutcome,
@@ -33,9 +36,6 @@ from wtbot.model import (
     RevisionLink,
     Site,
 )
-from wtbot.page_link_store import find_pair, pair_pages
-from wtbot.remote_link_store import LinkError, ladder
-from wtbot.revision_store import head_revision
 from wtbot.site_store import require_credentialed_site, resolve_pair
 
 """Works: the cross-site unit a reviewer actually navigates.

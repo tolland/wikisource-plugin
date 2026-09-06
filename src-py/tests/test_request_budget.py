@@ -216,8 +216,8 @@ def test_a_fan_out_asks_for_its_pages_images_once_not_once_per_page(engine, tmp_
     """
     from sqlmodel import Session, select
 
+    from wtbot.fetch.queue_runner import drain_queue
     from wtbot.model import FetchRequest, Site
-    from wtbot.queue_runner import drain_queue
     from wtbot.wiki.wiki_types import RemotePage, RemotePageImages
 
     index_title = "Index:Budget.djvu"
@@ -279,8 +279,8 @@ def test_a_page_fetched_on_its_own_still_gets_its_image(engine, tmp_path):
     prefetched entry, and must still end up with its thumbnail."""
     from sqlmodel import Session
 
+    from wtbot.fetch.queue_runner import drain_queue
     from wtbot.model import FetchRequest, Site
-    from wtbot.queue_runner import drain_queue
     from wtbot.wiki.wiki_types import RemotePage, RemotePageImages
 
     title = "Page:Budget.djvu/1"

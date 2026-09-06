@@ -1,8 +1,11 @@
+from pathlib import Path
 from typing import Annotated
 
 import typer
 from typer_di import Depends, TyperDI
 
+from wtbot.cli.callbacks import local_file_parser
+from wtbot.cli.commands.pdf_outline_utils import PdfOutline
 from wtbot.cli.deps import ApiClient, get_api
 
 app = TyperDI(
@@ -61,3 +64,28 @@ def reset_fetchrequest(
 ) -> None:
     """Empty fetchrequest."""
     _reset("fetchrequest", force, api)
+
+
+@app.command("extract-outline")
+def extract_outline(
+    pdf_filepath: Annotated[
+        Path,
+        typer.Option(
+            exists=True,
+            file_okay=True,
+            dir_okay=False,
+            # writable=False,
+            readable=True,
+            resolve_path=True,
+            parser=local_file_parser,
+        ),
+    ],
+) -> None:
+    """Generate pagelists from PDF bookmarks and labels, or all scans as a fallback."""
+    try:
+        outline = PdfOutline(pdf_filepath)
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise typer.BadParameter(str(exc), param_hint="--pdf-filepath") from exc
+
+    for entry in outline.entries:
+        typer.echo(f"{entry.title}\n{outline.pagelist(entry)}\n")

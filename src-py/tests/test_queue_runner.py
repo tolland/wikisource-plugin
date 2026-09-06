@@ -3,9 +3,9 @@ from conftest import credential_for, drain
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
+from wtbot.fetch.queue_runner import DrainStop, drain_queue, pending_count, queue_stats
 from wtbot.main import create_app
 from wtbot.model import FetchKind, FetchRequest, FetchStatus, Page, Site
-from wtbot.queue_runner import DrainStop, drain_queue, pending_count, queue_stats
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import RemotePage
 

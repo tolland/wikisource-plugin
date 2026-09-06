@@ -3,7 +3,8 @@ from datetime import datetime, timezone
 from conftest import add_proofread_meta
 from sqlmodel import Session, select
 
-from wtbot.index_link_store import link_indexes, work_for_index_page
+from wtbot.fetch.revision_store import record_head_revision
+from wtbot.linking.index_link_store import link_indexes, work_for_index_page
 from wtbot.model import (
     FetchRequest,
     IndexLink,
@@ -15,7 +16,6 @@ from wtbot.model import (
     Site,
     SiteCredential,
 )
-from wtbot.revision_store import record_head_revision
 from wtbot.wiki.wiki_types import RemotePage
 
 """Works: the cross-site unit a reviewer navigates, and the two-level drill.
@@ -224,7 +224,7 @@ def test_a_work_adopts_page_pairs_made_before_it(session: Session) -> None:
     local_page = build_page(session, local, INDEX, 1, text="a", revid=5)
     remote_page = build_page(session, remote, REMOTE_INDEX, 1, text="a", revid=900)
 
-    from wtbot.page_link_store import pair_pages
+    from wtbot.linking.page_link_store import pair_pages
 
     pairing = pair_pages(session, local_page, remote_page)
     session.commit()
@@ -251,7 +251,7 @@ def test_only_pages_with_index_meta_can_be_a_work(session: Session) -> None:
     session.refresh(local_page)
     remote_index = build_index(session, remote, REMOTE_INDEX)
 
-    from wtbot.remote_link_store import LinkError
+    from wtbot.linking.remote_link_store import LinkError
 
     try:
         link_indexes(session, local_page, remote_index)

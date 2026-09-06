@@ -25,7 +25,7 @@ from threading import Lock
 from sqlmodel import Session, select
 
 from wtbot.db_session import detached_site, read_snapshot, write_batch
-from wtbot.failure_log import FailureContext, record_failure, site_label
+from wtbot.log.failure_log import FailureContext, record_failure, site_label
 from wtbot.model import (
     Commit,
     CommitStatus,
@@ -107,6 +107,7 @@ def run_pending_commit_for_page(
     client_factory: ClientFactory,
     *,
     force: bool = False,
+    comment: str | None = None,
 ) -> bool:
     """Push one page's pending local edits.
 
@@ -116,7 +117,9 @@ def run_pending_commit_for_page(
     """
     with _worker_lock:
         try:
-            return _push_page(session, page_pk, client_factory, force=force)
+            return _push_page(
+                session, page_pk, client_factory, force=force, comment=comment
+            )
         finally:
             session.rollback()
 
@@ -163,6 +166,7 @@ def _push_page(
     client_factory: ClientFactory,
     *,
     force: bool = False,
+    comment: str | None = None,
 ) -> bool:
     """Return True if the page was successfully pushed, False on conflict/error."""
     pending = _load_pending_page_commit(session, page_pk)
@@ -174,6 +178,17 @@ def _push_page(
         return True  # removed from queue; not a retriable failure
     if pending is None:
         return True
+
+    if comment is not None:
+        pending = _PendingPageCommit(
+            page_pk=pending.page_pk,
+            title=pending.title,
+            site=pending.site,
+            journal_pks=pending.journal_pks,
+            base_revid=pending.base_revid,
+            body=pending.body,
+            comment=comment,
+        )
 
     outcome = _save_pending_page(pending, client_factory, force=force)
     _record_commit_outcome(session, pending, outcome)

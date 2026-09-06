@@ -5,6 +5,8 @@ from conftest import add_proofread_meta, drain
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
+from wtbot.fetch.revision_store import record_head_revision, record_history
+from wtbot.linking.remote_link_store import ladder
 from wtbot.main import create_app
 from wtbot.model import (
     FetchRequest,
@@ -17,9 +19,11 @@ from wtbot.model import (
     Site,
     SiteCredential,
 )
-from wtbot.promotion_store import materialize_promotion_links, stage_batch
-from wtbot.remote_link_store import ladder
-from wtbot.revision_store import record_head_revision, record_history
+from wtbot.promotion.promotion_store import (
+    _promotion_comment,
+    materialize_promotion_links,
+    stage_batch,
+)
 from wtbot.sync import build_report
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import RemotePage
@@ -32,7 +36,7 @@ The three things this pins are the three that make a push safe to press:
 - **only writable rows are staged.** An unlinked page a comparison likes is
   refused, not silently promoted -- staging is the last point at which "we are
   not sure these correspond" is cheap to say.
-- **nothing runs unapproved.** "Did a person agree to this" is stored, not
+- **nothing runs without an explicit push.** Staging itself never writes;
   assumed from the fact that a request arrived.
 - **the frozen body is re-checked.** A source that moved between review and
   execution is a conflict, because the body under review is no longer the body
@@ -307,6 +311,10 @@ def test_a_batch_stages_only_what_the_report_would_write(pushing_client, engine)
     assert promotion["intent"] == "update"
     assert promotion["status"] == "staged"
     assert promotion["base_revid"] == 254  # the target head it claims to follow
+    assert promotion["source_revid"] == 999
+    assert promotion["base_body"] == body(3, "Us", "Words.")
+    assert promotion["submitted_body"] == body(3, "Them", "Words, changed again.")
+    assert promotion["comment"] == "finish proofreading"
 
 
 def test_each_source_revision_is_an_ordered_promotion(pushing_client, engine):
@@ -325,6 +333,9 @@ def test_each_source_revision_is_an_ordered_promotion(pushing_client, engine):
     assert second["predecessor_promotion_pk"] == first["pk"]
     assert first["base_revid"] == 254
     assert second["base_revid"] is None
+    assert [first["source_revid"], second["source_revid"]] == [901, 902]
+    assert first["base_body"] == body(3, "Us", "Words.")
+    assert second["base_body"] == first["submitted_body"]
 
     with Session(engine) as session:
         revisions = {row.pk: row.revid for row in session.exec(select(Revision)).all()}
@@ -333,16 +344,13 @@ def test_each_source_revision_is_an_ordered_promotion(pushing_client, engine):
         902,
     ]
 
-    pushing_client.post(
-        f"/sync/batches/{batch['pk']}/approve", json={"approved_by": "tolland"}
-    )
     pushing_client.post(f"/sync/batches/{batch['pk']}/push", json={})
     pushed = pushing_client.post(f"/sync/batches/{batch['pk']}/push", json={}).json()
 
     assert [save[2] for save in RecordingWiki.saved] == [254, 4242]
     assert RecordingWiki.comments == [
-        "Sync upstream revid 901 by Editor: correct punctuation",
-        "Sync upstream revid 902 by Editor: promote proofread status",
+        "correct punctuation",
+        "promote proofread status",
     ]
     assert [row["result_revid"] for row in pushed["promotions"]] == [4242, 4243]
     assert pushed["status"] == "complete"
@@ -401,6 +409,36 @@ def test_each_source_revision_is_an_ordered_promotion(pushing_client, engine):
                 )
             )
         assert pairs == [(901, 4242), (902, 4243)]
+
+
+def test_promotion_blanks_pywikibot_default_comment(pushing_client, engine):
+    seed(engine)
+    add_source_revision(
+        engine,
+        revid=901,
+        parent_revid=900,
+        words="Words, with a minor correction.",
+        comment="Pywikibot 11.4.2",
+    )
+    batch = stage(pushing_client).json()
+
+    pushed = pushing_client.post(f"/sync/batches/{batch['pk']}/push", json={})
+
+    assert pushed.status_code == 200
+    assert RecordingWiki.comments == [""]
+
+
+@pytest.mark.parametrize(
+    "version",
+    ["11.1.0", "11.4.2", "12.0.0-rc.1", "12.0.0-beta.2+build.7"],
+)
+def test_pywikibot_semver_default_comments_are_blank(version):
+    assert _promotion_comment(Revision(comment=f"Pywikibot {version}")) == ""
+
+
+def test_a_real_comment_mentioning_pywikibot_is_preserved():
+    comment = "Pywikibot 11.4.2 corrected the page header"
+    assert _promotion_comment(Revision(comment=comment)) == comment
 
 
 def test_staging_refuses_to_squash_a_gap_in_cached_source_history(
@@ -494,37 +532,43 @@ def test_staging_requires_one_writable_page(pushing_client, engine):
     assert stage(pushing_client, page_number=1).status_code == 201
 
 
-# -- approval ------------------------------------------------------------------
-
-
-def test_nothing_pushes_without_an_approval(pushing_client, engine):
+def test_multi_stage_returns_independent_batches(pushing_client, engine):
     seed(engine, target_page=False)
-    batch_pk = stage(pushing_client).json()["pk"]
 
-    refused = pushing_client.post(f"/sync/batches/{batch_pk}/push", json={})
-    assert refused.status_code == 409
-    assert "approve it" in refused.json()["detail"]
-    assert RecordingWiki.saved == []
-
-
-def test_an_approval_records_who_gave_it(pushing_client, engine):
-    seed(engine, target_page=False)
-    batch_pk = stage(pushing_client).json()["pk"]
-
-    approved = pushing_client.post(
-        f"/sync/batches/{batch_pk}/approve", json={"approved_by": "tolland"}
-    ).json()
-    assert approved["status"] == "approved"
-    assert approved["approved_by"] == "tolland"
-
-
-def test_an_empty_approval_is_refused(pushing_client, engine):
-    seed(engine, target_page=False)
-    batch_pk = stage(pushing_client).json()["pk"]
-    refused = pushing_client.post(
-        f"/sync/batches/{batch_pk}/approve", json={"approved_by": "  "}
+    response = pushing_client.post(
+        "/sync/batches/stage-many",
+        json={
+            "source_label": "upstream",
+            "target_label": "local",
+            "index_title": INDEX,
+            "target_index_title": INDEX,
+            "page_numbers": [1],
+        },
     )
-    assert refused.status_code == 409
+
+    assert response.status_code == 201
+    [batch] = response.json()["batches"]
+    assert batch["page_number"] == 1
+    assert batch["status"] == "draft"
+
+
+def test_multi_stage_is_atomic_when_any_page_is_not_writable(pushing_client, engine):
+    seed(engine, target_page=False)
+
+    response = pushing_client.post(
+        "/sync/batches/stage-many",
+        json={
+            "source_label": "upstream",
+            "target_label": "local",
+            "index_title": INDEX,
+            "target_index_title": INDEX,
+            "page_numbers": [1, 99],
+        },
+    )
+
+    assert response.status_code == 409
+    with Session(engine) as session:
+        assert session.exec(select(PromotionBatch)).all() == []
 
 
 # -- pushing -------------------------------------------------------------------
@@ -533,10 +577,6 @@ def test_an_empty_approval_is_refused(pushing_client, engine):
 def test_pushing_writes_one_page_and_records_the_result(pushing_client, engine):
     seed(engine, target_page=False)
     batch_pk = stage(pushing_client).json()["pk"]
-    pushing_client.post(
-        f"/sync/batches/{batch_pk}/approve", json={"approved_by": "tolland"}
-    )
-
     after = pushing_client.post(f"/sync/batches/{batch_pk}/push", json={}).json()
 
     title, text, base_revid, _ = RecordingWiki.saved[0]
@@ -558,9 +598,6 @@ def test_an_update_sends_the_target_head_as_its_base(pushing_client, engine):
     seed(engine)
     move_source(engine)
     batch_pk = stage(pushing_client).json()["pk"]
-    pushing_client.post(
-        f"/sync/batches/{batch_pk}/approve", json={"approved_by": "tolland"}
-    )
     pushing_client.post(f"/sync/batches/{batch_pk}/push", json={})
 
     _, _, base_revid, _ = RecordingWiki.saved[0]
@@ -572,9 +609,6 @@ def test_a_source_that_moved_after_staging_is_a_conflict(pushing_client, engine)
     refused before it reaches the wiki."""
     seed(engine, target_page=False)
     batch_pk = stage(pushing_client).json()["pk"]
-    pushing_client.post(
-        f"/sync/batches/{batch_pk}/approve", json={"approved_by": "tolland"}
-    )
     move_source(engine)
 
     after = pushing_client.post(f"/sync/batches/{batch_pk}/push", json={}).json()
@@ -593,7 +627,6 @@ def test_a_wiki_refusing_the_edit_is_a_status_not_a_crash(engine):
     client = TestClient(create_app(engine=engine, client_factory=lambda site: wiki))
 
     batch_pk = stage(client).json()["pk"]
-    client.post(f"/sync/batches/{batch_pk}/approve", json={"approved_by": "t"})
     after = client.post(f"/sync/batches/{batch_pk}/push", json={}).json()
 
     (promotion,) = after["promotions"]
@@ -607,9 +640,6 @@ def test_a_target_that_already_holds_the_body_is_skipped(pushing_client, engine)
     seed(engine)
     move_source(engine)
     batch_pk = stage(pushing_client).json()["pk"]
-    pushing_client.post(
-        f"/sync/batches/{batch_pk}/approve", json={"approved_by": "tolland"}
-    )
     # Make the target hold exactly the staged body.
     with Session(engine) as session:
         (promotion,) = session.exec(select(Promotion)).all()
@@ -640,7 +670,6 @@ def test_a_target_that_already_holds_the_body_is_skipped(pushing_client, engine)
 def test_pushing_an_empty_batch_says_so(pushing_client, engine):
     seed(engine, target_page=False)
     batch_pk = stage(pushing_client).json()["pk"]
-    pushing_client.post(f"/sync/batches/{batch_pk}/approve", json={"approved_by": "t"})
     pushing_client.post(f"/sync/batches/{batch_pk}/push", json={})
 
     exhausted = pushing_client.post(f"/sync/batches/{batch_pk}/push", json={})
@@ -668,7 +697,6 @@ def test_aborting_skips_what_is_left_and_keeps_what_went(pushing_client, engine)
     another revision, which is its own piece of work."""
     seed(engine, target_page=False)
     batch_pk = stage(pushing_client).json()["pk"]
-    pushing_client.post(f"/sync/batches/{batch_pk}/approve", json={"approved_by": "t"})
 
     after = pushing_client.post(f"/sync/batches/{batch_pk}/abort").json()
     assert after["status"] == "aborted"
@@ -696,6 +724,7 @@ def test_a_pushed_batch_is_listed(pushing_client, engine):
     assert len(listed) == 1
     assert listed[0]["source_site"] == "upstream"
     assert listed[0]["target_site"] == "local"
+    assert listed[0]["promotions"][0]["submitted_body"] is None
 
 
 def test_an_unknown_batch_is_a_404(pushing_client):
@@ -707,7 +736,7 @@ def test_an_unknown_batch_is_a_404(pushing_client):
 # The embarrassment-risk workflow: one page, reviewed and pushed on its own,
 # no fan-out to a whole work. Same rules as the batch path -- only what a push
 # would actually write can be staged -- reusing the same Promotion/Batch rows
-# so the review/approve/push screens need nothing page-specific.
+# so the review/push screens need nothing page-specific.
 
 PAGE_TITLE = "Page:Varieties.djvu/1"
 
@@ -779,9 +808,6 @@ def test_a_staged_page_batch_pushes_through_the_ordinary_batch_endpoints(
     """No page-specific push path -- a batch of one is still a batch."""
     seed(engine, target_page=False)
     batch = stage_page_request(pushing_client).json()
-    pushing_client.post(
-        f"/sync/batches/{batch['pk']}/approve", json={"approved_by": "t"}
-    )
 
     pushed = pushing_client.post(f"/sync/batches/{batch['pk']}/push").json()
     assert pushed["status"] == "complete"

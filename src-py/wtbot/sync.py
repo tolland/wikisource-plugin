@@ -4,15 +4,15 @@ from typing import Literal
 
 from sqlmodel import Session, select
 
-from wtbot.index_link_store import find_index_link
+from wtbot.fetch.revision_store import head_revision
+from wtbot.linking.index_link_store import find_index_link
+from wtbot.linking.page_link_store import find_pair
+from wtbot.linking.remote_link_store import current_anchor, ladder
 from wtbot.matching import (
     compare_pages,
     index_children,
 )
 from wtbot.model import FetchState, FileBlob, NsRole, Page, PageLink, Revision, Site
-from wtbot.page_link_store import find_pair
-from wtbot.remote_link_store import ladder
-from wtbot.revision_store import head_revision
 from wtbot.vfs.store import canonical_title
 
 """``sync --from Index:X [--to Index:Y]``: what it would take to make the target
@@ -667,7 +667,9 @@ def _from_anchor(
     the ladder is what got us here."""
     source_head = head_revision(session, source_page)
     target_head = head_revision(session, target_page)
-    anchor = rungs[-1] if rungs else None
+    anchor = current_anchor(
+        session, page_pk=source_page.pk, other_page_pk=target_page.pk
+    )
     if anchor is None:  # pragma: no cover - already_linked implies a rung
         return SyncPage(verdict=SyncVerdict.unlinked, **base)
 

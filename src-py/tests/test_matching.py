@@ -4,6 +4,8 @@ from conftest import add_proofread_meta
 from sqlmodel import Session, select
 
 from wtbot.content_model import Significance
+from wtbot.fetch.revision_store import record_head_revision, record_history
+from wtbot.linking.remote_link_store import assert_link, current_anchor
 from wtbot.matching import (
     MatchOutcome,
     compare_pages,
@@ -18,8 +20,6 @@ from wtbot.model import (
     RevisionLink,
     Site,
 )
-from wtbot.remote_link_store import assert_link, current_anchor
-from wtbot.revision_store import record_head_revision, record_history
 from wtbot.wiki.wiki_types import RemotePage
 
 """Proposing correspondences, and the ambiguity it deliberately avoids.

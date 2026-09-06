@@ -4,6 +4,9 @@ import pytest
 from conftest import add_proofread_meta
 from sqlmodel import Session, select
 
+from wtbot.fetch.revision_store import record_head_revision
+from wtbot.linking.page_link_store import find_pair, pair_pages, unpair
+from wtbot.linking.remote_link_store import LinkError
 from wtbot.matching import compare_pages, confirm_proposals
 from wtbot.model import (
     LinkOrigin,
@@ -13,9 +16,6 @@ from wtbot.model import (
     RevisionLink,
     Site,
 )
-from wtbot.page_link_store import find_pair, pair_pages, unpair
-from wtbot.remote_link_store import LinkError
-from wtbot.revision_store import record_head_revision
 from wtbot.wiki.wiki_types import RemotePage
 
 """Page pairings: the mutable half of correspondence.

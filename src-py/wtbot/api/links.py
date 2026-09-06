@@ -7,6 +7,20 @@ from sqlmodel import Session, select
 from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.content_model import parse_document
 from wtbot.deps import get_session
+from wtbot.fetch.revision_store import head_revision
+from wtbot.linking.page_link_store import (
+    find_pair,
+    pair_pages,
+    pairs_for_index,
+    retract_rungs,
+    unpair,
+)
+from wtbot.linking.remote_link_store import (
+    LinkError,
+    assert_link,
+    current_anchor,
+    ladder,
+)
 from wtbot.matching import (
     LinkProposal,
     MatchOutcome,
@@ -29,15 +43,6 @@ from wtbot.model import (
     Site,
     Slot,
 )
-from wtbot.page_link_store import (
-    find_pair,
-    pair_pages,
-    pairs_for_index,
-    retract_rungs,
-    unpair,
-)
-from wtbot.remote_link_store import LinkError, assert_link, current_anchor, ladder
-from wtbot.revision_store import head_revision
 from wtbot.site_store import resolve_pair
 from wtbot.timeutil import utcnow
 

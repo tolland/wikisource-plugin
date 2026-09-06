@@ -3,8 +3,8 @@ from datetime import datetime, timezone
 from sqlmodel import Session, select
 
 from wtbot.content_model import ProofreadPageDocument, Significance, comparable_sha1
+from wtbot.fetch.revision_store import record_head_revision, upsert_content
 from wtbot.model import Content, NsRole, Page, Site
-from wtbot.revision_store import record_head_revision, upsert_content
 from wtbot.wiki.wiki_types import RemotePage
 
 """``Content.comparable_sha1``: the model-aware comparison, precomputed.

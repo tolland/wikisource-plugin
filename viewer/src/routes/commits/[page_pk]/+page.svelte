@@ -16,6 +16,7 @@
   let action: 'approve' | 'force' | 'cancel' | null = $state(null);
   let error = $state('');
   let lastCommit: Commit | null = $state(null);
+  let comment = $state('');
 
   function pagePk(): number {
     return Number(routePage.params.page_pk);
@@ -40,6 +41,7 @@
     try {
       const pending = await listPendingCommits();
       item = pending.find((entry) => entry.page_pk === pagePk()) ?? null;
+      comment = item?.comment ?? '';
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to load staged edit';
     } finally {
@@ -54,7 +56,7 @@
     error = '';
     lastCommit = null;
     try {
-      lastCommit = await approvePendingCommit(item.page_pk, force);
+      lastCommit = await approvePendingCommit(item.page_pk, force, comment);
       if (lastCommit.status === 'success') {
         await goto('/commits');
       } else {
@@ -146,6 +148,11 @@
       </header>
 
       <JournalList journals={item.journals} />
+
+      <label class="comment-field">
+        <span class="eyebrow">Edit summary</span>
+        <input bind:value={comment} placeholder="Describe this change" />
+      </label>
 
       <section class="diff">
         <div class="section-title">
@@ -239,6 +246,27 @@
 
   .diff {
     margin-top: 1.4rem;
+  }
+
+  .comment-field {
+    display: grid;
+    gap: 0.4rem;
+    margin-top: 1.25rem;
+  }
+
+  .comment-field input {
+    width: min(100%, 52rem);
+    border: 1px solid rgba(72, 49, 31, 0.28);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.72);
+    color: inherit;
+    font: inherit;
+    padding: 0.65rem 0.75rem;
+  }
+
+  .comment-field input:focus {
+    border-color: #9c5632;
+    outline: 2px solid rgba(156, 86, 50, 0.18);
   }
 
   .section-title {

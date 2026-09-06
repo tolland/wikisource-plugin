@@ -3,6 +3,12 @@ from datetime import datetime, timezone
 import pytest
 from sqlmodel import Session, select
 
+from wtbot.fetch.revision_store import (
+    RemoteIdentityError,
+    record_head_revision,
+    upsert_content,
+    validate_remote_identity,
+)
 from wtbot.model import (
     MAIN_SLOT,
     Content,
@@ -11,12 +17,6 @@ from wtbot.model import (
     Revision,
     Site,
     Slot,
-)
-from wtbot.revision_store import (
-    RemoteIdentityError,
-    record_head_revision,
-    upsert_content,
-    validate_remote_identity,
 )
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.sha1 import content_sha1_base36, hex_to_base36

@@ -4,8 +4,8 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
-from wtbot.model import LinkOrigin, Page, Revision, RevisionLink, Site
-from wtbot.remote_link_store import (
+from wtbot.fetch.revision_store import record_head_revision
+from wtbot.linking.remote_link_store import (
     LinkError,
     assert_link,
     corresponding_page,
@@ -14,7 +14,7 @@ from wtbot.remote_link_store import (
     ladder,
     links_for_revision,
 )
-from wtbot.revision_store import record_head_revision
+from wtbot.model import LinkOrigin, Page, Revision, RevisionLink, Site
 from wtbot.wiki.wiki_types import RemotePage
 
 """Asserted correspondence between revisions on two sites.
@@ -39,7 +39,13 @@ def _site(session: Session, family: str) -> Site:
 
 
 def _revision(
-    session: Session, site: Site, title: str, *, revid: int, body: str
+    session: Session,
+    site: Site,
+    title: str,
+    *,
+    revid: int,
+    body: str,
+    parent_revid: int | None = None,
 ) -> Revision:
     page = session.exec(
         select(Page).where(Page.site_pk == site.pk, Page.title == title)
@@ -57,6 +63,7 @@ def _revision(
         content_model=PROOFREAD,
         text=body,
         revid=revid,
+        parentid=parent_revid,
         timestamp=datetime(2026, 1, 1, tzinfo=timezone.utc),
     )
     revision = record_head_revision(session, page, remote)
@@ -405,6 +412,53 @@ def test_an_unlinked_pair_has_no_anchor(
         current_anchor(session, page_pk=local.page_pk, other_page_pk=remote.page_pk)
         is None
     )
+
+
+def test_current_anchor_follows_history_not_assertion_order(session: Session) -> None:
+    """Adding an older rung later must not move a head-to-head anchor backwards."""
+    local_site = _site(session, "mywikisource")
+    remote_site = _site(session, "wikisource")
+    local_old = _revision(
+        session, local_site, TITLE, revid=3, body=_body(1, "LocalEditor")
+    )
+    remote_old = _revision(
+        session, remote_site, TITLE, revid=8800, body=_body(1, "Hesperian")
+    )
+    local_head = _revision(
+        session,
+        local_site,
+        TITLE,
+        revid=4,
+        parent_revid=3,
+        body=_body(3, "LocalEditor"),
+    )
+    remote_head = _revision(
+        session,
+        remote_site,
+        TITLE,
+        revid=8801,
+        parent_revid=8800,
+        body=_body(3, "Hesperian"),
+    )
+
+    head_link = assert_link(
+        session,
+        local_revision_pk=local_head.pk,
+        remote_revision_pk=remote_head.pk,
+        origin=LinkOrigin.manual,
+    )
+    assert_link(
+        session,
+        local_revision_pk=local_old.pk,
+        remote_revision_pk=remote_old.pk,
+        origin=LinkOrigin.manual,
+    )
+    session.commit()
+
+    anchor = current_anchor(
+        session, page_pk=local_head.page_pk, other_page_pk=remote_head.page_pk
+    )
+    assert anchor.pk == head_link.pk
 
 
 def test_page_correspondence_is_derived_in_both_directions(

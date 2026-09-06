@@ -22,12 +22,12 @@ so it costs nothing and can be run as often as it takes.
 directional pair is separate from the link layer's local/remote because a sync
 is directional and a link is not.
 
-``batches``/``batch``/``approve``/``push`` are the CLI side of the push queue
+``batches``/``batch``/``push`` are the CLI side of the push queue
 that ``/sync/batches`` and ``/sync-page`` stage (viewer routes, or
 ``POST /sync/batches`` / ``POST /sync/page-batches`` directly): watching an
-approved run and pushing it one revision at a time without a browser open. They
+staged run and pushing it one revision at a time without a browser open. They
 are thin wrappers over that same HTTP contract -- there is no separate CLI-only
-path to a wiki -- so a batch staged from the viewer can be approved there and
+path to a wiki -- so a batch staged from the viewer can be pushed there and
 pushed from here, or the reverse.
 """
 
@@ -327,8 +327,6 @@ def _print_batch(batch: dict) -> None:
         f"{batch['source_site']} -> {batch['target_site']}"
         + (f"  ({batch['label']})" if batch["label"] else "")
     )
-    if batch["approved_by"]:
-        typer.echo(f"  approved by {batch['approved_by']}")
     for row in batch["promotions"]:
         _print_row(row, batch["target_title"])
     typer.echo(f"  {batch['remaining']} still staged")
@@ -383,18 +381,6 @@ def show_batch(
     _print_batch(api.get(f"/sync/batches/{batch_pk}"))
 
 
-@app.command("approve")
-def approve_batch(
-    batch_pk: int = typer.Argument(..., help="The batch to approve."),
-    approved_by: str = typer.Option(..., "--by", help="Who is signing this off."),
-    api: ApiClient = Depends(get_api),
-) -> None:
-    """Sign a draft batch off. Nothing pushes until this has run."""
-    _print_batch(
-        api.post(f"/sync/batches/{batch_pk}/approve", {"approved_by": approved_by})
-    )
-
-
 @app.command("push-batch")
 def push_batch(
     batch_pk: int = typer.Argument(..., help="The batch to push from."),
@@ -420,7 +406,7 @@ def push_batch(
     ),
     api: ApiClient = Depends(get_api),
 ) -> None:
-    """Legacy bulk workflow: push one approved batch row or use --all.
+    """Legacy bulk workflow: push one staged batch row or use --all.
 
     One HTTP request per page throughout, the same discipline the viewer's
     "push the next revision" button keeps: a rate-limited wiki gets one request

@@ -1,10 +1,11 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from sqlmodel import Session, select
 
 from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.api.schemas import (
+    CommitPageRequest,
     CommitRunResponse,
     PendingCommitJournal,
     PendingCommitPage,
@@ -127,6 +128,7 @@ def run_commit_for_page(
     page_pk: int,
     request: Request,
     session: Session = Depends(get_session),
+    body: Annotated[CommitPageRequest, Body()] = CommitPageRequest(),
     force: Annotated[
         bool,
         Query(
@@ -147,7 +149,9 @@ def run_commit_for_page(
         raise HTTPException(status_code=404, detail="no pending edits for page")
 
     factory = request.app.state.client_factory
-    run_pending_commit_for_page(session, page_pk, factory, force=force)
+    run_pending_commit_for_page(
+        session, page_pk, factory, force=force, comment=body.comment
+    )
     commit = session.exec(
         select(Commit)
         .where(Commit.page_pk == page_pk)

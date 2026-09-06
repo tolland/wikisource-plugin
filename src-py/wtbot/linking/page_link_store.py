@@ -1,8 +1,8 @@
 from sqlalchemy import func
 from sqlmodel import Session, select
 
+from wtbot.linking.remote_link_store import LinkError
 from wtbot.model import LinkOrigin, Page, PageLink, RevisionLink, Site
-from wtbot.remote_link_store import LinkError
 
 """Reading and writing page pairings.
 
@@ -44,6 +44,7 @@ def pair_pages(
     """
     if local_page.pk == remote_page.pk:
         raise LinkError("a page cannot be paired with itself")
+
     if local_page.site_pk == remote_page.site_pk:
         raise LinkError(
             "a PageLink pairs pages across sites; both are on site "
@@ -51,6 +52,7 @@ def pair_pages(
         )
 
     existing = find_pair(session, local_page.pk, remote_page.pk)
+
     if existing is not None:
         return existing
 
@@ -59,6 +61,7 @@ def pair_pages(
         remote_page_pk=remote_page.pk,
         origin=origin,
     )
+
     session.add(link)
     session.flush()
     return link

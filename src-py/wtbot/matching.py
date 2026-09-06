@@ -5,6 +5,8 @@ from sqlalchemy import func
 from sqlmodel import Session, select
 
 from wtbot.content_model import Significance, parse_document
+from wtbot.fetch.revision_store import head_revision
+from wtbot.linking.remote_link_store import assert_link, find_link
 from wtbot.model import (
     MAIN_SLOT,
     Content,
@@ -17,8 +19,6 @@ from wtbot.model import (
     Site,
     Slot,
 )
-from wtbot.remote_link_store import assert_link, find_link
-from wtbot.revision_store import head_revision
 from wtbot.vfs.store import canonical_title
 
 """Proposing correspondences between two sites' copies of a work.

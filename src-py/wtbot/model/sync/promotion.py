@@ -15,7 +15,7 @@ proposed, reviewed, possibly abandoned, and only then written. Putting one in
 the other is the overloading §12 identifies in ``Commit``.
 
 Two tables because there are two lifetimes. A ``PromotionBatch`` is one page:
-this correspondence, this direction, approved by this person, at this moment.
+this correspondence and this direction, staged at this moment.
 A ``Promotion`` is one ordered source revision inside it. Several pages do not
 share an ordering constraint, approval decision, or conflict boundary, so they
 do not share a batch.
@@ -39,9 +39,6 @@ class BatchStatus(str, Enum):
 
     draft = "draft"
     """Staged and editable. Rows can be added, dropped or re-staged."""
-
-    approved = "approved"
-    """A person has signed off. Frozen: re-staging means a new batch."""
 
     running = "running"
     """At least one push has been attempted."""
@@ -126,12 +123,6 @@ class PromotionBatch(SQLModel, table=True):
 
     status: BatchStatus = Field(default=BatchStatus.draft, index=True)
 
-    approved_by: str | None = None
-    approved_at: datetime | None = None
-    """Who signed this off, and when. Null while it is a draft -- and a batch
-    cannot run without them, which is the point of storing them here rather
-    than trusting the caller to have asked."""
-
     created_at: datetime = Field(default_factory=utcnow)
 
 
@@ -171,7 +162,7 @@ class Promotion(SQLModel, table=True):
 
     Stored rather than recomputed at push time so that what was reviewed is
     what is sent. A body that would be regenerated between the two is a body
-    nobody approved.
+    was not reviewed.
     """
     comment: str | None = None
 

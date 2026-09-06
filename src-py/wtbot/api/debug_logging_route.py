@@ -7,8 +7,8 @@ from fastapi import Request, Response
 from fastapi.routing import APIRoute
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from wtbot.log_levels import TRACE, install_trace_logging
-from wtbot.logging_config import body_limit_bytes
+from wtbot.log.log_levels import TRACE, install_trace_logging
+from wtbot.log.logging_config import body_limit_bytes
 
 install_trace_logging()
 

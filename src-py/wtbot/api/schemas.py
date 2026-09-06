@@ -167,6 +167,14 @@ class CommitRunResponse(BaseModel):
     )
 
 
+class CommitPageRequest(BaseModel):
+    comment: str | None = Field(
+        None,
+        description="Edit summary for this commit. When omitted, the latest "
+        "edit-journal comment is used.",
+    )
+
+
 class PendingCommitJournal(BaseModel):
     pk: int
     base_revid: int | None = None

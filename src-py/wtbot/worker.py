@@ -5,7 +5,14 @@ from pathlib import Path
 from sqlmodel import Session, select
 
 from wtbot.db_session import detached_site, read_snapshot, write_batch
-from wtbot.failure_log import FailureContext, record_failure, site_label
+from wtbot.fetch.revision_store import (
+    RemoteIdentityError,
+    head_revision,
+    record_head_revision,
+    record_history,
+    validate_remote_identity,
+)
+from wtbot.log.failure_log import FailureContext, record_failure, site_label
 from wtbot.model import (
     FetchRequest,
     FetchState,
@@ -24,14 +31,7 @@ from wtbot.page_processors import (
     processor_for,
     proofread_index_identity,
 )
-from wtbot.promotion_store import materialize_promotion_links
-from wtbot.revision_store import (
-    RemoteIdentityError,
-    head_revision,
-    record_head_revision,
-    record_history,
-    validate_remote_identity,
-)
+from wtbot.promotion.promotion_store import materialize_promotion_links
 from wtbot.timeutil import utcnow
 from wtbot.wiki.client import WikiClient
 from wtbot.wiki.failures import WikiFailure

@@ -1,9 +1,9 @@
 from sqlalchemy.orm import aliased
 from sqlmodel import Session, select
 
+from wtbot.linking.page_link_store import find_pair, pair_pages, unpair
+from wtbot.linking.remote_link_store import LinkError
 from wtbot.model import IndexLink, IndexMeta, LinkOrigin, Page, PageLink, Site
-from wtbot.page_link_store import find_pair, pair_pages, unpair
-from wtbot.remote_link_store import LinkError
 
 """Putting a work under cross-site tracking, and finding the ones that are.
 

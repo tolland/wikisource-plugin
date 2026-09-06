@@ -18,7 +18,6 @@
 
   const STATUSES: Record<BatchStatus, { label: string; tone: string }> = {
     draft: { label: 'draft', tone: 'quiet' },
-    approved: { label: 'approved', tone: 'in' },
     running: { label: 'running', tone: 'in' },
     complete: { label: 'complete', tone: 'go' },
     partial: { label: 'partial', tone: 'warn' },
@@ -74,7 +73,6 @@
       <tr>
         <th scope="col">#</th>
         <th scope="col">Status</th>
-        <th scope="col">Run</th>
         <th scope="col">Direction</th>
         <th scope="col">Progress</th>
         <th scope="col"></th>
@@ -89,25 +87,29 @@
               {STATUSES[batch.status]?.label ?? batch.status}
             </span>
           </td>
-          <td class="title">
-            {batch.label ?? batch.source_title}
-            <small>{batch.source_title}</small>
-            {#if batch.approved_by}
-              <small>approved by {batch.approved_by}</small>
-            {/if}
-          </td>
           <td class="dir">{batch.source_site} &rarr; {batch.target_site}</td>
           <td class="progress">
             {batch.promotions.length - batch.remaining}/{batch.promotions.length} settled
+          </td>
+          <td>
+            <a class="drill" href={`/sync/batches/${batch.pk}`}>Open</a>
+          </td>
+        </tr>
+        <tr class="run-row">
+          <td colspan="5">
+            <span class="run-label">Run</span>
+            <span class="title">
+              {batch.label ?? batch.source_title}
+              {#if batch.label && batch.label !== batch.source_title}
+                <small>{batch.source_title}</small>
+              {/if}
+            </span>
             {#if errorCount(batch) > 0}
               <small class="why">
                 {errorCount(batch)} needs a look
                 {#if firstError(batch)}&mdash; {firstError(batch)}{/if}
               </small>
             {/if}
-          </td>
-          <td>
-            <a class="drill" href={`/sync/batches/${batch.pk}`}>Open</a>
           </td>
         </tr>
       {/each}
@@ -194,6 +196,32 @@
     overflow-wrap: anywhere;
   }
 
+  .batches tr:not(.run-row) td {
+    border-bottom: 0;
+  }
+
+  .batches .run-row td {
+    padding-top: 0.15rem;
+    padding-bottom: 0.8rem;
+  }
+
+  .run-label {
+    display: inline-block;
+    min-width: 3.4rem;
+    margin-right: 0.45rem;
+    color: #73583d;
+    font-family: "Avenir Next", "Gill Sans", sans-serif;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    vertical-align: top;
+  }
+
+  .run-row .title {
+    display: inline;
+  }
+
   .batches small {
     display: block;
     margin-top: 0.2rem;
@@ -202,6 +230,7 @@
   }
 
   .batches small.why {
+    margin-left: 3.85rem;
     color: #7d5510;
   }
 

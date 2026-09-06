@@ -1,6 +1,11 @@
+import re
+
 from sqlmodel import Session, select
 
 from wtbot.content_model import ProofreadPageDocument, parse_document
+from wtbot.fetch.revision_store import head_revision
+from wtbot.linking.page_link_store import find_pair
+from wtbot.linking.remote_link_store import assert_link, current_anchor, ladder
 from wtbot.matching import content_of
 from wtbot.model import (
     MAIN_SLOT,
@@ -18,11 +23,7 @@ from wtbot.model import (
     SiteCredential,
     Slot,
 )
-from wtbot.page_link_store import find_pair
-from wtbot.remote_link_store import assert_link, ladder
-from wtbot.revision_store import head_revision
 from wtbot.sync import SyncPage, SyncReport, SyncVerdict
-from wtbot.timeutil import utcnow
 
 """Staging a push run from a sync report, one source revision at a time.
 
@@ -42,6 +43,15 @@ last point at which "we are not sure these correspond" is cheap to say.
 frozen as its own ordered promotion. That preserves both its edit summary and
 the one-to-one correspondence ladder when it is replayed on the target.
 """
+
+_SEMVER = (
+    r"(?:0|[1-9]\d*)\."
+    r"(?:0|[1-9]\d*)\."
+    r"(?:0|[1-9]\d*)"
+    r"(?:-(?:[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?"
+    r"(?:\+(?:[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?"
+)
+_PYWIKIBOT_DEFAULT_COMMENT = re.compile(rf"Pywikibot {_SEMVER}")
 
 
 class PromotionError(ValueError):
@@ -203,8 +213,13 @@ def _stage_promotions_for(
                 f"{page.source_title} is staged as an update with no asserted "
                 "anchor; a push replays onto the anchor and cannot invent one"
             )
-        anchor_pk = rungs[-1].pk
-        source_anchor = _revision_on_page(session, rungs[-1], source_page)
+        anchor = current_anchor(
+            session, page_pk=source_page.pk, other_page_pk=target_page.pk
+        )
+        if anchor is None:  # pragma: no cover - rungs is non-empty
+            raise PromotionError(f"{page.source_title} has no current anchor")
+        anchor_pk = anchor.pk
+        source_anchor = _revision_on_page(session, anchor, source_page)
         target_head = head_revision(session, target_page)
         base_revid = target_head.revid if target_head else None
     batch.source_head_revid = source_head.revid
@@ -228,7 +243,7 @@ def _stage_promotions_for(
             predecessor_promotion_pk=predecessor.pk if predecessor else None,
             base_revid=base_revid if predecessor is None else None,
             body=promoted_body(session, revision, source_site, target_site),
-            comment=_promotion_comment(source_site, revision),
+            comment=_promotion_comment(revision),
         )
         session.add(row)
         session.flush()
@@ -288,13 +303,12 @@ def _revisions_after_anchor(
     return list(reversed(reverse))
 
 
-def _promotion_comment(source_site: Site, revision: Revision) -> str:
-    provenance = (
-        f"Sync {source_site.label or source_site.family} revid {revision.revid}"
-    )
-    if revision.contributor:
-        provenance += f" by {revision.contributor}"
-    return f"{provenance}: {revision.comment}" if revision.comment else provenance
+def _promotion_comment(revision: Revision) -> str:
+    """Preserve real summaries, but discard Pywikibot's version-only default."""
+    comment = revision.comment or ""
+    if _PYWIKIBOT_DEFAULT_COMMENT.fullmatch(comment.strip()):
+        return ""
+    return comment
 
 
 def promoted_body(
@@ -343,24 +357,6 @@ def _push_credential(session: Session, target_site: Site) -> SiteCredential:
             "mapped pagequality user needs a target account"
         )
     return credential
-
-
-def approve(session: Session, batch: PromotionBatch, *, approved_by: str) -> None:
-    """Sign a draft off. Required before anything runs.
-
-    Stored rather than trusted to the caller having asked, because "did a
-    person agree to this" is exactly the fact an audit wants and exactly the
-    one a convenient default would erase.
-    """
-    if batch.status is not BatchStatus.draft:
-        raise PromotionError(f"batch {batch.pk} is {batch.status.value}, not a draft")
-    if not approved_by.strip():
-        raise PromotionError("an approval needs a name")
-    batch.status = BatchStatus.approved
-    batch.approved_by = approved_by
-    batch.approved_at = utcnow()
-    session.add(batch)
-    session.flush()
 
 
 def promotions(session: Session, batch_pk: int) -> list[Promotion]:

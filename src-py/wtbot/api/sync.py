@@ -22,10 +22,9 @@ from wtbot.model import (
     RevisionLink,
     Site,
 )
-from wtbot.promotion_store import (
+from wtbot.promotion.promotion_store import (
     PromotionError,
     abort,
-    approve,
     next_staged,
     promotions,
     skip,
@@ -35,7 +34,7 @@ from wtbot.promotion_store import (
     stage_page,
     target_head_revid,
 )
-from wtbot.promotion_worker import push_one
+from wtbot.promotion.promotion_worker import push_one
 from wtbot.site_store import require_credentialed_site, resolve_pair
 from wtbot.sync import (
     ScanStatus,
@@ -510,7 +509,7 @@ def _change_review(session: Session, promotion: Promotion) -> ChangeReviewOut:
     target_body = ""
     if batch.target_page_pk is not None:
         target_page = session.get(Page, batch.target_page_pk)
-        from wtbot.revision_store import head_revision
+        from wtbot.fetch.revision_store import head_revision
 
         target_head = head_revision(session, target_page)
         target_content = content_of(session, target_head) if target_head else None
@@ -713,12 +712,7 @@ def push_change(
     if client_factory is None:  # pragma: no cover - app construction wires it
         raise HTTPException(500, "no wiki client factory configured")
     try:
-        promotion = push_one(
-            session,
-            change_pk,
-            client_factory,
-            require_approval=False,
-        )
+        promotion = push_one(session, change_pk, client_factory)
     except PromotionError as exc:
         raise HTTPException(409, str(exc)) from exc
     session.commit()
@@ -740,12 +734,14 @@ class StageRequest(SyncRequest):
     page_number: int = Field(description="The one report row this page batch freezes.")
 
 
-class ApproveRequest(BaseModel):
-    approved_by: str = Field(
-        description=(
-            "Who is signing this off. Stored, not assumed -- 'did a person "
-            "agree to this' is exactly the fact an audit wants."
-        )
+class StageManyRequest(SyncRequest):
+    label: str | None = Field(
+        default=None, description="Optional label prefix for the staged batches."
+    )
+    page_numbers: list[int] = Field(
+        min_length=1,
+        max_length=1000,
+        description="The report rows to freeze as independent page batches.",
     )
 
 
@@ -767,6 +763,7 @@ class PushRequest(BaseModel):
 class PromotionOut(BaseModel):
     pk: int
     source_revision_pk: int
+    source_revid: int
     predecessor_promotion_pk: int | None = None
     intent: PromotionIntent
     status: PromotionStatus
@@ -775,6 +772,14 @@ class PromotionOut(BaseModel):
     result_revid: int | None = None
     error_message: str | None = None
     body_length: int
+    comment: str | None = None
+    base_body: str | None = Field(
+        default=None,
+        description="Frozen body this revision is reviewed against; null for a create.",
+    )
+    submitted_body: str | None = Field(
+        default=None, description="Frozen body that this promotion would write."
+    )
 
 
 class BatchOut(BaseModel):
@@ -786,17 +791,30 @@ class BatchOut(BaseModel):
     source_title: str
     target_title: str
     page_number: int | None = None
-    approved_by: str | None = None
     work_pk: int | None = None
     counts: dict[str, int] = Field(description="Promotions per status.")
     remaining: int = Field(description="Rows still staged.")
     promotions: list[PromotionOut]
 
 
-def _promotion_out(row: Promotion) -> PromotionOut:
+class StageManyOut(BaseModel):
+    batches: list[BatchOut]
+
+
+def _promotion_out(
+    session: Session,
+    row: Promotion,
+    *,
+    base_body: str | None,
+    include_bodies: bool,
+) -> PromotionOut:
+    source_revision = session.get(Revision, row.source_revision_pk)
+    if source_revision is None:  # pragma: no cover - foreign key holds
+        raise RuntimeError(f"promotion {row.pk} has no source revision")
     return PromotionOut(
         pk=row.pk,
         source_revision_pk=row.source_revision_pk,
+        source_revid=source_revision.revid,
         predecessor_promotion_pk=row.predecessor_promotion_pk,
         intent=row.intent,
         status=row.status,
@@ -805,6 +823,9 @@ def _promotion_out(row: Promotion) -> PromotionOut:
         result_revid=row.result_revid,
         error_message=row.error_message,
         body_length=len(row.body),
+        comment=row.comment,
+        base_body=base_body if include_bodies else None,
+        submitted_body=row.body if include_bodies else None,
     )
 
 
@@ -812,11 +833,23 @@ def _site_name(site: Site) -> str:
     return site.label or f"{site.family}:{site.code}"
 
 
-def _batch_out(session: Session, batch: PromotionBatch) -> BatchOut:
+def _batch_out(
+    session: Session, batch: PromotionBatch, *, include_bodies: bool = False
+) -> BatchOut:
     rows = promotions(session, batch.pk)
     counts: dict[str, int] = {}
     for row in rows:
         counts[row.status.value] = counts.get(row.status.value, 0) + 1
+    base_body = _batch_anchor_body(session, batch)
+    promotion_rows: list[PromotionOut] = []
+    for row in rows:
+        promotion_rows.append(
+            _promotion_out(
+                session, row, base_body=base_body, include_bodies=include_bodies
+            )
+        )
+        base_body = row.body
+
     return BatchOut(
         pk=batch.pk,
         label=batch.label,
@@ -826,12 +859,27 @@ def _batch_out(session: Session, batch: PromotionBatch) -> BatchOut:
         source_title=batch.source_title,
         target_title=batch.target_title,
         page_number=batch.page_number,
-        approved_by=batch.approved_by,
         work_pk=batch.index_link_pk,
         counts=counts,
         remaining=counts.get(PromotionStatus.staged.value, 0),
-        promotions=[_promotion_out(row) for row in rows],
+        promotions=promotion_rows,
     )
+
+
+def _batch_anchor_body(session: Session, batch: PromotionBatch) -> str | None:
+    """The exact target-side anchor body frozen as the first diff base."""
+    if batch.anchor_link_pk is None or batch.target_page_pk is None:
+        return None
+    anchor = session.get(RevisionLink, batch.anchor_link_pk)
+    if anchor is None:  # pragma: no cover - foreign key holds
+        return None
+    for revision_pk in (anchor.local_revision_pk, anchor.remote_revision_pk):
+        revision = session.get(Revision, revision_pk)
+        if revision is None or revision.page_pk != batch.target_page_pk:
+            continue
+        content = content_of(session, revision)
+        return content.text if content is not None else None
+    return None
 
 
 def _batch(session: Session, batch_pk: int) -> PromotionBatch:
@@ -876,7 +924,49 @@ def create_batch(
         raise HTTPException(409, str(exc)) from exc
     session.commit()
     session.refresh(batch)
-    return _batch_out(session, batch)
+    return _batch_out(session, batch, include_bodies=True)
+
+
+@router.post("/batches/stage-many", response_model=StageManyOut, status_code=201)
+def create_batches(
+    payload: StageManyRequest, session: Session = Depends(get_session)
+) -> StageManyOut:
+    """Atomically stage several report rows as independent page batches."""
+    if len(set(payload.page_numbers)) != len(payload.page_numbers):
+        raise HTTPException(409, "page_numbers contains duplicates")
+
+    source_site, target_site = resolve_pair(
+        session, payload.source_label, payload.target_label
+    )
+    try:
+        report = build_report(
+            session,
+            source_site=source_site,
+            target_site=target_site,
+            index_title=payload.index_title,
+            target_index_title=payload.target_index_title,
+        )
+        batches = [
+            stage_batch(
+                session,
+                report,
+                source_site=source_site,
+                target_site=target_site,
+                label=(
+                    f"{payload.label} · page {page_number}"
+                    if payload.label and len(payload.page_numbers) > 1
+                    else payload.label
+                ),
+                page_number=page_number,
+            )
+            for page_number in payload.page_numbers
+        ]
+    except SyncError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except PromotionError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    session.commit()
+    return StageManyOut(batches=[_batch_out(session, batch) for batch in batches])
 
 
 class StagePageRequest(PageSyncRequest):
@@ -893,7 +983,7 @@ def create_page_batch(
 
     The ``sync-page`` counterpart of ``POST /sync/batches``, with no fan-out
     -- the batch contains one ordered promotion per source revision after the
-    anchor. Everything past staging (approve, push, abort) uses the same batch
+    anchor. Everything past staging (push, abort) uses the same batch
     machinery.
     """
     source_site, target_site = resolve_pair(
@@ -920,7 +1010,7 @@ def create_page_batch(
         raise HTTPException(409, str(exc)) from exc
     session.commit()
     session.refresh(batch)
-    return _batch_out(session, batch)
+    return _batch_out(session, batch, include_bodies=True)
 
 
 @router.get("/batches", response_model=list[BatchOut])
@@ -933,21 +1023,7 @@ def list_batches(session: Session = Depends(get_session)) -> list[BatchOut]:
 
 @router.get("/batches/{batch_pk}", response_model=BatchOut)
 def get_batch(batch_pk: int, session: Session = Depends(get_session)) -> BatchOut:
-    return _batch_out(session, _batch(session, batch_pk))
-
-
-@router.post("/batches/{batch_pk}/approve", response_model=BatchOut)
-def approve_batch(
-    batch_pk: int, payload: ApproveRequest, session: Session = Depends(get_session)
-) -> BatchOut:
-    """Sign a draft off. Nothing runs without this."""
-    batch = _batch(session, batch_pk)
-    try:
-        approve(session, batch, approved_by=payload.approved_by)
-    except PromotionError as exc:
-        raise HTTPException(409, str(exc)) from exc
-    session.commit()
-    return _batch_out(session, batch)
+    return _batch_out(session, _batch(session, batch_pk), include_bodies=True)
 
 
 @router.post("/batches/{batch_pk}/push", response_model=BatchOut)
@@ -983,7 +1059,7 @@ def push_batch_page(
     except PromotionError as exc:
         raise HTTPException(409, str(exc)) from exc
     session.commit()
-    return _batch_out(session, _batch(session, batch_pk))
+    return _batch_out(session, _batch(session, batch_pk), include_bodies=True)
 
 
 @router.post(
@@ -1002,7 +1078,7 @@ def skip_promotion(
     except PromotionError as exc:
         raise HTTPException(409, str(exc)) from exc
     session.commit()
-    return _batch_out(session, batch)
+    return _batch_out(session, batch, include_bodies=True)
 
 
 @router.post("/batches/{batch_pk}/abort", response_model=BatchOut)
@@ -1015,4 +1091,4 @@ def abort_batch(batch_pk: int, session: Session = Depends(get_session)) -> Batch
     batch = _batch(session, batch_pk)
     abort(session, batch)
     session.commit()
-    return _batch_out(session, batch)
+    return _batch_out(session, batch, include_bodies=True)

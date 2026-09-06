@@ -38,6 +38,8 @@ import type {
   NextChangeRequest,
   StagePageRequest,
   StageRequest,
+  StageManyRequest,
+  StageManyResponse,
   SyncReport,
   SyncRequest,
   WorkDetail,
@@ -202,9 +204,13 @@ export function listPendingCommits(): Promise<PendingCommitPage[]> {
   return getJson<PendingCommitPage[]>('/commits/pending');
 }
 
-export function approvePendingCommit(pagePk: number, force = false): Promise<Commit> {
+export function approvePendingCommit(
+  pagePk: number,
+  force = false,
+  comment?: string | null
+): Promise<Commit> {
   const suffix = force ? '?force=true' : '';
-  return postJson<Commit>(`/commits/${pagePk}${suffix}`, {});
+  return postJson<Commit>(`/commits/${pagePk}${suffix}`, { comment });
 }
 
 export async function cancelPendingCommit(pagePk: number): Promise<CommitRunResponse> {
@@ -355,16 +361,16 @@ export function stageBatch(payload: StageRequest): Promise<Batch> {
   return postJson<Batch>('/sync/batches', payload);
 }
 
+export function stageManyBatches(payload: StageManyRequest): Promise<StageManyResponse> {
+  return postJson<StageManyResponse>('/sync/batches/stage-many', payload);
+}
+
 export function listBatches(): Promise<Batch[]> {
   return getJson<Batch[]>('/sync/batches');
 }
 
 export function getBatch(batchPk: number): Promise<Batch> {
   return getJson<Batch>(`/sync/batches/${batchPk}`);
-}
-
-export function approveBatch(batchPk: number, approvedBy: string): Promise<Batch> {
-  return postJson<Batch>(`/sync/batches/${batchPk}/approve`, { approved_by: approvedBy });
 }
 
 /** Pushes exactly one page. Call it again for the next one. */

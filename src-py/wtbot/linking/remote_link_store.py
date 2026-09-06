@@ -1,6 +1,7 @@
 from sqlalchemy.orm import aliased
 from sqlmodel import Session, select
 
+from wtbot.fetch.revision_store import head_revision
 from wtbot.model import LinkOrigin, Page, Revision, RevisionLink
 
 """Reading and writing asserted cross-site revision correspondence.
@@ -133,7 +134,7 @@ def _pairing_for(session: Session, local_page: Page, remote_page: Page):
     than left for a caller to remember. Imported here to keep the dependency
     one-way at module load: the pairing store reads links, not the reverse.
     """
-    from wtbot.page_link_store import pair_pages
+    from wtbot.linking.page_link_store import pair_pages
 
     return pair_pages(session, local_page, remote_page)
 
@@ -193,14 +194,62 @@ def ladder(session: Session, *, page_pk: int, other_page_pk: int) -> list[Revisi
 def current_anchor(
     session: Session, *, page_pk: int, other_page_pk: int
 ) -> RevisionLink | None:
-    """The most recent link for a page pair -- the base a push works from.
+    """The linked pair closest to both current heads -- the base a push uses.
 
     None means the pair has never been linked, which is a different state from
     "linked but diverged": the latter has an anchor whose revisions are no
     longer either side's head.
+
+    Assertion order is not revision order: a reviewer may link the heads and
+    later add an older historical rung. Choose by actual parent chains so that
+    adding history cannot move the current anchor backwards.
     """
     rungs = ladder(session, page_pk=page_pk, other_page_pk=other_page_pk)
-    return rungs[-1] if rungs else None
+    if not rungs:
+        return None
+
+    distances = {
+        page_pk: _revision_distances(session, page_pk),
+        other_page_pk: _revision_distances(session, other_page_pk),
+    }
+
+    def distance(rung: RevisionLink) -> tuple[int, int, int]:
+        revisions = (
+            session.get(Revision, rung.local_revision_pk),
+            session.get(Revision, rung.remote_revision_pk),
+        )
+        by_page = {revision.page_pk: revision.pk for revision in revisions if revision}
+        near = distances[page_pk].get(by_page.get(page_pk), 1_000_000)
+        far = distances[other_page_pk].get(by_page.get(other_page_pk), 1_000_000)
+        return near + far, max(near, far), -(rung.pk or 0)
+
+    return min(rungs, key=distance)
+
+
+def _revision_distances(session: Session, page_pk: int) -> dict[int, int]:
+    """Revision primary key to distance from this page's current head."""
+    page = session.get(Page, page_pk)
+    if page is None:
+        return {}
+    head = head_revision(session, page)
+    if head is None:
+        return {}
+
+    revisions = session.exec(select(Revision).where(Revision.page_pk == page_pk)).all()
+    by_revid = {revision.revid: revision for revision in revisions}
+    distances: dict[int, int] = {}
+    current = head
+    distance = 0
+    while current.pk is not None and current.pk not in distances:
+        distances[current.pk] = distance
+        if current.parent_revid is None:
+            break
+        parent = by_revid.get(current.parent_revid)
+        if parent is None:
+            break
+        current = parent
+        distance += 1
+    return distances
 
 
 def corresponding_page(

@@ -169,6 +169,42 @@ def test_commit_endpoint_can_force_overwrite_conflict(engine):
     assert fake._pages[TITLE].text == "edited"
 
 
+def test_commit_endpoint_accepts_edit_summary_override(engine):
+    _, page = _setup(engine)
+    fake = FakeWikiClient(
+        pages={
+            TITLE: RemotePage(
+                title=TITLE,
+                namespace_key=0,
+                namespace_canonical="Page",
+                content_model="proofread-page",
+                text="original",
+                revid=100,
+            )
+        }
+    )
+    app = create_app(engine=engine, client_factory=lambda site: fake)
+    with TestClient(app) as c:
+        assert (
+            c.post(
+                "/vfs/content",
+                json={
+                    "path": PATH,
+                    "content_base64": _b64("edited"),
+                    "base_revid": 100,
+                    "comment": "journal summary",
+                },
+            ).status_code
+            == 200
+        )
+
+        resp = c.post(f"/commits/{page.pk}", json={"comment": "reviewed summary"})
+
+    assert resp.status_code == 200
+    assert resp.json()["comment"] == "reviewed summary"
+    assert fake._pages[TITLE].comment == "reviewed summary"
+
+
 def test_cancel_pending_commit_discards_local_edits(engine):
     site, page = _setup(engine)
     app = create_app(engine=engine, client_factory=lambda site: FakeWikiClient())

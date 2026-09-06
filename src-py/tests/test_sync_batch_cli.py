@@ -4,7 +4,7 @@ from typer.testing import CliRunner
 
 from wtbot.cli.run_cli import create_app
 
-"""The CLI side of the push queue: `sync batches`/`batch`/`approve`/`push-batch`/
+"""The CLI side of the push queue: `sync batches`/`batch`/`push-batch`/
 `abort`, wrapping the same `/sync/batches` HTTP contract the viewer drives.
 
 The judgement worth pinning is in `push`: which row it reports (the API
@@ -49,7 +49,6 @@ def _batch(pk: int, status: str, promotions: list[dict], **extra) -> dict:
         "source_title": "Page:Foo.djvu/1",
         "target_title": "Page:Foo.djvu/1",
         "page_number": 1,
-        "approved_by": "reviewer",
         "work_pk": None,
         "counts": counts,
         "remaining": sum(1 for row in promotions if row["status"] == "staged"),
@@ -92,22 +91,13 @@ def test_batches_lists_every_run(api):
 
 def test_batch_shows_every_row(api):
     api["get_reply"] = _batch(
-        1, "approved", [_row(1, "pushed", result_revid=99), _row(2, "staged")]
+        1, "running", [_row(1, "pushed", result_revid=99), _row(2, "staged")]
     )
     result = runner.invoke(create_app(), ["sync", "batch", "1"])
     assert result.exit_code == 0, result.output
-    assert "approved by reviewer" in result.output
+    assert "running" in result.output
     assert "revid 99" in result.output
     assert "1 still staged" in result.output
-
-
-def test_approve_posts_the_name(api):
-    api["post_replies"] = [_batch(1, "approved", [_row(1, "staged")])]
-    result = runner.invoke(create_app(), ["sync", "approve", "1", "--by", "reviewer"])
-    assert result.exit_code == 0, result.output
-    url, payload = api["posts"][0]
-    assert url.endswith("/sync/batches/1/approve")
-    assert payload == {"approved_by": "reviewer"}
 
 
 def test_next_prints_the_exact_granular_change(api):
@@ -181,7 +171,7 @@ def test_push_is_one_granular_change_with_no_all_option(api):
 
 def test_push_reports_the_row_it_pushed(api):
     """The row the diff picks out, not just 'something happened'."""
-    api["get_reply"] = _batch(1, "approved", [_row(1, "staged")])
+    api["get_reply"] = _batch(1, "draft", [_row(1, "staged")])
     api["post_replies"] = [
         _batch(1, "complete", [_row(1, "pushed", result_revid=4242)])
     ]
@@ -198,7 +188,7 @@ def test_push_reports_the_row_it_pushed(api):
 
 
 def test_push_promotion_names_the_row_explicitly(api):
-    api["get_reply"] = _batch(1, "approved", [_row(1, "staged"), _row(2, "staged")])
+    api["get_reply"] = _batch(1, "draft", [_row(1, "staged"), _row(2, "staged")])
     api["post_replies"] = [
         _batch(1, "running", [_row(1, "staged"), _row(2, "pushed", result_revid=7)])
     ]
@@ -214,7 +204,7 @@ def test_push_promotion_names_the_row_explicitly(api):
 
 
 def test_push_all_stops_the_moment_a_row_does_not_push_cleanly(api):
-    api["get_reply"] = _batch(1, "approved", [_row(1, "staged"), _row(2, "staged")])
+    api["get_reply"] = _batch(1, "draft", [_row(1, "staged"), _row(2, "staged")])
     api["post_replies"] = [
         _batch(1, "running", [_row(1, "pushed", result_revid=1), _row(2, "staged")]),
         _batch(
