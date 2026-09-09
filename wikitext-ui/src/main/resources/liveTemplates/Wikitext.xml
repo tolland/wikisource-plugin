@@ -2,15 +2,17 @@
   <template name="{{ne"
             value="{{ne&#10;|1=$LEFTITEM$&#10;|2=&lt;math&gt;$MIDITEM$&lt;/math&gt;&#10;|3=$RIGHTITEM$&#10;}}&#10;$END$"
             description="insert numerical equation template" toReformat="false" toShortenFQNames="true">
-    <variable name="LEFTITEM" expression="" defaultValue="&quot;mptjogm&quot;" alwaysStopAt="true"/>
+    <variable name="LEFTITEM" expression="" defaultValue="" alwaysStopAt="true"/>
     <variable name="MIDITEM" expression="complete()" defaultValue="" alwaysStopAt="true"/>
     <variable name="RIGHTITEM" expression="" defaultValue="" alwaysStopAt="true"/>
-    <context/>
+    <context>
+      <option name="WIKITEXT" value="true" />
+    </context>
   </template>
-  <template name="{{ne2" value="{{ne&#10;|1=$LEFTITEM$&#10;|2=$SELECTION$&#10;|3=$RIGHTITEM$&#10;}}&#10;$END$"
-            description="insert numerical equation template" toReformat="false" toShortenFQNames="true">
+  <template name="{{ne2" value="{{ne&#10;|1=$LEFTITEM$&#10;|2=&lt;math&gt;&#10;$SELECTION$$MIDITEM$&#10;&lt;/math&gt;&#10;|3=$RIGHTITEM$&#10;}}&#10;$END$" description="insert numerical equation template" toReformat="false" toShortenFQNames="true">
     <variable name="LEFTITEM" expression="" defaultValue="" alwaysStopAt="true"/>
     <variable name="RIGHTITEM" expression="" defaultValue="" alwaysStopAt="true"/>
+    <variable name="RIGHTITEM" expression="" defaultValue="" alwaysStopAt="true" />
     <context>
       <option name="WIKITEXT" value="true"/>
     </context>
@@ -20,7 +22,8 @@
     <variable name="INDEX" expression="" defaultValue="" alwaysStopAt="true"/>
     <variable name="MAX" expression="" defaultValue="" alwaysStopAt="true"/>
     <context>
-      <option name="LATEX" value="true"/>
+      <option name="LATEX" value="true" />
+      <option name="latex" value="true" />
     </context>
   </template>
   <template name="\su" value="\sum_{$FROM$}^{$TO$} $END$" description="Sum with sub- and superscript"
@@ -37,11 +40,28 @@
       <option name="LATEX_MATH" value="true"/>
     </context>
   </template>
+  <template name="dot-surround" value="\dot{$SELECTION$}$END$" description="" toReformat="false" toShortenFQNames="true">
+    <context>
+      <option name="LATEX_MATH" value="true" />
+    </context>
+  </template>
   <template name="inline-mathfrak" value="&lt;math&gt;\mathfrak{$SELECTION$}$VAR1$&lt;/math&gt; $END$"
             description="start a mathfrak" toReformat="false" toShortenFQNames="true">
     <variable name="VAR1" expression="" defaultValue="" alwaysStopAt="true"/>
     <context>
       <option name="WIKITEXT" value="true"/>
+    </context>
+  </template>
+  <template name="dfra" value="\dot{\fraktur{$SELECTION$$VAR1$}}$END$" description="a dotted fraktur" toReformat="false" toShortenFQNames="true">
+    <variable name="VAR1" expression="" defaultValue="" alwaysStopAt="true" />
+    <context>
+      <option name="LATEX_MATH" value="true" />
+    </context>
+  </template>
+  <template name="surr" value="\$FUNCNAME${$SELECTION$}$END$" description="surround with arbitrary tex function" toReformat="false" toShortenFQNames="true">
+    <variable name="FUNCNAME" expression="" defaultValue="" alwaysStopAt="true" />
+    <context>
+      <option name="LATEX_MATH" value="true" />
     </context>
   </template>
 </templateSet>
