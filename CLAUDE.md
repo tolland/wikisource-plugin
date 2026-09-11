@@ -144,7 +144,7 @@ Transaction handling is the driver's normal deferred style — an earlier eager 
 - `src-py/wtbot/main.py` — FastAPI app factory (`create_app`)
 - `src-py/wtbot/db.py` — SQLite engine + WAL/busy-timeout pragma discipline
 - `src-py/wtbot/model/` — SQLModel ORM models, the **single source of truth** for the schema (`Site`, `Namespace`, `Page`, `Transclusion`, `FetchRequest`, `EditJournal`, `Commit`, …)
-- `src-py/wtbot/api/` — FastAPI routers: `model.py` (cache-fill job queue + `/fetch/drain`), `vfs` (read/write/list/stat for the plugin's VFS), `commit` (push-back to the wiki), `preview` (server-rendered live preview: wikitext → HTML), `reference_image` (the scan being transcribed — ProofreadPage's `imageforpage`, served from `/reference-image`), `page_nav`/`page_meta` (ProofreadPage navigation/metadata), `namespace`, `sites` (registration + per-site credentials), `edit_journal`, `viewer` (backs the SvelteKit debug app), `health`
+- `src-py/wtbot/api/` — FastAPI routers: `fetch` (cache-fill job queue + `/fetch/drain`), `vfs` (read/write/list/stat for the plugin's VFS), `commit` (push-back to the wiki), `preview` (server-rendered live preview: wikitext → HTML), `reference_image` (the scan being transcribed — ProofreadPage's `imageforpage`, served from `/reference-image`), `page_nav`/`page_meta` (ProofreadPage navigation/metadata), `namespace`, `sites` (registration + per-site credentials), `edit_journal`, `viewer` (backs the SvelteKit debug app), `health`
 
 A wiki is **registered before anything fetches from it** and addressed by its unique `label` thereafter; nothing creates a Site implicitly. Fetching is also decoupled from enqueueing — `POST /fetch` queues, `POST /fetch/drain` (or `wtbot drain`) does the throttled work:
 

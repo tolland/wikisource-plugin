@@ -1,10 +1,12 @@
 import logging
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from wtbot.settings import WikiSettings
+from wtbot.wiki.failures import is_login_session_timeout
 from wtbot.wiki.wiki_types import (
     EditConflict,
     IndexPageEntry,
@@ -219,7 +221,7 @@ class PywikibotClient:
                 family=self.site.family.name,
                 settings=settings,
             )
-            self.site.login()
+            self._with_session_retry(self.site.login)
 
         self._log_identity()
 
@@ -312,7 +314,28 @@ class PywikibotClient:
             )
             return None
 
+    def _with_session_retry[T](self, operation: Callable[[], T]) -> T:
+        """Retry a read/login once after an expired login handshake.
+
+        Both the relogin and the repeated operation are outside the catch:
+        persistent failures must return to the worker, never loop forever.
+        """
+        try:
+            return operation()
+        except Exception as exc:
+            if not is_login_session_timeout(exc):
+                raise
+            log.warning(
+                "login session timed out on %s; refreshing and retrying once", self.site
+            )
+        self.site.tokens.clear()
+        self.site._relogin()
+        return operation()
+
     def get_page(self, title: str) -> RemotePage:
+        return self._with_session_retry(lambda: self._get_page(title))
+
+    def _get_page(self, title: str) -> RemotePage:
         """One page, in one upstream request.
 
         It used to take two. ``page.exists()`` reads ``pageid``, which triggers
@@ -538,7 +561,7 @@ class PywikibotClient:
         return dest
 
     def get_namespaces(self):
-        return self.site.namespaces
+        return self._with_session_retry(lambda: self.site.namespaces)
 
     def save_page(
         self,

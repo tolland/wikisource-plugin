@@ -164,7 +164,9 @@ def _process(
 
         # Drive behaviour from what was actually fetched, not from req.kind.
         processor = processor_for(remote)
+
         page = _upsert_page(session, site, remote, processor)
+
         ctx = ProcessContext(
             session=session,
             site=site,

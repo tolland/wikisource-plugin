@@ -36,6 +36,7 @@ class FailureKind(str, Enum):
     site_definition = "site_definition"  # site/family could not be resolved
     conflict = "conflict"  # edit conflict on write-back
     api_error = "api_error"  # the API answered, with an error
+    session_expired = "session_expired"  # login session timed out
     unknown = "unknown"
 
 
@@ -44,7 +45,12 @@ class FailureKind(str, Enum):
 #: schedules that, and nothing should retry in a tight loop -- a 429 means the
 #: throttle is wrong, and retrying is how you make it worse.
 TRANSIENT_KINDS = frozenset(
-    {FailureKind.rate_limited, FailureKind.server_error, FailureKind.site_definition}
+    {
+        FailureKind.rate_limited,
+        FailureKind.server_error,
+        FailureKind.site_definition,
+        FailureKind.session_expired,
+    }
 )
 
 
@@ -121,6 +127,8 @@ def classify(exc: BaseException) -> WikiFailure:
     status = _http_status(exc)
     retry_after = _retry_after(exc)
     kind = _KIND_BY_EXCEPTION_NAME.get(name, FailureKind.unknown)
+    if is_login_session_timeout(exc):
+        kind = FailureKind.session_expired
 
     api_code = getattr(exc, "code", None)
     if isinstance(api_code, str) and api_code.lower() in _RATE_LIMIT_API_CODES:
@@ -139,6 +147,19 @@ def classify(exc: BaseException) -> WikiFailure:
         exception_type=name,
         http_status=status,
         retry_after=retry_after,
+    )
+
+
+def is_login_session_timeout(exc: BaseException) -> bool:
+    """Recognize MediaWiki's login timeout without retrying bad credentials.
+
+    Pywikibot wraps the API's Failed response in NoUsernameError, even though
+    in this case the username and password are not the problem.
+    """
+    return (
+        type(exc).__name__ in {"NoUsernameError", "APIError"}
+        and "unable to continue login" in str(exc).lower()
+        and "session most likely timed out" in str(exc).lower()
     )
 
 
