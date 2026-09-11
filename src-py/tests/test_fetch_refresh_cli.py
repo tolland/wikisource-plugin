@@ -53,7 +53,8 @@ def test_the_command_posts_what_was_asked_for(posted) -> None:
         [
             "--base-url",
             "http://wtbot:8000",
-            "fetch-refresh",
+            "fetch",
+            "refresh",
             "--label",
             "local",
             "--title-prefix",
@@ -88,7 +89,7 @@ def test_a_full_basis_reports_its_reason_and_that_nothing_advanced(posted) -> No
     }
 
     result = runner.invoke(
-        create_app(), ["--base-url", "http://x", "fetch-refresh", "--label", "local"]
+        create_app(), ["--base-url", "http://x", "fetch", "refresh", "--label", "local"]
     )
 
     assert result.exit_code == 0, result.output
@@ -112,7 +113,7 @@ def test_a_dry_run_says_so_without_claiming_a_watermark(posted) -> None:
 
     result = runner.invoke(
         create_app(),
-        ["--base-url", "http://x", "fetch-refresh", "--label", "local", "--dry-run"],
+        ["--base-url", "http://x", "fetch", "refresh", "--label", "local", "--dry-run"],
     )
 
     assert result.exit_code == 0, result.output
@@ -129,7 +130,8 @@ def test_since_is_sent_as_an_iso_timestamp(posted) -> None:
         [
             "--base-url",
             "http://x",
-            "fetch-refresh",
+            "fetch",
+            "refresh",
             "--label",
             "local",
             "--since",

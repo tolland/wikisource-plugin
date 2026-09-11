@@ -4,12 +4,12 @@ from conftest import drain
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
+from wtbot.fetch.worker import run_pending
 from wtbot.main import create_app
 from wtbot.model import EditJournal, FetchRequest, FetchStatus, IndexMeta, Page, Site
 from wtbot.model.wikisource.proofread_page_meta import ProofreadPageMeta
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import IndexPageEntry, RemotePage, RemotePageImages
-from wtbot.worker import run_pending
 
 """Partially transcribed works: fan-out discovers the index pagination via
 list=proofreadpagesinindex, creates local placeholder stub rows for pages

@@ -9,6 +9,7 @@ from wtbot.fetch.revision_store import (
     upsert_content,
     validate_remote_identity,
 )
+from wtbot.fetch.worker import run_pending
 from wtbot.model import (
     MAIN_SLOT,
     Content,
@@ -21,7 +22,6 @@ from wtbot.model import (
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.sha1 import content_sha1_base36, hex_to_base36
 from wtbot.wiki.wiki_types import RemotePage
-from wtbot.worker import run_pending
 
 """The page -> revision -> slot -> content chain the fetch worker writes.
 

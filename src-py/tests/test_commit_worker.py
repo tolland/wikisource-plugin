@@ -12,13 +12,13 @@ from wtbot.api.commit import (
     run_commit_for_page,
 )
 from wtbot.commit_worker import run_pending_commits
+from wtbot.fetch.worker import run_pending
 from wtbot.model import Commit, CommitStatus, EditJournal, FetchRequest, Page, Site
 from wtbot.model.fetch_request import FetchKind, FetchStatus
 from wtbot.model.wiki.namespace import NsRole
 from wtbot.vfs.store import PageStore
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import RemotePage, SaveResult
-from wtbot.worker import run_pending
 
 TITLE = "Page:Foo.djvu/1"
 

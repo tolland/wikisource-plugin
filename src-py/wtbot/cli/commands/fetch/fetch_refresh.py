@@ -7,7 +7,7 @@ from wtbot.cli.deps import ApiClient, get_api, get_context, get_label
 
 app = TyperDI(
     no_args_is_help=False,
-    name="fetch-refresh",
+    name="refresh",
 )
 
 

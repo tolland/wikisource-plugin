@@ -5,7 +5,8 @@ from wtbot.cli.deps import ApiClient, get_api, get_context, get_label
 
 app = TyperDI(
     no_args_is_help=True,
-    name="fetch-page",
+    name="page",
+    help="commands relating to fetch wiki page to local cache",
 )
 
 

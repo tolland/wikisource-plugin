@@ -33,13 +33,13 @@ from wtbot.api import (
 )
 from wtbot.api.errors import register_error_handlers
 from wtbot.db import create_db_engine, init_db
+from wtbot.fetch.worker import ClientFactory
 from wtbot.log.logging_config import LOGGING_CONFIG, LoggingConfig, configure_logging
 from wtbot.log.logging_config import sqlalchemy_echo as configured_sqlalchemy_echo
 from wtbot.model import Site, SiteCredential
 from wtbot.settings import WikiSettings
 from wtbot.site_store import AnonymousAccessRefused, anonymous_allowed
 from wtbot.wiki.client_registry import make_client_factory
-from wtbot.worker import ClientFactory
 
 """wtbot FastAPI application.
 

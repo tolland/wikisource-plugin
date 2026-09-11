@@ -25,7 +25,7 @@ Counted from `src-py/wtbot/api/`: **20 routers, 78 paths, 99 operations,
 | `ocr` | — + `/pages` | `/ocr/{backends,models,run}`, `/ocr/config/{name}` (PUT/DELETE), `/pages/ocr/{backends,models,run}` | plugin + admin |
 | `page_meta` | `/pages` | `GET /pages/resolve`, `{index,page,file}-meta` (GET/PUT) under `/pages/{page_pk}`, `index-meta/ensure` | admin/tests |
 | `pages` | `/pages` | `GET /pages/`, `GET /pages/query`, `GET /pages/{page_pk}` | viewer/tests |
-| `fetch` | `/fetch` | `POST /fetch/`, `/fetch/drain`, `/fetch/refresh`, `GET /fetch/queue`, `GET /fetch/{pk}` | plugin/CLI |
+| `model.py` | `/fetch` | `POST /fetch/`, `/fetch/drain`, `/fetch/refresh`, `GET /fetch/queue`, `GET /fetch/{pk}` | plugin/CLI |
 | `commit` | `/commits` | list, `pending`, create, run-one, cancel-pending, get | viewer/plugin |
 | `links` | `/links` | `propose`, link CRUD, `pairs` CRUD, `pairs/{pk}/{rungs,revisions}`, `pairs/index` | viewer/CLI |
 | `works` | `/links/works` | list, `candidates`, track, untrack, get, `propose`, `fetch-history` | viewer/CLI |
@@ -124,7 +124,7 @@ register app-level handlers that log and shape every error response (see
 
 21 model classes live in `api/schemas.py`; the rest are inline in `ocr.py`,
 `annotations.py`, `page_meta.py`, `page_nav.py`, `preview.py`, `sites.py`,
-`links.py`, `works.py`, `sync.py`, `viewer.py` and `fetch.py`.
+`links.py`, `works.py`, `sync.py`, `viewer.py` and `model.py`.
 `schemas.py` is documented as "the VFS contract" but also holds
 `CommitRunResponse`, `PendingCommitPage` and `PendingCommitJournal`.
 

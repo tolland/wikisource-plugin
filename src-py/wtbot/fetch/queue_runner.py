@@ -6,9 +6,9 @@ from pathlib import Path
 
 from sqlmodel import Session, func, select
 
+from wtbot.fetch.worker import ClientFactory, run_pending
 from wtbot.model import FetchRequest, FetchStatus
 from wtbot.wiki.failures import FailureKind, WikiFailure
-from wtbot.worker import ClientFactory, run_pending
 
 """Draining the fetch queue.
 

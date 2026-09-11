@@ -409,7 +409,7 @@ landed":
 
 ## 7. The fetch worker (pywikibot side)
 
-The worker (`wtbot/worker.py`) drives surface B:
+The worker (`wtbot/fetch/worker.py`) drives surface B:
 
 ```
 1. claim a pending FetchRequest (highest priority first) -> in_progress
@@ -591,7 +591,7 @@ classify(content_model, namespace_role) -> Handling
 A central future use case: a local wiki is a **staging copy** of an upstream one.
 `https://wikisource-debian-13.lan/.../Index:…Tractatus…djvu` is the local staging
 of `https://en.wikisource.org/.../Index:…Tractatus…djvu`. We want to iterate
-locally, then later `fetch`/`pull`/diff/rebase against the canonical wiki, and
+locally, then later `model.py`/`pull`/diff/rebase against the canonical wiki, and
 surface that relationship to IntelliJ (compare staging vs canonical, pull
 updates, view diffs).
 

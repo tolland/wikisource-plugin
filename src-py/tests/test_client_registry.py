@@ -178,9 +178,9 @@ def test_worker_run_builds_one_client_for_a_whole_fan_out(engine):
     """End to end through the fetch worker: N queued requests, one client."""
     from sqlmodel import Session
 
+    from wtbot.fetch.worker import run_pending
     from wtbot.model import FetchKind, FetchRequest
     from wtbot.wiki.wiki_types import RemotePage
-    from wtbot.worker import run_pending
 
     builder = _CountingBuilder()
     titles = [f"Page:Book.djvu/{n}" for n in range(1, 26)]

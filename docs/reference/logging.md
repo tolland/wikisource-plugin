@@ -124,7 +124,7 @@ that logs request and response bodies at `TRACE`, switched per router tag
 (logger `wtbot.api.debug_logging_route.<tag>`; see
 `WTBOT_TRACE_DEBUG_ROUTE_TAGS`). **Every router opts in** — the full tag list
 is `KNOWN_DEBUG_ROUTE_TAGS` in `logging_config.py` (`vfs`, `preview`,
-`reference-image`, `page-annotations`, `ocr`, `fetch`, `commits`,
+`reference-image`, `page-annotations`, `ocr`, `model.py`, `commits`,
 `edit-journal`, `file-blobs`, `links`, `namespaces`, `page-meta`, `page-nav`,
 `pages`, `sites`, `viewer`, `health`).
 

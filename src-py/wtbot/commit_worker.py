@@ -25,6 +25,7 @@ from threading import Lock
 from sqlmodel import Session, select
 
 from wtbot.db_session import detached_site, read_snapshot, write_batch
+from wtbot.fetch.worker import ClientFactory
 from wtbot.log.failure_log import FailureContext, record_failure, site_label
 from wtbot.model import (
     Commit,
@@ -36,7 +37,6 @@ from wtbot.model import (
     Site,
 )
 from wtbot.wiki.wiki_types import EditConflict
-from wtbot.worker import ClientFactory
 
 _worker_lock = Lock()
 
