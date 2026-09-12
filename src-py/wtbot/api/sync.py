@@ -927,6 +927,40 @@ def create_batch(
     return _batch_out(session, batch, include_bodies=True)
 
 
+@router.post("/batches/preview", response_model=BatchOut)
+def preview_batch(
+    payload: StageRequest, session: Session = Depends(get_session)
+) -> BatchOut:
+    """Preview what staging one page from a work report would produce,
+    including diff bodies, without committing changes to the database."""
+    source_site, target_site = resolve_pair(
+        session, payload.source_label, payload.target_label
+    )
+    try:
+        report = build_report(
+            session,
+            source_site=source_site,
+            target_site=target_site,
+            index_title=payload.index_title,
+            target_index_title=payload.target_index_title,
+        )
+        batch = stage_batch(
+            session,
+            report,
+            source_site=source_site,
+            target_site=target_site,
+            label=payload.label,
+            page_number=payload.page_number,
+        )
+        return _batch_out(session, batch, include_bodies=True)
+    except SyncError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except PromotionError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    finally:
+        session.rollback()
+
+
 @router.post("/batches/stage-many", response_model=StageManyOut, status_code=201)
 def create_batches(
     payload: StageManyRequest, session: Session = Depends(get_session)
@@ -1013,11 +1047,46 @@ def create_page_batch(
     return _batch_out(session, batch, include_bodies=True)
 
 
+@router.post("/page-batches/preview", response_model=BatchOut)
+def preview_page_batch(
+    payload: StagePageRequest, session: Session = Depends(get_session)
+) -> BatchOut:
+    """Preview what staging a single page would produce, without committing."""
+    source_site, target_site = resolve_pair(
+        session, payload.source_label, payload.target_label
+    )
+    try:
+        page = build_page_report(
+            session,
+            source_site=source_site,
+            target_site=target_site,
+            source_title=payload.source_title,
+            target_title=payload.target_title,
+        )
+        batch = stage_page(
+            session,
+            page,
+            source_site=source_site,
+            target_site=target_site,
+            label=payload.label,
+        )
+        return _batch_out(session, batch, include_bodies=True)
+    except SyncError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except PromotionError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    finally:
+        session.rollback()
+
+
 @router.get("/batches", response_model=list[BatchOut])
-def list_batches(session: Session = Depends(get_session)) -> list[BatchOut]:
-    batches = session.exec(
-        select(PromotionBatch).order_by(PromotionBatch.pk.desc())
-    ).all()
+def list_batches(
+    status: BatchStatus | None = None, session: Session = Depends(get_session)
+) -> list[BatchOut]:
+    statement = select(PromotionBatch).order_by(PromotionBatch.pk.desc())
+    if status is not None:
+        statement = statement.where(PromotionBatch.status == status)
+    batches = session.exec(statement).all()
     return [_batch_out(session, batch) for batch in batches]
 
 

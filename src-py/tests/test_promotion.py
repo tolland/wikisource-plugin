@@ -317,6 +317,62 @@ def test_a_batch_stages_only_what_the_report_would_write(pushing_client, engine)
     assert promotion["comment"] == "finish proofreading"
 
 
+def test_preview_batch_returns_diff_without_persisting(pushing_client, engine):
+    seed(engine)
+    move_source(engine)
+
+    resp = pushing_client.post(
+        "/sync/batches/preview",
+        json={
+            "source_label": "upstream",
+            "target_label": "local",
+            "index_title": INDEX,
+            "target_index_title": INDEX,
+            "page_number": 1,
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    batch = resp.json()
+    assert batch["status"] == "draft"
+    (promotion,) = batch["promotions"]
+    assert promotion["intent"] == "update"
+    assert promotion["source_revid"] == 999
+    assert promotion["base_body"] == body(3, "Us", "Words.")
+    assert promotion["submitted_body"] == body(3, "Them", "Words, changed again.")
+
+    # Verify no batch was saved in the database
+    listed = pushing_client.get("/sync/batches").json()
+    assert len(listed) == 0
+
+
+def test_list_batches_filters_by_status(pushing_client, engine):
+    seed(engine)
+    move_source_twice(engine)
+
+    batch = stage(pushing_client).json()
+    assert batch["status"] == "draft"
+
+    draft_batches = pushing_client.get(
+        "/sync/batches", params={"status": "draft"}
+    ).json()
+    assert len(draft_batches) == 1
+    assert draft_batches[0]["pk"] == batch["pk"]
+
+    complete_batches = pushing_client.get(
+        "/sync/batches", params={"status": "complete"}
+    ).json()
+    assert len(complete_batches) == 0
+
+    pushing_client.post(f"/sync/batches/{batch['pk']}/push", json={})
+    pushing_client.post(f"/sync/batches/{batch['pk']}/push", json={})
+
+    complete_batches = pushing_client.get(
+        "/sync/batches", params={"status": "complete"}
+    ).json()
+    assert len(complete_batches) == 1
+    assert complete_batches[0]["pk"] == batch["pk"]
+
+
 def test_each_source_revision_is_an_ordered_promotion(pushing_client, engine):
     """Revision boundaries are part of the change, not an implementation detail.
 

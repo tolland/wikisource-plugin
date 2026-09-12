@@ -11,6 +11,7 @@
   import Notice from '$lib/components/Notice.svelte';
   import PageHeading from '$lib/components/PageHeading.svelte';
   import SelectField from '$lib/components/SelectField.svelte';
+  import SyncPageCard from '$lib/components/SyncPageCard.svelte';
   import TextField from '$lib/components/TextField.svelte';
   import type {
     SyncPage,
@@ -43,6 +44,7 @@
   let fetching = $state(false);
   let staging = $state(false);
   let selectedPages: number[] = $state([]);
+  let expandedPages: number[] = $state([]);
   let batchLabel = $state('');
   let error = $state('');
   let message = $state('');
@@ -154,6 +156,7 @@
     try {
       report = await syncReport(selectedRequest);
       selectedPages = [];
+      expandedPages = [];
     } catch (err) {
       error = err instanceof Error ? err.message : 'The report failed';
       report = null;
@@ -215,10 +218,35 @@
       : [...new Set([...selectedPages, ...visibleNumbers])];
   }
 
+  function toggleExpandedPage(pageNumber: number, isExpanded: boolean): void {
+    if (isExpanded) {
+      if (!expandedPages.includes(pageNumber)) {
+        expandedPages = [...expandedPages, pageNumber];
+      }
+    } else {
+      expandedPages = expandedPages.filter((num) => num !== pageNumber);
+    }
+  }
+
+  function expandAllVisible(): void {
+    const visibleNumbers = visible
+      .map((row) => row.page_number)
+      .filter((num): num is number => num != null);
+    expandedPages = [...new Set([...expandedPages, ...visibleNumbers])];
+  }
+
+  function collapseAllVisible(): void {
+    const visibleNumbers = new Set(
+      visible.map((row) => row.page_number).filter((num): num is number => num != null)
+    );
+    expandedPages = expandedPages.filter((num) => !visibleNumbers.has(num));
+  }
+
   function swap(): void {
     reversed = !reversed;
     report = null;
     selectedPages = [];
+    expandedPages = [];
     message = '';
   }
 
@@ -226,6 +254,7 @@
     reversed = false;
     report = null;
     selectedPages = [];
+    expandedPages = [];
     message = '';
   }
 
@@ -434,83 +463,64 @@
     </section>
   {/if}
 
-  <div class="filter">
-    <SelectField label="Show" bind:value={show}>
-      <option value="actionable">what would be written</option>
-      <option value="problems">what needs a person</option>
-      <option value="all">every page</option>
-    </SelectField>
-    {#if report.work_pk}
-      <a class="drill" href={`/links/${report.work_pk}`}>Open the tracked work &rarr;</a>
-    {/if}
+  <div class="filter-bar">
+    <div class="filter-left">
+      <SelectField label="Show" bind:value={show}>
+        <option value="actionable">what would be written ({report.actionable})</option>
+        <option value="problems">what needs a person</option>
+        <option value="all">every page ({report.pages.length})</option>
+      </SelectField>
+    </div>
+
+    <div class="filter-actions">
+      {#if selectableVisible.length > 0}
+        <ActionButton
+          variant="ghost"
+          onclick={toggleVisible}
+          disabled={staging}
+        >
+          {allVisibleSelected ? 'Deselect visible' : 'Select all visible'}
+        </ActionButton>
+      {/if}
+
+      {#if visible.length > 0}
+        <ActionButton
+          variant="ghost"
+          onclick={expandAllVisible}
+        >
+          Expand all
+        </ActionButton>
+        <ActionButton
+          variant="ghost"
+          onclick={collapseAllVisible}
+        >
+          Collapse all
+        </ActionButton>
+      {/if}
+
+      {#if report.work_pk}
+        <a class="drill link-btn" href={`/links/${report.work_pk}`}>Open the tracked work &rarr;</a>
+      {/if}
+    </div>
   </div>
 
   {#if visible.length === 0}
     <p class="state">Nothing in this view.</p>
   {:else}
-    <table class="pages">
-      <thead>
-        <tr>
-          <th scope="col" class="select-col">
-            <input
-              type="checkbox"
-              aria-label="Select all writable rows in this view"
-              checked={allVisibleSelected}
-              disabled={selectableVisible.length === 0 || staging}
-              onchange={toggleVisible}
-            />
-          </th>
-          <th scope="col">#</th>
-          <th scope="col">Verdict</th>
-          <th scope="col">Page</th>
-          <th scope="col">Revisions</th>
-          <th scope="col"></th>
-        </tr>
-      </thead>
-      <tbody>
-        {#each visible as row}
-          <tr>
-            <td class="select-col">
-              {#if row.actionable && row.page_number != null}
-                <input
-                  type="checkbox"
-                  aria-label={`Select page ${row.page_number}`}
-                  checked={selectedPages.includes(row.page_number)}
-                  disabled={staging}
-                  onchange={() => togglePage(row.page_number as number)}
-                />
-              {/if}
-            </td>
-            <td>{row.page_number ?? '?'}</td>
-            <td>
-              <span class="chip {VERDICTS[row.verdict]?.tone ?? 'warn'}">
-                {VERDICTS[row.verdict]?.label ?? row.verdict}
-              </span>
-            </td>
-            <td class="title">
-              {row.source_title ?? row.target_title}
-              <small>{row.detail ?? VERDICTS[row.verdict]?.note ?? ''}</small>
-              {#if row.linkable}
-                <small class="linkable">linkable &mdash; one Propose away</small>
-              {/if}
-            </td>
-            <td class="revs">
-              {row.source_revid ?? '-'} &rarr; {row.target_revid ?? 'none'}
-              {#if row.anchor_source_revid}
-                <small>
-                  anchor {row.anchor_source_revid} &harr; {row.anchor_target_revid}
-                </small>
-              {/if}
-            </td>
-            <td>
-              {#if row.pair_pk}
-                <a class="drill" href={`/links/pairs/${row.pair_pk}`}>Revisions</a>
-              {/if}
-            </td>
-          </tr>
-        {/each}
-      </tbody>
-    </table>
+    <section class="pages-list" aria-label="Sync report pages">
+      {#each visible as row (row.page_number ?? row.source_title ?? row.target_title)}
+        <SyncPageCard
+          {row}
+          request={selectedRequest}
+          selectable={true}
+          selected={row.page_number != null && selectedPages.includes(row.page_number)}
+          disabled={staging}
+          expanded={row.page_number != null && expandedPages.includes(row.page_number)}
+          ontoggle={() => row.page_number != null && togglePage(row.page_number)}
+          onexpand={(exp) => row.page_number != null && toggleExpandedPage(row.page_number, exp)}
+        />
+      {/each}
+    </section>
   {/if}
 
   <p class="footnote">
@@ -829,10 +839,6 @@
     font-size: 0.88rem;
   }
 
-  .pages small.linkable {
-    color: #7d5510;
-  }
-
   .stage {
     border: 1px solid rgba(40, 107, 76, 0.34);
     border-radius: 20px;
@@ -860,62 +866,36 @@
     align-items: end;
   }
 
-  .filter {
+  .filter-bar {
     display: flex;
     flex-wrap: wrap;
     gap: 1rem;
     align-items: end;
-    margin-bottom: 1rem;
+    justify-content: space-between;
+    margin-bottom: 1.2rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(72, 49, 31, 0.12);
   }
 
-  .pages {
-    width: 100%;
-    border-collapse: collapse;
+  .filter-left {
+    min-width: 14rem;
   }
 
-  .pages th,
-  .pages td {
-    border-bottom: 1px solid rgba(72, 49, 31, 0.14);
-    padding: 0.55rem 0.5rem;
-    text-align: left;
-    vertical-align: top;
+  .filter-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.6rem 0.85rem;
   }
 
-  .pages th {
-    color: #73583d;
-    font-family: "Avenir Next", "Gill Sans", sans-serif;
-    font-size: 0.72rem;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
+  .link-btn {
+    margin-left: 0.5rem;
   }
 
-  .pages .select-col {
-    width: 2rem;
-    padding-right: 0.15rem;
-    text-align: center;
-  }
-
-  .pages input[type='checkbox'] {
-    width: 1rem;
-    height: 1rem;
-    accent-color: #286b4c;
-  }
-
-  .pages .title {
-    overflow-wrap: anywhere;
-  }
-
-  .pages small {
-    display: block;
-    margin-top: 0.2rem;
-    color: #73583d;
-    font-size: 0.76rem;
-  }
-
-  .pages .revs {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 0.8rem;
-    white-space: nowrap;
+  .pages-list {
+    display: flex;
+    flex-direction: column;
+    margin-top: 0.5rem;
   }
 
   .drill {
@@ -923,8 +903,13 @@
     font-family: "Avenir Next", "Gill Sans", sans-serif;
     font-size: 0.76rem;
     font-weight: 700;
+    text-decoration: none;
     text-transform: uppercase;
     white-space: nowrap;
+  }
+
+  .drill:hover {
+    text-decoration: underline;
   }
 
   .footnote {

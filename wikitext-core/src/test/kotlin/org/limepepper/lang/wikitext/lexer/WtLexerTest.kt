@@ -36,6 +36,7 @@ class WtLexerTest : WtLexerTestCase() {
     // templates
     fun testAuthorTemplate() = doTest()
     fun testProofreadpage_index_template() = doTest()
+    fun testincludeInsideTemplate() = doTest()
 
     // quote markup ('' italic, ''' bold, ''''' both)
     fun testQuoteBasics() = doTest()

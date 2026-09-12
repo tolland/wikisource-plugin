@@ -30,6 +30,7 @@ import type {
   ProposeWorkResult,
   RungRow,
   Batch,
+  BatchStatus,
   ChangePushResult,
   ChangeReview,
   FetchAssetsResult,
@@ -204,6 +205,10 @@ export function listPendingCommits(): Promise<PendingCommitPage[]> {
   return getJson<PendingCommitPage[]>('/commits/pending');
 }
 
+export function runPendingCommits(): Promise<CommitRunResponse> {
+  return postJson<CommitRunResponse>('/commits/', {});
+}
+
 export function approvePendingCommit(
   pagePk: number,
   force = false,
@@ -337,6 +342,10 @@ export function stagePageBatch(payload: StagePageRequest): Promise<Batch> {
   return postJson<Batch>('/sync/page-batches', payload);
 }
 
+export function previewPageBatch(payload: StagePageRequest): Promise<Batch> {
+  return postJson<Batch>('/sync/page-batches/preview', payload);
+}
+
 export async function nextChange(payload: NextChangeRequest): Promise<ChangeReview | null> {
   const response = await fetch('/api/sync/changes/next', {
     method: 'POST',
@@ -361,12 +370,17 @@ export function stageBatch(payload: StageRequest): Promise<Batch> {
   return postJson<Batch>('/sync/batches', payload);
 }
 
+export function previewBatch(payload: StageRequest): Promise<Batch> {
+  return postJson<Batch>('/sync/batches/preview', payload);
+}
+
 export function stageManyBatches(payload: StageManyRequest): Promise<StageManyResponse> {
   return postJson<StageManyResponse>('/sync/batches/stage-many', payload);
 }
 
-export function listBatches(): Promise<Batch[]> {
-  return getJson<Batch[]>('/sync/batches');
+export function listBatches(status?: BatchStatus | string): Promise<Batch[]> {
+  const query = status && status !== 'all' ? `?status=${encodeURIComponent(status)}` : '';
+  return getJson<Batch[]>(`/sync/batches${query}`);
 }
 
 export function getBatch(batchPk: number): Promise<Batch> {
