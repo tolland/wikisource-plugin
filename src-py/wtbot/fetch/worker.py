@@ -13,6 +13,7 @@ from wtbot.fetch.revision_store import (
     validate_remote_identity,
 )
 from wtbot.log.failure_log import FailureContext, record_failure, site_label
+from wtbot.log.fetch_log import activity, fetch_context, fetch_stage
 from wtbot.model import (
     FetchRequest,
     FetchState,
@@ -83,14 +84,15 @@ def run_pending(
         req = _claim_next(session)
         if req is None:
             break
-        _process(
-            session,
-            req,
-            client_factory,
-            blob_root=blob_root,
-            on_failure=on_failure,
-            image_cache=image_cache,
-        )
+        with fetch_context(req.pk, req.site_pk, req.title), fetch_stage("request"):
+            _process(
+                session,
+                req,
+                client_factory,
+                blob_root=blob_root,
+                on_failure=on_failure,
+                image_cache=image_cache,
+            )
         handled += 1
     return handled
 
@@ -152,20 +154,33 @@ def _process(
     on_failure: FailureObserver | None = None,
     image_cache: dict | None = None,
 ) -> None:
-    site = _load_site_snapshot(session, req.site_pk)
+    activity(
+        "claimed parent_pk=%s kind=%s depth=%d revisions=%d",
+        req.parent_pk,
+        req.kind.value,
+        req.depth,
+        req.revisions,
+    )
+    with fetch_stage("load_site"):
+        site = _load_site_snapshot(session, req.site_pk)
+    activity("site=%s", site_label(site))
     status = FetchStatus.error
     progress_total = None
     progress_done = 0
     error_message = None
     try:
-        client = client_factory(site)
-        _maybe_sync_namespaces(session, site, client)
-        remote = client.get_page(req.title)
+        with fetch_stage("client_setup"):
+            client = client_factory(site)
+        with fetch_stage("namespace_sync"):
+            _maybe_sync_namespaces(session, site, client)
+        with fetch_stage("get_page"):
+            remote = client.get_page(req.title)
 
         # Drive behaviour from what was actually fetched, not from req.kind.
         processor = processor_for(remote)
 
-        page = _upsert_page(session, site, remote, processor)
+        with fetch_stage("store_page"):
+            page = _upsert_page(session, site, remote, processor)
 
         ctx = ProcessContext(
             session=session,
@@ -179,11 +194,14 @@ def _process(
             # After the head is recorded, never instead of it: the processor
             # and every existing reader work from the head denormalisation, and
             # a history walk must not change what "current" means.
-            _record_history(session, client, page, req)
+            with fetch_stage("revision_history"):
+                _record_history(session, client, page, req)
 
-        _materialize_promotion_links(session, page)
+        with fetch_stage("promotion_links"):
+            _materialize_promotion_links(session, page)
 
-        outcome = processor.postprocess(ctx, page, remote)
+        with fetch_stage("postprocess"):
+            outcome = processor.postprocess(ctx, page, remote)
         status = outcome.status
         progress_total = outcome.progress_total
         progress_done = outcome.progress_done
@@ -207,13 +225,22 @@ def _process(
         if on_failure is not None:
             on_failure(failure)
 
-    _record_fetch_result(
-        session,
-        req,
-        status=status,
-        progress_total=progress_total,
-        progress_done=progress_done,
-        error_message=error_message,
+    with fetch_stage("store_result"):
+        _record_fetch_result(
+            session,
+            req,
+            status=status,
+            progress_total=progress_total,
+            progress_done=progress_done,
+            error_message=error_message,
+        )
+
+    activity(
+        "result status=%s progress=%s/%s error=%s",
+        status.value,
+        progress_done,
+        progress_total,
+        error_message,
     )
 
 
@@ -238,8 +265,11 @@ def _record_history(
     the processor commits next.
     """
     try:
-        history = client.get_history(req.title, limit=req.revisions)
+        with fetch_stage("get_history", f"limit={req.revisions}"):
+            history = client.get_history(req.title, limit=req.revisions)
+        activity("history received revisions=%d", len(history) if history else 0)
     except Exception as exc:  # noqa: BLE001 - enrichment must not fail a fetch
+        activity("history enrichment skipped: %s", exc)
         log.warning("history fetch failed for %s: %s", req.title, exc)
         return
     if not history:
@@ -267,6 +297,7 @@ def _record_history(
         # cache instead of trusting a partially corrupt history.
         raise
     except Exception:  # noqa: BLE001 - ordinary enrichment remains best effort
+        activity("history storage failed; continuing with head revision")
         log.warning("recording history for %s failed", req.title, exc_info=True)
 
 
@@ -327,6 +358,13 @@ def _update_parent_progress(session: Session, parent_pk: int) -> None:
         parent.status = FetchStatus.done
     parent.updated_at = utcnow()
     session.add(parent)
+    activity(
+        "parent request_pk=%d status=%s progress=%s/%s (awaiting commit)",
+        parent_pk,
+        parent.status.value,
+        parent.progress_done,
+        parent.progress_total,
+    )
     # Caller commits.
 
 

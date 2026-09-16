@@ -3,10 +3,12 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
+from time import monotonic
 
 from sqlmodel import Session, func, select
 
 from wtbot.fetch.worker import ClientFactory, run_pending
+from wtbot.log.fetch_log import activity
 from wtbot.model import FetchRequest, FetchStatus
 from wtbot.wiki.failures import FailureKind, WikiFailure
 
@@ -92,6 +94,8 @@ def drain_queue(
     fan-out takes minutes by design. Nothing here is on a request path that
     must answer quickly.
     """
+    started = monotonic()
+    activity("drain started batch=%d max_passes=%s", batch, max_passes)
     handled = 0
     passes = 0
     stop = DrainStop.queue_empty
@@ -110,6 +114,8 @@ def drain_queue(
                 pending_count(session),
             )
             break
+        pass_started = monotonic()
+        activity("drain pass=%d started", passes + 1)
         done = run_pending(
             session,
             client_factory,
@@ -120,6 +126,13 @@ def drain_queue(
         )
         passes += 1
         handled += done
+        activity(
+            "drain pass=%d finished handled=%d total_handled=%d elapsed=%.3fs",
+            passes,
+            done,
+            handled,
+            monotonic() - pass_started,
+        )
         if limiter.hit:
             stop = DrainStop.rate_limited
             log.warning(
@@ -142,6 +155,14 @@ def drain_queue(
         remaining=pending_count(session),
         stop_reason=stop,
         retry_after=limiter.retry_after,
+    )
+    activity(
+        "drain finished handled=%d passes=%d remaining=%d stop=%s elapsed=%.3fs",
+        result.handled,
+        result.passes,
+        result.remaining,
+        result.stop_reason.value,
+        monotonic() - started,
     )
     if handled:
         log.info(

@@ -6,8 +6,8 @@ from sqlmodel import Field, SQLModel
 
 """Scan annotations: bounding boxes drawn over a proofread page's scan image.
 
-One row per box, in scan-pixel coordinates (the coordinate space of the
-full-resolution scan, independent of any on-screen zoom). ``annotation_id``
+One row per box, in normalized full-page coordinates (fractions from 0 to 1,
+independent of the raster resolution and on-screen zoom). ``annotation_id``
 is the client-generated stable identity that outlives geometry changes — it
 is the join key to everything outside this table, in particular the text
 anchors (see wtbot.model.text_target_anchor), which are managed separately.
@@ -40,10 +40,10 @@ class ScanAnnotation(SQLModel, table=True):
     page_pk: int = Field(foreign_key="page.pk", index=True)
     annotation_id: str = Field(index=True)
 
-    x: float
-    y: float
-    width: float
-    height: float
+    normalized_x: float
+    normalized_y: float
+    normalized_width: float
+    normalized_height: float
 
     label: str | None = None
     category: AnnotationCategory | None = None

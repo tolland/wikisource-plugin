@@ -17,7 +17,7 @@ revision ID, while a fresh database creates that schema directly.
 
 BASELINE = "8ac41e2d7f90"
 THROTTLE = "e7f3b415fd0a"
-HEAD = "f19c2d4a7b31"
+HEAD = "b72e8c913a04"
 
 
 @pytest.fixture
@@ -42,6 +42,9 @@ def test_history_starts_at_the_squashed_baseline() -> None:
     assert script.get_heads() == [HEAD]
     assert [revision.revision for revision in script.walk_revisions()] == [
         HEAD,
+        "a21d6430c902",
+        "a21d6430c901",
+        "f19c2d4a7b31",
         THROTTLE,
         BASELINE,
     ]
@@ -179,3 +182,78 @@ def test_baseline_can_be_downgraded_to_an_empty_database(
             )
         }
     assert tables == {"alembic_version"}
+
+
+def test_annotation_migration_requires_backfill_and_preserves_identity(
+    baseline_engine, tmp_path, monkeypatch
+):
+    import json
+    from io import BytesIO
+
+    from PIL import Image
+
+    from wtbot.annotation_normalization import backfill
+
+    _run(baseline_engine, command.upgrade, "a21d6430c901")
+    with baseline_engine.begin() as c:
+        c.execute(
+            text(
+                "INSERT INTO site (pk,family,code,articlepath,created_at) VALUES (1,'wikisource','en','/wiki/$1',CURRENT_TIMESTAMP)"
+            )
+        )
+        c.execute(
+            text(
+                "INSERT INTO page (pk,site_pk,title,namespace_role,dirty,fetch_status) VALUES (1,1,'Page:Book.pdf/1','page',0,'done')"
+            )
+        )
+        c.execute(
+            text(
+                "INSERT INTO proofreadpagemeta (page_pk,index_page_pk,source_image_url) VALUES (1,1,'https://example.test/scan.jpg')"
+            )
+        )
+        c.execute(
+            text(
+                "INSERT INTO scanannotation (pk,page_pk,annotation_id,x,y,width,height,created_at,updated_at) VALUES (1,1,'box',20,60,100,120,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)"
+            )
+        )
+    with pytest.raises(RuntimeError, match="need backfilling"):
+        _run(baseline_engine, command.upgrade, "head")
+    dump = tmp_path / "dump.json"
+    dump.write_text(
+        json.dumps(
+            [
+                dict(
+                    pk=1,
+                    page_pk=1,
+                    annotation_id="box",
+                    x=20,
+                    y=60,
+                    width=100,
+                    height=120,
+                )
+            ]
+        )
+    )
+    image = BytesIO()
+    Image.new("RGB", (200, 600)).save(image, format="PNG")
+    monkeypatch.setattr(
+        "wtbot.annotation_normalization.fetch_image_bytes", lambda url: image.getvalue()
+    )
+    from pathlib import Path
+
+    backfill(Path(baseline_engine.url.database), dump, apply=True)
+    _run(baseline_engine, command.upgrade, "head")
+    with baseline_engine.connect() as c:
+        assert c.execute(
+            text(
+                "SELECT pk,page_pk,annotation_id,normalized_x,normalized_y,normalized_width,normalized_height FROM scanannotation"
+            )
+        ).one() == (1, 1, "box", 0.1, 0.1, 0.5, 0.2)
+        columns = {
+            row[1]: row[3]
+            for row in c.execute(text("PRAGMA table_info(scanannotation)"))
+        }
+        assert "x" not in columns
+        assert all(
+            columns[f"normalized_{name}"] == 1 for name in ("x", "y", "width", "height")
+        )

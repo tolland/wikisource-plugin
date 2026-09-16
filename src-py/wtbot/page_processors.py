@@ -1,4 +1,3 @@
-import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -6,6 +5,7 @@ from pathlib import Path
 from sqlalchemy import func
 from sqlmodel import Session, select
 
+from wtbot.log.fetch_log import activity, fetch_stage
 from wtbot.model import FetchState, FileBlob, Page, Site, role_for_canonical
 from wtbot.model.fetch_request import FetchKind, FetchRequest, FetchStatus
 from wtbot.model.wiki.namespace import NsRole
@@ -14,8 +14,6 @@ from wtbot.timeutil import utcnow
 from wtbot.vfs.store import PageStore
 from wtbot.wiki.client import WikiClient
 from wtbot.wiki.wiki_types import PageNotFound, RemotePage, RemotePageImages
-
-log = logging.getLogger(__name__)
 
 """Per-page-type fetch processing.
 
@@ -132,8 +130,10 @@ def _page_images(ctx: ProcessContext, title: str) -> RemotePageImages | None:
     """Scan-image metadata for one page, from the drain's bulk prefetch when
     the fan-out took it, else asked for directly."""
     if ctx.image_cache is not None and title in ctx.image_cache:
+        activity("image_cache hit title=%r", title)
         return ctx.image_cache[title]
-    return ctx.client.get_page_images(title)
+    with fetch_stage("page_images"):
+        return ctx.client.get_page_images(title)
 
 
 def _prefetch_page_images(ctx: ProcessContext, titles: list[str]) -> None:
@@ -149,9 +149,13 @@ def _prefetch_page_images(ctx: ProcessContext, titles: list[str]) -> None:
     if not wanted:
         return
     try:
-        found = ctx.client.get_page_images_bulk(wanted)
+        with fetch_stage("bulk_page_images", f"titles={len(wanted)}"):
+            found = ctx.client.get_page_images_bulk(wanted)
     except Exception:  # noqa: BLE001 - enrichment, never fatal
-        log.debug("bulk image prefetch failed for %d titles", len(wanted))
+        activity(
+            "bulk image prefetch failed titles=%d; falling back to per-page calls",
+            len(wanted),
+        )
         return
     for title in wanted:
         # Absent titles are cached as None: "asked, nothing there" must not
@@ -284,8 +288,10 @@ def download_file_blob(
     """Fetch imageinfo + download binary for a File: page; upsert a FileBlob row."""
     dest = _blob_path(blob_root, site, file_title)
     try:
-        info = client.get_file_info(file_title)
-        actual = client.download_file(file_title, dest)
+        with fetch_stage("file_info", f"title={file_title!r}"):
+            info = client.get_file_info(file_title)
+        with fetch_stage("file_download", f"title={file_title!r} bytes={info.size}"):
+            actual = client.download_file(file_title, dest)
     except PageNotFound:
         return  # blob not available; proceed without FileBlob
 
@@ -350,8 +356,10 @@ def _fan_out_index(
     # Prefer page_count from IndexPage.num_pages (via PywikibotClient); fall
     # back to <pagelist> parsing for FakeWikiClient.
     page_count = remote.page_count or parse_page_count(index_page.text or "")
-    subpage_titles = ctx.client.list_index_subpage_titles(req.title)
-    entries = ctx.client.list_index_pages(req.title)
+    with fetch_stage("index_subpages"):
+        subpage_titles = ctx.client.list_index_subpage_titles(req.title)
+    with fetch_stage("index_pagination"):
+        entries = ctx.client.list_index_pages(req.title)
 
     child_specs: list[tuple[str, FetchKind]] = []
     stub_specs: list[tuple[str, int]] = []  # (title, page_number)
@@ -368,6 +376,10 @@ def _fan_out_index(
             (f"Page:{basename}/{n}", FetchKind.page) for n in range(1, page_count + 1)
         )
     child_specs.extend((title, FetchKind.single) for title in subpage_titles)
+
+    activity(
+        "index fan-out children=%d placeholders=%d", len(child_specs), len(stub_specs)
+    )
 
     # Network calls, so before the fan-out transaction opens.
     enrichments = _gather_placeholder_enrichment(
@@ -417,6 +429,9 @@ def _fan_out_index(
             child_count += 1
 
         session.commit()
+        activity(
+            "fan-out stored children=%d placeholders=%d", child_count, len(stub_specs)
+        )
         return child_count
     except Exception:
         session.rollback()
@@ -467,14 +482,22 @@ def _gather_placeholder_enrichment(
         and meta.default_body is not None
         and (meta.thumb_url is not None or meta.source_image_url is not None)
     }
-    return {
-        title: PlaceholderEnrichment(
-            images=client.get_page_images(title),
-            default_body=client.get_default_page_content(title),
-        )
-        for title in titles
-        if title not in enriched
-    }
+    wanted = [title for title in titles if title not in enriched]
+    activity(
+        "placeholder enrichment total=%d cached=%d remaining=%d",
+        len(titles),
+        len(enriched),
+        len(wanted),
+    )
+    result: dict[str, PlaceholderEnrichment] = {}
+    for position, title in enumerate(wanted, start=1):
+        detail = f"page={position}/{len(wanted)} title={title!r}"
+        with fetch_stage("placeholder_images", detail):
+            images = client.get_page_images(title)
+        with fetch_stage("placeholder_default_content", detail):
+            default_body = client.get_default_page_content(title)
+        result[title] = PlaceholderEnrichment(images=images, default_body=default_body)
+    return result
 
 
 def _apply_placeholder_enrichment(

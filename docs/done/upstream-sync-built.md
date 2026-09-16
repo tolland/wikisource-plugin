@@ -174,8 +174,8 @@ Refresh a curated subset without refetching everything. Built on
 *planning* only: the titles it produces go to the ordinary fetch queue, so
 there is one fetch mechanism and a shorter list — not a second path.
 
-`POST /fetch/refresh { family, code, title_prefix?, since?, dry_run? }` →
-`wtbot.incremental.plan_refresh`, or `wtbot fetch-refresh` from the CLI. The
+`POST /fetch/refresh { label, since, title_prefix?, dry_run? }` →
+`wtbot.incremental.plan_refresh`, or `wtbot fetch refresh --since 2026-08-01 --label en.wikisource` from the CLI. The
 request and response are typed (`RefreshCreate`/`RefreshResult`), so Swagger
 renders described fields and an example rather than an opaque JSON blob, and
 `basis` reaches the caller as an enum rather than a string in a dict.
@@ -183,17 +183,16 @@ renders described fields and an example rather than an opaque JSON blob, and
 - **The recentchanges table is pruned** (`$wgRCMaxAge`, 90 days by
   default). Past that horizon "nothing changed" and "the wiki no longer
   remembers" are the same empty response — so the oldest retained entry is
-  asked for (one request), and a watermark older than it downgrades the
+  asked for (one request), and a supplied `since` older than it downgrades the
   plan to a full pass. The result carries its `basis`
   (`incremental` | `full`) and the reason: a caller that cannot tell the
   two apart cannot tell "two pages moved" from "we gave up and listed
   everything".
-- **The watermark is the newest change seen, not `now`.** An edit saved
-  during the query can carry a timestamp earlier than the moment we
-  finished reading. `rcstart` is inclusive, so passing the observed maximum
-  back re-reads that instant — duplicates, which a fetch absorbs, rather
-  than a gap, which it does not. Stored per site
-  (`Site.changes_seen_through`), advanced only on an incremental plan.
+- **The caller supplies `since` on every request.** There is no stored
+  server watermark. Refreshing one book or client must not consume changes
+  for another. The start timestamp is inclusive; timestamps without a timezone
+  are interpreted as UTC. The caller controls the window and must not treat
+  enqueueing as confirmation that it has received the fetched content.
 - **Namespace ids are per-site**, so the `rcnamespace` filter is resolved
   from this site's `Namespace` rows by role. An unresolved table sends no
   filter at all: an empty `rcnamespace` matches nothing, which looks

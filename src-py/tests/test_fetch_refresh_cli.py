@@ -30,11 +30,9 @@ def posted(monkeypatch):
             "basis": "incremental",
             "reason": None,
             "titles": ["Page:Work.djvu/2"],
-            "watermark": "2026-08-05T12:05:00Z",
             "changes": 1,
         },
         "enqueued": 1,
-        "watermark": "2026-08-05T12:05:00Z",
     }
 
     def fake_post(url, json=None, timeout=None):
@@ -55,6 +53,8 @@ def test_the_command_posts_what_was_asked_for(posted) -> None:
             "http://wtbot:8000",
             "fetch",
             "refresh",
+            "--since",
+            "2026-08-01",
             "--label",
             "local",
             "--title-prefix",
@@ -67,61 +67,73 @@ def test_the_command_posts_what_was_asked_for(posted) -> None:
     assert posted["json"]["label"] == "local"
     assert posted["json"]["title_prefix"] == "Page:Work.djvu/"
     assert posted["json"]["dry_run"] is False
+    assert posted["json"]["since"] == "2026-08-01T00:00:00"
     assert "basis=incremental" in result.output
     assert "Page:Work.djvu/2" in result.output
 
 
-def test_a_full_basis_reports_its_reason_and_that_nothing_advanced(posted) -> None:
-    """The output an operator must not misread. A full pass reads no change
-    stream, so it advances no watermark -- and without saying so, the next run
-    being full again looks like a bug rather than the stated consequence."""
+def test_a_full_basis_reports_its_reason(posted) -> None:
     posted["reply"] = {
         "plan": {
             "basis": "full",
-            "reason": "watermark 2025-01-01T00:00:00+00:00 predates the oldest "
+            "reason": "since 2025-01-01T00:00:00+00:00 predates the oldest "
             "change the wiki still holds",
             "titles": ["Page:Work.djvu/1", "Page:Work.djvu/2"],
-            "watermark": None,
             "changes": 0,
         },
         "enqueued": 2,
-        "watermark": None,
     }
 
     result = runner.invoke(
-        create_app(), ["--base-url", "http://x", "fetch", "refresh", "--label", "local"]
+        create_app(),
+        [
+            "--base-url",
+            "http://x",
+            "fetch",
+            "refresh",
+            "--since",
+            "2026-08-01",
+            "--label",
+            "local",
+        ],
     )
 
     assert result.exit_code == 0, result.output
     assert "basis=full" in result.output
     assert "predates the oldest change" in result.output
-    assert "watermark unchanged" in result.output
+    assert "watermark" not in result.output
 
 
-def test_a_dry_run_says_so_without_claiming_a_watermark(posted) -> None:
+def test_a_dry_run_says_so(posted) -> None:
     posted["reply"] = {
         "plan": {
             "basis": "incremental",
             "reason": None,
             "titles": [],
-            "watermark": None,
             "changes": 0,
         },
         "enqueued": 0,
-        "watermark": None,
     }
 
     result = runner.invoke(
         create_app(),
-        ["--base-url", "http://x", "fetch", "refresh", "--label", "local", "--dry-run"],
+        [
+            "--base-url",
+            "http://x",
+            "fetch",
+            "refresh",
+            "--since",
+            "2026-08-01",
+            "--label",
+            "local",
+            "--dry-run",
+        ],
     )
 
     assert result.exit_code == 0, result.output
     assert posted["json"]["dry_run"] is True
     assert "enqueued=0" in result.output
-    # Not the full-pass message: nothing was enqueued because nothing was asked
-    # to be, which is a different thing from a plan that could not advance.
-    assert "watermark unchanged" not in result.output
+    assert "dry run: nothing enqueued" in result.output
 
 
 def test_since_is_sent_as_an_iso_timestamp(posted) -> None:
@@ -132,10 +144,10 @@ def test_since_is_sent_as_an_iso_timestamp(posted) -> None:
             "http://x",
             "fetch",
             "refresh",
-            "--label",
-            "local",
             "--since",
             "2026-08-01",
+            "--label",
+            "local",
         ],
     )
 
@@ -159,6 +171,7 @@ def test_the_refresh_body_is_documented_in_openapi(client) -> None:
         field.get("description") for field in request_schema["properties"].values()
     )
     assert request_schema["examples"]
+    assert "since" in request_schema["required"]
 
     operation = spec["paths"]["/fetch/refresh"]["post"]
     schema = operation["responses"]["202"]["content"]["application/json"]["schema"]
@@ -167,3 +180,12 @@ def test_the_refresh_body_is_documented_in_openapi(client) -> None:
         "incremental",
         "full",
     ]
+
+
+def test_since_is_required_before_any_http_request(posted):
+    result = runner.invoke(
+        create_app(), ["--base-url", "http://x", "fetch", "refresh", "--label", "local"]
+    )
+    assert result.exit_code == 2
+    assert "--since" in result.output
+    assert "url" not in posted

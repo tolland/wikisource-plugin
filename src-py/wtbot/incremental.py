@@ -21,7 +21,7 @@ Three things this must not get wrong:
 - **The recentchanges table is pruned.** ``$wgRCMaxAge`` defaults to 90 days.
   Past that horizon "nothing changed" and "the wiki no longer remembers" are the
   same empty response, and trusting it would silently skip every page that moved
-  while we were away. So the horizon is *asked for*, and a watermark older than
+  while we were away. So the horizon is *asked for*, and a since timestamp older than
   it downgrades the plan to a full refresh rather than a confident wrong answer.
 - **A changed revid is not a changed page.** Null and touch edits create
   revisions with identical content -- four of them in the Canadian patent
@@ -49,10 +49,10 @@ class RefreshBasis(str, Enum):
     """
 
     incremental = "incremental"
-    """recentchanges answered, and the watermark was inside its horizon."""
+    """recentchanges answered, and the supplied since timestamp was inside its horizon."""
 
     full = "full"
-    """No usable watermark, or one older than the wiki still remembers. Every
+    """The supplied since timestamp is older than the wiki still remembers. Every
     known title is a candidate."""
 
 
@@ -62,16 +62,6 @@ class RefreshPlan:
 
     basis: RefreshBasis
     titles: tuple[str, ...] = ()
-    watermark: datetime | None = None
-    """The newest change timestamp observed, to be stored and passed back.
-
-    Deliberately the newest *seen* rather than "now": an edit saved during our
-    query can carry a timestamp earlier than the moment we finished reading,
-    and a now-based watermark would step over it. ``rcstart`` is inclusive, so
-    passing this back re-reads that instant -- duplicates, which a fetch
-    absorbs, instead of a gap, which it does not.
-    """
-
     reason: str | None = None
     """Why the basis is what it is, when it is not the happy path."""
 
@@ -85,22 +75,21 @@ def plan_refresh(
     site: Site,
     client: WikiClient,
     *,
-    since: datetime | None = None,
+    since: datetime,
     title_prefix: str | None = None,
     roles: tuple[NsRole, ...] = DEFAULT_WATCHED_ROLES,
 ) -> RefreshPlan:
     """Decide which of this site's known titles are worth refetching.
 
-    ``since`` defaults to the site's stored watermark. ``title_prefix`` narrows
+    ``since`` is supplied by the caller on every request. ``title_prefix`` narrows
     to one work (``Page:Foo.djvu/``): recentchanges has no prefix filter --
     ``rctitle`` takes a single page -- so this is applied here, over metadata
     we already paid for rather than a fetch per candidate.
     """
-    # The watermark round-trips through SQLite, which has no timezone type, so
-    # it comes back naive while API timestamps are aware; comparing them raises.
-    since = as_utc(since or site.changes_seen_through)
+    # CLI dates without an explicit timezone are interpreted as UTC.
+    since = as_utc(since)
     if since is None:
-        return _full(session, site, title_prefix, "no watermark: nothing to be since")
+        raise ValueError("since is required")
 
     horizon = as_utc(client.oldest_retained_change())
     if horizon is not None and since < horizon:
@@ -108,7 +97,7 @@ def plan_refresh(
             session,
             site,
             title_prefix,
-            f"watermark {since.isoformat()} predates the oldest change the wiki "
+            f"since {since.isoformat()} predates the oldest change the wiki "
             f"still holds ({horizon.isoformat()}); recentchanges cannot answer",
         )
 
@@ -137,7 +126,6 @@ def plan_refresh(
     return RefreshPlan(
         basis=RefreshBasis.incremental,
         titles=tuple(titles),
-        watermark=max((c.timestamp for c in changes), default=since),
         changes=tuple(changes),
     )
 
@@ -148,7 +136,6 @@ def _full(
     return RefreshPlan(
         basis=RefreshBasis.full,
         titles=tuple(sorted(_known_titles(session, site, title_prefix))),
-        watermark=None,
         reason=reason,
     )
 

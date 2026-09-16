@@ -1,5 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import Annotated
 
+import pytimeparse
 import typer
 from typer_di import Depends, TyperDI
 
@@ -9,6 +11,14 @@ app = TyperDI(
     no_args_is_help=False,
     name="refresh",
 )
+
+
+def parse_since(value: str | None) -> datetime | None:
+    if value is None:
+        return None
+    if seconds := pytimeparse.parse(value):
+        return datetime.utcnow() - timedelta(seconds=seconds)
+    return datetime.fromisoformat(value)
 
 
 @app.callback(invoke_without_command=True)
@@ -22,13 +32,17 @@ def fetch_refresh(
             "transcribed index grows."
         ),
     ),
-    since: datetime | None = typer.Option(
-        None,
-        formats=["%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"],
-        help="Override the site's stored watermark, e.g. 2026-08-01.",
-    ),
+    since: Annotated[
+        datetime | None,
+        typer.Option(
+            # formats=["%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"],
+            # formats=None,
+            help="Required inclusive start date/time in UTC, e.g. 2026-08-01. No server cursor is stored.",
+            parser=parse_since,
+        ),
+    ] = None,
     dry_run: bool = typer.Option(
-        False, help="Plan only: print what would be refetched, advance nothing."
+        False, help="Plan only: print what would be refetched, enqueue nothing."
     ),
     label: str = Depends(get_label),
     api: ApiClient = Depends(get_api),
@@ -40,7 +54,7 @@ def fetch_refresh(
     Not a second fetch mechanism: it plans a shorter list of titles and hands
     them to the same queue ``fetch-page`` uses. Read the *basis* in the output
     before believing a short list -- ``full`` means recentchanges could not
-    answer (no watermark, or one older than the wiki still remembers) and every
+    answer (--since is older than the wiki still remembers) and every
     known title is a candidate, which is a different statement from "two pages
     moved".
     """
@@ -52,7 +66,7 @@ def fetch_refresh(
         {
             "label": label,
             "title_prefix": title_prefix,
-            "since": since.isoformat() if since else None,
+            "since": since.isoformat() if since is not None else None,
             "dry_run": dry_run,
         },
     )
@@ -66,11 +80,7 @@ def fetch_refresh(
         typer.echo(f"  reason: {plan['reason']}")
     for title in plan["titles"]:
         typer.echo(f"  {title}")
-    if data.get("watermark"):
-        typer.echo(f"  watermark now {data['watermark']}")
-    elif not dry_run:
-        # A full pass reads no change stream, so it advances nothing; saying so
-        # beats leaving the operator to wonder why the next run is full again.
-        typer.echo("  watermark unchanged (a full pass claims no position)")
+    if dry_run:
+        typer.echo("  dry run: nothing enqueued")
     if not dry_run and data["enqueued"]:
         typer.echo("  run `wtbot drain` to fetch them")

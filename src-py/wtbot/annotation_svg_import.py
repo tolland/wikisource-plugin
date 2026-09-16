@@ -53,6 +53,7 @@ class ParsedRect:
 class ParsedDocument:
     rects: list[ParsedRect]
     warnings: list[str]
+    bounds: tuple[float, float, float, float] | None = None
 
 
 @dataclass
@@ -126,7 +127,16 @@ def parse_svg_rects(text: str) -> ParsedDocument:
             walk(child, tx, ty)
 
     walk(root, 0.0, 0.0)
-    return ParsedDocument(rects=rects, warnings=warnings)
+    bounds = None
+    try:
+        values = tuple(
+            float(v) for v in root.get("viewBox", "").replace(",", " ").split()
+        )
+        if len(values) == 4 and values[2] > 0 and values[3] > 0:
+            bounds = values
+    except ValueError:
+        pass
+    return ParsedDocument(rects=rects, warnings=warnings, bounds=bounds)
 
 
 def import_svg_annotations(
@@ -156,6 +166,12 @@ def import_svg_annotations(
                 report.warnings.append(f"{svg_path.name}: {exc}")
                 continue
             report.warnings.extend(f"{svg_path.name}: {w}" for w in parsed.warnings)
+            if parsed.bounds is None:
+                report.warnings.append(
+                    f"{svg_path.name}: missing valid viewBox; cannot normalize boxes"
+                )
+                continue
+            origin_x, origin_y, image_width, image_height = parsed.bounds
             for rect in parsed.rects:
                 if rect.width <= 0 or rect.height <= 0:
                     report.warnings.append(
@@ -166,15 +182,25 @@ def import_svg_annotations(
                 if store.get(page_pk, rect.id) is not None:
                     report.skipped_existing.append(key)
                     continue
+                if (
+                    rect.x < origin_x
+                    or rect.y < origin_y
+                    or rect.x + rect.width > origin_x + image_width
+                    or rect.y + rect.height > origin_y + image_height
+                ):
+                    report.warnings.append(
+                        f"{svg_path.name}: {rect.id}: outside viewBox, skipped"
+                    )
+                    continue
                 if not dry_run:
                     store.upsert(
                         ScanAnnotation(
                             page_pk=page_pk,
                             annotation_id=rect.id,
-                            x=rect.x,
-                            y=rect.y,
-                            width=rect.width,
-                            height=rect.height,
+                            normalized_x=(rect.x - origin_x) / image_width,
+                            normalized_y=(rect.y - origin_y) / image_height,
+                            normalized_width=rect.width / image_width,
+                            normalized_height=rect.height / image_height,
                             label=rect.label,
                         )
                     )

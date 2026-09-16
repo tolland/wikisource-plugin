@@ -16,7 +16,7 @@ from wtbot.fetch.queue_runner import (
     drain_queue,
     queue_stats,
 )
-from wtbot.incremental import RefreshBasis, RefreshPlan, plan_refresh
+from wtbot.incremental import RefreshPlan, plan_refresh
 from wtbot.model import FetchKind, FetchRequest, Page
 from wtbot.site_store import require_credentialed_site
 
@@ -133,9 +133,8 @@ def refresh(
     incremental plan from a full one cannot tell "two pages moved" from "we
     could not tell, so here is everything".
 
-    The watermark advances only after the fetches are enqueued, and only on an
-    incremental plan. Advancing it on a full pass would claim a position in a
-    change stream we did not read.
+    The caller supplies the inclusive start of the window on every request.
+    Refreshing one work or client never consumes changes for another.
 
     Like ``POST /fetch``, this enqueues without fetching: ``enqueued`` is a
     count of queued work, not of pages written. Drain to make it real.
@@ -157,19 +156,9 @@ def refresh(
         session.add(FetchRequest(site_pk=site.pk, title=title, kind=FetchKind.single))
     session.commit()
 
-    # Enqueued, not fetched -- same split as POST /fetch. The watermark still
-    # advances here: it records how far the *change stream* was read, which
-    # this call did do, and the enqueued titles survive a crash in the queue.
-    if plan.basis is RefreshBasis.incremental and plan.watermark is not None:
-        site.changes_seen_through = plan.watermark
-        session.add(site)
-        session.commit()
-        session.refresh(site)
-
     return RefreshResult(
         plan=_plan_summary(plan),
         enqueued=len(plan.titles),
-        watermark=site.changes_seen_through,
     )
 
 
@@ -178,7 +167,6 @@ def _plan_summary(plan: RefreshPlan) -> RefreshPlanOut:
         basis=plan.basis,
         reason=plan.reason,
         titles=list(plan.titles),
-        watermark=plan.watermark,
         changes=len(plan.changes),
     )
 

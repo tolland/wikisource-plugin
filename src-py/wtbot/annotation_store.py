@@ -101,10 +101,10 @@ class SqlAnnotationStore:
         if row is None:
             row = annotation
         else:
-            row.x = annotation.x
-            row.y = annotation.y
-            row.width = annotation.width
-            row.height = annotation.height
+            row.normalized_x = annotation.normalized_x
+            row.normalized_y = annotation.normalized_y
+            row.normalized_width = annotation.normalized_width
+            row.normalized_height = annotation.normalized_height
             row.label = annotation.label
             row.category = annotation.category
             row.updated_at = datetime.now()

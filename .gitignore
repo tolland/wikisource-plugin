@@ -70,3 +70,7 @@ __pycache__/
 /fixtures/vcr_cassettes/
 /docker/wtbot/wtbot_18574_data/
 /query
+
+# Rotating wtbot activity logs
+/logs/
+/matrix_test/

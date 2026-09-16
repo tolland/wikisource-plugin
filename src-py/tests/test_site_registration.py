@@ -71,7 +71,7 @@ def test_fetching_with_no_sites_at_all_says_so(http):
 
 
 def test_refresh_also_refuses_an_unknown_label(http):
-    resp = http.post("/fetch/refresh", json={"label": "nope"})
+    resp = http.post("/fetch/refresh", json={"label": "nope", "since": "2026-08-01"})
     assert resp.status_code == 404
 
 

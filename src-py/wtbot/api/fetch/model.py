@@ -18,11 +18,11 @@ class RefreshCreate(BaseModel):
     body that renders as an undocumented JSON blob is the thing this fixes."""
 
     label: str = Field(description="The registered site to refresh (see POST /sites).")
-    since: datetime | None = Field(
-        default=None,
+    since: datetime = Field(
         description=(
-            "Overrides the site's stored watermark. Mostly for re-running a "
-            "window that has already been consumed."
+            "Required inclusive start of the recent-changes window, supplied by "
+            "the caller on every request. No server cursor is stored. "
+            "Timestamps without a timezone are interpreted as UTC."
         ),
     )
     title_prefix: str | None = Field(
@@ -36,7 +36,7 @@ class RefreshCreate(BaseModel):
     )
     dry_run: bool = Field(
         default=False,
-        description="Plan only: report what would be refetched, advance nothing.",
+        description="Plan only: report what would be refetched, enqueue nothing.",
     )
 
     model_config = {
@@ -44,6 +44,7 @@ class RefreshCreate(BaseModel):
             "examples": [
                 {
                     "label": "en.wikisource",
+                    "since": "2026-08-01T00:00:00Z",
                     "title_prefix": "Page:Canadian patent 29537.djvu/",
                     "dry_run": True,
                 }
@@ -65,13 +66,6 @@ class RefreshPlanOut(BaseModel):
         description="Why the basis is not incremental, when it is not.",
     )
     titles: list[str] = Field(description="Titles to refetch, deduplicated.")
-    watermark: datetime | None = Field(
-        default=None,
-        description=(
-            "Newest change timestamp observed. None on a full plan, which read "
-            "no change stream and so may claim no position in one."
-        ),
-    )
     changes: int = Field(
         description="Raw recentchanges entries behind `titles`; several can "
         "collapse to one title."
@@ -81,10 +75,6 @@ class RefreshPlanOut(BaseModel):
 class RefreshResult(BaseModel):
     plan: RefreshPlanOut
     enqueued: int = Field(description="FetchRequests created; 0 for a dry run.")
-    watermark: datetime | None = Field(
-        default=None,
-        description="The site's watermark after the run.",
-    )
 
 
 class FetchCreate(BaseModel):

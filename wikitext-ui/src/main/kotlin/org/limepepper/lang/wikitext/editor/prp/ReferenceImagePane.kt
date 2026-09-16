@@ -5,7 +5,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
-import org.limepepper.lang.wikitext.annotation.AnnotationCategory
+import org.limepepper.lang.wikitext.annotation.toPixelBox
 import org.limepepper.lang.wikitext.annotation.BoundingBox
 import org.limepepper.lang.wikitext.annotation.BoundingBoxModel
 import org.limepepper.lang.wikitext.annotation.ImageAnnotationPane
@@ -155,15 +155,7 @@ class ReferenceImagePane(
             val boxes = if (image != null && vfsPath != null) {
                 try {
                     backend.listAnnotations(vfsPath).map { annotation ->
-                        BoundingBox(
-                            id = annotation.id,
-                            x = annotation.x,
-                            y = annotation.y,
-                            width = annotation.width,
-                            height = annotation.height,
-                            label = annotation.label,
-                            category = AnnotationCategory.fromWire(annotation.category),
-                        )
+                        annotation.toPixelBox(image.width, image.height)
                     }
                 } catch (e: Exception) {
                     IMAGE_LOG.warn("annotation load failed for $vfsPath", e)
@@ -184,7 +176,7 @@ class ReferenceImagePane(
                 if (boxes != null && vfsPath != null) {
                     boxesLoaded = true // before setAll: the seed event may prune links
                     annotationPane.model.setAll(boxes)
-                    val sync = WtAnnotationSync(annotationPane.model, vfsPath)
+                    val sync = WtAnnotationSync(annotationPane.model, vfsPath, image.width, image.height)
                     Disposer.register(this, sync)
                     sync.seed(boxes)
                 }

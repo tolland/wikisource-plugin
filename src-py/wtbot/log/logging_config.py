@@ -48,6 +48,8 @@ class LoggingConfig:
     trace_all_debug_routes: bool = False
     trace_debug_route_tags: Iterable[str] = field(default_factory=frozenset)
     body_limit_bytes: int = 131072
+    # Routine fetch timings and progress, kept separate from the console.
+    fetch_log_path: Path | None = Path("logs/wtbot-fetch.log")
     # Detailed worker-failure log (traceback + upstream HTTP history). Off
     # unless a path is given: it is a debugging aid, not part of normal
     # operation, and it holds more than a status display should.
@@ -60,6 +62,7 @@ class LoggingConfig:
         e = env if env is not None else os.environ
         default = cls()
         return cls(
+            fetch_log_path=_get_path(e.get("WTBOT_FETCH_LOG", "logs/wtbot-fetch.log")),
             failure_log_path=_get_path(e.get("WTBOT_FAILURE_LOG")),
             failure_log_max_bytes=_get_int(
                 e.get("WTBOT_FAILURE_LOG_MAX_BYTES"), default.failure_log_max_bytes
@@ -158,6 +161,9 @@ def configure_logging(config: LoggingConfig = LOGGING_CONFIG) -> None:
     # Imported here rather than at module scope: failure_log pulls in the
     # wiki package, and logging_config is imported by nearly everything.
     from wtbot.log.failure_log import configure_failure_log
+    from wtbot.log.fetch_log import configure_fetch_log
+
+    configure_fetch_log(config.fetch_log_path)
 
     configure_failure_log(
         config.failure_log_path,

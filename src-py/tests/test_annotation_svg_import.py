@@ -78,7 +78,7 @@ def test_import_inserts_rects_and_is_idempotent(engine, tmp_path):
         rows = {
             a.annotation_id: a for a in SqlAnnotationStore(s).list_for_page(page_pk)
         }
-    assert rows["r1"].x == 15.0 and rows["r1"].label == "para 1"
+    assert rows["r1"].normalized_x == 0.015 and rows["r1"].label == "para 1"
 
     # Re-run: everything already there, nothing rewritten.
     again = import_svg_annotations(engine, tmp_path)
@@ -92,13 +92,18 @@ def test_import_existing_rows_win(engine, tmp_path):
     with Session(engine) as s:
         SqlAnnotationStore(s).upsert(
             ScanAnnotation(
-                page_pk=page_pk, annotation_id="r1", x=999, y=0, width=1, height=1
+                page_pk=page_pk,
+                annotation_id="r1",
+                normalized_x=0.999,
+                normalized_y=0,
+                normalized_width=0.001,
+                normalized_height=0.1,
             )
         )
 
     import_svg_annotations(engine, tmp_path)
     with Session(engine) as s:
-        assert SqlAnnotationStore(s).get(page_pk, "r1").x == 999
+        assert SqlAnnotationStore(s).get(page_pk, "r1").normalized_x == 0.999
 
 
 def test_import_dry_run_writes_nothing(engine, tmp_path):

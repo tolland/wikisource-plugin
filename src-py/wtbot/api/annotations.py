@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 from sqlmodel import Session
 
 from wtbot.annotation_store import (
@@ -44,12 +44,22 @@ router = APIRouter(
 
 
 class AnnotationUpsert(BaseModel):
-    x: float
-    y: float
-    width: float
-    height: float
+    """Geometry is normalized to the complete page raster, not screen pixels."""
+
+    x: float = Field(ge=0, le=1, allow_inf_nan=False)
+    y: float = Field(ge=0, le=1, allow_inf_nan=False)
+    width: float = Field(ge=0, le=1, allow_inf_nan=False)
+    height: float = Field(ge=0, le=1, allow_inf_nan=False)
     label: str | None = None
     category: AnnotationCategory | None = None
+
+    @model_validator(mode="after")
+    def _check_bounds(self):
+        if self.width <= 0 or self.height <= 0:
+            raise ValueError("box dimensions must be positive")
+        if self.x + self.width > 1 + 1e-9 or self.y + self.height > 1 + 1e-9:
+            raise ValueError("box must fit inside the normalized page")
+        return self
 
 
 class AnnotationOut(BaseModel):
@@ -131,10 +141,10 @@ def get_box_link_store(
 def _annotation_out(row: ScanAnnotation) -> AnnotationOut:
     return AnnotationOut(
         id=row.annotation_id,
-        x=row.x,
-        y=row.y,
-        width=row.width,
-        height=row.height,
+        x=row.normalized_x,
+        y=row.normalized_y,
+        width=row.normalized_width,
+        height=row.normalized_height,
         label=row.label,
         category=row.category,
     )
@@ -184,10 +194,10 @@ def upsert_annotation(
         ScanAnnotation(
             page_pk=page.pk,
             annotation_id=annotation_id,
-            x=body.x,
-            y=body.y,
-            width=body.width,
-            height=body.height,
+            normalized_x=body.x,
+            normalized_y=body.y,
+            normalized_width=body.width,
+            normalized_height=body.height,
             label=body.label,
             category=body.category,
         )

@@ -4,8 +4,7 @@ from conftest import credential_for, drain
 from sqlmodel import Session, select
 
 from wtbot.incremental import RefreshBasis, plan_refresh
-from wtbot.model import Namespace, NsRole, Page, Site
-from wtbot.timeutil import as_utc
+from wtbot.model import FetchRequest, Namespace, NsRole, Page, Site
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import RemoteChange, RemotePage
 
@@ -72,58 +71,46 @@ def _work_page(number: int) -> str:
 
 
 def test_only_the_titles_that_moved_are_planned(session: Session) -> None:
-    site = _site(session, changes_seen_through=NOW)
+    site = _site(session)
     for number in (1, 2, 3):
         _page(session, site, _work_page(number))
 
     client = FakeWikiClient(changes=[_change(_work_page(2), minutes=5)])
-    plan = plan_refresh(session, site, client)
+    plan = plan_refresh(session, site, client, since=NOW)
 
     assert plan.basis is RefreshBasis.incremental
     assert plan.titles == (_work_page(2),)
 
 
-def test_a_watermark_older_than_the_wiki_remembers_forces_a_full_pass(
+def test_since_older_than_the_wiki_remembers_forces_a_full_pass(
     session: Session,
 ) -> None:
     """The failure this exists to prevent: recentchanges returning nothing
     because the window has been pruned, read as "nothing changed"."""
-    site = _site(session, changes_seen_through=NOW - timedelta(days=365))
+    site = _site(session)
     for number in (1, 2, 3):
         _page(session, site, _work_page(number))
 
-    # The wiki's oldest surviving entry is far newer than our watermark: the
+    # The wiki's oldest surviving entry is far newer than our since timestamp: the
     # year in between has been pruned, so an empty-looking answer would be a
     # lie rather than good news.
     client = FakeWikiClient(
         changes=[_change(_work_page(2), minutes=5)], oldest_change=NOW
     )
-    plan = plan_refresh(session, site, client)
+    plan = plan_refresh(session, site, client, since=NOW - timedelta(days=365))
 
     assert plan.basis is RefreshBasis.full
     assert set(plan.titles) == {_work_page(n) for n in (1, 2, 3)}
     assert "predates" in plan.reason
-    # A full pass read no change stream, so it must claim no position in one.
-    assert plan.watermark is None
-
-
-def test_no_watermark_is_a_full_pass_not_an_empty_one(session: Session) -> None:
-    site = _site(session)
-    _page(session, site, _work_page(1))
-
-    plan = plan_refresh(session, site, FakeWikiClient())
-
-    assert plan.basis is RefreshBasis.full
-    assert plan.titles == (_work_page(1),)
 
 
 def test_an_empty_change_stream_is_answerable(session: Session) -> None:
-    """A wiki with no recentchanges at all cannot contradict our watermark, so
+    """A wiki with no recentchanges at all cannot contradict our start timestamp, so
     "nothing moved" is the honest answer -- distinct from the pruned case."""
-    site = _site(session, changes_seen_through=NOW)
+    site = _site(session)
     _page(session, site, _work_page(1))
 
-    plan = plan_refresh(session, site, FakeWikiClient(changes=[]))
+    plan = plan_refresh(session, site, FakeWikiClient(changes=[]), since=NOW)
 
     assert plan.basis is RefreshBasis.incremental
     assert plan.titles == ()
@@ -132,7 +119,7 @@ def test_an_empty_change_stream_is_answerable(session: Session) -> None:
 def test_changes_to_pages_we_do_not_hold_are_ignored(session: Session) -> None:
     """Without a prefix there is nothing to say a strange title belongs to a
     work we track, so the scan stays within what we hold."""
-    site = _site(session, changes_seen_through=NOW)
+    site = _site(session)
     _page(session, site, _work_page(1))
 
     client = FakeWikiClient(
@@ -141,7 +128,7 @@ def test_changes_to_pages_we_do_not_hold_are_ignored(session: Session) -> None:
             _change("Page:Something else.djvu/1", minutes=2),
         ]
     )
-    plan = plan_refresh(session, site, client)
+    plan = plan_refresh(session, site, client, since=NOW)
 
     assert plan.titles == (_work_page(1),)
 
@@ -149,7 +136,7 @@ def test_changes_to_pages_we_do_not_hold_are_ignored(session: Session) -> None:
 def test_a_prefix_scan_picks_up_pages_created_since(session: Session) -> None:
     """The discovery case: a partially transcribed index grows new Page:
     subpages, and nothing local matches them yet."""
-    site = _site(session, changes_seen_through=NOW)
+    site = _site(session)
     _page(session, site, _work_page(1))
 
     client = FakeWikiClient(
@@ -159,42 +146,33 @@ def test_a_prefix_scan_picks_up_pages_created_since(session: Session) -> None:
         ]
     )
     plan = plan_refresh(
-        session, site, client, title_prefix="Page:Canadian patent 29537.djvu/"
+        session,
+        site,
+        client,
+        since=NOW,
+        title_prefix="Page:Canadian patent 29537.djvu/",
     )
 
     assert plan.titles == (_work_page(9),)
 
 
 def test_one_title_edited_twice_is_fetched_once(session: Session) -> None:
-    site = _site(session, changes_seen_through=NOW)
+    site = _site(session)
     _page(session, site, _work_page(1))
 
     client = FakeWikiClient(
         changes=[_change(_work_page(1), minutes=1), _change(_work_page(1), minutes=2)]
     )
-    plan = plan_refresh(session, site, client)
+    plan = plan_refresh(session, site, client, since=NOW)
 
     assert plan.titles == (_work_page(1),)
     assert len(plan.changes) == 2
 
 
-def test_the_watermark_is_the_newest_change_seen_not_now(session: Session) -> None:
-    """A now-based watermark would step over an edit saved during the query
-    whose timestamp predates our finishing. rcstart is inclusive, so the
-    newest observed timestamp overlaps rather than gaps."""
-    site = _site(session, changes_seen_through=NOW)
-    _page(session, site, _work_page(1))
-
-    client = FakeWikiClient(changes=[_change(_work_page(1), minutes=7)])
-    plan = plan_refresh(session, site, client)
-
-    assert plan.watermark == NOW + timedelta(minutes=7)
-
-
 def test_namespaces_are_filtered_by_role_not_by_number(session: Session) -> None:
     """Page:/Index: ids differ between installs, so the server-side filter is
     resolved from this site's rows."""
-    site = _site(session, changes_seen_through=NOW)
+    site = _site(session)
     _page(session, site, _work_page(1))
 
     seen: dict = {}
@@ -206,7 +184,7 @@ def test_namespaces_are_filtered_by_role_not_by_number(session: Session) -> None
                 since=since, namespace_keys=namespace_keys, limit=limit
             )
 
-    plan_refresh(session, site, RecordingClient(changes=[]))
+    plan_refresh(session, site, RecordingClient(changes=[]), since=NOW)
 
     assert seen["namespace_keys"] == [PAGE_NS, INDEX_NS]
 
@@ -216,7 +194,7 @@ def test_an_unsynced_namespace_table_does_not_filter_everything_out(
 ) -> None:
     """An empty rcnamespace matches nothing, which would look exactly like a
     wiki where nothing ever changes."""
-    site = Site(family="wikisource", code="en", changes_seen_through=NOW)
+    site = Site(family="wikisource", code="en")
     session.add(site)
     session.commit()
     session.refresh(site)
@@ -232,7 +210,10 @@ def test_an_unsynced_namespace_table_does_not_filter_everything_out(
             )
 
     plan_refresh(
-        session, site, RecordingClient(changes=[_change(_work_page(1), minutes=1)])
+        session,
+        site,
+        RecordingClient(changes=[_change(_work_page(1), minutes=1)]),
+        since=NOW,
     )
 
     assert seen["namespace_keys"] is None
@@ -240,7 +221,7 @@ def test_an_unsynced_namespace_table_does_not_filter_everything_out(
 
 def test_refresh_endpoint_fetches_only_what_moved(client, engine) -> None:
     """End to end through the API: a refresh enqueues the changed title into
-    the ordinary fetch path and advances the watermark."""
+    the ordinary fetch path."""
     moved = _work_page(2)
     remote = RemotePage(
         title=moved,
@@ -255,11 +236,13 @@ def test_refresh_endpoint_fetches_only_what_moved(client, engine) -> None:
     client.app.state.client_factory = lambda _site: wiki
 
     with Session(engine) as session:
-        site = _site(session, changes_seen_through=NOW)
+        site = _site(session)
         for number in (1, 2, 3):
             _page(session, site, _work_page(number))
 
-    response = client.post("/fetch/refresh", json={"label": LABEL})
+    response = client.post(
+        "/fetch/refresh", json={"label": LABEL, "since": NOW.isoformat()}
+    )
 
     assert response.status_code == 202
     body = response.json()
@@ -278,13 +261,11 @@ def test_refresh_endpoint_fetches_only_what_moved(client, engine) -> None:
     with Session(engine) as session:
         page = session.exec(select(Page).where(Page.title == moved)).one()
         assert page.text == "refreshed body"
-        refreshed_site = session.exec(select(Site)).one()
-        assert as_utc(refreshed_site.changes_seen_through) == NOW + timedelta(minutes=5)
 
 
-def test_a_dry_run_plans_without_fetching_or_advancing(client, engine) -> None:
+def test_a_dry_run_plans_without_enqueueing(client, engine) -> None:
     with Session(engine) as session:
-        site = _site(session, changes_seen_through=NOW)
+        site = _site(session)
         _page(session, site, _work_page(1))
 
     client.app.state.client_factory = lambda _site: FakeWikiClient(
@@ -293,9 +274,45 @@ def test_a_dry_run_plans_without_fetching_or_advancing(client, engine) -> None:
 
     response = client.post(
         "/fetch/refresh",
-        json={"label": LABEL, "dry_run": True},
+        json={"label": LABEL, "since": NOW.isoformat(), "dry_run": True},
     )
 
     assert response.json()["enqueued"] == 0
     with Session(engine) as session:
-        assert as_utc(session.exec(select(Site)).one().changes_seen_through) == NOW
+        assert session.exec(select(FetchRequest)).all() == []
+
+
+def test_refresh_rejects_missing_or_null_since_without_queueing(client, engine):
+    with Session(engine) as session:
+        _site(session)
+    for payload in ({"label": LABEL}, {"label": LABEL, "since": None}):
+        response = client.post("/fetch/refresh", json=payload)
+        assert response.status_code == 422
+    with Session(engine) as session:
+        assert session.exec(select(FetchRequest)).all() == []
+
+
+def test_separate_books_and_repeated_calls_do_not_consume_changes(client, engine):
+    first = "Page:First.djvu/1"
+    second = "Page:Second.djvu/1"
+    with Session(engine) as session:
+        _site(session)
+    client.app.state.client_factory = lambda _site: FakeWikiClient(
+        changes=[_change(first, minutes=8), _change(second, minutes=2)]
+    )
+    for title in (first, second, first):
+        response = client.post(
+            "/fetch/refresh",
+            json={
+                "label": LABEL,
+                "since": NOW.isoformat(),
+                "title_prefix": title.rsplit("/", 1)[0] + "/",
+            },
+        )
+        assert response.status_code == 202
+        assert response.json()["plan"]["titles"] == [title]
+        assert response.json()["enqueued"] == 1
+        assert "watermark" not in response.json()
+        assert "watermark" not in response.json()["plan"]
+    with Session(engine) as session:
+        assert len(session.exec(select(FetchRequest)).all()) == 3

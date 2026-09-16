@@ -6,7 +6,7 @@ import com.intellij.openapi.diagnostic.logger
 import com.intellij.util.Alarm
 import org.limepepper.lang.wikitext.annotation.BoundingBox
 import org.limepepper.lang.wikitext.annotation.BoundingBoxModel
-import org.limepepper.lang.wikitext.vfs.backend.PageAnnotation
+import org.limepepper.lang.wikitext.annotation.toNormalizedAnnotation
 import org.limepepper.lang.wikitext.vfs.backend.WtVfsService
 
 private val SYNC_LOG = logger<WtAnnotationSync>()
@@ -30,6 +30,8 @@ private val SYNC_LOG = logger<WtAnnotationSync>()
 class WtAnnotationSync(
     private val model: BoundingBoxModel,
     private val path: String,
+    private val imageWidth: Int,
+    private val imageHeight: Int,
 ) : Disposable {
     /** Last state the server acknowledged, by annotation id. */
     private val synced = HashMap<String, BoundingBox>()
@@ -88,15 +90,7 @@ class WtAnnotationSync(
                 for (box in saves) {
                     backend.saveAnnotation(
                         path,
-                        PageAnnotation(
-                            id = box.id,
-                            x = box.x,
-                            y = box.y,
-                            width = box.width,
-                            height = box.height,
-                            label = box.label,
-                            category = box.category?.wire,
-                        ),
+                        box.toNormalizedAnnotation(imageWidth, imageHeight),
                     )
                     acked += box
                 }

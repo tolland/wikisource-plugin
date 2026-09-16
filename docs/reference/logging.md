@@ -64,7 +64,7 @@ uv run fastapi dev src-py/wtbot/main.py --port 18564
 ### 1.1 Configuration entry point
 
 All sidecar logging is configured in one place,
-`src-py/wtbot/logging_config.py`. A frozen `LoggingConfig` dataclass is built
+`src-py/wtbot/log/logging_config.py`. A frozen `LoggingConfig` dataclass is built
 from the environment (with `.env` in the working directory loaded first, via
 `python-dotenv`) **at module import time** and applied by
 `configure_logging()`, which `create_app()` calls on startup. The knobs are
@@ -78,6 +78,35 @@ read once per process — restart `fastapi dev` / uvicorn after changing `.env`.
 | `WTBOT_TRACE_DEBUG_ROUTE_TAGS` | Comma-separated router tags to trace request/response bodies for, e.g. `vfs,preview` | none |
 | `WTBOT_TRACE_ALL_DEBUG_ROUTES` | `true` → body tracing for every router | `false` |
 | `WTBOT_DEBUG_ROUTE_BODY_LIMIT_BYTES` | Truncation limit for logged bodies; `0` = unlimited | `131072` |
+
+### Fetch activity log
+
+Fetch workers write stage timings to `logs/wtbot-fetch.log` by default,
+relative to the **server's working directory**. Set `WTBOT_FETCH_LOG` in the
+server environment or `.env` to choose a different path, then restart wtbot.
+An empty value sends activity to the normal console logger instead. The file
+rotates at 10 MiB and retains three backups; it receives INFO activity even
+when `WTBOT_LOG_LEVEL=WARNING`.
+
+```bash
+tail -F logs/wtbot-fetch.log
+```
+
+Each request line carries `request_pk`, `site_pk`, and the Index/Page title.
+Stages emit `started` **before** blocking work, then `finished` or `failed`
+with monotonic `elapsed` seconds. The latest unmatched start identifies the
+current operation; its timestamp shows how long it has been running. Timings
+include any upstream throttling, login or retry waits inside that call.
+
+Stages cover client setup, namespaces, page retrieval and storage, revision
+history, file metadata/download, index enumeration, scan-image prefetch and
+placeholder OCR content. Placeholder lines also show `page=N/total` and the
+child title; fan-out summaries show children, placeholders and cached skips.
+Missing pages are enriched inside the Index request, so a drain reporting
+only four requests can still make hundreds of placeholder calls. Drain pass
+and total timings, request results and parent progress are recorded too.
+The log records operation metadata, not page bodies or authentication headers.
+Existing detailed failure logging remains separate.
 
 ### 1.2 The TRACE level
 

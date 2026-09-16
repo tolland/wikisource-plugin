@@ -81,7 +81,7 @@ def page_pk(engine) -> int:
 
 
 def _put_box(client, annotation_id: str, **overrides):
-    body = {"x": 10, "y": 20, "width": 30, "height": 40, **overrides}
+    body = {"x": 0.1, "y": 0.2, "width": 0.3, "height": 0.4, **overrides}
     return client.put(
         f"/pages/annotations/{annotation_id}", params={"path": PAGE_PATH}, json=body
     )
@@ -104,25 +104,40 @@ def test_store_upsert_inserts_then_updates(engine, page_pk):
             ScanAnnotation(
                 page_pk=page_pk,
                 annotation_id="a1",
-                x=10,
-                y=20,
-                width=30,
-                height=40,
+                normalized_x=0.1,
+                normalized_y=0.2,
+                normalized_width=0.3,
+                normalized_height=0.4,
                 label="l",
                 category=AnnotationCategory.body,
             )
         )
         [row] = store.list_for_page(page_pk)
-        assert (row.x, row.y, row.width, row.height) == (10, 20, 30, 40)
+        assert (
+            row.normalized_x,
+            row.normalized_y,
+            row.normalized_width,
+            row.normalized_height,
+        ) == (0.1, 0.2, 0.3, 0.4)
         assert row.category is AnnotationCategory.body
 
         store.upsert(
             ScanAnnotation(
-                page_pk=page_pk, annotation_id="a1", x=1, y=2, width=3, height=4
+                page_pk=page_pk,
+                annotation_id="a1",
+                normalized_x=0.01,
+                normalized_y=0.02,
+                normalized_width=0.03,
+                normalized_height=0.04,
             )
         )
         [row] = store.list_for_page(page_pk)
-        assert (row.x, row.y, row.width, row.height) == (1, 2, 3, 4)
+        assert (
+            row.normalized_x,
+            row.normalized_y,
+            row.normalized_width,
+            row.normalized_height,
+        ) == (0.01, 0.02, 0.03, 0.04)
         assert row.label is None and row.category is None
         assert len(store.list_for_page(page_pk)) == 1
 
@@ -132,7 +147,12 @@ def test_store_delete(engine, page_pk):
         store = SqlAnnotationStore(s)
         store.upsert(
             ScanAnnotation(
-                page_pk=page_pk, annotation_id="a", x=0, y=0, width=1, height=1
+                page_pk=page_pk,
+                annotation_id="a",
+                normalized_x=0.0,
+                normalized_y=0.0,
+                normalized_width=0.01,
+                normalized_height=0.01,
             )
         )
         assert store.delete(page_pk, "a") is True
@@ -179,7 +199,7 @@ def test_upsert_and_list_boxes(client, page_pk):
     listing = client.get("/pages/annotations", params={"path": PAGE_PATH}).json()
     [ann] = listing["annotations"]
     assert ann["id"] == "a1"
-    assert (ann["x"], ann["width"]) == (10.0, 30.0)
+    assert (ann["x"], ann["width"]) == (0.1, 0.3)
     assert ann["label"] == "para 1"
     assert ann["category"] == "paragraph"
 
@@ -251,3 +271,18 @@ def test_anchor_delete(client, engine, page_pk):
         client.delete("/pages/text-anchors/a1", params={"path": PAGE_PATH}).status_code
         == 404
     )
+
+
+@pytest.mark.parametrize(
+    "geometry",
+    [
+        {"x": 10},
+        {"x": -0.1},
+        {"width": 0},
+        {"height": -0.2},
+        {"x": 0.9, "width": 0.2},
+        {"y": 0.8, "height": 0.3},
+    ],
+)
+def test_boxes_reject_pixels_and_out_of_bounds(client, page_pk, geometry):
+    assert _put_box(client, "invalid", **geometry).status_code == 422

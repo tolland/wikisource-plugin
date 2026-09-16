@@ -114,7 +114,7 @@ data class WriteResult(
 
 /**
  * One scan annotation from /pages/annotations — a bounding box drawn over
- * the reference image, in scan-pixel coordinates. [category] classifies the
+ * the reference image, in normalized full-page coordinates (0 to 1). [category] classifies the
  * region for the OCR pipeline (one of the sidecar's AnnotationCategory wire
  * values: "header", "footer", "body", "paragraph", "section", "ignore");
  * null = uncategorized. Text anchoring is a separate resource (see

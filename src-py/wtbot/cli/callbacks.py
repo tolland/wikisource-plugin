@@ -74,15 +74,13 @@ def local_file_parser(local_file: str):
         print("stripping prefix")
         return local_file.removeprefix("file://")
     elif local_file.startswith("https://"):
-        data = get(local_file)
-        import tempfile
-
-        new_file, filename = tempfile.mkstemp()
-
-        with open(new_file, "wb") as f:
-            f.write(data.content)
-
-        return filename
+        raise NotImplementedError("https:// URLs are not supported yet")
+        # data = get(local_file)
+        # import tempfile
+        # new_file, filename = tempfile.mkstemp()
+        # with open(new_file, "wb") as f:
+        #     f.write(data.content)
+        # return filename
 
     return local_file
 
