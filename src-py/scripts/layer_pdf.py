@@ -13,14 +13,14 @@ text_ocg_id = doc.add_ocg("Cleaned Text (High-Contrast)", on=True)
 # 3. Insert background image onto its layer
 page.insert_image(
     page.rect,
-    filename="/home/tomhodder/Sync/projects/java/wikisource_plugin/wikisource/matrix_test/page_216_stream-000.png",
+    filename="./matrix_test/page_216_stream-000.png",
     oc=bg_ocg_id,
 )
 
 # 4. Insert clean text image onto its layer
 page.insert_image(
     page.rect,
-    filename="/home/tomhodder/Sync/projects/java/wikisource_plugin/wikisource/matrix_test/p9_pipe4_final.png",
+    filename="./matrix_test/p9_pipe4_final.png",
     oc=text_ocg_id,
 )
 
