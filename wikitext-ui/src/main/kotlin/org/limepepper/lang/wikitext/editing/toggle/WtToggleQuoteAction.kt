@@ -59,7 +59,7 @@ abstract class WtToggleQuoteAction(private val style: WtQuoteStyle) : AnAction()
         val firstLine = document.getLineNumber(selectionStart)
         val lastLine = document.getLineNumber(selectionEnd)
         val lines = (firstLine..lastLine).map {
-            document.getLineStartOffset(it)..document.getLineEndOffset(it).coerceAtLeast(document.getLineStartOffset(it))
+            document.getLineStartOffset(it) until document.getLineEndOffset(it).coerceAtLeast(document.getLineStartOffset(it))
         }
 
         val result = WtQuoteToggle.toggleRange(
