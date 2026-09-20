@@ -1,10 +1,17 @@
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
 from sqlmodel import Session
 
 from wtbot.api.debug_logging_route import DebugLoggingRoute
+from wtbot.api.locator_index.schemas import (
+    LocatorIndexDump,
+    PageIndexEntry,
+    PagelistAssignmentEntry,
+    PageNumberMatch,
+    PageRef,
+    SectionMatch,
+)
 from wtbot.deps import get_session
 from wtbot.locator_index import (
     compute_labels,
@@ -41,60 +48,13 @@ work's whole shape (symbol search, "find usages" of a section id) rather
 than one query's answer. An interactive completion feature should still call
 the targeted endpoints for the one locator it needs; slurping the whole dump
 on every keystroke is the wrong shape even though computing it is cheap.
+
+The response models live in `wtbot.api.locator_index.schemas`.
 """
 
 router = APIRouter(
     prefix="/locator-index", tags=["locator-index"], route_class=DebugLoggingRoute
 )
-
-
-class PageRef(BaseModel):
-    """A `Page:` addressed the way the client opens files — by VFS path,
-    matching `PageNavEntry` in `page_nav.py`."""
-
-    path: str
-    title: str
-    scan_page: int
-
-
-class PageNumberMatch(BaseModel):
-    label: str
-    confidence: Literal["explicit", "inferred", "unknown"]
-    page: PageRef
-
-
-class SectionMatch(BaseModel):
-    section_id: str
-    role: Literal["begin", "end", "anchor_template"]
-    page: PageRef
-
-
-class PagelistAssignmentEntry(BaseModel):
-    """One explicit `<pagelist>` entry, as written -- the raw source of truth
-    [PageIndexEntry.confidence] `"explicit"` is read back from, versus
-    `"inferred"` which has no entry here at all."""
-
-    scan_page: int
-    kind: Literal["blank", "text", "numeral"]
-    text: str | None = None
-    style: Literal["arabic", "roman", "highroman"] | None = None
-    value: int | None = None
-
-
-class PageIndexEntry(BaseModel):
-    page: PageRef
-    label: str | None
-    confidence: Literal["explicit", "inferred", "unknown"]
-
-
-class LocatorIndexDump(BaseModel):
-    """Everything this module currently knows about one work, unfiltered."""
-
-    index_title: str
-    index_path: str
-    pagelist_assignments: list[PagelistAssignmentEntry]
-    pages: list[PageIndexEntry]
-    sections: list[SectionMatch]
 
 
 def _resolve_index(path: str, session: Session) -> tuple[PageStore, Site, str]:

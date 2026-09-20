@@ -10,6 +10,7 @@ from wtbot.cli.commands import (
 )
 from wtbot.cli.commands.dev import dev
 from wtbot.cli.commands.fetch import fetch
+from wtbot.cli.commands.locator import locator
 from wtbot.cli.commands.site import site, site_credential
 
 """Typer CLI for wtbot. Thin demonstration of the wiki-access seam from the
@@ -41,6 +42,7 @@ def create_app() -> typer.Typer:
     cli.add_typer(fetch.app, rich_help_panel="Fetch Page")
     # sync between two sites ib local cache
     cli.add_typer(link.app, rich_help_panel="Model commands")
+    cli.add_typer(locator.app, rich_help_panel="Model commands")
     cli.add_typer(sync.app)
     # utils commands
     cli.add_typer(show_config.app, rich_help_panel="Tools")
