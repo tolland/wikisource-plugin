@@ -48,44 +48,56 @@ class ApiClient:
     base_url: str
     timeout: float = DEFAULT_TIMEOUT
 
-    def _url(self, path: str) -> str:
-        return f"{self.base_url.rstrip('/')}{path}"
+    def _url(self, endpoint: str) -> str:
+        return f"{self.base_url.rstrip('/')}{endpoint}"
 
-    def get(self, path: str, **params: Any) -> Any:
+    def get(self, endpoint: str, **params: Any) -> Any:
+        """[endpoint] (not `path`, on purpose) is the URL to call; [params]
+        become its query string. Several routes -- GET /pages/nav,
+        GET /locator-index/{sections,page-numbers,dump} -- take a query
+        parameter that is itself named `path` (the wikisource:// VFS path).
+        A parameter here called `path` would make `api.get("/pages/nav",
+        path=vfs_path)` collide with this method's own first argument
+        (`got multiple values for argument 'path'`) since Python binds a
+        keyword to a named parameter before `**params` ever sees it --
+        not a caller mistake but an unavoidable name clash. `endpoint`
+        sidesteps it so a route's own `path` query parameter can be passed
+        exactly as every other query parameter is.
+        """
         import httpx
 
         return self._result(
-            httpx.get(self._url(path), params=params or None, timeout=self.timeout)
+            httpx.get(self._url(endpoint), params=params or None, timeout=self.timeout)
         )
 
-    def get_optional(self, path: str) -> Any | None:
+    def get_optional(self, endpoint: str) -> Any | None:
         """A GET whose 404 is an answer rather than an error -- "this site has
         no credential" is a fact worth printing, not a failure to report."""
         import httpx
 
-        response = httpx.get(self._url(path), timeout=self.timeout)
+        response = httpx.get(self._url(endpoint), timeout=self.timeout)
         if response.status_code == 404:
             return None
         return self._result(response)
 
-    def post(self, path: str, payload: dict | None = None) -> Any:
+    def post(self, endpoint: str, payload: dict | None = None) -> Any:
         import httpx
 
         return self._result(
-            httpx.post(self._url(path), json=payload, timeout=self.timeout)
+            httpx.post(self._url(endpoint), json=payload, timeout=self.timeout)
         )
 
-    def put(self, path: str, payload: dict | None = None) -> Any:
+    def put(self, endpoint: str, payload: dict | None = None) -> Any:
         import httpx
 
         return self._result(
-            httpx.put(self._url(path), json=payload, timeout=self.timeout)
+            httpx.put(self._url(endpoint), json=payload, timeout=self.timeout)
         )
 
-    def delete(self, path: str) -> Any:
+    def delete(self, endpoint: str) -> Any:
         import httpx
 
-        return self._result(httpx.delete(self._url(path), timeout=self.timeout))
+        return self._result(httpx.delete(self._url(endpoint), timeout=self.timeout))
 
     @staticmethod
     def _result(response) -> Any:
