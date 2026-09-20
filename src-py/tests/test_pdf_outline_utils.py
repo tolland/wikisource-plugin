@@ -1,10 +1,11 @@
+from dataclasses import replace
 from pathlib import Path
 
 import pymupdf
 import pytest
 from typer.testing import CliRunner
 
-from wtbot.cli.commands.dev import app
+from wtbot.cli.commands.dev.dev import app
 from wtbot.cli.commands.pdf_outline_utils import PageLabel, PdfOutline
 
 
@@ -95,6 +96,91 @@ def test_uppercase_roman_reset_and_single_page_range(tmp_path):
     assert outline.pagelist(outline.entries[0]) == (
         '<pagelist from="1" to="4" 1="7" 1to3="highroman" 4="1" 4to4="highroman" />'
     )
+
+
+def _parted_pdf(tmp_path) -> Path:
+    return make_pdf(
+        tmp_path,
+        toc=[
+            [1, "Part I", 5],
+            [2, "Chapter 1", 9],
+            [2, "Chapter 2", 13],
+            [1, "Index", 17],
+        ],
+    )
+
+
+def _sections(outline: PdfOutline) -> list[tuple[str, int, int, int]]:
+    return [
+        (entry.title, entry.level, entry.pdf_page, entry.final_index + 1)
+        for entry in outline.entries
+    ]
+
+
+def test_depth_one_collapses_chapters_into_their_part(tmp_path):
+    assert _sections(PdfOutline(_parted_pdf(tmp_path))) == [
+        ("Pages before first bookmark", 1, 1, 4),
+        ("Part I", 1, 5, 16),
+        ("Index", 1, 17, 20),
+    ]
+
+
+def test_depth_two_splits_at_chapters_and_shortens_the_part(tmp_path):
+    assert _sections(PdfOutline(_parted_pdf(tmp_path), depth=2)) == [
+        ("Pages before first bookmark", 1, 1, 4),
+        ("Part I", 1, 5, 8),
+        ("Chapter 1", 2, 9, 12),
+        ("Chapter 2", 2, 13, 16),
+        ("Index", 1, 17, 20),
+    ]
+
+
+def test_part_sharing_a_scan_with_its_first_chapter_is_combined(tmp_path):
+    outline = PdfOutline(
+        make_pdf(tmp_path, toc=[[1, "Part I", 5], [2, "Chapter 1", 5]]), depth=2
+    )
+    assert [(e.title, e.level, e.pdf_page) for e in outline.entries] == [
+        ("Pages before first bookmark", 1, 1),
+        ("Part I / Chapter 1", 1, 5),
+    ]
+
+
+def test_depth_below_one_is_rejected(tmp_path):
+    with pytest.raises(ValueError, match="depth must be 1 or greater"):
+        PdfOutline(make_pdf(tmp_path, count=1), depth=0)
+
+
+def test_every_scan_is_accounted_for_exactly_once(tmp_path):
+    outline = PdfOutline(_parted_pdf(tmp_path), depth=2)
+    covered = [
+        scan
+        for entry in outline.entries
+        for scan in range(entry.pdf_page, entry.final_index + 2)
+    ]
+    assert covered == list(range(1, outline.page_count + 1))
+
+
+def test_verify_coverage_refuses_a_gap(tmp_path):
+    outline = PdfOutline(make_pdf(tmp_path, count=4))
+    first = outline.entries[0]
+    outline.entries[0] = replace(first, final_index=1)
+    with pytest.raises(ValueError, match="cover 2 of 4"):
+        outline.verify_coverage()
+
+
+def test_cli_depth_option_splits_at_chapters(tmp_path):
+    result = CliRunner().invoke(
+        app,
+        [
+            "extract-outline",
+            "--pdf-filepath",
+            str(_parted_pdf(tmp_path)),
+            "--depth",
+            "2",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert 'Chapter 1\n<pagelist from="9" to="12"' in result.output
 
 
 @pytest.mark.parametrize("label", ["civil", "IIII", "mixED", "A-ix", "", None])

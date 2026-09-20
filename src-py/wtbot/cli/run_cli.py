@@ -2,13 +2,13 @@ import typer
 
 from wtbot.cli.callbacks import get_callback
 from wtbot.cli.commands import (
-    dev,
     import_svg_annotations,
     link,
     page,
     show_config,
     sync,
 )
+from wtbot.cli.commands.dev import dev
 from wtbot.cli.commands.fetch import fetch
 from wtbot.cli.commands.site import site, site_credential
 

@@ -60,14 +60,23 @@ class PdfOutlineEntry:
 
 
 class PdfOutline:
-    """Use top-level bookmarks for sections and page labels for numbering.
+    """Use bookmarks down to ``depth`` for sections, page labels for numbering.
+
+    ``depth`` exists because not every book puts its chapters at the top level:
+    some group them under a "Part" bookmark, so depth=1 collapses a whole part
+    into one section and loses the chapter-by-chapter numbering. depth=2 splits
+    at those chapters too, which also keeps the part's own section down to the
+    scans before its first chapter.
 
     Without usable bookmarks, expose the entire document as one section.
     Missing page labels use scan numbers; no printed TOC or OCR is inferred.
     """
 
-    def __init__(self, filepath: Path):
+    def __init__(self, filepath: Path, depth: int = 1):
+        if depth < 1:
+            raise ValueError("depth must be 1 or greater")
         self.filepath = filepath
+        self.depth = depth
         self.page_count = 0
         self._entries: list[PdfOutlineEntry] = []
         self._labels: list[PageLabel] = []
@@ -89,29 +98,36 @@ class PdfOutline:
             self._labels = [PageLabel.parse(page.get_label()) for page in doc]
             bookmarks = sorted(
                 (
-                    (page - 1, title)
+                    (page - 1, level, title)
                     for level, title, page in doc.get_toc()
-                    if level == 1 and 1 <= page <= self.page_count
+                    if level <= self.depth and 1 <= page <= self.page_count
                 ),
-                key=lambda bookmark: bookmark[0],
+                key=lambda bookmark: (bookmark[0], bookmark[1]),
             )
 
-        # Combine bookmarks sharing a scan so no section has an inverted range.
-        starts: list[tuple[int, str]] = []
-        for page_index, title in bookmarks:
+        # Combine bookmarks sharing a scan so no section has an inverted range,
+        # and so a part heading landing on its own first chapter does not
+        # produce an empty section.
+        starts: list[tuple[int, int, str]] = []
+        for page_index, level, title in bookmarks:
             if starts and starts[-1][0] == page_index:
-                starts[-1] = (page_index, f"{starts[-1][1]} / {title}")
+                previous_level, previous_title = starts[-1][1], starts[-1][2]
+                starts[-1] = (
+                    page_index,
+                    min(previous_level, level),
+                    f"{previous_title} / {title}",
+                )
             else:
-                starts.append((page_index, title))
+                starts.append((page_index, level, title))
         if self.page_count and not starts:
-            starts.append((0, "Document"))
+            starts.append((0, 1, "Document"))
         elif starts and starts[0][0] > 0:
-            starts.insert(0, (0, "Pages before first bookmark"))
+            starts.insert(0, (0, 1, "Pages before first bookmark"))
 
         self._entries = [
             PdfOutlineEntry(
                 title=title,
-                level=1,
+                level=level,
                 page_label=self._labels[start].text,
                 page_index=start,
                 final_index=(
@@ -120,9 +136,37 @@ class PdfOutline:
                     else self.page_count - 1
                 ),
             )
-            for index, (start, title) in enumerate(starts)
+            for index, (start, level, title) in enumerate(starts)
         ]
+        self.verify_coverage()
         return self.entries
+
+    def verify_coverage(self) -> None:
+        """Fail loudly unless every scan belongs to exactly one section.
+
+        A pagelist is only usable if the scan-to-printed-page mapping is
+        one-to-one, so a gap or an overlap here is a bug worth refusing rather
+        than emitting numbering that quietly skips or repeats scans.
+        """
+        expected = 0
+        for entry in self._entries:
+            if entry.final_index < entry.page_index:
+                raise ValueError(
+                    f"section {entry.title!r} ends before it starts "
+                    f"({entry.pdf_page}-{entry.final_index + 1})"
+                )
+            if entry.page_index != expected:
+                problem = "overlaps" if entry.page_index < expected else "leaves a gap"
+                raise ValueError(
+                    f"section {entry.title!r} starting at scan {entry.pdf_page} "
+                    f"{problem}; scan {expected + 1} was expected"
+                )
+            expected = entry.final_index + 1
+        if expected != self.page_count:
+            raise ValueError(
+                f"sections cover {expected} of {self.page_count} scan(s); "
+                "every scan must be accounted for exactly once"
+            )
 
     def pagelist(self, entry: PdfOutlineEntry) -> str:
         """Render a section, preserving label transitions and numbering resets."""
