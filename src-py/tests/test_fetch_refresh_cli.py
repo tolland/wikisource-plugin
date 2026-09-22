@@ -67,7 +67,10 @@ def test_the_command_posts_what_was_asked_for(posted) -> None:
     assert posted["json"]["label"] == "local"
     assert posted["json"]["title_prefix"] == "Page:Work.djvu/"
     assert posted["json"]["dry_run"] is False
-    assert posted["json"]["since"] == "2026-08-01T00:00:00"
+    # A bare date is a UTC date -- what --since's help and the endpoint's
+    # own example both say -- so the wire form carries the offset rather
+    # than leaning on the server's "no timezone means UTC" fallback.
+    assert posted["json"]["since"] == "2026-08-01T00:00:00+00:00"
     assert "basis=incremental" in result.output
     assert "Page:Work.djvu/2" in result.output
 

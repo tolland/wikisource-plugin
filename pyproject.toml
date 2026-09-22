@@ -39,8 +39,14 @@ test = [
     "ruff>=0.15",
 ]
 
+tox = [
+    "tox>=4.30",
+    "tox-uv>=1.30",
+]
+
 dev = [
     { include-group = "test" },
+    { include-group = "tox" },
     "black[jupyter]>=26.5.1",
     "ipykernel>=7.3.0",
     "pre-commit>=4.0",

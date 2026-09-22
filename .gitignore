@@ -49,6 +49,7 @@ __pycache__/
 .venv/
 .pytest_cache/
 .ruff_cache/
+.tox/
 # SQLite cache DBs created at runtime
 *.db
 *.db-wal

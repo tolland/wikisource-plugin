@@ -6,6 +6,7 @@ import typer
 from typer_di import Depends, TyperDI
 
 from wtbot.cli.deps import ApiClient, get_api, get_context, get_label
+from wtbot.timeutil import as_utc, utcnow
 
 app = TyperDI(
     no_args_is_help=False,
@@ -17,8 +18,10 @@ def parse_since(value: str | None) -> datetime | None:
     if value is None:
         return None
     if seconds := pytimeparse.parse(value):
-        return datetime.utcnow() - timedelta(seconds=seconds)
-    return datetime.fromisoformat(value)
+        return utcnow() - timedelta(seconds=seconds)
+    # A bare '2026-08-01' parses naive; the option documents itself as UTC,
+    # so say so rather than shipping a tz-less timestamp to the server.
+    return as_utc(datetime.fromisoformat(value))
 
 
 @app.callback(invoke_without_command=True)

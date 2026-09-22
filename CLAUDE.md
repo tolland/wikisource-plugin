@@ -62,6 +62,7 @@ uv run fastapi dev src-py/wtbot/main.py --port 18564   # start FastAPI dev serve
 uv run pytest                              # run Python tests (uses pythonpath=src-py, testpaths=src-py/tests)
 uv run pytest src-py/tests/test_fetch.py -k some_case  # single test
 uv run pytest -m slow                      # incl. the docker-backed harness suites (deselected by default)
+uv run --group tox tox                     # the suite across several dependency resolutions (see tox.ini)
 
 # The two-wiki sync harness. Both wikis seed themselves from the same compose
 # anchor (SEED_DUMPS/SEED_SCANS), so the pair starts converged; `--wait` blocks
@@ -79,6 +80,15 @@ PYTHONPATH=src-py/tests uv run python -m wiki_harness up --api
 uv run ruff check --fix                    # lint (mirrors the pre-commit hook)
 uv run black .                             # format (mirrors the pre-commit hook)
 ```
+
+`uv.lock` is gitignored (LAN-local mirror URLs), so `uv run pytest` proves the
+code against whichever resolution a given machine happens to hold — which once
+let a real breakage hide: every annotation write raised under sqlmodel 0.0.45+,
+whose `UTCDateTime` refuses naive datetimes, while a workstation resolved below
+that saw green. `tox.ini` pins the edges of what `project.dependencies` actually
+promises (the declared floor, either side of that 0.0.45 boundary, and
+unpinned-latest) and runs the suite against each. Raise a floor there and in
+`project.dependencies` together.
 
 `pre-commit` (`.pre-commit-config.yaml`) runs `ruff check --fix` + `black` on pre-commit, and `./gradlew check` on pre-push — both sides of the repo are gated by the same hooks.
 
