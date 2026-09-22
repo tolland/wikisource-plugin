@@ -3,6 +3,8 @@ from datetime import datetime
 from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, SQLModel
 
+from wtbot.timeutil import utcnow
+
 """Anchors into text documents that are targets for processed text.
 
 A TextTargetAnchor marks a range of a text document (today: a proofread
@@ -38,4 +40,4 @@ class TextTargetAnchor(SQLModel, table=True):
     text_end: int
     anchor_revid: int | None = None
 
-    updated_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=utcnow)

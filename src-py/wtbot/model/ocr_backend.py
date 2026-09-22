@@ -4,6 +4,8 @@ from enum import StrEnum
 from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, SQLModel
 
+from wtbot.timeutil import utcnow
+
 """OCR backend configuration — part of wtbot's own app state (this file's
 row class is the thing Alembic tracks and wtbot's shared database.db
 stores). Its HTTP surface lives in ``wtbot.api.ocr``; reusable service,
@@ -71,8 +73,8 @@ class OcrBackendConfig(SQLModel, table=True):
 
     enabled: bool = True
 
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
 
     def langs_list(self) -> list[str]:
         return [

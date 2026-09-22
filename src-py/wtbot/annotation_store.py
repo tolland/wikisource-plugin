@@ -1,4 +1,3 @@
-from datetime import datetime
 from typing import Protocol
 
 from sqlmodel import Session, select
@@ -6,6 +5,7 @@ from sqlmodel import Session, select
 from wtbot.model.annotation.box_range_link import BoxRangeLink
 from wtbot.model.annotation.scan_annotation import ScanAnnotation
 from wtbot.model.annotation.text_target_anchor import TextTargetAnchor
+from wtbot.timeutil import utcnow
 
 """Storage seams for scan annotations, their text anchors, and the links
 between them.
@@ -107,7 +107,7 @@ class SqlAnnotationStore:
             row.normalized_height = annotation.normalized_height
             row.label = annotation.label
             row.category = annotation.category
-            row.updated_at = datetime.now()
+            row.updated_at = utcnow()
         self._session.add(row)
         self._session.commit()
         self._session.refresh(row)
@@ -151,7 +151,7 @@ class SqlBoxLinkStore:
             row = link
         else:
             row.range_annotation_id = link.range_annotation_id
-            row.updated_at = datetime.now()
+            row.updated_at = utcnow()
         self._session.add(row)
         self._session.commit()
         self._session.refresh(row)
@@ -210,7 +210,7 @@ class SqlTextAnchorStore:
             row.text_start = anchor.text_start
             row.text_end = anchor.text_end
             row.anchor_revid = anchor.anchor_revid
-            row.updated_at = datetime.now()
+            row.updated_at = utcnow()
         self._session.add(row)
         self._session.commit()
         self._session.refresh(row)

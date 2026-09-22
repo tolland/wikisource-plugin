@@ -11,12 +11,12 @@ annoation bounding box into the current format.
 
 app = TyperDI(
     no_args_is_help=True,
-    name="import-svg-annotations",
+    name="import-svg",
 )
 
 
 @app.callback(invoke_without_command=True)
-def import_svg_annotations_cmd(
+def import_svg_cmd(
     blob_root: str = typer.Option(
         lambda: os.environ.get("WTBOT_BLOB_ROOT", "./blobs"),
         help="blob root containing the legacy annotations/*.svg documents",

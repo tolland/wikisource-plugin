@@ -1,11 +1,11 @@
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
 
 from sqlmodel import Session, select
 
 from wtbot.model.ocr_backend import OcrBackendConfig, OcrBackendKind
 from wtbot.ocrapi.client import OcrClient, OcrRequest, OcrResult, build_client
+from wtbot.timeutil import utcnow
 
 """Framework-agnostic core: everything ocrapi's own router (scope from a
 query param) and a host's own scoped routes (wtbot's page-scoped /pages/ocr,
@@ -82,7 +82,7 @@ def upsert_backend(
     row.default_langs = ",".join(default_langs) if default_langs else None
     row.default_prompt = default_prompt
     row.enabled = enabled
-    row.updated_at = datetime.now()
+    row.updated_at = utcnow()
     session.add(row)
     session.commit()
     session.refresh(row)
