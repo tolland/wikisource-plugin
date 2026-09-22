@@ -17,7 +17,7 @@ revision ID, while a fresh database creates that schema directly.
 
 BASELINE = "8ac41e2d7f90"
 THROTTLE = "e7f3b415fd0a"
-HEAD = "b72e8c913a04"
+HEAD = "c38d2e7f901a"
 
 
 @pytest.fixture
@@ -42,6 +42,7 @@ def test_history_starts_at_the_squashed_baseline() -> None:
     assert script.get_heads() == [HEAD]
     assert [revision.revision for revision in script.walk_revisions()] == [
         HEAD,
+        "b72e8c913a04",
         "a21d6430c902",
         "a21d6430c901",
         "f19c2d4a7b31",
@@ -257,3 +258,61 @@ def test_annotation_migration_requires_backfill_and_preserves_identity(
         assert all(
             columns[f"normalized_{name}"] == 1 for name in ("x", "y", "width", "height")
         )
+
+
+def test_namespace_classification_removal_preserves_pages_and_links(baseline_engine):
+    _run(baseline_engine, command.upgrade, "b72e8c913a04")
+    with baseline_engine.begin() as c:
+        c.execute(text("""
+            INSERT INTO site (pk, family, code, articlepath, created_at)
+            VALUES (1, 'wikisource', 'de', '/wiki/$1', CURRENT_TIMESTAMP)
+            """))
+        c.execute(text("""
+            INSERT INTO namespace
+                (pk, site_pk, key, canonical_name, local_name, role, subpages, content)
+            VALUES (1, 1, 252, 'Index', 'Index', 'index', 1, 0),
+                   (2, 1, 250, 'Page', 'Seite', 'page', 1, 0)
+            """))
+        c.execute(text("""
+            INSERT INTO page
+                (pk, site_pk, title, namespace_role, content_model, dirty, fetch_status)
+            VALUES (1, 1, 'Index:Book.pdf', 'index', 'proofread-index', 0, 'unfetched'),
+                   (2, 1, 'Seite:Book.pdf/1', 'page', 'proofread-page', 1, 'done'),
+                   (3, 1, 'Index:Book.pdf/style.css', 'index', 'sanitized-css', 0, 'done'),
+                   (4, 1, 'Seite:Book.pdf/data', 'page', 'json', 0, 'done'),
+                   (5, 1, 'Datei:Book.pdf', 'file', 'wikitext', 0, 'done'),
+                   (6, 1, 'Index:Unknown', 'index', NULL, 0, 'unfetched')
+            """))
+        c.execute(text("""
+            INSERT INTO proofreadpagemeta (page_pk, index_page_pk, page_number)
+            VALUES (2, 1, 1)
+            """))
+    _run(baseline_engine, command.upgrade, "head")
+    with baseline_engine.connect() as c:
+        assert "namespace_role" not in {
+            row[1] for row in c.execute(text("PRAGMA table_info(page)"))
+        }
+        assert "role" not in {
+            row[1] for row in c.execute(text("PRAGMA table_info(namespace)"))
+        }
+        rows = c.execute(
+            text("SELECT pk, namespace_key, content_model, dirty FROM page ORDER BY pk")
+        ).all()
+        assert rows == [
+            (1, 252, "proofread-index", 0),
+            (2, 250, "proofread-page", 1),
+            (3, 252, "sanitized-css", 0),
+            (4, 250, "json", 0),
+            (5, 6, "wikitext", 0),
+            (6, 252, None, 0),
+        ]
+        assert c.execute(
+            text("SELECT page_pk, index_page_pk FROM proofreadpagemeta")
+        ).all() == [(2, 1)]
+        assert c.execute(text("PRAGMA foreign_key_check")).all() == []
+    _run(baseline_engine, command.downgrade, "b72e8c913a04")
+    with baseline_engine.connect() as c:
+        assert c.execute(
+            text("SELECT namespace_role FROM page ORDER BY pk")
+        ).scalars().all() == ["index", "page", "index", "page", "file", "index"]
+    _run(baseline_engine, command.upgrade, "head")

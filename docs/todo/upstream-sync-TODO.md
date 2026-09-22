@@ -57,7 +57,7 @@ The first sync run then has to re-derive correspondence by title match — the
 weaker claim, for a fact that was known at the moment of the import.
 
 - [ ] `wtctl adopt --from <site> --to <site> Index:X` — run after an import,
-      match by namespace role + page number, and write `origin=copy` links
+      match by content model + page number, and write `origin=copy` links
       against both sides' head revisions. Cheap, and it turns a title guess back
       into a recorded fact.
 - [ ] **Not `EditJournal` + the commit worker.** The two-step (stage, then

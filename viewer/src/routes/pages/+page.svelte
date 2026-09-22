@@ -250,7 +250,7 @@
       <div class="empty">Loading page...</div>
     {:else if selectedPage}
       <WikitextArticle
-        eyebrow={selectedPage.namespace_role}
+        eyebrow={selectedPage.content_model ?? 'unknown'}
         title={selectedPage.title}
         content={selectedPage.text}
       >

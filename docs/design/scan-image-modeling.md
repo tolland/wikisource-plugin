@@ -220,7 +220,7 @@ of a `ScanSource`.
 - Where does the per-site valid-width set come from — `siteinfo`, a
   configured list, or discovered by trying? (`siteinfo` exposes
   `thumblimits`, which is probably the answer, and would sit naturally
-  alongside the existing per-site namespace-role resolution.)
+  alongside the existing per-site namespace identity resolution.)
 - Fractional coordinates relative to *what* — the full page raster, or the
   displayed rendition's box? The former is stable, the latter is what the
   client measures. (The former, with the client converting, is almost

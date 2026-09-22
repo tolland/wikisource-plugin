@@ -10,7 +10,6 @@ from sqlmodel import Session, select
 from wtbot.api.schemas import WriteContentRequest
 from wtbot.api.vfs import list_children, read_content, write_content
 from wtbot.model import EditJournal, FileBlob, Page, Site
-from wtbot.model.wiki.namespace import NsRole
 from wtbot.vfs import WikisourceVfs
 
 FAMILY = "wikisource"
@@ -40,14 +39,12 @@ def _add_index_asset_tree(session: Session) -> None:
         Page(
             site_pk=site.pk,
             title=INDEX,
-            namespace_role=NsRole.index,
             content_model="proofread-index",
         )
     )
     styles = Page(
         site_pk=site.pk,
         title=INDEX_STYLES,
-        namespace_role=NsRole.index,
         content_model="sanitized-css",
         text=".pagetext {}",
         revid=5005,
@@ -71,7 +68,6 @@ def vfs_client(engine, tmp_path) -> TestClient:
         index_page = Page(
             site_pk=site.pk,
             title=INDEX,
-            namespace_role=NsRole.index,
             content_model="proofread-index",
             text=_INDEX_BODY,
             pageid=1001,
@@ -82,7 +78,6 @@ def vfs_client(engine, tmp_path) -> TestClient:
         index_styles = Page(
             site_pk=site.pk,
             title=INDEX_STYLES,
-            namespace_role=NsRole.index,
             content_model="sanitized-css",
             text=".pagetext {}",
             pageid=1005,
@@ -92,7 +87,7 @@ def vfs_client(engine, tmp_path) -> TestClient:
         file_page = Page(
             site_pk=site.pk,
             title=FILE,
-            namespace_role=NsRole.file,
+            namespace_key=6,
             content_model="wikitext",
             text=_FILE_BODY,
             pageid=1002,
@@ -113,7 +108,6 @@ def vfs_client(engine, tmp_path) -> TestClient:
         p1 = Page(
             site_pk=site.pk,
             title=PAGE_1,
-            namespace_role=NsRole.page,
             content_model="proofread-page",
             text=_PAGE_1_BODY,
             pageid=1003,
@@ -122,7 +116,6 @@ def vfs_client(engine, tmp_path) -> TestClient:
         p2 = Page(
             site_pk=site.pk,
             title=PAGE_2,
-            namespace_role=NsRole.page,
             content_model="proofread-page",
             text=_PAGE_2_BODY,
             pageid=1004,
@@ -421,7 +414,6 @@ def test_list_index_includes_index_namespace_assets(engine):
             Page(
                 site_pk=site.pk,
                 title=f"{INDEX}/legacy.css",
-                namespace_role=NsRole.index,
                 content_model="sanitized-css",
                 text=".legacy {}",
             )

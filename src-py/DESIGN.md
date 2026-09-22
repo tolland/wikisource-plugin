@@ -88,36 +88,22 @@ attached; an unknown label is a 404 listing the labels that do exist.
 Wikisource is not flat. Certain titles imply a structured set of other objects,
 and the backend must understand this to fetch a *work*, not just a *page*.
 
-### Namespaces we care about — by role, never by hardcoded id
+### Namespace identity and content models
 
-**Numeric namespace ids are per-site and must not be hardcoded.** When the
-ProofreadPage extension is reinstalled on a fresh wiki it gets deconflicted ids
-(`Page`=250, `Index`=252), whereas en.wikisource.org still runs the legacy ids
-(`Page`=104, `Index`=106). Custom namespaces (e.g. a dedicated `Book`=3100 for
-moving mainspace works) are operator-chosen and differ per install. So the only
-portable thing is the **canonical namespace name**, which *is* stable across
-sites — `Page`, `Index`, `File`, `Template`, `Module` are the same string
-everywhere; only the integer key moves.
+Extension namespace IDs are site-local: en.wikisource uses 104/106 for
+Page/Index, while a fresh ProofreadPage installation uses 250/252. Resolve
+namespace names and capabilities from each site's `siteinfo`; never assume
+an extension namespace number is portable. Core File namespace ID 6 is fixed.
 
-The backend therefore works in terms of a **role** (an enum), and resolves
-role → local numeric id per-site from `siteinfo`:
-
-| Role        | canonical name | en.ws | local (PRP reinstall) | Treatment                              |
-|-------------|----------------|-------|-----------------------|----------------------------------------|
-| `INDEX`     | `Index`        | 106   | 252                   | ProofreadPage index — root of a work   |
-| `PAGE`      | `Page`         | 104   | 250                   | one scan page's transcription (`…/N`)  |
-| `FILE`      | `File`         | 6     | 6                     | backing DjVu/PDF — **file, not a row** |
-| `MAIN`      | (empty)        | 0     | 0                     | article / composed work                |
-| `BOOK`*     | `Book`         | —     | 3100 (custom)         | collection/landing (site-configured)   |
-
-\* `BOOK` is not a standard Wikisource namespace; on en.ws works live in `MAIN`.
-It's an operator convention, so its name/id come from per-site config, not a
-global assumption. Role resolution falls back to "by name from siteinfo"; only
-genuinely custom roles need a per-site override.
+A namespace can contain several content models. Use `proofread-index` for
+work expansion and `proofread-page` for transcription operations. CSS and JSON
+assets in the same namespace remain ordinary content. Use `Namespace.subpages`
+for subpage relationships independently of content type.
 
 ### Implied-asset expansion
 
-Given a fetch request for an `Index:`, the backend expands it into the full work.
+Given a fetched page with content model `proofread-index`, the backend expands
+it into the full work.
 `Index:Foo.djvu` implies:
 
 1. **`File:Foo.djvu`** — the scan. Persisted to disk (see §5), referenced from
@@ -299,48 +285,23 @@ class FetchRequest(SQLModel, table=True):
 `parent_pk` gives the Index→Pages fan-out; the plugin polls the parent and reads
 aggregate `progress_done / progress_total`.
 
-### 6.3 Per-site namespace map (role → local id)
+### 6.3 Per-site namespace identity and capabilities
 
-`Namespace` becomes **per-site** and role-aware. We never compare numeric ids
-across sites; we compare roles. The map is populated from each site's `siteinfo`
-on first contact.
+`Namespace` is populated from each site's `siteinfo`. Its `(site_pk, key)`
+identifies a namespace; `canonical_name` and `local_name` identify its names.
+`subpages`, `content`, and `case` describe namespace capabilities.
 
-```python
-# wtbot/sqlmodel/namespace.py  (proposed — replaces the flat model)
-from enum import Enum
-from sqlmodel import SQLModel, Field
-from sqlalchemy import UniqueConstraint
+`Page.namespace_key` resolves within its own site, never across sites. Extension
+namespace IDs can differ between installations. Use namespace metadata when
+filtering namespaces or determining whether slashes denote subpages.
 
+Choose page operations from `Page.content_model`: `proofread-index` supports
+index fan-out and `proofread-page` supports transcription metadata. CSS, JSON,
+and other content can live in those same namespaces without gaining those
+operations. Namespace membership does not determine a page's content model.
 
-class NsRole(str, Enum):
-    main = "main"
-    page = "page"      # ProofreadPage Page:
-    index = "index"    # ProofreadPage Index:
-    file = "file"
-    template = "template"
-    module = "module"
-    book = "book"      # site-custom (operator convention)
-    author = "author"
-    other = "other"
-
-
-class Namespace(SQLModel, table=True):
-    __table_args__ = (
-        UniqueConstraint("site_pk", "key", name="uq_ns_site_key"),
-    )
-    pk: int | None = Field(default=None, primary_key=True)
-    site_pk: int = Field(foreign_key="site.pk")
-    key: int                      # the site-local numeric id (104 or 250 …)
-    canonical_name: str           # 'Page', 'Index', 'File' — stable across sites
-    local_name: str               # display name on this wiki (may be localized)
-    role: NsRole = NsRole.other   # resolved from canonical_name (+ site overrides)
-```
-
-`pages.namespace` should then store the **role** (or FK the `Namespace` row),
-not a bare integer, so a Page from a 250-wiki and a Page from a 104-wiki are
-recognisably the same kind of object. Roles are assigned by matching
-`canonical_name` against the standard set, with a small per-site override map for
-custom namespaces like `Book`.
+File downloads additionally use MediaWiki's fixed core File namespace ID (6),
+because its description page's `wikitext` model does not identify the binary.
 
 ### 6.4 The journal (separating saves from cached remote state)
 
@@ -558,8 +519,8 @@ binary scan — so the namespace decides before content_model does.
 `wtbot/wiki/dispatch.py`:
 
 ```
-classify(content_model, namespace_role) -> Handling
-   namespace_role == file        -> FILE              (download the binary)
+classify(content_model, namespace_key) -> Handling
+   namespace_key == 6        -> FILE              (download the binary)
    content_model 'proofread-index' -> PROOFREAD_INDEX (pagelist, File, fan out)
    content_model 'proofread-page'  -> PROOFREAD_PAGE  (transcription + quality)
    content_model 'wikitext'        -> WIKITEXT        (mainspace, Book, Author)
@@ -580,9 +541,9 @@ classify(content_model, namespace_role) -> Handling
    data. Current stack (SQLModel + FastAPI + Typer CLI) is lighter and already
    started. Recommendation: stay on SQLModel until the data model is settled
    (this doc), reassess once there's real cached data to inspect.
-3. ~~Namespace ids per site.~~ **Resolved** (§3, §6.3): work in terms of a
-   role enum, resolve role → local numeric id from per-site `siteinfo`, never
-   hardcode `104`/`106`.
+3. ~~Namespace ids per site.~~ **Resolved** (§3, §6.3): resolve namespace identity and
+   capabilities from per-site `siteinfo`, and select page operations by content
+   model. Never hardcode extension IDs such as `104`/`106`.
 
 ---
 

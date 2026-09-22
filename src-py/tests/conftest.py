@@ -26,7 +26,7 @@ from wiki_harness import (
 
 from wtbot.db import create_db_engine, init_db
 from wtbot.main import create_app
-from wtbot.model import NsRole, Page, ProofreadPageMeta
+from wtbot.model import Page, ProofreadPageMeta
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 COMPOSE_FILE = REPO_ROOT / "compose.seeded.yml"
@@ -51,7 +51,7 @@ def add_proofread_meta(
     index = session.exec(
         select(Page).where(
             Page.site_pk == page.site_pk,
-            Page.namespace_role == NsRole.index,
+            Page.content_model == "proofread-index",
             func.replace(Page.title, "_", " ") == canonical,
         )
     ).first()
@@ -59,7 +59,6 @@ def add_proofread_meta(
         index = Page(
             site_pk=page.site_pk,
             title=index_title,
-            namespace_role=NsRole.index,
             content_model="proofread-index",
         )
         session.add(index)

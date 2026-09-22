@@ -1,16 +1,5 @@
 export type FetchKind = 'single' | 'index';
 export type FetchStatus = 'pending' | 'running' | 'done' | 'error';
-export type NamespaceRole =
-  | 'main'
-  | 'page'
-  | 'index'
-  | 'file'
-  | 'template'
-  | 'module'
-  | 'category'
-  | 'author'
-  | 'book'
-  | 'other';
 
 export interface Site {
   pk: number;
@@ -29,7 +18,6 @@ export interface WikiNamespace {
   key: number;
   canonical_name: string;
   local_name: string;
-  role: NamespaceRole;
   subpages: boolean;
   content: boolean;
   case?: string | null;
@@ -148,7 +136,6 @@ export interface CachedPage {
   pk: number;
   site_pk: number;
   title: string;
-  namespace_role: NamespaceRole;
   namespace_key?: number | null;
   content_model?: string | null;
   text?: string | null;

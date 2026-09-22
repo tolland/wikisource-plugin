@@ -3,7 +3,7 @@ from sqlmodel import Session, select
 
 from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.deps import get_session
-from wtbot.model import Namespace, NsRole
+from wtbot.model import Namespace
 
 router = APIRouter(
     prefix="/namespaces", tags=["namespaces"], route_class=DebugLoggingRoute
@@ -14,7 +14,7 @@ router = APIRouter(
 def list_namespaces(
     session: Session = Depends(get_session),
     site_pk: int | None = None,
-    role: NsRole | None = None,
+    canonical_name: str | None = None,
     offset: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
 ) -> list[Namespace]:
@@ -26,8 +26,8 @@ def list_namespaces(
     )
     if site_pk is not None:
         statement = statement.where(Namespace.site_pk == site_pk)
-    if role is not None:
-        statement = statement.where(Namespace.role == role)
+    if canonical_name is not None:
+        statement = statement.where(Namespace.canonical_name == canonical_name)
     return list(session.exec(statement).all())
 
 

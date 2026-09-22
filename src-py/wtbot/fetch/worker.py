@@ -20,7 +20,6 @@ from wtbot.model import (
     FetchStatus,
     Page,
     Site,
-    role_for_canonical,
 )
 from wtbot.model.wikisource.proofread_page_meta import ProofreadPageMeta
 from wtbot.page_processors import (
@@ -387,7 +386,6 @@ def _upsert_page(
         validate_remote_identity(session, page, remote)
 
         page.namespace_key = remote.namespace_key
-        page.namespace_role = role_for_canonical(remote.namespace_canonical or "")
         page.content_model = remote.content_model
         page.text = remote.text
         page.pageid = remote.pageid
@@ -427,7 +425,6 @@ def _upsert_page(
         return CachedPage(
             pk=page.pk,
             title=page.title,
-            namespace_role=page.namespace_role,
             content_model=page.content_model,
             text=page.text,
         )

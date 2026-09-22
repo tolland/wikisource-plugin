@@ -15,7 +15,6 @@ from wtbot.commit_worker import run_pending_commits
 from wtbot.fetch.worker import run_pending
 from wtbot.model import Commit, CommitStatus, EditJournal, FetchRequest, Page, Site
 from wtbot.model.fetch_request import FetchKind, FetchStatus
-from wtbot.model.wiki.namespace import NsRole
 from wtbot.vfs.store import PageStore
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import RemotePage, SaveResult
@@ -33,7 +32,6 @@ def _setup(engine, *, remote_text="original", remote_revid=100):
         page = Page(
             site_pk=site.pk,
             title=TITLE,
-            namespace_role=NsRole.page,
             content_model="proofread-page",
             text=remote_text,
             revid=remote_revid,

@@ -2,7 +2,6 @@ from collections import defaultdict
 
 import pytest
 
-from wtbot.model import NsRole
 from wtbot.settings import WikiSettings
 from wtbot.wiki.client import FakeWikiClient, _save_with_exact_summary
 from wtbot.wiki.dispatch import Handling, classify, classify_remote
@@ -31,16 +30,16 @@ class TestDispatch:
 
     def test_file_is_namespace_override_not_content_model(self):
         # A File reports content_model 'wikitext' but must be handled as a binary.
-        assert classify("wikitext", NsRole.file) is Handling.file
+        assert classify("wikitext", 6) is Handling.file
 
     def test_plain_wikitext(self):
-        assert classify("wikitext", NsRole.main) is Handling.wikitext
+        assert classify("wikitext", 0) is Handling.wikitext
 
     def test_unknown_model(self):
         assert classify("flow-board") is Handling.unknown
 
-    def test_classify_remote_resolves_role_from_canonical_name(self):
-        # 'File' canonical name -> file handling regardless of content_model.
+    def test_classify_remote_uses_namespace_identity(self):
+        # The core File namespace has ID 6, regardless of its localized name.
         fp = _page("File:Foo.djvu", "wikitext", "File", 6)
         assert classify_remote(fp) is Handling.file
         ip = _page("Index:Foo.djvu", "proofread-index", "Index", 252)

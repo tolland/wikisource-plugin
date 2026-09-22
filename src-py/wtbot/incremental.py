@@ -4,7 +4,7 @@ from enum import Enum
 
 from sqlmodel import Session, select
 
-from wtbot.model import Namespace, NsRole, Page, Site
+from wtbot.model import Namespace, Page, Site
 from wtbot.timeutil import as_utc
 from wtbot.wiki.client import WikiClient
 from wtbot.wiki.wiki_types import RemoteChange
@@ -29,7 +29,7 @@ Three things this must not get wrong:
   content comparison after fetching.
 - **Namespace ids are per-site.** ``Page``/``Index`` are 104/106 on
   en.wikisource and different on a fresh ProofreadPage install, so the
-  server-side filter is resolved from this site's Namespace rows by *role*.
+  server-side filter is resolved from this site's Namespace rows by canonical name.
 
 Moves and deletions are out of scope here and deliberately not half-covered:
 they are ``log`` entries needing ``list=logevents`` to read properly, and
@@ -38,7 +38,7 @@ discussion section 5 wants them classified, not merely noticed.
 
 # Only ever narrows a scan we would otherwise do in full, so erring large is
 # free; erring small silently drops changes.
-DEFAULT_WATCHED_ROLES = (NsRole.page, NsRole.index)
+DEFAULT_WATCHED_NAMESPACES = ("Page", "Index")
 
 
 class RefreshBasis(str, Enum):
@@ -77,7 +77,7 @@ def plan_refresh(
     *,
     since: datetime,
     title_prefix: str | None = None,
-    roles: tuple[NsRole, ...] = DEFAULT_WATCHED_ROLES,
+    namespace_names: tuple[str, ...] = DEFAULT_WATCHED_NAMESPACES,
 ) -> RefreshPlan:
     """Decide which of this site's known titles are worth refetching.
 
@@ -103,7 +103,7 @@ def plan_refresh(
 
     changes = client.recent_changes(
         since=since,
-        namespace_keys=_namespace_keys(session, site, roles),
+        namespace_keys=_namespace_keys(session, site, namespace_names),
     )
 
     known = _known_titles(session, site, title_prefix)
@@ -148,9 +148,9 @@ def _known_titles(session: Session, site: Site, title_prefix: str | None) -> set
 
 
 def _namespace_keys(
-    session: Session, site: Site, roles: tuple[NsRole, ...]
+    session: Session, site: Site, namespace_names: tuple[str, ...]
 ) -> list[int] | None:
-    """This site's numeric ids for the watched roles, or None to not filter.
+    """This site's numeric ids for the watched namespace names, or None to not filter.
 
     None rather than an empty list when nothing resolves: an empty
     ``rcnamespace`` would be a filter matching nothing, and a namespace table
@@ -160,7 +160,7 @@ def _namespace_keys(
     keys = session.exec(
         select(Namespace.key).where(
             Namespace.site_pk == site.pk,
-            Namespace.role.in_(roles),
+            Namespace.canonical_name.in_(namespace_names),
         )
     ).all()
     return sorted(keys) or None

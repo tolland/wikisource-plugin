@@ -25,7 +25,7 @@ from wtbot.model.sync.promotion import (
 )
 from wtbot.model.sync.revision_link import LinkOrigin, RevisionLink
 from wtbot.model.wiki.content import Content
-from wtbot.model.wiki.namespace import Namespace, NsRole, role_for_canonical
+from wtbot.model.wiki.namespace import Namespace
 from wtbot.model.wiki.page import FetchState, Page
 from wtbot.model.wiki.revision import Revision
 from wtbot.model.wiki.site import Site
@@ -48,8 +48,6 @@ __all__ = [
     "OcrBackendKind",
     "Site",
     "Namespace",
-    "NsRole",
-    "role_for_canonical",
     "Page",
     "FetchState",
     "Revision",

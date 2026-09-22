@@ -181,7 +181,7 @@ def test_fetch_then_drain_persists(app_with_fake, engine):
     page = body["page"]
     assert page is not None
     assert page["content_model"] == "proofread-index"
-    assert page["namespace_role"] == "index"  # role resolved from canonical 'Index'
+    assert page["content_model"] == "proofread-index"
     assert page["revid"] == 23417
     assert page["dirty"] is False
 
@@ -716,7 +716,7 @@ def test_file_fetch_downloads_blob(engine, tmp_path):
     assert body["request"]["status"] == FetchStatus.done.value
     page = body["page"]
     assert page is not None
-    assert page["namespace_role"] == "file"
+    assert page["namespace_key"] == 6
 
     blob_file = tmp_path / "blobs" / "mywikisource" / "en" / "Tractatus.djvu"
     assert blob_file.exists()

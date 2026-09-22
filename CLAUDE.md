@@ -162,7 +162,7 @@ uv run wtbot drain --status                                    # queue depth
 ```
 
 `--label` and `--base-url` are TyperDI dependencies (`src-py/wtbot/cli/deps.py`), so they appear on every command that declares them rather than being dug out of `ctx.parent.params`; `WTBOT_SITE_LABEL` sets the default label for a shell session.
-- `src-py/wtbot/wiki/` — the injectable wiki-access seam: `WikiSettings` (config), `configure_pywikibot()` (programmatic config, no on-disk `user-config.py`), `WikiClient` protocol with `PywikibotClient` (real) and `FakeWikiClient` (in-memory, no pywikibot import) implementations, `dispatch.py` (classifies a fetched title as `FILE`/`PROOFREAD_INDEX`/`PROOFREAD_PAGE`/`WIKITEXT` from namespace role + content_model)
+- `src-py/wtbot/wiki/` — the injectable wiki-access seam: `WikiSettings` (config), `configure_pywikibot()` (programmatic config, no on-disk `user-config.py`), `WikiClient` protocol with `PywikibotClient` (real) and `FakeWikiClient` (in-memory, no pywikibot import) implementations, `dispatch.py` (classifies a fetched title as `FILE`/`PROOFREAD_INDEX`/`PROOFREAD_PAGE`/`WIKITEXT` from content_model with an explicit File namespace check)
 - `src-py/wtbot/vfs/` — VFS-surface implementation backing the `/vfs` router
 - `src-py/wtbot/fetch/worker.py` — the fetch worker (`run_pending`) that drains the `FetchRequest` queue; today invoked inline by `POST /fetch` rather than as a background loop
 - `src-py/DESIGN.md` — backend operations & data-model design (read this before touching the fetch/VFS/commit contract)

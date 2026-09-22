@@ -23,7 +23,7 @@ a page's does, and a pairing carries a ladder of revision links for free.
 
 So the pairing stays one thing and this records what that pairing *is*: the
 same relationship ``IndexMeta`` has to ``Page``, which is the established shape
-here. ``Page`` stays one table and role-specific attributes hang off it; page
+here. ``Page`` stays one table and content-specific attributes hang off it; page
 pairings stay one table and the work-level ones hang off this.
 
 **Children are pointed at their work.** ``PageLink.index_link_pk`` is set when

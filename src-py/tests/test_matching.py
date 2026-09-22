@@ -14,7 +14,6 @@ from wtbot.matching import (
 )
 from wtbot.model import (
     LinkOrigin,
-    NsRole,
     Page,
     Revision,
     RevisionLink,
@@ -59,7 +58,7 @@ def _page(
     title: str | None = None,
 ) -> Page:
     title = title or f"Page:Canadian patent 29537.djvu/{number}"
-    page = Page(site_pk=site.pk, title=title, namespace_role=NsRole.page)
+    page = Page(site_pk=site.pk, title=title, content_model="proofread-page")
     session.add(page)
     session.commit()
     session.refresh(page)

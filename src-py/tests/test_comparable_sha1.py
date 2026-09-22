@@ -4,7 +4,7 @@ from sqlmodel import Session, select
 
 from wtbot.content_model import ProofreadPageDocument, Significance, comparable_sha1
 from wtbot.fetch.revision_store import record_head_revision, upsert_content
-from wtbot.model import Content, NsRole, Page, Site
+from wtbot.model import Content, Page, Site
 from wtbot.wiki.wiki_types import RemotePage
 
 """``Content.comparable_sha1``: the model-aware comparison, precomputed.
@@ -136,7 +136,7 @@ def test_two_sites_bodies_share_a_digest_but_not_a_row(session: Session) -> None
         session.commit()
         session.refresh(site)
         page = Page(
-            site_pk=site.pk, title="Page:Work.djvu/1", namespace_role=NsRole.page
+            site_pk=site.pk, title="Page:Work.djvu/1", content_model="proofread-page"
         )
         session.add(page)
         session.commit()

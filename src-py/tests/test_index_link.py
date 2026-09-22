@@ -9,7 +9,6 @@ from wtbot.model import (
     FetchRequest,
     IndexLink,
     IndexMeta,
-    NsRole,
     Page,
     PageLink,
     RevisionLink,
@@ -61,7 +60,6 @@ def build_index(session: Session, site: Site, title: str) -> Page:
     page = Page(
         site_pk=site.pk,
         title=title,
-        namespace_role=NsRole.index,
         content_model="proofread-index",
     )
     session.add(page)
@@ -96,7 +94,7 @@ def build_page(
     "we did not look far enough" from "they disagree".
     """
     title = title or f"Page:Canadian patent 29537.djvu/{number}"
-    page = Page(site_pk=site.pk, title=title, namespace_role=NsRole.page)
+    page = Page(site_pk=site.pk, title=title, content_model="proofread-page")
     session.add(page)
     session.commit()
     session.refresh(page)
@@ -243,7 +241,6 @@ def test_only_pages_with_index_meta_can_be_a_work(session: Session) -> None:
     local_page = Page(
         site_pk=local.pk,
         title=f"{INDEX}/styles.css",
-        namespace_role=NsRole.index,
         content_model="sanitized-css",
     )
     session.add(local_page)
@@ -342,7 +339,6 @@ def test_candidates_exclude_index_namespace_pages_without_index_meta(engine) -> 
             Page(
                 site_pk=site.pk,
                 title=f"{INDEX}/styles.css",
-                namespace_role=NsRole.index,
                 content_model="sanitized-css",
             )
         )

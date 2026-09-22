@@ -4,7 +4,7 @@ from sqlmodel import Session, select
 
 from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.deps import get_session
-from wtbot.model import Content, NsRole, Page, Revision, Site, Slot
+from wtbot.model import Content, Page, Revision, Site, Slot
 
 router = APIRouter(prefix="/pages", tags=["pages"], route_class=DebugLoggingRoute)
 
@@ -30,7 +30,7 @@ class PageQueryResult(BaseModel):
 def list_pages(
     session: Session = Depends(get_session),
     site_pk: int | None = None,
-    namespace_role: NsRole | None = None,
+    namespace_key: int | None = None,
     content_model: str | None = None,
     title: str | None = None,
     title_contains: str | None = None,
@@ -40,8 +40,8 @@ def list_pages(
     statement = select(Page).order_by(Page.title).offset(offset).limit(limit)
     if site_pk is not None:
         statement = statement.where(Page.site_pk == site_pk)
-    if namespace_role is not None:
-        statement = statement.where(Page.namespace_role == namespace_role)
+    if namespace_key is not None:
+        statement = statement.where(Page.namespace_key == namespace_key)
     if content_model is not None:
         statement = statement.where(Page.content_model == content_model)
     if title is not None:
@@ -60,7 +60,7 @@ def query_pages(
     pageid: int | None = None,
     revid: int | None = None,
     site_label: str | None = None,
-    namespace_role: NsRole | None = None,
+    namespace_key: int | None = None,
     content_model: str | None = None,
     limit: int = Query(100, ge=1, le=1000),
 ) -> list[PageQueryResult]:
@@ -83,7 +83,7 @@ def query_pages(
         (pageid, Page.pageid),
         (revid, Page.revid),
         (site_label, Site.label),
-        (namespace_role, Page.namespace_role),
+        (namespace_key, Page.namespace_key),
         (content_model, Page.content_model),
     )
     for value, column in filters:

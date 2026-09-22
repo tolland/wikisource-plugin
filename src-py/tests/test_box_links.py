@@ -6,7 +6,6 @@ from sqlmodel import Session
 from wtbot.annotation_store import SqlBoxLinkStore
 from wtbot.main import create_app
 from wtbot.model import BoxRangeLink, Page, Site
-from wtbot.model.wiki.namespace import NsRole
 from wtbot.model.wikisource.index_meta import IndexMeta
 
 """Tests for box→range links: the SQL-backed store and the /pages/box-links
@@ -29,7 +28,6 @@ def _seed(engine) -> int:
         index = Page(
             site_pk=site.pk,
             title=INDEX,
-            namespace_role=NsRole.index,
             content_model="proofread-index",
         )
         s.add(index)
@@ -45,7 +43,6 @@ def _seed(engine) -> int:
         page = Page(
             site_pk=site.pk,
             title=PAGE_TITLE,
-            namespace_role=NsRole.page,
             content_model="proofread-page",
             revid=42,
         )

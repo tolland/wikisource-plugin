@@ -3,7 +3,6 @@ from conftest import add_proofread_meta
 from sqlmodel import Session
 
 from wtbot.model import Page, Site
-from wtbot.model.wiki.namespace import NsRole
 from wtbot.vfs.nodes import (
     FileBlobLeaf,
     FileDir,
@@ -47,14 +46,12 @@ def store(engine):
             Page(
                 site_pk=site.pk,
                 title=INDEX,
-                namespace_role=NsRole.index,
                 content_model="proofread-index",
             )
         )
         styles = Page(
             site_pk=site.pk,
             title=f"{INDEX}/styles.css",
-            namespace_role=NsRole.index,
             content_model="sanitized-css",
         )
         s.add(styles)
@@ -62,14 +59,13 @@ def store(engine):
             Page(
                 site_pk=site.pk,
                 title=FILE,
-                namespace_role=NsRole.file,
+                namespace_key=6,
                 content_model="wikitext",
             )
         )
         page_1 = Page(
             site_pk=site.pk,
             title=PAGE_1,
-            namespace_role=NsRole.page,
             content_model="proofread-page",
         )
         s.add(page_1)

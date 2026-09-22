@@ -4,8 +4,6 @@ from enum import Enum
 from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, SQLModel
 
-from wtbot.model.wiki.namespace import NsRole
-
 
 class FetchState(str, Enum):
     unfetched = "unfetched"
@@ -18,8 +16,8 @@ class FetchState(str, Enum):
 class Page(SQLModel, table=True):
     """One (site, title) object -- mainspace, Index:, Page:, Book:, anything.
     One table, not three: "search/replace across the whole work" is a core use
-    case and wants a single scan. The namespace role discriminates shape;
-    role-specific columns are nullable and only meaningful for their role.
+    case and wants a single scan. The content model determines supported operations;
+    namespace identity and capabilities come from the per-site namespace map.
 
     (site_pk, title) is the natural key. pageid/revid are wiki-local and not
     comparable across independently-running instances -- which is exactly why
@@ -32,8 +30,8 @@ class Page(SQLModel, table=True):
     site_pk: int = Field(foreign_key="site.pk")
 
     title: str  # full title incl. namespace prefix, e.g. 'Page:Foo.djvu/171'
-    namespace_role: NsRole = NsRole.other
-    namespace_key: int | None = None  # site-local numeric ns id, informational
+    # Site-local numeric ID; resolves against Namespace for this site.
+    namespace_key: int | None = None
     content_model: str | None = None  # remote contentmodel ('proofread-index', ...)
 
     # Remote identity / revision state -- this IS the conflict token. revid +
