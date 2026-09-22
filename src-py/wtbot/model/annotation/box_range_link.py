@@ -3,6 +3,8 @@ from datetime import datetime
 from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, SQLModel
 
+from wtbot.timeutil import utcnow
+
 """Explicit link from a scan bounding box to a text target range.
 
 A BoxRangeLink says "the content of this box is destined for that text
@@ -34,5 +36,5 @@ class BoxRangeLink(SQLModel, table=True):
     box_annotation_id: str = Field(index=True)
     range_annotation_id: str = Field(index=True)
 
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)

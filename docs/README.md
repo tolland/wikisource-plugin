@@ -44,6 +44,7 @@ backend data model and fetch/edit/commit contract live in `src-py/DESIGN.md`.
 | [`ocr-design.md`](reference/ocr-design.md) | plugin + wtbot | live behaviour | Explains the backend contract, engine discovery and the generated favourites menu. |
 | [`locator-index-design.md`](reference/locator-index-design.md) | wtbot | first cut implemented | The one inferential `<pagelist>` rule is flagged in the doc and tracked in `todo/backlog.md`. |
 | [`logging.md`](reference/logging.md) | all components | live behaviour | Start here when tracing a failing request end-to-end; §0 is the port conventions. |
+| [`annotation-transfer.md`](reference/annotation-transfer.md) | wtbot | live behaviour | Why the annotation tables are the one part of the cache a rebuild cannot re-fetch, and the dump/load file that makes them portable. Read before a schema migration. |
 | [`proofread-page-sha1-discordance.md`](reference/proofread-page-sha1-discordance.md) | wtbot | empirical finding | Why cross-wiki comparison must hash served content, not `Revision.sha1`. Read before writing anything that compares revisions. |
 | [`check_revisions.http`](reference/check_revisions.http) | wtbot | scratch requests | Ready-made `recentchanges` queries against en.wikisource. |
 

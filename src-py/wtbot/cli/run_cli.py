@@ -2,12 +2,12 @@ import typer
 
 from wtbot.cli.callbacks import get_callback
 from wtbot.cli.commands import (
-    import_svg_annotations,
     link,
     page,
     show_config,
     sync,
 )
+from wtbot.cli.commands.annotations import annotations
 from wtbot.cli.commands.dev import dev
 from wtbot.cli.commands.fetch import fetch
 from wtbot.cli.commands.locator import locator
@@ -46,7 +46,7 @@ def create_app() -> typer.Typer:
     cli.add_typer(sync.app)
     # utils commands
     cli.add_typer(show_config.app, rich_help_panel="Tools")
-    cli.add_typer(import_svg_annotations.app, rich_help_panel="Tools")
+    cli.add_typer(annotations.app, rich_help_panel="Tools")
     cli.add_typer(dev.app, rich_help_panel="Development")
 
     return cli
