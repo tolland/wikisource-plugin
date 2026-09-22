@@ -24,21 +24,20 @@ def parse_since(value: str | None) -> datetime | None:
 @app.callback(invoke_without_command=True)
 def fetch_refresh(
     ctx: typer.Context = Depends(get_context),
-    title_prefix: str | None = typer.Option(
-        None,
-        help=(
-            "Narrow to one work, e.g. 'Page:Some_book.djvu/'. With a prefix, "
-            "titles not held locally are taken too -- that is how a partially "
-            "transcribed index grows."
-        ),
+    since: datetime = typer.Option(
+        # formats=["%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"],
+        # formats=None,
+        help="Required inclusive start date/time in UTC, e.g. 2026-08-01. No server cursor is stored.",
+        parser=parse_since,
     ),
-    since: Annotated[
-        datetime | None,
+    title_prefix: Annotated[
+        str | None,
         typer.Option(
-            # formats=["%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"],
-            # formats=None,
-            help="Required inclusive start date/time in UTC, e.g. 2026-08-01. No server cursor is stored.",
-            parser=parse_since,
+            help=(
+                "Narrow to one work, e.g. 'Page:Some_book.djvu/'. With a prefix, "
+                "titles not held locally are taken too -- that is how a partially "
+                "transcribed index grows."
+            ),
         ),
     ] = None,
     dry_run: bool = typer.Option(

@@ -75,7 +75,7 @@ def page_pk(engine) -> int:
 
 
 def _put_box(client, annotation_id: str):
-    body = {"x": 10, "y": 20, "width": 30, "height": 40}
+    body = {"x": 0.1, "y": 0.2, "width": 0.3, "height": 0.4}
     return client.put(
         f"/pages/annotations/{annotation_id}", params={"path": PAGE_PATH}, json=body
     )
@@ -98,6 +98,12 @@ def _put_link(client, box_id: str, range_id: str):
 
 def _links(client):
     return client.get("/pages/box-links", params={"path": PAGE_PATH}).json()["links"]
+
+
+def _annotations(client):
+    return client.get("/pages/annotations", params={"path": PAGE_PATH}).json()[
+        "annotations"
+    ]
 
 
 # -- SqlBoxLinkStore -------------------------------------------------------------
