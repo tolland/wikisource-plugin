@@ -17,11 +17,11 @@ class IndexMeta(SQLModel, table=True):
 
     __table_args__ = (
         UniqueConstraint("site_pk", "short_name", name="uq_indexmeta_site_short"),
-        UniqueConstraint("page_pk", name="uq_indexmeta_page"),
+        UniqueConstraint("title_pk", name="uq_indexmeta_page"),
     )
 
     pk: int | None = Field(default=None, primary_key=True)
-    page_pk: int = Field(foreign_key="page.pk", index=True)
+    title_pk: int = Field(foreign_key="title.pk", index=True)
     site_pk: int = Field(foreign_key="site.pk", index=True)
 
     short_name: str

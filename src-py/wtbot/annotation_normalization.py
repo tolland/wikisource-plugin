@@ -22,7 +22,7 @@ from wtbot.api.reference_image import fetch_image_bytes
 
 class LegacyAnnotation(BaseModel):
     pk: int
-    page_pk: int
+    title_pk: int
     annotation_id: str
     x: float
     y: float
@@ -35,7 +35,7 @@ class LegacyAnnotation(BaseModel):
 
 @dataclass(frozen=True)
 class ImageDimensions:
-    page_pk: int
+    title_pk: int
     width: int
     height: int
     sha256: str
@@ -67,10 +67,10 @@ def normalize_box(
 
 def _check_row(connection: sqlite3.Connection, box: LegacyAnnotation) -> None:
     row = connection.execute(
-        "SELECT page_pk, annotation_id, x, y, width, height FROM scanannotation WHERE pk=?",
+        "SELECT title_pk, annotation_id, x, y, width, height FROM scanannotation WHERE pk=?",
         (box.pk,),
     ).fetchone()
-    if row != (box.page_pk, box.annotation_id, *box.pixels()):
+    if row != (box.title_pk, box.annotation_id, *box.pixels()):
         raise ValueError(f"annotation {box.pk} is missing or differs from the dump")
 
 
@@ -105,17 +105,17 @@ def backfill(
             raise ValueError("database must be at migration a21d6430c901")
         for box in boxes:
             _check_row(connection, box)
-            if box.page_pk not in dimensions:
+            if box.title_pk not in dimensions:
                 row = connection.execute(
-                    "SELECT source_image_url, thumb_url FROM proofreadpagemeta WHERE page_pk=?",
-                    (box.page_pk,),
+                    "SELECT source_image_url, thumb_url FROM proofreadpagemeta WHERE title_pk=?",
+                    (box.title_pk,),
                 ).fetchone()
                 url = (row[0] or row[1]) if row else None
                 if not url:
-                    raise ValueError(f"page {box.page_pk} has no reference image URL")
+                    raise ValueError(f"page {box.title_pk} has no reference image URL")
                 ext = Path(url.split("?", 1)[0]).suffix or ".jpg"
                 cache = (
-                    blob_root / "page_images" / f"{box.page_pk}-src{ext}"
+                    blob_root / "page_images" / f"{box.title_pk}-src{ext}"
                     if blob_root
                     else None
                 )
@@ -125,14 +125,14 @@ def backfill(
                     data, location = fetch_image_bytes(url), url
                 with Image.open(BytesIO(data)) as image:
                     width, height = image.size
-                dimensions[box.page_pk] = ImageDimensions(
-                    box.page_pk,
+                dimensions[box.title_pk] = ImageDimensions(
+                    box.title_pk,
                     width,
                     height,
                     hashlib.sha256(data).hexdigest(),
                     location,
                 )
-            image = dimensions[box.page_pk]
+            image = dimensions[box.title_pk]
             converted.append(
                 ConvertedAnnotation(box, normalize_box(box, image.width, image.height))
             )

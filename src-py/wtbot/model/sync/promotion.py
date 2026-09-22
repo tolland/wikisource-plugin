@@ -99,17 +99,18 @@ class PromotionBatch(SQLModel, table=True):
         index=True,
         description="The tracked work, when the pair is tracked.",
     )
-    page_link_pk: int | None = Field(
-        default=None,
-        foreign_key="pagelink.pk",
-        index=True,
-        description="The page correspondence; null only while creating the target.",
-    )
-    source_page_pk: int = Field(foreign_key="page.pk", index=True)
-    target_page_pk: int | None = Field(default=None, foreign_key="page.pk", index=True)
+    source_page_pk: int = Field(foreign_key="title.pk", index=True)
+    target_page_pk: int = Field(foreign_key="title.pk", index=True)
+    """The target title. Never null: a title exists the moment somebody can
+    type it, whether or not the wiki holds a page at it, so "we are creating
+    the target" is no longer a hole in this row -- it is ``intent`` on each
+    promotion, recorded rather than inferred.
 
-    source_title: str
-    target_title: str
+    ``page_link_pk`` used to sit beside this, null for the same reason. It is
+    gone: with both sides non-null the pairing is ``find_pair(source, target)``,
+    a lookup rather than a column, and storing it froze a pk that ``unpair``
+    can delete out from under the batch."""
+
     page_number: int | None = None
     source_head_revid: int | None = None
     anchor_link_pk: int | None = Field(
@@ -120,6 +121,15 @@ class PromotionBatch(SQLModel, table=True):
     )
     label: str | None = None
     """A human's name for the run, for telling two of them apart in a list."""
+
+    staged_target_title: str | None = None
+    """What the target was called when this was staged. An audit note only.
+
+    The worker must resolve the write target through ``target_page_pk``, not
+    from here: a page moved on the wiki between staging and push would leave
+    this string naming the redirect, and writing to it forks the content
+    instead of editing the moved page. PageLink survives renames by pointing
+    at pks; a batch that carried a frozen title did not."""
 
     status: BatchStatus = Field(default=BatchStatus.draft, index=True)
 

@@ -11,12 +11,12 @@ class FileBlob(SQLModel, table=True):
     VFS uses this to answer stat/HEAD requests without re-reading the file.
 
     ``file_sha1`` is the SHA1 of the binary payload -- distinct from the
-    wikitext revision sha1 on Page and the correct cache-key for the blob.
+    wikitext revision sha1 on Title and the correct cache-key for the blob.
     A new revision of the file gets a new row (or an upsert of the fields).
     """
 
     pk: int | None = Field(default=None, primary_key=True)
-    page_pk: int = Field(foreign_key="page.pk", index=True)
+    title_pk: int = Field(foreign_key="title.pk", index=True)
 
     # MediaWiki imageinfo fields (pywikibot FileInfo attributes)
     file_sha1: str | None = None  # SHA1 of the binary (not the wikitext rev)

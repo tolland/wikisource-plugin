@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from wtbot.model import Page, Site
+from wtbot.model import Site, Title
 from wtbot.vfs.paths import WikiPath
 from wtbot.vfs.store import PROOFREAD_INDEX_CONTENT_MODEL, PageStore
 
@@ -16,7 +16,7 @@ ProofreadPage tree:
     /{family}/{code}/{Index title}           IndexDir      (dual role: container...)
     /{family}/{code}/{Index title}/wikitext  IndexWikitext (...and content)
     /.../{Index title}/Pages                 PagesDir
-    /.../{Index title}/Pages/{Page title}    PageLeaf
+    /.../{Index title}/Pages/{Title title}    PageLeaf
     /.../{Index title}/{File title}          FileDir       (dual role again)
     /.../{Index title}/{File title}/wikitext FileWikitext
     /.../{Index title}/{File title}/blob     FileBlobLeaf
@@ -50,7 +50,7 @@ class IndexDir:
 
     path: WikiPath
     site: Site
-    index: Page
+    index: Title
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,7 +59,7 @@ class IndexWikitext:
 
     path: WikiPath
     site: Site
-    index: Page
+    index: Title
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,35 +69,35 @@ class PagesDir:
 
     path: WikiPath
     site: Site
-    index: Page
+    index: Title
 
 
 @dataclass(frozen=True, slots=True)
 class PageLeaf:
     path: WikiPath
     site: Site
-    page: Page
+    page: Title
 
 
 @dataclass(frozen=True, slots=True)
 class FileDir:
     path: WikiPath
     site: Site
-    file_page: Page
+    file_page: Title
 
 
 @dataclass(frozen=True, slots=True)
 class FileWikitext:
     path: WikiPath
     site: Site
-    file_page: Page
+    file_page: Title
 
 
 @dataclass(frozen=True, slots=True)
 class FileBlobLeaf:
     path: WikiPath
     site: Site
-    file_page: Page
+    file_page: Title
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,7 +108,7 @@ class IndexAssetLeaf:
 
     path: WikiPath
     site: Site
-    page: Page
+    page: Title
     name: str
 
 

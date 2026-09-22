@@ -39,7 +39,7 @@ def create_app() -> typer.Typer:
     cli.add_typer(site_credential.app, rich_help_panel="Model commands")
     cli.add_typer(page.app, rich_help_panel="Model commands")
     # commands for queue pages to sync to local sqlite cache
-    cli.add_typer(fetch.app, rich_help_panel="Fetch Page")
+    cli.add_typer(fetch.app, rich_help_panel="Fetch Title")
     # sync between two sites ib local cache
     cli.add_typer(link.app, rich_help_panel="Model commands")
     cli.add_typer(locator.app, rich_help_panel="Model commands")

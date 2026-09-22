@@ -12,11 +12,11 @@ from wtbot.api.schemas import (
 )
 from wtbot.commit_worker import run_pending_commit_for_page, run_pending_commits
 from wtbot.deps import get_session
-from wtbot.model import Commit, CommitStatus, EditJournal, Page
+from wtbot.model import Commit, CommitStatus, EditJournal, Title
 
 router = APIRouter(prefix="/commits", tags=["commits"], route_class=DebugLoggingRoute)
 
-# A successful push enqueues a refetch of its page -- the Page row is only ever
+# A successful push enqueues a refetch of its page -- the Title row is only ever
 # written from fetched remote state -- and, like POST /fetch, this endpoint no
 # longer drains that queue itself. Committing is a write to the wiki; waiting
 # for the throttled read-back is a separate concern with a separate call
@@ -28,7 +28,7 @@ router = APIRouter(prefix="/commits", tags=["commits"], route_class=DebugLogging
 @router.get("/", response_model=list[Commit])
 def list_commits(
     session: Session = Depends(get_session),
-    page_pk: int | None = None,
+    title_pk: int | None = None,
     status: CommitStatus | None = None,
     offset: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
@@ -36,15 +36,15 @@ def list_commits(
     """
 
     :param session:
-    :param page_pk:
+    :param title_pk:
     :param status:
     :param offset:
     :param limit:
     :return:
     """
     statement = select(Commit).order_by(Commit.created_at).offset(offset).limit(limit)
-    if page_pk is not None:
-        statement = statement.where(Commit.page_pk == page_pk)
+    if title_pk is not None:
+        statement = statement.where(Commit.title_pk == title_pk)
     if status is not None:
         statement = statement.where(Commit.status == status)
     return list(session.exec(statement).all())
@@ -64,11 +64,11 @@ def list_pending_commits(
 
     grouped: dict[int, list[EditJournal]] = {}
     for row in rows:
-        grouped.setdefault(row.page_pk, []).append(row)
+        grouped.setdefault(row.title_pk, []).append(row)
 
     pending_pages: list[PendingCommitPage] = []
-    for page_pk, journals in list(grouped.items())[offset : offset + limit]:
-        page = session.get(Page, page_pk)
+    for title_pk, journals in list(grouped.items())[offset : offset + limit]:
+        page = session.get(Title, title_pk)
         if page is None:
             continue
 
@@ -78,7 +78,7 @@ def list_pending_commits(
         )
         pending_pages.append(
             PendingCommitPage(
-                page_pk=page_pk,
+                title_pk=title_pk,
                 site_pk=page.site_pk,
                 title=page.title,
                 current_revid=page.revid,
@@ -123,9 +123,9 @@ def run_commits(
     return CommitRunResponse(handled=handled)
 
 
-@router.post("/{page_pk}", response_model=Commit)
+@router.post("/{title_pk}", response_model=Commit)
 def run_commit_for_page(
-    page_pk: int,
+    title_pk: int,
     request: Request,
     session: Session = Depends(get_session),
     body: Annotated[CommitPageRequest, Body()] = CommitPageRequest(),
@@ -139,7 +139,7 @@ def run_commit_for_page(
     pending = session.exec(
         select(EditJournal.pk)
         .where(
-            EditJournal.page_pk == page_pk,
+            EditJournal.title_pk == title_pk,
             EditJournal.committed == False,  # noqa: E712
         )
         .limit(1)
@@ -150,11 +150,11 @@ def run_commit_for_page(
 
     factory = request.app.state.client_factory
     run_pending_commit_for_page(
-        session, page_pk, factory, force=force, comment=body.comment
+        session, title_pk, factory, force=force, comment=body.comment
     )
     commit = session.exec(
         select(Commit)
-        .where(Commit.page_pk == page_pk)
+        .where(Commit.title_pk == title_pk)
         .order_by(Commit.created_at.desc(), Commit.pk.desc())
     ).first()
     if commit is None:
@@ -162,13 +162,13 @@ def run_commit_for_page(
     return commit
 
 
-@router.delete("/{page_pk}/pending", response_model=CommitRunResponse)
+@router.delete("/{title_pk}/pending", response_model=CommitRunResponse)
 def cancel_pending_commit_for_page(
-    page_pk: int, session: Session = Depends(get_session)
+    title_pk: int, session: Session = Depends(get_session)
 ) -> CommitRunResponse:
     rows = session.exec(
         select(EditJournal).where(
-            EditJournal.page_pk == page_pk,
+            EditJournal.title_pk == title_pk,
             EditJournal.committed == False,  # noqa: E712
         )
     ).all()
@@ -179,7 +179,7 @@ def cancel_pending_commit_for_page(
         for row in rows:
             session.delete(row)
 
-        page = session.get(Page, page_pk)
+        page = session.get(Title, title_pk)
         if page is not None:
             page.dirty = False
             session.add(page)

@@ -26,12 +26,13 @@ from wtbot.model.sync.promotion import (
 from wtbot.model.sync.revision_link import LinkOrigin, RevisionLink
 from wtbot.model.wiki.content import Content
 from wtbot.model.wiki.namespace import Namespace, NsRole, role_for_canonical
-from wtbot.model.wiki.page import FetchState, Page
 from wtbot.model.wiki.revision import Revision
 from wtbot.model.wiki.site import Site
 from wtbot.model.wiki.site_credential import SiteCredential
 from wtbot.model.wiki.slot import MAIN_SLOT, Slot
+from wtbot.model.wiki.title import FetchState, Title
 from wtbot.model.wiki.transclusion import Transclusion
+from wtbot.model.wiki.wiki_page import WikiPage
 from wtbot.model.wikisource.file_meta import FileMeta, FileOrigin
 from wtbot.model.wikisource.index_meta import IndexMeta
 from wtbot.model.wikisource.proofread_page_meta import (
@@ -50,7 +51,8 @@ __all__ = [
     "Namespace",
     "NsRole",
     "role_for_canonical",
-    "Page",
+    "Title",
+    "WikiPage",
     "FetchState",
     "Revision",
     "BatchStatus",

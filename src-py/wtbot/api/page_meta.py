@@ -9,8 +9,8 @@ from wtbot.model import (
     FileOrigin,
     IndexMeta,
     NsRole,
-    Page,
     ProofreadPageMeta,
+    Title,
 )
 from wtbot.model.wikisource.proofread_page_meta import SHORT_NAME_RE
 from wtbot.vfs.nodes import (
@@ -25,7 +25,7 @@ from wtbot.vfs.nodes import (
 )
 from wtbot.vfs.store import PROOFREAD_INDEX_CONTENT_MODEL, PageStore
 
-"""Per-role Page metadata extensions (IndexMeta / ProofreadPageMeta / FileMeta).
+"""Per-role Title metadata extensions (IndexMeta / ProofreadPageMeta / FileMeta).
 
 GET returns 404 while no row exists; PUT upserts with partial-update
 semantics (only fields present in the request body are applied).
@@ -37,7 +37,7 @@ derive the default itself.
 router = APIRouter(prefix="/pages", tags=["page-meta"], route_class=DebugLoggingRoute)
 
 
-@router.get("/resolve", response_model=Page)
+@router.get("/resolve", response_model=Title)
 def resolve_page(
     path: str | None = Query(
         None, description="wikisource:// VFS path, resolved via the overlay"
@@ -46,11 +46,11 @@ def resolve_page(
     code: str | None = Query(None),
     title: str | None = Query(None, description="full title incl. namespace prefix"),
     session: Session = Depends(get_session),
-) -> Page:
+) -> Title:
     """Identity bridge between the two addressing schemes and the rich model:
     map either a wikisource:// VFS path (what the client's editors/tree hold)
     or a canonical (family, code, title) triple (what batch tooling holds) to
-    the backing Page row — whose pk keys the per-role metadata endpoints."""
+    the backing Title row — whose pk keys the per-role metadata endpoints."""
     store = PageStore(session)
     if path is not None:
         match resolve(store, path):
@@ -81,8 +81,8 @@ def resolve_page(
     )
 
 
-def _get_page(session: Session, page_pk: int) -> Page:
-    page = session.get(Page, page_pk)
+def _get_page(session: Session, title_pk: int) -> Title:
+    page = session.get(Title, title_pk)
     if page is None:
         raise HTTPException(status_code=404, detail="page not found")
     return page
@@ -117,8 +117,8 @@ class FileMetaUpdate(BaseModel):
 # -- IndexMeta ---------------------------------------------------------------
 
 
-def _require_index_page(session: Session, page_pk: int) -> Page:
-    page = _get_page(session, page_pk)
+def _require_index_page(session: Session, title_pk: int) -> Title:
+    page = _get_page(session, title_pk)
     if page.content_model != PROOFREAD_INDEX_CONTENT_MODEL:
         raise HTTPException(
             status_code=400, detail=f"not a ProofreadPage index: {page.title}"
@@ -126,30 +126,30 @@ def _require_index_page(session: Session, page_pk: int) -> Page:
     return page
 
 
-@router.get("/{page_pk}/index-meta", response_model=IndexMeta)
-def get_index_meta(page_pk: int, session: Session = Depends(get_session)) -> IndexMeta:
-    page = _require_index_page(session, page_pk)
+@router.get("/{title_pk}/index-meta", response_model=IndexMeta)
+def get_index_meta(title_pk: int, session: Session = Depends(get_session)) -> IndexMeta:
+    page = _require_index_page(session, title_pk)
     meta = PageStore(session).index_meta(page)
     if meta is None:
         raise HTTPException(status_code=404, detail="no index meta yet")
     return meta
 
 
-@router.post("/{page_pk}/index-meta/ensure", response_model=IndexMeta)
+@router.post("/{title_pk}/index-meta/ensure", response_model=IndexMeta)
 def ensure_index_meta(
-    page_pk: int, session: Session = Depends(get_session)
+    title_pk: int, session: Session = Depends(get_session)
 ) -> IndexMeta:
-    page = _require_index_page(session, page_pk)
+    page = _require_index_page(session, title_pk)
     return PageStore(session).ensure_index_meta(page)
 
 
-@router.put("/{page_pk}/index-meta", response_model=IndexMeta)
+@router.put("/{title_pk}/index-meta", response_model=IndexMeta)
 def put_index_meta(
-    page_pk: int,
+    title_pk: int,
     update: IndexMetaUpdate,
     session: Session = Depends(get_session),
 ) -> IndexMeta:
-    page = _require_index_page(session, page_pk)
+    page = _require_index_page(session, title_pk)
     if not SHORT_NAME_RE.match(update.short_name):
         raise HTTPException(
             status_code=400,
@@ -166,7 +166,7 @@ def put_index_meta(
         )
     if meta is None:
         meta = IndexMeta(
-            page_pk=page.pk, site_pk=page.site_pk, short_name=update.short_name
+            title_pk=page.pk, site_pk=page.site_pk, short_name=update.short_name
         )
     else:
         meta.short_name = update.short_name
@@ -179,24 +179,24 @@ def put_index_meta(
 # -- ProofreadPageMeta ---------------------------------------------------------
 
 
-@router.get("/{page_pk}/page-meta", response_model=ProofreadPageMeta)
+@router.get("/{title_pk}/page-meta", response_model=ProofreadPageMeta)
 def get_page_meta(
-    page_pk: int, session: Session = Depends(get_session)
+    title_pk: int, session: Session = Depends(get_session)
 ) -> ProofreadPageMeta:
-    page = _get_page(session, page_pk)
+    page = _get_page(session, title_pk)
     meta = PageStore(session).proofread_page_meta(page)
     if meta is None:
         raise HTTPException(status_code=404, detail="no page meta yet")
     return meta
 
 
-@router.put("/{page_pk}/page-meta", response_model=ProofreadPageMeta)
+@router.put("/{title_pk}/page-meta", response_model=ProofreadPageMeta)
 def put_page_meta(
-    page_pk: int,
+    title_pk: int,
     update: ProofreadPageMetaUpdate,
     session: Session = Depends(get_session),
 ) -> ProofreadPageMeta:
-    page = _get_page(session, page_pk)
+    page = _get_page(session, title_pk)
     if page.namespace_role != NsRole.page:
         raise HTTPException(
             status_code=400, detail=f"not a Page:-namespace page: {page.title}"
@@ -221,7 +221,7 @@ def put_page_meta(
             )
     if meta is None:
         assert index_page_pk is not None  # guarded above; narrows the model input
-        meta = ProofreadPageMeta(page_pk=page.pk, index_page_pk=index_page_pk)
+        meta = ProofreadPageMeta(title_pk=page.pk, index_page_pk=index_page_pk)
     for field, value in values.items():
         setattr(meta, field, value)
     session.add(meta)
@@ -233,27 +233,27 @@ def put_page_meta(
 # -- FileMeta ------------------------------------------------------------------
 
 
-@router.get("/{page_pk}/file-meta", response_model=FileMeta)
-def get_file_meta(page_pk: int, session: Session = Depends(get_session)) -> FileMeta:
-    page = _get_page(session, page_pk)
+@router.get("/{title_pk}/file-meta", response_model=FileMeta)
+def get_file_meta(title_pk: int, session: Session = Depends(get_session)) -> FileMeta:
+    page = _get_page(session, title_pk)
     meta = PageStore(session).file_meta(page)
     if meta is None:
         raise HTTPException(status_code=404, detail="no file meta yet")
     return meta
 
 
-@router.put("/{page_pk}/file-meta", response_model=FileMeta)
+@router.put("/{title_pk}/file-meta", response_model=FileMeta)
 def put_file_meta(
-    page_pk: int,
+    title_pk: int,
     update: FileMetaUpdate,
     session: Session = Depends(get_session),
 ) -> FileMeta:
-    page = _get_page(session, page_pk)
+    page = _get_page(session, title_pk)
     if page.namespace_role != NsRole.file:
         raise HTTPException(
             status_code=400, detail=f"not a File:-namespace page: {page.title}"
         )
-    meta = PageStore(session).file_meta(page) or FileMeta(page_pk=page.pk)
+    meta = PageStore(session).file_meta(page) or FileMeta(title_pk=page.pk)
     for field, value in update.model_dump(exclude_unset=True).items():
         setattr(meta, field, value)
     session.add(meta)

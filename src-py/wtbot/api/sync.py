@@ -13,7 +13,6 @@ from wtbot.model import (
     BatchStatus,
     FetchKind,
     FetchRequest,
-    Page,
     Promotion,
     PromotionBatch,
     PromotionIntent,
@@ -21,10 +20,13 @@ from wtbot.model import (
     Revision,
     RevisionLink,
     Site,
+    Title,
 )
+from wtbot.pages import head_revision
 from wtbot.promotion.promotion_store import (
     PromotionError,
     abort,
+    ensure_title,
     next_staged,
     promotions,
     skip,
@@ -33,6 +35,7 @@ from wtbot.promotion.promotion_store import (
     stage_next_change,
     stage_page,
     target_head_revid,
+    target_title_of,
 )
 from wtbot.promotion.promotion_worker import push_one
 from wtbot.site_store import require_credentialed_site, resolve_pair
@@ -364,7 +367,7 @@ class PageSyncRequest(BaseModel):
             "mywikisource/wikisource)."
         ),
     )
-    source_title: str = Field(description="Page title on the source site.")
+    source_title: str = Field(description="Title title on the source site.")
     target_title: str | None = Field(
         default=None,
         description="Only needed when the two sides' titles differ.",
@@ -457,11 +460,11 @@ def _transformations(source_body: str, submitted_body: str) -> list[str]:
 
 def _correspondence_materialized(session: Session, promotion: Promotion) -> bool:
     batch = session.get(PromotionBatch, promotion.batch_pk)
-    if promotion.result_revid is None or batch.target_page_pk is None:
+    if promotion.result_revid is None:
         return False
     target_revision = session.exec(
         select(Revision).where(
-            Revision.page_pk == batch.target_page_pk,
+            Revision.title_pk == batch.target_page_pk,
             Revision.revid == promotion.result_revid,
         )
     ).first()
@@ -483,7 +486,7 @@ def _change_blockers(session: Session, promotion: Promotion) -> list[str]:
     blockers: list[str] = []
     batch = session.get(PromotionBatch, promotion.batch_pk)
     source_revision = session.get(Revision, promotion.source_revision_pk)
-    if source_revision is None or source_revision.page_pk != batch.source_page_pk:
+    if source_revision is None or source_revision.title_pk != batch.source_page_pk:
         blockers.append("The source revision no longer belongs to the source page.")
     if not source_is_unchanged(session, promotion):
         blockers.append("The source moved after this change was calculated.")
@@ -503,22 +506,18 @@ def _change_review(session: Session, promotion: Promotion) -> ChangeReviewOut:
     batch = session.get(PromotionBatch, promotion.batch_pk)
     source_site = session.get(Site, batch.source_site_pk)
     target_site = session.get(Site, batch.target_site_pk)
-    source_page = session.get(Page, batch.source_page_pk)
+    source_page = session.get(Title, batch.source_page_pk)
     source_revision = session.get(Revision, promotion.source_revision_pk)
     source_content = content_of(session, source_revision)
-    target_body = ""
-    if batch.target_page_pk is not None:
-        target_page = session.get(Page, batch.target_page_pk)
-        from wtbot.fetch.revision_store import head_revision
-
-        target_head = head_revision(session, target_page)
-        target_content = content_of(session, target_head) if target_head else None
-        target_body = target_content.text if target_content else ""
+    target_page = session.get(Title, batch.target_page_pk)
+    target_head = head_revision(session, target_page)
+    target_content = content_of(session, target_head) if target_head else None
+    target_body = target_content.text if target_content else ""
     diff = "".join(
         unified_diff(
             target_body.splitlines(keepends=True),
             promotion.body.splitlines(keepends=True),
-            fromfile=f"{batch.target_title}@{promotion.base_revid or 'missing'}",
+            fromfile=f"{target_title_of(session, batch)}@{promotion.base_revid or 'missing'}",
             tofile=f"{source_page.title}@{source_revision.revid}",
         )
     )
@@ -538,9 +537,9 @@ def _change_review(session: Session, promotion: Promotion) -> ChangeReviewOut:
         ),
         target=ChangeTargetOut(
             site=_site_name(target_site),
-            title=batch.target_title,
+            title=target_title_of(session, batch),
             base_revid=promotion.base_revid,
-            url=_page_url(target_site, batch.target_title),
+            url=_page_url(target_site, target_title_of(session, batch)),
         ),
         submitted_body=promotion.body,
         diff=diff,
@@ -554,7 +553,7 @@ def _verification_status(session: Session, promotion: Promotion) -> str:
     requests = session.exec(
         select(FetchRequest).where(
             FetchRequest.site_pk == batch.target_site_pk,
-            FetchRequest.title == batch.target_title,
+            FetchRequest.title == target_title_of(session, batch),
         )
     ).all()
     if not requests:
@@ -575,7 +574,9 @@ def _change_result(session: Session, promotion: Promotion) -> ChangePushOut:
         status=status,
         new_target_revid=promotion.result_revid,
         target_revision_url=(
-            _page_url(target_site, batch.target_title, promotion.result_revid)
+            _page_url(
+                target_site, target_title_of(session, batch), promotion.result_revid
+            )
             if promotion.result_revid is not None
             else None
         ),
@@ -634,11 +635,19 @@ def next_change(
         raise HTTPException(404, str(exc)) from exc
 
     source_page = session.exec(
-        select(Page).where(
-            Page.site_pk == source_site.pk,
-            Page.title == payload.source_title,
+        select(Title).where(
+            Title.site_pk == source_site.pk,
+            Title.title == payload.source_title,
         )
     ).one()
+    # Matching on the target's pk rather than on a stored title string: a move
+    # between staging and now keeps the pk and changes the name.
+    target_page = ensure_title(
+        session,
+        site=target_site,
+        title=payload.target_title or payload.source_title,
+        namespace_role=source_page.namespace_role,
+    )
     existing = session.exec(
         select(Promotion)
         .join(PromotionBatch, Promotion.batch_pk == PromotionBatch.pk)
@@ -647,8 +656,7 @@ def next_change(
             PromotionBatch.source_site_pk == source_site.pk,
             PromotionBatch.target_site_pk == target_site.pk,
             PromotionBatch.source_page_pk == source_page.pk,
-            PromotionBatch.target_title
-            == (payload.target_title or payload.source_title),
+            PromotionBatch.target_page_pk == target_page.pk,
             Promotion.status == PromotionStatus.staged,
         )
         .order_by(Promotion.pk.desc())
@@ -664,8 +672,7 @@ def next_change(
             PromotionBatch.source_site_pk == source_site.pk,
             PromotionBatch.target_site_pk == target_site.pk,
             PromotionBatch.source_page_pk == source_page.pk,
-            PromotionBatch.target_title
-            == (payload.target_title or payload.source_title),
+            PromotionBatch.target_page_pk == target_page.pk,
             Promotion.status == PromotionStatus.pushed,
         )
         .order_by(Promotion.pk.desc())
@@ -856,8 +863,8 @@ def _batch_out(
         status=batch.status,
         source_site=_site_name(session.get(Site, batch.source_site_pk)),
         target_site=_site_name(session.get(Site, batch.target_site_pk)),
-        source_title=batch.source_title,
-        target_title=batch.target_title,
+        source_title=session.get(Title, batch.source_page_pk).title,
+        target_title=target_title_of(session, batch),
         page_number=batch.page_number,
         work_pk=batch.index_link_pk,
         counts=counts,
@@ -868,14 +875,14 @@ def _batch_out(
 
 def _batch_anchor_body(session: Session, batch: PromotionBatch) -> str | None:
     """The exact target-side anchor body frozen as the first diff base."""
-    if batch.anchor_link_pk is None or batch.target_page_pk is None:
+    if batch.anchor_link_pk is None:
         return None
     anchor = session.get(RevisionLink, batch.anchor_link_pk)
     if anchor is None:  # pragma: no cover - foreign key holds
         return None
     for revision_pk in (anchor.local_revision_pk, anchor.remote_revision_pk):
         revision = session.get(Revision, revision_pk)
-        if revision is None or revision.page_pk != batch.target_page_pk:
+        if revision is None or revision.title_pk != batch.target_page_pk:
             continue
         content = content_of(session, revision)
         return content.text if content is not None else None

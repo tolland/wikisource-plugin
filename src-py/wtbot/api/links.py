@@ -35,13 +35,13 @@ from wtbot.model import (
     MAIN_SLOT,
     Content,
     LinkOrigin,
-    Page,
     PageLink,
     ProofreadPageMeta,
     Revision,
     RevisionLink,
     Site,
     Slot,
+    Title,
 )
 from wtbot.site_store import resolve_pair
 from wtbot.timeutil import utcnow
@@ -177,9 +177,9 @@ class LadderOut(BaseModel):
     checked_at: datetime | None = None
 
 
-def _page(session: Session, site: Site, title: str) -> Page:
+def _page(session: Session, site: Site, title: str) -> Title:
     page = session.exec(
-        select(Page).where(Page.site_pk == site.pk, Page.title == title)
+        select(Title).where(Title.site_pk == site.pk, Title.title == title)
     ).first()
     if page is None:
         raise HTTPException(
@@ -299,9 +299,9 @@ def get_ladder(
     local_page = _page(session, local_site, local_title)
     remote_page = _page(session, remote_site, remote_title or local_title)
 
-    rungs = ladder(session, page_pk=local_page.pk, other_page_pk=remote_page.pk)
+    rungs = ladder(session, title_pk=local_page.pk, other_page_pk=remote_page.pk)
     anchor = current_anchor(
-        session, page_pk=local_page.pk, other_page_pk=remote_page.pk
+        session, title_pk=local_page.pk, other_page_pk=remote_page.pk
     )
     local_head = head_revision(session, local_page)
     remote_head = head_revision(session, remote_page)
@@ -378,17 +378,19 @@ def _site_name(site: Site) -> str:
 
 
 def _pair_out(session: Session, link: PageLink) -> PairOut:
-    local_page = session.get(Page, link.local_page_pk)
-    remote_page = session.get(Page, link.remote_page_pk)
+    local_page = session.get(Title, link.local_page_pk)
+    remote_page = session.get(Title, link.remote_page_pk)
     rungs = ladder(
-        session, page_pk=link.local_page_pk, other_page_pk=link.remote_page_pk
+        session, title_pk=link.local_page_pk, other_page_pk=link.remote_page_pk
     )
     anchor = rungs[-1] if rungs else None
     local_head = head_revision(session, local_page)
     remote_head = head_revision(session, remote_page)
 
     meta = session.exec(
-        select(ProofreadPageMeta).where(ProofreadPageMeta.page_pk == link.local_page_pk)
+        select(ProofreadPageMeta).where(
+            ProofreadPageMeta.title_pk == link.local_page_pk
+        )
     ).first()
 
     return PairOut(
@@ -629,12 +631,12 @@ class AssertRungRequest(BaseModel):
 
 
 def _revision_rows(
-    session: Session, page: Page
+    session: Session, page: Title
 ) -> tuple[list[Revision], dict[int, Content | None]]:
     revisions = list(
         session.exec(
             select(Revision)
-            .where(Revision.page_pk == page.pk)
+            .where(Revision.title_pk == page.pk)
             .order_by(Revision.revid.desc())
         ).all()
     )
@@ -695,15 +697,15 @@ def pair_revisions(
     if pairing is None:
         raise HTTPException(404, f"no pairing {pair_pk}")
 
-    local_page = session.get(Page, pairing.local_page_pk)
-    remote_page = session.get(Page, pairing.remote_page_pk)
+    local_page = session.get(Title, pairing.local_page_pk)
+    remote_page = session.get(Title, pairing.remote_page_pk)
     local_revisions, local_content = _revision_rows(session, local_page)
     remote_revisions, remote_content = _revision_rows(session, remote_page)
 
     local_head = head_revision(session, local_page)
     remote_head = head_revision(session, remote_page)
 
-    rungs = ladder(session, page_pk=local_page.pk, other_page_pk=remote_page.pk)
+    rungs = ladder(session, title_pk=local_page.pk, other_page_pk=remote_page.pk)
     linked_pairs: dict[tuple[int, int], RevisionLink] = {}
     linked_from: dict[int, list[int]] = {}
     for rung in rungs:
@@ -830,9 +832,9 @@ def assert_pair_rung(
     return LinkOut(**link.model_dump())
 
 
-def _revision_by_id(session: Session, page_pk: int, revid: int) -> Revision:
+def _revision_by_id(session: Session, title_pk: int, revid: int) -> Revision:
     revision = session.exec(
-        select(Revision).where(Revision.page_pk == page_pk, Revision.revid == revid)
+        select(Revision).where(Revision.title_pk == title_pk, Revision.revid == revid)
     ).first()
     if revision is None:
         raise HTTPException(

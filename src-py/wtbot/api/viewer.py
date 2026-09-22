@@ -4,7 +4,7 @@ from sqlmodel import Session, select
 
 from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.deps import get_session
-from wtbot.model import IndexMeta, Page, Site
+from wtbot.model import IndexMeta, NsRole, Site, Title
 
 router = APIRouter(prefix="/viewer", tags=["viewer"], route_class=DebugLoggingRoute)
 
@@ -29,7 +29,7 @@ class IndexPageDetail(IndexPageSummary):
     body: str
 
 
-def _summary(page: Page, site: Site, page_count: int | None) -> IndexPageSummary:
+def _summary(page: Title, site: Site, page_count: int | None) -> IndexPageSummary:
     return IndexPageSummary(
         pk=page.pk or 0,
         title=page.title,
@@ -45,20 +45,18 @@ def _summary(page: Page, site: Site, page_count: int | None) -> IndexPageSummary
 @router.get("/indexes", response_model=list[IndexPageSummary])
 def list_index_pages(session: Session = Depends(get_session)) -> list[IndexPageSummary]:
     pages = session.exec(
-        select(Page)
-        .where(Page.content_model == PROOFREAD_INDEX_CONTENT_MODEL)
-        .order_by(Page.title)
+        select(Title).where(Title.namespace_role == NsRole.index).order_by(Title.title)
     ).all()
     counts = _page_counts(session, [p.pk for p in pages if p.pk is not None])
     sites = _sites_by_pk(session, [p.site_pk for p in pages])
     return [_summary(page, sites[page.site_pk], counts.get(page.pk)) for page in pages]
 
 
-@router.get("/indexes/{page_pk}", response_model=IndexPageDetail)
+@router.get("/indexes/{title_pk}", response_model=IndexPageDetail)
 def get_index_page(
-    page_pk: int, session: Session = Depends(get_session)
+    title_pk: int, session: Session = Depends(get_session)
 ) -> IndexPageDetail:
-    page = session.get(Page, page_pk)
+    page = session.get(Title, title_pk)
     if page is None or page.content_model != PROOFREAD_INDEX_CONTENT_MODEL:
         raise HTTPException(status_code=404, detail="index page not found")
 
@@ -76,8 +74,8 @@ def _sites_by_pk(session: Session, site_pks: list[int]) -> dict[int, Site]:
 
 
 def _page_counts(session: Session, page_pks: list[int]) -> dict[int, int | None]:
-    """Index page_count now lives on IndexMeta; look it up per Index page_pk."""
+    """Index page_count now lives on IndexMeta; look it up per Index title_pk."""
     if not page_pks:
         return {}
-    rows = session.exec(select(IndexMeta).where(IndexMeta.page_pk.in_(page_pks))).all()
-    return {row.page_pk: row.page_count for row in rows}
+    rows = session.exec(select(IndexMeta).where(IndexMeta.title_pk.in_(page_pks))).all()
+    return {row.title_pk: row.page_count for row in rows}

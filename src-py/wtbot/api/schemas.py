@@ -184,7 +184,7 @@ class PendingCommitJournal(BaseModel):
 
 
 class PendingCommitPage(BaseModel):
-    page_pk: int
+    title_pk: int
     site_pk: int
     title: str
     current_revid: int | None = None
@@ -192,7 +192,7 @@ class PendingCommitPage(BaseModel):
     comment: str | None = None
     base_body: str | None = Field(
         None,
-        description="Cached remote body (Page.text) the local edits are diffed "
+        description="Cached remote body (Title.text) the local edits are diffed "
         "against; None when the page was never fetched (page creation).",
     )
     submitted_body: str

@@ -9,9 +9,9 @@ from wtbot.timeutil import utcnow
 
 Deliberately **sparse**: a row exists for each revision we have actually
 fetched, and the absence of a row never means the revision does not exist. That
-is the same known-absent/unknown distinction ``Page`` already carries for
+is the same known-absent/unknown distinction ``Title`` already carries for
 placeholders, one level down -- and getting it wrong would let a base search
-report a fork point that is only the oldest row we happen to hold. ``Page``
+report a fork point that is only the oldest row we happen to hold. ``Title``
 records how much of the history is known.
 
 Two deliberate divergences from MediaWiki's schema:
@@ -35,14 +35,14 @@ class Revision(SQLModel, table=True):
     """A fetched revision. Content hangs off it via ``Slot``, one row per role."""
 
     __table_args__ = (
-        UniqueConstraint("page_pk", "revid", name="uq_revision_page_revid"),
+        UniqueConstraint("title_pk", "revid", name="uq_revision_page_revid"),
     )
 
     pk: int | None = Field(default=None, primary_key=True)
-    page_pk: int = Field(foreign_key="page.pk", index=True)
+    title_pk: int = Field(foreign_key="title.pk", index=True)
 
     # Site-local and not comparable across wikis -- the same caveat as
-    # Page.pageid. Ancestry within one wiki, nothing more.
+    # Title.pageid. Ancestry within one wiki, nothing more.
     revid: int = Field(index=True)
     parent_revid: int | None = None
 
@@ -56,4 +56,4 @@ class Revision(SQLModel, table=True):
     when the wiki recorded it. Conflating the two is a known bug class here."""
 
     def __repr__(self) -> str:  # pragma: no cover - convenience only
-        return f"Revision(pk={self.pk}, page_pk={self.page_pk}, revid={self.revid})"
+        return f"Revision(pk={self.pk}, title_pk={self.title_pk}, revid={self.revid})"

@@ -31,7 +31,7 @@ def import_svg_cmd(
     """One-shot import of legacy per-page SVG annotation documents into the
     ScanAnnotation table.
 
-    Reads blob_root/annotations/{page_pk}.svg (the pre-SQL storage), inserts
+    Reads blob_root/annotations/{title_pk}.svg (the pre-SQL storage), inserts
     every identifiable <rect> as a ScanAnnotation row, and reports anything
     it could not carry over (non-rect shapes, unsupported transforms). Rows
     that already exist are left alone, so re-running is safe. The SVG files
@@ -56,7 +56,7 @@ def import_svg_cmd(
         for key in report.skipped_existing:
             typer.echo(f"  = {key}")
     if report.skipped_pages:
-        typer.echo("skipped files with no matching Page row:")
+        typer.echo("skipped files with no matching Title row:")
         for name in report.skipped_pages:
             typer.echo(f"  ? {name}")
     for warning in report.warnings:

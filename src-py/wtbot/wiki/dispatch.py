@@ -1,7 +1,7 @@
 """How a fetched page is handled, decided from its content_model.
 
 We trust the remote's ``content_model`` rather than parsing titles by hand --
-an Index reports ``proofread-index``, a Page reports ``proofread-page``. The one
+an Index reports ``proofread-index``, a Title reports ``proofread-page``. The one
 structural override is the **File namespace**: a File's content_model is plain
 ``wikitext`` (its description page), but the payload we actually want is the
 binary scan, so the namespace decides before content_model does.

@@ -8,12 +8,12 @@ from sqlmodel import Session
 
 from wtbot.annotation_store import SqlAnnotationStore
 from wtbot.model.annotation.scan_annotation import ScanAnnotation
-from wtbot.model.wiki.page import Page
+from wtbot.model.wiki.title import Title
 
 """One-shot import of legacy per-page SVG annotation documents.
 
 Before scan annotations moved into the ScanAnnotation table, each page's
-boxes lived in ``blob_root/annotations/{page_pk}.svg``. This module walks
+boxes lived in ``blob_root/annotations/{title_pk}.svg``. This module walks
 those files and inserts the rects it finds, so nothing drawn under the old
 scheme is lost. It is deliberately conservative:
 
@@ -23,7 +23,7 @@ scheme is lost. It is deliberately conservative:
 - ``translate(...)`` transforms on the rect or its ancestors are applied —
   the common leftover from Inkscape edits; any other transform function
   is reported and the element imported with only its translates applied;
-- rows that already exist (same page_pk + annotation_id) are left alone,
+- rows that already exist (same title_pk + annotation_id) are left alone,
   so re-running the import is safe.
 
 The SVG files themselves are not touched; delete the ``annotations``
@@ -58,9 +58,9 @@ class ParsedDocument:
 
 @dataclass
 class ImportReport:
-    imported: list[str] = field(default_factory=list)  # "page_pk/annotation_id"
+    imported: list[str] = field(default_factory=list)  # "title_pk/annotation_id"
     skipped_existing: list[str] = field(default_factory=list)
-    skipped_pages: list[str] = field(default_factory=list)  # files with no Page row
+    skipped_pages: list[str] = field(default_factory=list)  # files with no Title row
     warnings: list[str] = field(default_factory=list)
 
 
@@ -142,7 +142,7 @@ def parse_svg_rects(text: str) -> ParsedDocument:
 def import_svg_annotations(
     engine: Engine, blob_root: Path, dry_run: bool = False
 ) -> ImportReport:
-    """Import every ``{page_pk}.svg`` under ``blob_root/annotations`` into
+    """Import every ``{title_pk}.svg`` under ``blob_root/annotations`` into
     the ScanAnnotation table. Existing rows win; SVG files are left in
     place either way."""
     report = ImportReport()
@@ -154,10 +154,10 @@ def import_svg_annotations(
         store = SqlAnnotationStore(session)
         for svg_path in sorted(svg_dir.glob("*.svg")):
             if not svg_path.stem.isdigit():
-                report.warnings.append(f"{svg_path.name}: not a page_pk name, skipped")
+                report.warnings.append(f"{svg_path.name}: not a title_pk name, skipped")
                 continue
-            page_pk = int(svg_path.stem)
-            if session.get(Page, page_pk) is None:
+            title_pk = int(svg_path.stem)
+            if session.get(Title, title_pk) is None:
                 report.skipped_pages.append(svg_path.name)
                 continue
             try:
@@ -178,8 +178,8 @@ def import_svg_annotations(
                         f"{svg_path.name}: {rect.id}: empty geometry, skipped"
                     )
                     continue
-                key = f"{page_pk}/{rect.id}"
-                if store.get(page_pk, rect.id) is not None:
+                key = f"{title_pk}/{rect.id}"
+                if store.get(title_pk, rect.id) is not None:
                     report.skipped_existing.append(key)
                     continue
                 if (
@@ -195,7 +195,7 @@ def import_svg_annotations(
                 if not dry_run:
                     store.upsert(
                         ScanAnnotation(
-                            page_pk=page_pk,
+                            title_pk=title_pk,
                             annotation_id=rect.id,
                             normalized_x=(rect.x - origin_x) / image_width,
                             normalized_y=(rect.y - origin_y) / image_height,

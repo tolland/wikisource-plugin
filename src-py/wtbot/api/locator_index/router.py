@@ -18,7 +18,7 @@ from wtbot.locator_index import (
     parse_pagelist_assignments,
     scan_section_occurrences,
 )
-from wtbot.model import Page, Site
+from wtbot.model import Site, Title
 from wtbot.vfs.paths import WikiPath
 from wtbot.vfs.store import PageStore
 
@@ -78,7 +78,7 @@ def _pages_dir(path: str) -> str:
     return "/" + "/".join(wiki_path.segments[:3]) + "/Pages"
 
 
-def _page_ref(store: PageStore, page: Page, pages_dir: str) -> PageRef | None:
+def _page_ref(store: PageStore, page: Title, pages_dir: str) -> PageRef | None:
     meta = store.proofread_page_meta(page)
     if meta is None or meta.page_number is None:
         return None
@@ -94,7 +94,7 @@ def _matches(candidate: str, query: str) -> bool:
 
 
 def _page_refs_by_scan(
-    store: PageStore, pages: list[Page], pages_dir: str
+    store: PageStore, pages: list[Title], pages_dir: str
 ) -> dict[int, PageRef]:
     refs: dict[int, PageRef] = {}
     for page in pages:

@@ -30,11 +30,11 @@ from wtbot.model import (
     IndexMeta,
     LinkOrigin,
     NsRole,
-    Page,
     PageLink,
     ProofreadPageMeta,
     RevisionLink,
     Site,
+    Title,
 )
 from wtbot.site_store import require_credentialed_site, resolve_pair
 
@@ -106,7 +106,7 @@ class WorkSummary(BaseModel):
     local_page_pk: int
     remote_page_pk: int
 
-    pairs: int = Field(description="Page pairs claimed by this work.")
+    pairs: int = Field(description="Title pairs claimed by this work.")
     linked: int = Field(description="Of those, how many have at least one rung.")
     local_pages: int = Field(
         description="Page: children the local index has cached, paired or not."
@@ -125,7 +125,7 @@ class IndexCandidate(BaseModel):
     lists.
     """
 
-    page_pk: int
+    title_pk: int
     title: str
     page_count: int | None = None
     cached_pages: int
@@ -170,7 +170,7 @@ class LinkWorkRequest(BaseModel):
 class LinkWorkResult(BaseModel):
     work: WorkSummary
     created: bool = Field(description="False when the work was already tracked.")
-    paired: int = Field(default=0, description="Page pairs created by this call.")
+    paired: int = Field(default=0, description="Title pairs created by this call.")
     adopted: int = Field(
         default=0, description="Existing page pairs claimed by the work."
     )
@@ -231,7 +231,7 @@ class PagePairOut(BaseModel):
 class WorkDetail(BaseModel):
     work: WorkSummary
     pages: list[PagePairOut]
-    counts: dict[str, int] = Field(description="Page pairs per outcome.")
+    counts: dict[str, int] = Field(description="Title pairs per outcome.")
     needs_history: int = Field(
         description="Pairs an ordinary fetch-history run would act on."
     )
@@ -280,7 +280,7 @@ class FetchHistoryRequest(BaseModel):
 
 class FetchHistoryResult(BaseModel):
     queued: int = Field(description="Fetch requests enqueued.")
-    pages: int = Field(description="Page pairs they cover (two sides each).")
+    pages: int = Field(description="Title pairs they cover (two sides each).")
     revisions: int
     note: str = Field(
         default=(
@@ -297,9 +297,9 @@ def _site_name(site: Site) -> str:
     return site.label or f"{site.family}:{site.code}"
 
 
-def _index_page(session: Session, site: Site, title: str) -> Page:
+def _index_page(session: Session, site: Site, title: str) -> Title:
     page = session.exec(
-        select(Page).where(Page.site_pk == site.pk, Page.title == title)
+        select(Title).where(Title.site_pk == site.pk, Title.title == title)
     ).first()
     if page is None:
         raise HTTPException(
@@ -312,8 +312,8 @@ def _index_page(session: Session, site: Site, title: str) -> Page:
 
 def _summary(session: Session, work: IndexLink) -> WorkSummary:
     pairing = session.get(PageLink, work.page_link_pk)
-    local_page = session.get(Page, pairing.local_page_pk)
-    remote_page = session.get(Page, pairing.remote_page_pk)
+    local_page = session.get(Title, pairing.local_page_pk)
+    remote_page = session.get(Title, pairing.remote_page_pk)
 
     pairs = session.exec(
         select(func.count())
@@ -351,10 +351,10 @@ def _work(session: Session, work_pk: int) -> IndexLink:
     return work
 
 
-def _sides(session: Session, work: IndexLink) -> tuple[Page, Page, Site, Site]:
+def _sides(session: Session, work: IndexLink) -> tuple[Title, Title, Site, Site]:
     pairing = session.get(PageLink, work.page_link_pk)
-    local_page = session.get(Page, pairing.local_page_pk)
-    remote_page = session.get(Page, pairing.remote_page_pk)
+    local_page = session.get(Title, pairing.local_page_pk)
+    remote_page = session.get(Title, pairing.remote_page_pk)
     return (
         local_page,
         remote_page,
@@ -381,14 +381,14 @@ def _pair_out(
     rungs = 0
     anchor_is_current = False
     local = session.exec(
-        select(Page).where(
-            Page.site_pk == local_site.pk, Page.title == proposal.local_title
+        select(Title).where(
+            Title.site_pk == local_site.pk, Title.title == proposal.local_title
         )
     ).first()
     remote = (
         session.exec(
-            select(Page).where(
-                Page.site_pk == remote_site.pk, Page.title == proposal.remote_title
+            select(Title).where(
+                Title.site_pk == remote_site.pk, Title.title == proposal.remote_title
             )
         ).first()
         if proposal.remote_title
@@ -398,7 +398,7 @@ def _pair_out(
         pairing = find_pair(session, local.pk, remote.pk)
         if pairing is not None:
             pair_pk = pairing.pk
-            ladder_rows = ladder(session, page_pk=local.pk, other_page_pk=remote.pk)
+            ladder_rows = ladder(session, title_pk=local.pk, other_page_pk=remote.pk)
             rungs = len(ladder_rows)
             if ladder_rows:
                 anchor = ladder_rows[-1]
@@ -478,17 +478,17 @@ def list_candidates(
         raise HTTPException(404, f"no site {site_pk if site_pk is not None else label}")
 
     pages = session.exec(
-        select(Page, IndexMeta)
-        .join(IndexMeta, IndexMeta.page_pk == Page.pk)
-        .where(Page.site_pk == site.pk, IndexMeta.site_pk == site.pk)
-        .order_by(Page.title)
+        select(Title, IndexMeta)
+        .join(IndexMeta, IndexMeta.title_pk == Title.pk)
+        .where(Title.site_pk == site.pk, IndexMeta.site_pk == site.pk)
+        .order_by(Title.title)
     ).all()
 
     counts = dict(
         session.exec(
             select(ProofreadPageMeta.index_page_pk, func.count())
-            .join(Page, Page.pk == ProofreadPageMeta.page_pk)
-            .where(Page.site_pk == site.pk, Page.namespace_role == NsRole.page)
+            .join(Title, Title.pk == ProofreadPageMeta.title_pk)
+            .where(Title.site_pk == site.pk, Title.namespace_role == NsRole.page)
             .group_by(ProofreadPageMeta.index_page_pk)
         ).all()
     )
@@ -504,11 +504,11 @@ def list_candidates(
                 if pairing.local_page_pk == page.pk
                 else pairing.local_page_pk
             )
-            other = session.get(Page, other_pk)
+            other = session.get(Title, other_pk)
             paired_with = other.title if other else None
         out.append(
             IndexCandidate(
-                page_pk=page.pk,
+                title_pk=page.pk,
                 title=page.title,
                 page_count=meta.page_count,
                 cached_pages=counts.get(page.pk, 0),
@@ -594,11 +594,11 @@ def create_work(
     )
 
 
-def _page_by_title(session: Session, site: Site, title: str | None) -> Page | None:
+def _page_by_title(session: Session, site: Site, title: str | None) -> Title | None:
     if title is None:
         return None
     return session.exec(
-        select(Page).where(Page.site_pk == site.pk, Page.title == title)
+        select(Title).where(Title.site_pk == site.pk, Title.title == title)
     ).first()
 
 

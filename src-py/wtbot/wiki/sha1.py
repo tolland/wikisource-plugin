@@ -8,7 +8,7 @@ encodings depending on the surface*, which is a silent-mismatch trap for any
 cross-wiki comparison:
 
 - ``action=query&prop=revisions&rvprop=sha1`` (and therefore pywikibot's
-  ``Revision.sha1``, and therefore ``Page.sha1`` in this codebase) returns
+  ``Revision.sha1``, and therefore ``Title.sha1`` in this codebase) returns
   **40-char lowercase hex**;
 - the XML export (``Special:Export``, dump files) and the ``rev_sha1`` database
   column store **31-char base-36**, zero-padded.

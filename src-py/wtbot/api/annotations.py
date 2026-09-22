@@ -12,7 +12,7 @@ from wtbot.annotation_store import (
 )
 from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.deps import get_session
-from wtbot.model import Page
+from wtbot.model import Title
 from wtbot.model.annotation.box_range_link import BoxRangeLink
 from wtbot.model.annotation.scan_annotation import AnnotationCategory, ScanAnnotation
 from wtbot.model.annotation.text_target_anchor import TextTargetAnchor
@@ -113,7 +113,7 @@ class BoxLinkList(BaseModel):
     links: list[BoxLinkOut]
 
 
-def _page_for(session: Session, path: str) -> Page:
+def _page_for(session: Session, path: str) -> Title:
     node = resolve(PageStore(session), path)
     if not isinstance(node, PageLeaf):
         raise HTTPException(status_code=404, detail=f"not a proofread page: {path}")
@@ -192,7 +192,7 @@ def upsert_annotation(
     page = _page_for(session, path)
     row = store.upsert(
         ScanAnnotation(
-            page_pk=page.pk,
+            title_pk=page.pk,
             annotation_id=annotation_id,
             normalized_x=body.x,
             normalized_y=body.y,
@@ -252,7 +252,7 @@ def upsert_text_anchor(
     page = _page_for(session, path)
     row = anchors.upsert(
         TextTargetAnchor(
-            page_pk=page.pk,
+            title_pk=page.pk,
             annotation_id=annotation_id,
             text_start=body.text_start,
             text_end=body.text_end,
@@ -307,7 +307,7 @@ def upsert_box_link(
         )
     row = links.upsert(
         BoxRangeLink(
-            page_pk=page.pk,
+            title_pk=page.pk,
             box_annotation_id=box_annotation_id,
             range_annotation_id=body.range_annotation_id,
         )

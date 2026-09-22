@@ -2,7 +2,7 @@ from sqlalchemy import func
 from sqlmodel import Session, select
 
 from wtbot.linking.remote_link_store import LinkError
-from wtbot.model import LinkOrigin, Page, PageLink, RevisionLink, Site
+from wtbot.model import LinkOrigin, PageLink, RevisionLink, Site, Title
 
 """Reading and writing page pairings.
 
@@ -31,8 +31,8 @@ reason this is stored rather than recomputed.
 
 def pair_pages(
     session: Session,
-    local_page: Page,
-    remote_page: Page,
+    local_page: Title,
+    remote_page: Title,
     *,
     origin: LinkOrigin = LinkOrigin.title_match,
 ) -> PageLink:
@@ -67,37 +67,38 @@ def pair_pages(
     return link
 
 
-def find_pair(session: Session, page_pk: int, other_page_pk: int) -> PageLink | None:
+def find_pair(session: Session, title_pk: int, other_page_pk: int) -> PageLink | None:
     """The pairing of two pages, whichever way round it was stored."""
     return session.exec(
         select(PageLink).where(
             (
-                (PageLink.local_page_pk == page_pk)
+                (PageLink.local_page_pk == title_pk)
                 & (PageLink.remote_page_pk == other_page_pk)
             )
             | (
                 (PageLink.local_page_pk == other_page_pk)
-                & (PageLink.remote_page_pk == page_pk)
+                & (PageLink.remote_page_pk == title_pk)
             )
         )
     ).first()
 
 
 def pair_for_page(
-    session: Session, page_pk: int, other_site_pk: int
+    session: Session, title_pk: int, other_site_pk: int
 ) -> PageLink | None:
     """This page's pairing with a given site, from either orientation."""
     other = func.iif(
-        PageLink.local_page_pk == page_pk,
+        PageLink.local_page_pk == title_pk,
         PageLink.remote_page_pk,
         PageLink.local_page_pk,
     )
     return session.exec(
         select(PageLink)
-        .join(Page, Page.pk == other)
+        .join(Title, Title.pk == other)
         .where(
-            (PageLink.local_page_pk == page_pk) | (PageLink.remote_page_pk == page_pk),
-            Page.site_pk == other_site_pk,
+            (PageLink.local_page_pk == title_pk)
+            | (PageLink.remote_page_pk == title_pk),
+            Title.site_pk == other_site_pk,
         )
     ).first()
 
@@ -161,10 +162,10 @@ def unpair(session: Session, link: PageLink) -> int:
     return removed
 
 
-def other_side(link: PageLink, page_pk: int) -> int:
+def other_side(link: PageLink, title_pk: int) -> int:
     """The page pk at the other end of a pairing."""
-    if page_pk == link.local_page_pk:
+    if title_pk == link.local_page_pk:
         return link.remote_page_pk
-    if page_pk == link.remote_page_pk:
+    if title_pk == link.remote_page_pk:
         return link.local_page_pk
-    raise LinkError(f"page {page_pk} is not part of pairing {link.pk}")
+    raise LinkError(f"page {title_pk} is not part of pairing {link.pk}")

@@ -18,8 +18,8 @@ from wtbot.model import (
     FetchRequest,
     FetchState,
     FetchStatus,
-    Page,
     Site,
+    Title,
     role_for_canonical,
 )
 from wtbot.model.wikisource.proofread_page_meta import ProofreadPageMeta
@@ -42,7 +42,7 @@ from wtbot.wiki.wiki_types import PageNotFound, RemotePage
 """Fetch worker: drains the FetchRequest queue, calls the wiki, writes results
 back into the cache.
 
-The worker owns the queue mechanics — claim, common Page upsert, progress
+The worker owns the queue mechanics — claim, common Title upsert, progress
 bookkeeping. Everything type-specific (blobs, index fan-out, scan-image
 metadata) lives in ``wtbot.page_processors``, one class per page type.
 
@@ -282,7 +282,7 @@ def _record_history(
             # `history_complete_from_revid` and reads the head denormalisation
             # -- and a frozen dataclass has neither the columns nor a session
             # to be added to.
-            row = session.get(Page, page.pk)
+            row = session.get(Title, page.pk)
             if row is None:  # pragma: no cover - the upsert just wrote it
                 return
             head = head_revision(session, row)
@@ -304,7 +304,7 @@ def _record_history(
 def _materialize_promotion_links(session: Session, page: CachedPage) -> None:
     """Attach fetched target revisions to the source revisions that created them."""
     with write_batch(session):
-        target = session.get(Page, page.pk)
+        target = session.get(Title, page.pk)
         if target is not None:
             materialize_promotion_links(session, target)
 
@@ -371,19 +371,19 @@ def _update_parent_progress(session: Session, parent_pk: int) -> None:
 def _upsert_page(
     session: Session, site: Site, remote: RemotePage, processor: PageProcessor
 ) -> CachedPage:
-    """Write the common Page fields from the remote snapshot, then let the
+    """Write the common Title fields from the remote snapshot, then let the
     type-specific processor enrich its own columns, in one transaction."""
     with write_batch(session):
         page = session.exec(
-            select(Page).where(Page.site_pk == site.pk, Page.title == remote.title)
+            select(Title).where(Title.site_pk == site.pk, Title.title == remote.title)
         ).first()
         if page is None:
-            page = Page(site_pk=site.pk, title=remote.title)
+            page = Title(site_pk=site.pk, title=remote.title)
 
         # pageid and revid are identities within one MediaWiki database, not
         # merely mutable metadata. Check before overwriting the cached values:
         # a restored wiki paired with a persistent wtbot database otherwise
-        # splices two unrelated histories together under this Page row.
+        # splices two unrelated histories together under this Title row.
         validate_remote_identity(session, page, remote)
 
         page.namespace_key = remote.namespace_key
@@ -417,7 +417,7 @@ def _upsert_page(
             index_page = ensure_index_page(session, site.pk, index_title)
             meta = session.get(ProofreadPageMeta, page.pk)
             target = meta or ProofreadPageMeta(
-                page_pk=page.pk,
+                title_pk=page.pk,
                 index_page_pk=index_page.pk,
             )
             target.index_page_pk = index_page.pk

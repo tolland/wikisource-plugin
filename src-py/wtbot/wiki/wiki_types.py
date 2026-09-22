@@ -115,7 +115,7 @@ class RemoteChange:
 
 @dataclass(frozen=True)
 class RemotePage:
-    """A plain snapshot of a wiki page, decoupled from pywikibot's Page object so
+    """A plain snapshot of a wiki page, decoupled from pywikibot's Title object so
     the rest of the backend (dispatch, worker, tests) never imports pywikibot.
 
     ``content_model`` is what drives handling ('proofread-index',

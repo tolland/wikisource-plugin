@@ -17,7 +17,7 @@ from wtbot.fetch.queue_runner import (
     queue_stats,
 )
 from wtbot.incremental import RefreshPlan, plan_refresh
-from wtbot.model import FetchKind, FetchRequest, Page
+from wtbot.model import FetchKind, FetchRequest, Title
 from wtbot.site_store import require_credentialed_site
 
 """Cache-fill endpoint (surface B).
@@ -71,7 +71,7 @@ def create_fetch(payload: FetchCreate, session: Session = Depends(get_session)) 
     session.refresh(req)
 
     page = session.exec(
-        select(Page).where(Page.site_pk == site.pk, Page.title == payload.title)
+        select(Title).where(Title.site_pk == site.pk, Title.title == payload.title)
     ).first()
     return {"request": req, "page": page}
 

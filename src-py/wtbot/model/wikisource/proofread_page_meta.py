@@ -2,13 +2,13 @@ import re
 
 from sqlmodel import Field, SQLModel
 
-"""Per-role attribute extensions for Page.
+"""Per-role attribute extensions for Title.
 
-Page stays one table (whole-work scans are a core use case) and keeps the
+Title stays one table (whole-work scans are a core use case) and keeps the
 *fetched remote state*. Everything else — curated values a user sets, or
 locally derived values with their own lifecycle — lives in these side
-tables, one row per page, keyed by page_pk. Adding a new role-specific
-attribute means a column here, not another nullable column on Page.
+tables, one row per page, keyed by title_pk. Adding a new role-specific
+attribute means a column here, not another nullable column on Title.
 
 These tables store values only. Whether/how they surface to the client
 (extra VFS stat metadata vs. a separate preview/approval endpoint) is a
@@ -42,9 +42,9 @@ File: titles (no spaces, slashes, colons or other reserved characters)."""
 class ProofreadPageMeta(SQLModel, table=True):
     """Optional Wikisource metadata for one proofread ``Page:``.
 
-    ``page_pk`` is both identity and ownership: this row cannot exist apart
-    from its vanilla MediaWiki Page. ``index_page_pk`` is the authoritative
-    structural link to the owning ``Index:`` Page; titles are presentation,
+    ``title_pk`` is both identity and ownership: this row cannot exist apart
+    from its vanilla MediaWiki Title. ``index_page_pk`` is the authoritative
+    structural link to the owning ``Index:`` Title; titles are presentation,
     not relational identity.
 
     The remaining fields hold proofread quality and scan-page image values for
@@ -55,10 +55,10 @@ class ProofreadPageMeta(SQLModel, table=True):
     backing DjVu/PDF into blob_root.
     """
 
-    page_pk: int = Field(foreign_key="page.pk", primary_key=True)
+    title_pk: int = Field(foreign_key="title.pk", primary_key=True)
 
     # ProofreadPage structure (resolved from the title / Index fan-out)
-    index_page_pk: int = Field(foreign_key="page.pk", index=True)
+    index_page_pk: int = Field(foreign_key="title.pk", index=True)
     page_number: int | None = None
     quality_level: int | None = None  # ProofreadPage <pagequality level="N"/>, 0-4
 
@@ -68,7 +68,7 @@ class ProofreadPageMeta(SQLModel, table=True):
     # pagequality header + the scan's OCR text layer + footer, from
     # prop=defaultcontentforpage at Index fan-out time). Served as the
     # opening body of a placeholder until the first local edit; never the
-    # remote body — that stays on Page.text.
+    # remote body — that stays on Title.text.
     default_body: str | None = None
     thumb_url: str | None = None
     thumb_width: int | None = None

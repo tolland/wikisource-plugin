@@ -2,7 +2,7 @@ from sqlalchemy.orm import aliased
 from sqlmodel import Session, select
 
 from wtbot.fetch.revision_store import head_revision
-from wtbot.model import LinkOrigin, Page, Revision, RevisionLink
+from wtbot.model import LinkOrigin, Revision, RevisionLink, Title
 
 """Reading and writing asserted cross-site revision correspondence.
 
@@ -25,7 +25,7 @@ Three rules, all of them enforced here rather than left to callers:
   matter which way round the caller asks. The database enforces the same thing
   (``uq_revisionlink_pair``), because a convention only the store honours is one
   raw ``session.add`` away from being untrue.
-- **Page correspondence is derived.** ``corresponding_page`` walks
+- **Title correspondence is derived.** ``corresponding_page`` walks
   ``link -> revision -> page``; no page-pair table exists, because a target
   redlink must have no link rather than a link to nothing.
 """
@@ -53,8 +53,8 @@ def assert_link(
     """
     local, remote = _load_pair(session, local_revision_pk, remote_revision_pk)
 
-    local_page = session.get(Page, local.page_pk)
-    remote_page = session.get(Page, remote.page_pk)
+    local_page = session.get(Title, local.title_pk)
+    remote_page = session.get(Title, remote.title_pk)
     if local_page is None or remote_page is None:  # pragma: no cover - FK holds
         raise LinkError("a linked revision has no page")
     if local_page.site_pk == remote_page.site_pk:
@@ -115,7 +115,7 @@ def _assert_site_cardinality(
         linked_revision = session.get(Revision, linked_pk)
         if linked_revision is None:  # pragma: no cover - FK holds
             continue
-        linked_page = session.get(Page, linked_revision.page_pk)
+        linked_page = session.get(Title, linked_revision.title_pk)
         if linked_page is None:  # pragma: no cover - FK holds
             continue
         if linked_page.site_pk == other_site_pk and linked_pk != other_revision.pk:
@@ -126,7 +126,7 @@ def _assert_site_cardinality(
             )
 
 
-def _pairing_for(session: Session, local_page: Page, remote_page: Page):
+def _pairing_for(session: Session, local_page: Title, remote_page: Title):
     """The pairing this rung belongs under, created if the caller did not.
 
     A revision link always implies its page pairing -- asserting two revisions
@@ -155,7 +155,9 @@ def find_link(
     ).first()
 
 
-def ladder(session: Session, *, page_pk: int, other_page_pk: int) -> list[RevisionLink]:
+def ladder(
+    session: Session, *, title_pk: int, other_page_pk: int
+) -> list[RevisionLink]:
     """Every link asserted between two pages, oldest first.
 
     The two arguments are interchangeable: a page pair has one ladder, not one
@@ -180,9 +182,9 @@ def ladder(session: Session, *, page_pk: int, other_page_pk: int) -> list[Revisi
             )
             .where(
                 _either_way(
-                    local_revision.page_pk,
-                    remote_revision.page_pk,
-                    page_pk,
+                    local_revision.title_pk,
+                    remote_revision.title_pk,
+                    title_pk,
                     other_page_pk,
                 )
             )
@@ -192,7 +194,7 @@ def ladder(session: Session, *, page_pk: int, other_page_pk: int) -> list[Revisi
 
 
 def current_anchor(
-    session: Session, *, page_pk: int, other_page_pk: int
+    session: Session, *, title_pk: int, other_page_pk: int
 ) -> RevisionLink | None:
     """The linked pair closest to both current heads -- the base a push uses.
 
@@ -204,12 +206,12 @@ def current_anchor(
     later add an older historical rung. Choose by actual parent chains so that
     adding history cannot move the current anchor backwards.
     """
-    rungs = ladder(session, page_pk=page_pk, other_page_pk=other_page_pk)
+    rungs = ladder(session, title_pk=title_pk, other_page_pk=other_page_pk)
     if not rungs:
         return None
 
     distances = {
-        page_pk: _revision_distances(session, page_pk),
+        title_pk: _revision_distances(session, title_pk),
         other_page_pk: _revision_distances(session, other_page_pk),
     }
 
@@ -218,24 +220,26 @@ def current_anchor(
             session.get(Revision, rung.local_revision_pk),
             session.get(Revision, rung.remote_revision_pk),
         )
-        by_page = {revision.page_pk: revision.pk for revision in revisions if revision}
-        near = distances[page_pk].get(by_page.get(page_pk), 1_000_000)
+        by_page = {revision.title_pk: revision.pk for revision in revisions if revision}
+        near = distances[title_pk].get(by_page.get(title_pk), 1_000_000)
         far = distances[other_page_pk].get(by_page.get(other_page_pk), 1_000_000)
         return near + far, max(near, far), -(rung.pk or 0)
 
     return min(rungs, key=distance)
 
 
-def _revision_distances(session: Session, page_pk: int) -> dict[int, int]:
+def _revision_distances(session: Session, title_pk: int) -> dict[int, int]:
     """Revision primary key to distance from this page's current head."""
-    page = session.get(Page, page_pk)
+    page = session.get(Title, title_pk)
     if page is None:
         return {}
     head = head_revision(session, page)
     if head is None:
         return {}
 
-    revisions = session.exec(select(Revision).where(Revision.page_pk == page_pk)).all()
+    revisions = session.exec(
+        select(Revision).where(Revision.title_pk == title_pk)
+    ).all()
     by_revid = {revision.revid: revision for revision in revisions}
     distances: dict[int, int] = {}
     current = head
@@ -253,9 +257,9 @@ def _revision_distances(session: Session, page_pk: int) -> dict[int, int]:
 
 
 def corresponding_page(
-    session: Session, *, page_pk: int, other_site_pk: int
-) -> Page | None:
-    """The page on ``other_site_pk`` that any link says corresponds to ``page_pk``.
+    session: Session, *, title_pk: int, other_site_pk: int
+) -> Title | None:
+    """The page on ``other_site_pk`` that any link says corresponds to ``title_pk``.
 
     Derived from the links rather than stored, and it works in both directions:
     a page appears as the local side of some links and the remote side of
@@ -271,7 +275,7 @@ def corresponding_page(
     ):
         near_revision = aliased(Revision)
         far_revision = aliased(Revision)
-        far_page = aliased(Page)
+        far_page = aliased(Title)
         found = session.exec(
             select(far_page)
             # From the link outwards, not from the page: selecting the page as
@@ -280,9 +284,9 @@ def corresponding_page(
             .select_from(RevisionLink)
             .join(near_revision, near == near_revision.pk)
             .join(far_revision, far == far_revision.pk)
-            .join(far_page, far_revision.page_pk == far_page.pk)
+            .join(far_page, far_revision.title_pk == far_page.pk)
             .where(
-                near_revision.page_pk == page_pk,
+                near_revision.title_pk == title_pk,
                 far_page.site_pk == other_site_pk,
             )
             .order_by(RevisionLink.pk.desc())

@@ -1,7 +1,8 @@
 from sqlmodel import Session, select
 
 from wtbot.content_model import comparable_sha1
-from wtbot.model import MAIN_SLOT, Content, Page, Revision, Slot
+from wtbot.model import MAIN_SLOT, Content, Revision, Slot, Title, WikiPage
+from wtbot.pages import head_content, head_revision
 from wtbot.wiki.sha1 import content_sha1_base36, normalize_sha1
 from wtbot.wiki.wiki_types import RemotePage
 
@@ -30,27 +31,30 @@ class RemoteIdentityError(ValueError):
     """
 
 
-def validate_remote_identity(session: Session, page: Page, remote: RemotePage) -> None:
+def validate_remote_identity(session: Session, page: Title, remote: RemotePage) -> None:
     """Refuse a remote snapshot that contradicts this Site's cached identity."""
     if remote.pageid is not None:
-        if page.pageid is not None and page.pageid != remote.pageid:
+        known = session.get(WikiPage, page.pk)
+        if known is not None and known.pageid != remote.pageid:
             raise RemoteIdentityError(
                 f"site {page.site_pk} title {page.title!r} changed pageid "
-                f"from {page.pageid} to {remote.pageid}; the MediaWiki database "
+                f"from {known.pageid} to {remote.pageid}; the MediaWiki database "
                 "may have been restored or replaced"
             )
 
-        other_page = session.exec(
-            select(Page).where(
-                Page.site_pk == page.site_pk,
-                Page.pageid == remote.pageid,
-                Page.pk != page.pk,
+        other = session.exec(
+            select(Title)
+            .join(WikiPage, WikiPage.title_pk == Title.pk)
+            .where(
+                Title.site_pk == page.site_pk,
+                WikiPage.pageid == remote.pageid,
+                Title.pk != page.pk,
             )
         ).first()
-        if other_page is not None:
+        if other is not None:
             raise RemoteIdentityError(
                 f"site {page.site_pk} pageid {remote.pageid} is already cached as "
-                f"{other_page.title!r}, not {page.title!r}; the MediaWiki database "
+                f"{other.title!r}, not {page.title!r}; the MediaWiki database "
                 "may have been restored or a move needs reconciling"
             )
 
@@ -67,15 +71,15 @@ def validate_remote_identity(session: Session, page: Page, remote: RemotePage) -
     if remote.pageid is not None:
         other_revision = session.exec(
             select(Revision)
-            .join(Page, Page.pk == Revision.page_pk)
+            .join(Title, Title.pk == Revision.title_pk)
             .where(
-                Page.site_pk == page.site_pk,
+                Title.site_pk == page.site_pk,
                 Revision.revid == remote.revid,
-                Revision.page_pk != page.pk,
+                Revision.title_pk != page.pk,
             )
         ).first()
         if other_revision is not None:
-            other_revision_page = session.get(Page, other_revision.page_pk)
+            other_revision_page = session.get(Title, other_revision.title_pk)
             other_title = (
                 other_revision_page.title if other_revision_page else "unknown"
             )
@@ -87,7 +91,7 @@ def validate_remote_identity(session: Session, page: Page, remote: RemotePage) -
 
     existing = session.exec(
         select(Revision).where(
-            Revision.page_pk == page.pk,
+            Revision.title_pk == page.pk,
             Revision.revid == remote.revid,
         )
     ).first()
@@ -106,30 +110,53 @@ def validate_remote_identity(session: Session, page: Page, remote: RemotePage) -
         )
 
 
-def head_revision(session: Session, page: Page) -> Revision | None:
-    """The page's current revision, or None for a placeholder."""
-    if page.latest_revision_pk is None:
-        return None
-    return session.get(Revision, page.latest_revision_pk)
+# The head accessors live in `wtbot.pages`, which owns the Title/WikiPage join.
+# Re-exported here because this module is where callers already look for them,
+# and two implementations of "what is the head" is the dual-writer problem this
+# whole split exists to remove.
+head_revision = head_revision
+head_content = head_content
 
 
-def head_content(
-    session: Session, page: Page, *, role: str = MAIN_SLOT
-) -> Content | None:
-    """The Content of one slot of the page's current revision.
+def _point_head_at(
+    session: Session, page: Title, revision: Revision, remote: RemotePage
+) -> None:
+    """Make ``revision`` the head, creating the WikiPage row if this is the
+    first time we have seen the wiki hold anything at this title.
 
-    Takes an explicit ``session`` rather than being a property on ``Page``.
-    This codebase deliberately works from detached snapshots -- the commit
-    worker loads a page, rolls back, then does slow network I/O -- so a
-    lazy-loading attribute would raise ``DetachedInstanceError`` exactly where
-    it is least expected. Requiring the session makes the database access
-    visible at the call site.
+    The two rows are written together, here and only here. ``WikiPage`` exists
+    iff the wiki has a page, so a fetch that found one is exactly the event
+    that creates it -- and a fetch that found nothing never reaches this
+    function, because ``record_head_revision`` returns early with no revid.
     """
-    revision = head_revision(session, page)
-    if revision is None:
-        return None
-    slot = session.get(Slot, (revision.pk, role))
-    return None if slot is None else session.get(Content, slot.content_pk)
+    if revision.title_pk != page.pk:  # pragma: no cover - guarded by callers
+        raise RemoteIdentityError(
+            f"revision {revision.pk} belongs to title {revision.title_pk}, "
+            f"not {page.pk}; a head must belong to its own page"
+        )
+
+    if remote.pageid is None:
+        raise RemoteIdentityError(
+            f"{page.title!r} returned revid {remote.revid} with no pageid; a "
+            "page the wiki holds a revision for must have a page id"
+        )
+
+    wiki_page = session.get(WikiPage, page.pk)
+    if wiki_page is None:
+        wiki_page = WikiPage(
+            title_pk=page.pk,
+            pageid=remote.pageid,
+            namespace_key=remote.namespace_key,
+            content_model=remote.content_model or "wikitext",
+            latest_revision_pk=revision.pk,
+        )
+    else:
+        wiki_page.latest_revision_pk = revision.pk
+        wiki_page.pageid = remote.pageid
+        if remote.content_model is not None:
+            wiki_page.content_model = remote.content_model
+    session.add(wiki_page)
+    session.add(page)
 
 
 def upsert_content(
@@ -182,12 +209,12 @@ def upsert_content(
 
 
 def record_head_revision(
-    session: Session, page: Page, remote: RemotePage
+    session: Session, page: Title, remote: RemotePage
 ) -> Revision | None:
     """Record the revision a fetch just observed, and point the page at it.
 
     Only the head is recorded: a fetch sees one revision, and the store is
-    deliberately sparse -- ``Page.history_complete_from_revid`` stays None
+    deliberately sparse -- ``Title.history_complete_from_revid`` stays None
     because nothing here establishes a contiguous range. A later history walk
     is what fills gaps in and sets that marker.
 
@@ -209,11 +236,11 @@ def record_head_revision(
 
     revision = session.exec(
         select(Revision).where(
-            Revision.page_pk == page.pk, Revision.revid == remote.revid
+            Revision.title_pk == page.pk, Revision.revid == remote.revid
         )
     ).first()
     if revision is None:
-        revision = Revision(page_pk=page.pk, revid=remote.revid)
+        revision = Revision(title_pk=page.pk, revid=remote.revid)
 
     revision.parent_revid = remote.parentid
     revision.timestamp = remote.timestamp
@@ -224,8 +251,7 @@ def record_head_revision(
 
     _upsert_slot(session, revision, content, role=MAIN_SLOT)
 
-    page.latest_revision_pk = revision.pk
-    session.add(page)
+    _point_head_at(session, page, revision, remote)
     # A head whose parent we do not hold marks nothing; a head with *no* parent
     # is the page's only revision, and that is a complete history worth
     # recording -- otherwise every never-edited page reads as "we did not look
@@ -235,15 +261,15 @@ def record_head_revision(
 
 
 def record_history(
-    session: Session, page: Page, remotes: list[RemotePage]
+    session: Session, page: Title, remotes: list[RemotePage]
 ) -> list[Revision]:
     """Record older revisions of a page without moving the head.
 
-    The head denormalisation on ``Page`` is owned by ``record_head_revision``;
+    The head denormalisation on ``Title`` is owned by ``record_head_revision``;
     this fills in behind it, so a caller can walk a page's history without the
     walk deciding what "current" means.
 
-    Sets ``Page.history_complete_from_revid`` to the oldest revid stored *only
+    Sets ``Title.history_complete_from_revid`` to the oldest revid stored *only
     when the run reaches back from the head contiguously*: without that, a
     later base search cannot tell "the histories diverge here" from "this is
     merely the oldest revision we happened to fetch", which is the whole reason
@@ -266,11 +292,11 @@ def record_history(
         )
         revision = session.exec(
             select(Revision).where(
-                Revision.page_pk == page.pk, Revision.revid == remote.revid
+                Revision.title_pk == page.pk, Revision.revid == remote.revid
             )
         ).first()
         if revision is None:
-            revision = Revision(page_pk=page.pk, revid=remote.revid)
+            revision = Revision(title_pk=page.pk, revid=remote.revid)
         revision.parent_revid = remote.parentid
         revision.timestamp = remote.timestamp
         revision.contributor = remote.user
@@ -284,7 +310,7 @@ def record_history(
     return stored
 
 
-def _mark_contiguous_history(session: Session, page: Page) -> None:
+def _mark_contiguous_history(session: Session, page: Title) -> None:
     """Walk parent_revid back from the head and record how far we can get.
 
     Following ``parent_revid`` rather than sorting by revid: consecutive revids
@@ -299,7 +325,7 @@ def _mark_contiguous_history(session: Session, page: Page) -> None:
     by_revid = {
         revision.revid: revision
         for revision in session.exec(
-            select(Revision).where(Revision.page_pk == page.pk)
+            select(Revision).where(Revision.title_pk == page.pk)
         ).all()
     }
     current = head

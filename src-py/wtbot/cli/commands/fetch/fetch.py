@@ -8,6 +8,6 @@ app = TyperDI(
     help="commands relating to fetch wiki page to local cache",
 )
 
-app.add_typer(drain.app, rich_help_panel="Fetch Page")
-app.add_typer(fetch_page.app, rich_help_panel="Fetch Page")
-app.add_typer(fetch_refresh.app, rich_help_panel="Fetch Page")
+app.add_typer(drain.app, rich_help_panel="Fetch Title")
+app.add_typer(fetch_page.app, rich_help_panel="Fetch Title")
+app.add_typer(fetch_refresh.app, rich_help_panel="Fetch Title")

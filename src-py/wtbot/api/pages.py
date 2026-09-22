@@ -4,7 +4,7 @@ from sqlmodel import Session, select
 
 from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.deps import get_session
-from wtbot.model import Content, NsRole, Page, Revision, Site, Slot
+from wtbot.model import Content, NsRole, Revision, Site, Slot, Title, WikiPage
 
 router = APIRouter(prefix="/pages", tags=["pages"], route_class=DebugLoggingRoute)
 
@@ -21,12 +21,12 @@ class PageQueryRevision(BaseModel):
 
 
 class PageQueryResult(BaseModel):
-    page: Page
+    page: Title
     site_label: str | None
     revisions: list[PageQueryRevision]
 
 
-@router.get("/", response_model=list[Page])
+@router.get("/", response_model=list[Title])
 def list_pages(
     session: Session = Depends(get_session),
     site_pk: int | None = None,
@@ -36,18 +36,20 @@ def list_pages(
     title_contains: str | None = None,
     offset: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-) -> list[Page]:
-    statement = select(Page).order_by(Page.title).offset(offset).limit(limit)
+) -> list[Title]:
+    statement = select(Title).order_by(Title.title).offset(offset).limit(limit)
     if site_pk is not None:
-        statement = statement.where(Page.site_pk == site_pk)
+        statement = statement.where(Title.site_pk == site_pk)
     if namespace_role is not None:
-        statement = statement.where(Page.namespace_role == namespace_role)
+        statement = statement.where(Title.namespace_role == namespace_role)
     if content_model is not None:
-        statement = statement.where(Page.content_model == content_model)
+        statement = statement.join(WikiPage, WikiPage.title_pk == Title.pk).where(
+            WikiPage.content_model == content_model
+        )
     if title is not None:
-        statement = statement.where(Page.title == title)
+        statement = statement.where(Title.title == title)
     if title_contains:
-        statement = statement.where(Page.title.contains(title_contains))
+        statement = statement.where(Title.title.contains(title_contains))
     return list(session.exec(statement).all())
 
 
@@ -67,30 +69,36 @@ def query_pages(
     """Find pages and return their complete locally-held revision records.
 
     Every supplied predicate is combined with AND. ``revid`` deliberately
-    addresses ``Page.revid`` (the cached head), just like the other arguments
-    address Page columns; the returned history then shows every sparse
+    addresses ``Title.revid`` (the cached head), just like the other arguments
+    address Title columns; the returned history then shows every sparse
     Revision row currently held behind that page.
     """
     statement = (
-        select(Page, Site.label)
-        .join(Site, Site.pk == Page.site_pk)
-        .order_by(Site.label, Page.title, Page.pk)
+        select(Title, Site.label)
+        .join(Site, Site.pk == Title.site_pk)
+        .order_by(Site.label, Title.title, Title.pk)
         .limit(limit)
     )
+    if any(v is not None for v in (pageid, revid, content_model)):
+        statement = statement.join(WikiPage, WikiPage.title_pk == Title.pk)
+        if revid is not None:
+            statement = statement.join(
+                Revision, Revision.pk == WikiPage.latest_revision_pk
+            ).where(Revision.revid == revid)
+
     filters = (
-        (pk, Page.pk),
-        (title, Page.title),
-        (pageid, Page.pageid),
-        (revid, Page.revid),
+        (pk, Title.pk),
+        (title, Title.title),
+        (pageid, WikiPage.pageid),
         (site_label, Site.label),
-        (namespace_role, Page.namespace_role),
-        (content_model, Page.content_model),
+        (namespace_role, Title.namespace_role),
+        (content_model, WikiPage.content_model),
     )
     for value, column in filters:
         if value is not None:
             statement = statement.where(column == value)
     if title_contains:
-        statement = statement.where(Page.title.contains(title_contains))
+        statement = statement.where(Title.title.contains(title_contains))
 
     page_rows = list(session.exec(statement).all())
     if not page_rows:
@@ -101,12 +109,12 @@ def query_pages(
         select(Revision, Slot, Content)
         .outerjoin(Slot, Slot.revision_pk == Revision.pk)
         .outerjoin(Content, Content.pk == Slot.content_pk)
-        .where(Revision.page_pk.in_(page_pks))
-        .order_by(Revision.page_pk, Revision.revid.desc(), Slot.role)
+        .where(Revision.title_pk.in_(page_pks))
+        .order_by(Revision.title_pk, Revision.revid.desc(), Slot.role)
     ).all()
 
     revisions_by_page: dict[int, list[PageQueryRevision]] = {
-        page_pk: [] for page_pk in page_pks
+        title_pk: [] for title_pk in page_pks
     }
     revisions_by_pk: dict[int, PageQueryRevision] = {}
     for revision, slot, content in revision_rows:
@@ -116,7 +124,7 @@ def query_pages(
         if result_revision is None:
             result_revision = PageQueryRevision(revision=revision, slots=[])
             revisions_by_pk[revision.pk] = result_revision
-            revisions_by_page[revision.page_pk].append(result_revision)
+            revisions_by_page[revision.title_pk].append(result_revision)
         if slot is not None and content is not None:
             result_revision.slots.append(
                 PageQuerySlot(
@@ -137,9 +145,9 @@ def query_pages(
     ]
 
 
-@router.get("/{page_pk}", response_model=Page)
-def get_page(page_pk: int, session: Session = Depends(get_session)) -> Page:
-    page = session.get(Page, page_pk)
+@router.get("/{title_pk}", response_model=Title)
+def get_page(title_pk: int, session: Session = Depends(get_session)) -> Title:
+    page = session.get(Title, title_pk)
     if page is None:
         raise HTTPException(status_code=404, detail="page not found")
     return page

@@ -4,7 +4,6 @@ from sqlmodel import Session, select
 
 from wtbot.content_model import ProofreadPageDocument, parse_document
 from wtbot.fetch.revision_store import head_revision
-from wtbot.linking.page_link_store import find_pair
 from wtbot.linking.remote_link_store import assert_link, current_anchor, ladder
 from wtbot.matching import content_of
 from wtbot.model import (
@@ -12,7 +11,7 @@ from wtbot.model import (
     BatchStatus,
     Content,
     LinkOrigin,
-    Page,
+    NsRole,
     Promotion,
     PromotionBatch,
     PromotionIntent,
@@ -22,6 +21,7 @@ from wtbot.model import (
     Site,
     SiteCredential,
     Slot,
+    Title,
 )
 from wtbot.sync import SyncPage, SyncReport, SyncVerdict
 
@@ -56,6 +56,41 @@ _PYWIKIBOT_DEFAULT_COMMENT = re.compile(rf"Pywikibot {_SEMVER}")
 
 class PromotionError(ValueError):
     """A batch or promotion that cannot be staged or run as asked."""
+
+
+def ensure_title(
+    session: Session, *, site: Site, title: str, namespace_role: NsRole
+) -> Title:
+    """The Title row for an address on a site, created if we have not seen it.
+
+    Creating one asserts nothing about the wiki: a Title is an address, and
+    ``fetch_status`` stays ``unfetched`` so a later report still distinguishes
+    "we asked and there is nothing there" from "we have not looked". The row
+    exists so that everything keyed to an address -- journals, links, batches
+    -- has something non-null to point at.
+    """
+    existing = session.exec(
+        select(Title).where(Title.site_pk == site.pk, Title.title == title)
+    ).first()
+    if existing is not None:
+        return existing
+    row = Title(site_pk=site.pk, title=title, namespace_role=namespace_role)
+    session.add(row)
+    session.flush()
+    return row
+
+
+def target_title_of(session: Session, batch: PromotionBatch) -> str:
+    """The title to write to, resolved now rather than frozen at staging.
+
+    A page moved on the wiki between staging and push keeps its Title row and
+    its pk; the string it was called does not. Resolving through the pk is
+    what stops a push editing the redirect left behind by a move.
+    """
+    target = session.get(Title, batch.target_page_pk)
+    if target is None:  # pragma: no cover - non-null FK
+        raise PromotionError(f"batch {batch.pk} has no target title row")
+    return target.title
 
 
 def stage_batch(
@@ -113,34 +148,28 @@ def stage_page(
         )
 
     source_page = session.exec(
-        select(Page).where(
-            Page.site_pk == source_site.pk, Page.title == page.source_title
+        select(Title).where(
+            Title.site_pk == source_site.pk, Title.title == page.source_title
         )
     ).one()
-    target_page = (
-        session.exec(
-            select(Page).where(
-                Page.site_pk == target_site.pk, Page.title == page.target_title
-            )
-        ).first()
-        if page.target_title
-        else None
-    )
-    pairing = (
-        find_pair(session, source_page.pk, target_page.pk)
-        if target_page is not None
-        else None
+    # The target title always exists, whether or not the wiki holds a page at
+    # it: staging a create is not staging against a hole, it is staging against
+    # an address the wiki has nothing at yet. `intent` records which, so
+    # nothing downstream has to infer it from a null.
+    target_page = ensure_title(
+        session,
+        site=target_site,
+        title=page.target_title or page.source_title,
+        namespace_role=source_page.namespace_role,
     )
     batch = PromotionBatch(
         source_site_pk=source_site.pk,
         target_site_pk=target_site.pk,
         index_link_pk=index_link_pk,
-        page_link_pk=pairing.pk if pairing else None,
         source_page_pk=source_page.pk,
-        target_page_pk=target_page.pk if target_page else None,
-        source_title=page.source_title or "",
-        target_title=page.target_title or page.source_title or "",
+        target_page_pk=target_page.pk,
         page_number=page.page_number,
+        staged_target_title=target_page.title,
         label=label,
     )
     session.add(batch)
@@ -183,13 +212,13 @@ def _stage_promotions_for(
     *,
     limit: int | None = None,
 ) -> list[Promotion]:
-    source_page = session.get(Page, batch.source_page_pk)
+    source_page = session.get(Title, batch.source_page_pk)
     source_head = head_revision(session, source_page)
     if source_head is None:  # pragma: no cover - actionable implies a head
         raise PromotionError(f"{page.source_title} has no cached revision to push")
 
     target_page = (
-        session.get(Page, batch.target_page_pk)
+        session.get(Title, batch.target_page_pk)
         if batch.target_page_pk is not None
         else None
     )
@@ -207,14 +236,14 @@ def _stage_promotions_for(
             raise PromotionError(
                 f"{page.source_title} is staged as an update with no target page"
             )
-        rungs = ladder(session, page_pk=source_page.pk, other_page_pk=target_page.pk)
+        rungs = ladder(session, title_pk=source_page.pk, other_page_pk=target_page.pk)
         if not rungs:  # pragma: no cover - a push verdict implies a ladder
             raise PromotionError(
                 f"{page.source_title} is staged as an update with no asserted "
                 "anchor; a push replays onto the anchor and cannot invent one"
             )
         anchor = current_anchor(
-            session, page_pk=source_page.pk, other_page_pk=target_page.pk
+            session, title_pk=source_page.pk, other_page_pk=target_page.pk
         )
         if anchor is None:  # pragma: no cover - rungs is non-empty
             raise PromotionError(f"{page.source_title} has no current anchor")
@@ -252,18 +281,18 @@ def _stage_promotions_for(
     return rows
 
 
-def _revision_on_page(session: Session, link: RevisionLink, page: Page) -> Revision:
+def _revision_on_page(session: Session, link: RevisionLink, page: Title) -> Revision:
     """Return the side of a rung belonging to ``page``."""
     for revision_pk in (link.local_revision_pk, link.remote_revision_pk):
         revision = session.get(Revision, revision_pk)
-        if revision is not None and revision.page_pk == page.pk:
+        if revision is not None and revision.title_pk == page.pk:
             return revision
     raise PromotionError(f"anchor {link.pk} does not belong to {page.title}")
 
 
 def _revisions_after_anchor(
     session: Session,
-    page: Page,
+    page: Title,
     head: Revision,
     anchor: Revision | None,
 ) -> list[Revision]:
@@ -286,7 +315,7 @@ def _revisions_after_anchor(
             break
         parent = session.exec(
             select(Revision).where(
-                Revision.page_pk == page.pk,
+                Revision.title_pk == page.pk,
                 Revision.revid == current.parent_revid,
             )
         ).first()
@@ -450,7 +479,7 @@ def source_is_unchanged(session: Session, promotion: Promotion) -> bool:
     revision that is no longer current.
     """
     batch = session.get(PromotionBatch, promotion.batch_pk)
-    source_page = session.get(Page, batch.source_page_pk)
+    source_page = session.get(Title, batch.source_page_pk)
     head = head_revision(session, source_page)
     if batch.source_head_revid is not None:
         return head is not None and head.revid == batch.source_head_revid
@@ -471,15 +500,15 @@ def target_head_revid(session: Session, promotion: Promotion) -> int | None:
         return predecessor.result_revid if predecessor is not None else None
     batch = session.get(PromotionBatch, promotion.batch_pk)
     target = (
-        session.get(Page, batch.target_page_pk)
+        session.get(Title, batch.target_page_pk)
         if batch.target_page_pk is not None
         else None
     )
     if target is None:
         target = session.exec(
-            select(Page).where(
-                Page.site_pk == batch.target_site_pk,
-                Page.title == batch.target_title,
+            select(Title).where(
+                Title.site_pk == batch.target_site_pk,
+                Title.title == target_title_of(session, batch),
             )
         ).first()
     head = head_revision(session, target) if target else None
@@ -499,15 +528,15 @@ def body_matches_target(session: Session, promotion: Promotion) -> bool:
         return False
     batch = session.get(PromotionBatch, promotion.batch_pk)
     target = (
-        session.get(Page, batch.target_page_pk)
+        session.get(Title, batch.target_page_pk)
         if batch.target_page_pk is not None
         else None
     )
     if target is None:
         target = session.exec(
-            select(Page).where(
-                Page.site_pk == batch.target_site_pk,
-                Page.title == batch.target_title,
+            select(Title).where(
+                Title.site_pk == batch.target_site_pk,
+                Title.title == target_title_of(session, batch),
             )
         ).first()
     head = head_revision(session, target) if target else None
@@ -518,7 +547,7 @@ def body_matches_target(session: Session, promotion: Promotion) -> bool:
 
 
 def materialize_promotion_links(
-    session: Session, target_page: Page
+    session: Session, target_page: Title
 ) -> list[RevisionLink]:
     """Turn fetched promotion results into their exact one-to-one ladder rungs.
 
@@ -534,7 +563,7 @@ def materialize_promotion_links(
         .join(PromotionBatch, Promotion.batch_pk == PromotionBatch.pk)
         .where(
             PromotionBatch.target_site_pk == target_page.site_pk,
-            PromotionBatch.target_title == target_page.title,
+            PromotionBatch.target_page_pk == target_page.pk,
             Promotion.status == PromotionStatus.pushed,
             Promotion.result_revid.is_not(None),
         )
@@ -545,7 +574,7 @@ def materialize_promotion_links(
         batch = session.get(PromotionBatch, promotion.batch_pk)
         target_revision = session.exec(
             select(Revision).where(
-                Revision.page_pk == target_page.pk,
+                Revision.title_pk == target_page.pk,
                 Revision.revid == promotion.result_revid,
             )
         ).first()
@@ -556,10 +585,8 @@ def materialize_promotion_links(
             local_revision_pk=promotion.source_revision_pk,
             remote_revision_pk=target_revision.pk,
             origin=LinkOrigin.copy,
-            page_link_pk=batch.page_link_pk,
         )
         batch.target_page_pk = target_page.pk
-        batch.page_link_pk = link.page_link_pk
         session.add(batch)
         linked.append(link)
     return linked

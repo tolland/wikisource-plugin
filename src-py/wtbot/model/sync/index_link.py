@@ -12,7 +12,7 @@ reconciled *within* one, and "is this work tracked against upstream?" is the
 question a reviewer asks first and the one the viewer opens on.
 
 **Why this is a side table on ``PageLink`` rather than a table of its own.**
-An ``Index:`` page is a ``Page`` row like any other, so the claim "these two
+An ``Index:`` page is a ``Title`` row like any other, so the claim "these two
 Index pages are the same page" is already exactly a ``PageLink``. Giving works
 their own pairing table would mean two tables that can each assert page
 correspondence, two unordered-pair constraints that cannot see each other, and
@@ -22,8 +22,8 @@ metadata, the transclusion structure -- which diverges across sites exactly as
 a page's does, and a pairing carries a ladder of revision links for free.
 
 So the pairing stays one thing and this records what that pairing *is*: the
-same relationship ``IndexMeta`` has to ``Page``, which is the established shape
-here. ``Page`` stays one table and role-specific attributes hang off it; page
+same relationship ``IndexMeta`` has to ``Title``, which is the established shape
+here. ``Title`` stays one table and role-specific attributes hang off it; page
 pairings stay one table and the work-level ones hang off this.
 
 **Children are pointed at their work.** ``PageLink.index_link_pk`` is set when

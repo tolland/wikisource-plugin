@@ -12,7 +12,6 @@ from wtbot.model import (
     FileMeta,
     IndexMeta,
     Namespace,
-    Page,
     ProofreadPageMeta,
     Revision,
     RevisionLink,
@@ -21,6 +20,7 @@ from wtbot.model import (
     SiteCredential,
     Slot,
     TextTargetAnchor,
+    Title,
     Transclusion,
 )
 
@@ -74,11 +74,11 @@ class SiteDeletePlan(BaseModel):
 
 
 def _page_pks(site_pk: int):
-    return select(Page.pk).where(Page.site_pk == site_pk)
+    return select(Title.pk).where(Title.site_pk == site_pk)
 
 
 def _revision_pks(site_pk: int):
-    return select(Revision.pk).where(Revision.page_pk.in_(_page_pks(site_pk)))
+    return select(Revision.pk).where(Revision.title_pk.in_(_page_pks(site_pk)))
 
 
 def _orphaned_content_pks(site_pk: int):
@@ -111,16 +111,16 @@ def _predicates(site_pk: int) -> list[tuple[type, object]]:
         ),
         (Slot, Slot.revision_pk.in_(revisions)),
         (Content, Content.pk.in_(_orphaned_content_pks(site_pk))),
-        (Revision, Revision.page_pk.in_(pages)),
-        (ProofreadPageMeta, ProofreadPageMeta.page_pk.in_(pages)),
-        (IndexMeta, or_(IndexMeta.site_pk == site_pk, IndexMeta.page_pk.in_(pages))),
-        (FileMeta, FileMeta.page_pk.in_(pages)),
-        (FileBlob, FileBlob.page_pk.in_(pages)),
-        (ScanAnnotation, ScanAnnotation.page_pk.in_(pages)),
-        (BoxRangeLink, BoxRangeLink.page_pk.in_(pages)),
-        (TextTargetAnchor, TextTargetAnchor.page_pk.in_(pages)),
-        (EditJournal, EditJournal.page_pk.in_(pages)),
-        (Commit, Commit.page_pk.in_(pages)),
+        (Revision, Revision.title_pk.in_(pages)),
+        (ProofreadPageMeta, ProofreadPageMeta.title_pk.in_(pages)),
+        (IndexMeta, or_(IndexMeta.site_pk == site_pk, IndexMeta.title_pk.in_(pages))),
+        (FileMeta, FileMeta.title_pk.in_(pages)),
+        (FileBlob, FileBlob.title_pk.in_(pages)),
+        (ScanAnnotation, ScanAnnotation.title_pk.in_(pages)),
+        (BoxRangeLink, BoxRangeLink.title_pk.in_(pages)),
+        (TextTargetAnchor, TextTargetAnchor.title_pk.in_(pages)),
+        (EditJournal, EditJournal.title_pk.in_(pages)),
+        (Commit, Commit.title_pk.in_(pages)),
         (
             Transclusion,
             or_(
@@ -129,7 +129,7 @@ def _predicates(site_pk: int) -> list[tuple[type, object]]:
             ),
         ),
         (FetchRequest, FetchRequest.site_pk == site_pk),
-        (Page, Page.site_pk == site_pk),
+        (Title, Title.site_pk == site_pk),
         (Namespace, Namespace.site_pk == site_pk),
         (SiteCredential, SiteCredential.site_pk == site_pk),
         (Site, Site.pk == site_pk),
@@ -175,7 +175,7 @@ def execute_site_delete(session: Session, site: Site) -> SiteDeletePlan:
     # foreign keys (rightly) refuse.
     session.execute(
         update(FileMeta)
-        .where(FileMeta.source_page_pk.in_(pages), FileMeta.page_pk.not_in(pages))
+        .where(FileMeta.source_page_pk.in_(pages), FileMeta.title_pk.not_in(pages))
         .values(source_page_pk=None)
     )
     session.execute(

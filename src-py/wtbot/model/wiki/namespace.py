@@ -5,7 +5,7 @@ from sqlmodel import Field, SQLModel
 
 
 class NsRole(str, Enum):
-    """Portable namespace role. Numeric namespace ids are per-site (Page=104 on
+    """Portable namespace role. Numeric namespace ids are per-site (Title=104 on
     en.wikisource, 250 on a fresh ProofreadPage reinstall; Book is operator-
     chosen), so we never compare ids across wikis -- we compare roles. A role is
     resolved from the *canonical* namespace name, which is stable everywhere."""
@@ -45,7 +45,7 @@ def role_for_canonical(canonical_name: str) -> NsRole:
 
 class Namespace(SQLModel, table=True):
     """Per-site namespace map, populated from each wiki's ``siteinfo``. Lets a
-    Page from a 250-wiki and a Page from a 104-wiki be recognised as the same
+    Title from a 250-wiki and a Title from a 104-wiki be recognised as the same
     kind of object."""
 
     __table_args__ = (UniqueConstraint("site_pk", "key", name="uq_ns_site_key"),)

@@ -43,7 +43,7 @@ def _slot_summary(slot: dict) -> str:
 def query(
     title: str | None = typer.Option(None, help="Exact full page title."),
     pk: int | None = typer.Option(
-        None, "--pk", "--page-pk", help="Local Page primary key."
+        None, "--pk", "--page-pk", help="Local Title primary key."
     ),
     pageid: int | None = typer.Option(None, help="Site-local MediaWiki page id."),
     revid: int | None = typer.Option(None, help="Cached head revision id."),
@@ -65,7 +65,7 @@ def query(
     limit: int = typer.Option(100, min=1, max=1000),
     api: ApiClient = Depends(get_api),
 ) -> None:
-    """Query Page rows and show revisions joined to their slots and content."""
+    """Query Title rows and show revisions joined to their slots and content."""
     params = {
         key: value
         for key, value in {

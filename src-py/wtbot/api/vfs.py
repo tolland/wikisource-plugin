@@ -30,7 +30,7 @@ Path scheme (all relative to wikisource://):
   /{family}/{code}/                       site root — Index pages for that site
   /{family}/{code}/{Index title}/         index dir — Pages + File subdir
   /{family}/{code}/{Index title}/wikitext            Index: description/pagelist wikitext
-  /{family}/{code}/{Index title}/Pages/{Page title}  page wikitext file
+  /{family}/{code}/{Index title}/Pages/{Title title}  page wikitext file
   /{family}/{code}/{Index title}/{File title}/       file dir
   /{family}/{code}/{Index title}/{File title}/wikitext   File: description wikitext
   /{family}/{code}/{Index title}/{File title}/blob       binary (stub — 501)

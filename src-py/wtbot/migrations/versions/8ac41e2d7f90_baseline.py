@@ -351,7 +351,7 @@ def upgrade() -> None:
     op.create_table(
         "boxrangelink",
         sa.Column("pk", sa.Integer(), nullable=False),
-        sa.Column("page_pk", sa.Integer(), nullable=False),
+        sa.Column("title_pk", sa.Integer(), nullable=False),
         sa.Column(
             "box_annotation_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False
         ),
@@ -361,12 +361,12 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(
-            ["page_pk"],
+            ["title_pk"],
             ["page.pk"],
         ),
         sa.PrimaryKeyConstraint("pk"),
         sa.UniqueConstraint(
-            "page_pk", "box_annotation_id", name="uq_box_range_link_box"
+            "title_pk", "box_annotation_id", name="uq_box_range_link_box"
         ),
     )
     with op.batch_alter_table("boxrangelink", schema=None) as batch_op:
@@ -376,7 +376,7 @@ def upgrade() -> None:
             unique=False,
         )
         batch_op.create_index(
-            batch_op.f("ix_boxrangelink_page_pk"), ["page_pk"], unique=False
+            batch_op.f("ix_boxrangelink_page_pk"), ["title_pk"], unique=False
         )
         batch_op.create_index(
             batch_op.f("ix_boxrangelink_range_annotation_id"),
@@ -387,7 +387,7 @@ def upgrade() -> None:
     op.create_table(
         "commit",
         sa.Column("pk", sa.Integer(), nullable=False),
-        sa.Column("page_pk", sa.Integer(), nullable=False),
+        sa.Column("title_pk", sa.Integer(), nullable=False),
         sa.Column("base_revid", sa.Integer(), nullable=True),
         sa.Column("submitted_body", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("comment", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
@@ -400,28 +400,28 @@ def upgrade() -> None:
         sa.Column("error_message", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(
-            ["page_pk"],
+            ["title_pk"],
             ["page.pk"],
         ),
         sa.PrimaryKeyConstraint("pk"),
     )
     with op.batch_alter_table("commit", schema=None) as batch_op:
         batch_op.create_index(
-            batch_op.f("ix_commit_page_pk"), ["page_pk"], unique=False
+            batch_op.f("ix_commit_page_pk"), ["title_pk"], unique=False
         )
         batch_op.create_index(batch_op.f("ix_commit_status"), ["status"], unique=False)
 
     op.create_table(
         "editjournal",
         sa.Column("pk", sa.Integer(), nullable=False),
-        sa.Column("page_pk", sa.Integer(), nullable=False),
+        sa.Column("title_pk", sa.Integer(), nullable=False),
         sa.Column("base_revid", sa.Integer(), nullable=True),
         sa.Column("body", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("comment", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("saved_at", sa.DateTime(), nullable=False),
         sa.Column("committed", sa.Boolean(), nullable=False),
         sa.ForeignKeyConstraint(
-            ["page_pk"],
+            ["title_pk"],
             ["page.pk"],
         ),
         sa.PrimaryKeyConstraint("pk"),
@@ -431,13 +431,13 @@ def upgrade() -> None:
             batch_op.f("ix_editjournal_committed"), ["committed"], unique=False
         )
         batch_op.create_index(
-            batch_op.f("ix_editjournal_page_pk"), ["page_pk"], unique=False
+            batch_op.f("ix_editjournal_page_pk"), ["title_pk"], unique=False
         )
 
     op.create_table(
         "fileblob",
         sa.Column("pk", sa.Integer(), nullable=False),
-        sa.Column("page_pk", sa.Integer(), nullable=False),
+        sa.Column("title_pk", sa.Integer(), nullable=False),
         sa.Column("file_sha1", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("size", sa.Integer(), nullable=True),
         sa.Column("mime", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
@@ -451,20 +451,20 @@ def upgrade() -> None:
         sa.Column("local_path", sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.Column("downloaded_at", sa.DateTime(), nullable=True),
         sa.ForeignKeyConstraint(
-            ["page_pk"],
+            ["title_pk"],
             ["page.pk"],
         ),
         sa.PrimaryKeyConstraint("pk"),
     )
     with op.batch_alter_table("fileblob", schema=None) as batch_op:
         batch_op.create_index(
-            batch_op.f("ix_fileblob_page_pk"), ["page_pk"], unique=False
+            batch_op.f("ix_fileblob_page_pk"), ["title_pk"], unique=False
         )
 
     op.create_table(
         "filemeta",
         sa.Column("pk", sa.Integer(), nullable=False),
-        sa.Column("page_pk", sa.Integer(), nullable=False),
+        sa.Column("title_pk", sa.Integer(), nullable=False),
         sa.Column(
             "origin",
             sa.Enum("remote", "paste", "ocr", name="fileorigin"),
@@ -477,7 +477,7 @@ def upgrade() -> None:
         sa.Column("crop_w", sa.Integer(), nullable=True),
         sa.Column("crop_h", sa.Integer(), nullable=True),
         sa.ForeignKeyConstraint(
-            ["page_pk"],
+            ["title_pk"],
             ["page.pk"],
         ),
         sa.ForeignKeyConstraint(
@@ -485,22 +485,22 @@ def upgrade() -> None:
             ["page.pk"],
         ),
         sa.PrimaryKeyConstraint("pk"),
-        sa.UniqueConstraint("page_pk", name="uq_filemeta_page"),
+        sa.UniqueConstraint("title_pk", name="uq_filemeta_page"),
     )
     with op.batch_alter_table("filemeta", schema=None) as batch_op:
         batch_op.create_index(
-            batch_op.f("ix_filemeta_page_pk"), ["page_pk"], unique=False
+            batch_op.f("ix_filemeta_page_pk"), ["title_pk"], unique=False
         )
 
     op.create_table(
         "indexmeta",
         sa.Column("pk", sa.Integer(), nullable=False),
-        sa.Column("page_pk", sa.Integer(), nullable=False),
+        sa.Column("title_pk", sa.Integer(), nullable=False),
         sa.Column("site_pk", sa.Integer(), nullable=False),
         sa.Column("short_name", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("page_count", sa.Integer(), nullable=True),
         sa.ForeignKeyConstraint(
-            ["page_pk"],
+            ["title_pk"],
             ["page.pk"],
         ),
         sa.ForeignKeyConstraint(
@@ -508,12 +508,12 @@ def upgrade() -> None:
             ["site.pk"],
         ),
         sa.PrimaryKeyConstraint("pk"),
-        sa.UniqueConstraint("page_pk", name="uq_indexmeta_page"),
+        sa.UniqueConstraint("title_pk", name="uq_indexmeta_page"),
         sa.UniqueConstraint("site_pk", "short_name", name="uq_indexmeta_site_short"),
     )
     with op.batch_alter_table("indexmeta", schema=None) as batch_op:
         batch_op.create_index(
-            batch_op.f("ix_indexmeta_page_pk"), ["page_pk"], unique=False
+            batch_op.f("ix_indexmeta_page_pk"), ["title_pk"], unique=False
         )
         batch_op.create_index(
             batch_op.f("ix_indexmeta_site_pk"), ["site_pk"], unique=False
@@ -521,7 +521,7 @@ def upgrade() -> None:
 
     op.create_table(
         "proofreadpagemeta",
-        sa.Column("page_pk", sa.Integer(), nullable=False),
+        sa.Column("title_pk", sa.Integer(), nullable=False),
         sa.Column("index_page_pk", sa.Integer(), nullable=False),
         sa.Column("page_number", sa.Integer(), nullable=True),
         sa.Column("quality_level", sa.Integer(), nullable=True),
@@ -539,10 +539,10 @@ def upgrade() -> None:
             ["page.pk"],
         ),
         sa.ForeignKeyConstraint(
-            ["page_pk"],
+            ["title_pk"],
             ["page.pk"],
         ),
-        sa.PrimaryKeyConstraint("page_pk"),
+        sa.PrimaryKeyConstraint("title_pk"),
     )
     with op.batch_alter_table("proofreadpagemeta", schema=None) as batch_op:
         batch_op.create_index(
@@ -554,7 +554,7 @@ def upgrade() -> None:
     op.create_table(
         "revision",
         sa.Column("pk", sa.Integer(), nullable=False),
-        sa.Column("page_pk", sa.Integer(), nullable=False),
+        sa.Column("title_pk", sa.Integer(), nullable=False),
         sa.Column("revid", sa.Integer(), nullable=False),
         sa.Column("parent_revid", sa.Integer(), nullable=True),
         sa.Column("timestamp", sa.DateTime(), nullable=True),
@@ -563,22 +563,22 @@ def upgrade() -> None:
         sa.Column("minor", sa.Boolean(), nullable=False),
         sa.Column("observed_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(
-            ["page_pk"],
+            ["title_pk"],
             ["page.pk"],
         ),
         sa.PrimaryKeyConstraint("pk"),
-        sa.UniqueConstraint("page_pk", "revid", name="uq_revision_page_revid"),
+        sa.UniqueConstraint("title_pk", "revid", name="uq_revision_page_revid"),
     )
     with op.batch_alter_table("revision", schema=None) as batch_op:
         batch_op.create_index(
-            batch_op.f("ix_revision_page_pk"), ["page_pk"], unique=False
+            batch_op.f("ix_revision_page_pk"), ["title_pk"], unique=False
         )
         batch_op.create_index(batch_op.f("ix_revision_revid"), ["revid"], unique=False)
 
     op.create_table(
         "scanannotation",
         sa.Column("pk", sa.Integer(), nullable=False),
-        sa.Column("page_pk", sa.Integer(), nullable=False),
+        sa.Column("title_pk", sa.Integer(), nullable=False),
         sa.Column("annotation_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("x", sa.Float(), nullable=False),
         sa.Column("y", sa.Float(), nullable=False),
@@ -602,12 +602,12 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(
-            ["page_pk"],
+            ["title_pk"],
             ["page.pk"],
         ),
         sa.PrimaryKeyConstraint("pk"),
         sa.UniqueConstraint(
-            "page_pk", "annotation_id", name="uq_scan_annotation_page_annotation"
+            "title_pk", "annotation_id", name="uq_scan_annotation_page_annotation"
         ),
     )
     with op.batch_alter_table("scanannotation", schema=None) as batch_op:
@@ -617,25 +617,25 @@ def upgrade() -> None:
             unique=False,
         )
         batch_op.create_index(
-            batch_op.f("ix_scanannotation_page_pk"), ["page_pk"], unique=False
+            batch_op.f("ix_scanannotation_page_pk"), ["title_pk"], unique=False
         )
 
     op.create_table(
         "texttargetanchor",
         sa.Column("pk", sa.Integer(), nullable=False),
-        sa.Column("page_pk", sa.Integer(), nullable=False),
+        sa.Column("title_pk", sa.Integer(), nullable=False),
         sa.Column("annotation_id", sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column("text_start", sa.Integer(), nullable=False),
         sa.Column("text_end", sa.Integer(), nullable=False),
         sa.Column("anchor_revid", sa.Integer(), nullable=True),
         sa.Column("updated_at", sa.DateTime(), nullable=False),
         sa.ForeignKeyConstraint(
-            ["page_pk"],
+            ["title_pk"],
             ["page.pk"],
         ),
         sa.PrimaryKeyConstraint("pk"),
         sa.UniqueConstraint(
-            "page_pk", "annotation_id", name="uq_text_target_anchor_page_annotation"
+            "title_pk", "annotation_id", name="uq_text_target_anchor_page_annotation"
         ),
     )
     with op.batch_alter_table("texttargetanchor", schema=None) as batch_op:
@@ -645,7 +645,7 @@ def upgrade() -> None:
             unique=False,
         )
         batch_op.create_index(
-            batch_op.f("ix_texttargetanchor_page_pk"), ["page_pk"], unique=False
+            batch_op.f("ix_texttargetanchor_page_pk"), ["title_pk"], unique=False
         )
 
     op.create_table(

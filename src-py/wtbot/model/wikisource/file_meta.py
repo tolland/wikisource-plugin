@@ -19,13 +19,13 @@ class FileMeta(SQLModel, table=True):
     captured from day one rather than reconstructed later.
     """
 
-    __table_args__ = (UniqueConstraint("page_pk", name="uq_filemeta_page"),)
+    __table_args__ = (UniqueConstraint("title_pk", name="uq_filemeta_page"),)
 
     pk: int | None = Field(default=None, primary_key=True)
-    page_pk: int = Field(foreign_key="page.pk", index=True)
+    title_pk: int = Field(foreign_key="title.pk", index=True)
 
     origin: FileOrigin = FileOrigin.remote
-    source_page_pk: int | None = Field(default=None, foreign_key="page.pk")
+    source_page_pk: int | None = Field(default=None, foreign_key="title.pk")
     source_page_number: int | None = None
     crop_x: int | None = None
     crop_y: int | None = None

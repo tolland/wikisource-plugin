@@ -3,7 +3,7 @@ from sqlmodel import Session, select
 
 from wtbot.linking.page_link_store import find_pair, pair_pages, unpair
 from wtbot.linking.remote_link_store import LinkError
-from wtbot.model import IndexLink, IndexMeta, LinkOrigin, Page, PageLink, Site
+from wtbot.model import IndexLink, IndexMeta, LinkOrigin, PageLink, Site, Title
 
 """Putting a work under cross-site tracking, and finding the ones that are.
 
@@ -28,8 +28,8 @@ asking "which pairs belong to this work" through both sides would answer
 
 def link_indexes(
     session: Session,
-    local_index: Page,
-    remote_index: Page,
+    local_index: Title,
+    remote_index: Title,
     *,
     origin: LinkOrigin = LinkOrigin.manual,
 ) -> IndexLink:
@@ -42,7 +42,7 @@ def link_indexes(
     for page in (local_index, remote_index):
         meta = session.exec(
             select(IndexMeta).where(
-                IndexMeta.page_pk == page.pk,
+                IndexMeta.title_pk == page.pk,
                 IndexMeta.site_pk == page.site_pk,
             )
         ).first()
@@ -83,7 +83,7 @@ def adopt_children(session: Session, work: IndexLink) -> int:
     from wtbot.matching import index_children
 
     pairing = session.get(PageLink, work.page_link_pk)
-    local_index = session.get(Page, pairing.local_page_pk)
+    local_index = session.get(Title, pairing.local_page_pk)
     site = session.get(Site, local_index.site_pk)
 
     child_pks = {
@@ -135,13 +135,13 @@ def find_index_link(
     ).first()
 
 
-def work_for_index_page(session: Session, page_pk: int) -> IndexLink | None:
+def work_for_index_page(session: Session, title_pk: int) -> IndexLink | None:
     """The work an Index page belongs to, from either side of the pairing."""
     return session.exec(
         select(IndexLink)
         .join(PageLink, PageLink.pk == IndexLink.page_link_pk)
         .where(
-            (PageLink.local_page_pk == page_pk) | (PageLink.remote_page_pk == page_pk)
+            (PageLink.local_page_pk == title_pk) | (PageLink.remote_page_pk == title_pk)
         )
     ).first()
 
@@ -158,8 +158,8 @@ def works_for_sites(
     assertion was made, not a hierarchy, and a viewer that swapped its two
     columns should see the same works.
     """
-    local_page = aliased(Page)
-    remote_page = aliased(Page)
+    local_page = aliased(Title)
+    remote_page = aliased(Title)
     statement = (
         select(IndexLink)
         .join(PageLink, PageLink.pk == IndexLink.page_link_pk)

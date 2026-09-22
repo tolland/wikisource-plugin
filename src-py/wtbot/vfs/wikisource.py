@@ -12,7 +12,7 @@ from wtbot.api.schemas import (
     WriteResult,
     WriteStatus,
 )
-from wtbot.model import FileBlob, Page, Site
+from wtbot.model import FileBlob, Site, Title
 from wtbot.vfs.errors import BlobsNotImplemented, NotADirectory, NotAFile, NotFound
 from wtbot.vfs.mediawiki import MediaWikiVfs, ts_millis
 from wtbot.vfs.nodes import (
@@ -127,11 +127,9 @@ class WikisourceVfs:
                     exists=True,
                     name=index.title,
                     kind=NodeKind.directory,
-                    stable_id=index.pageid,
+                    stable_id=index.pk,
                     revid=index.revid,
-                    timestamp=ts_millis(
-                        index.local_modified_at or index.remote_timestamp
-                    ),
+                    timestamp=ts_millis(None),
                     content_model=index.content_model,
                 )
             case IndexWikitext(path, _, index):
@@ -158,7 +156,7 @@ class WikisourceVfs:
                     exists=True,
                     name=file_page.title,
                     kind=NodeKind.directory,
-                    stable_id=file_page.pageid,
+                    stable_id=file_page.pk,
                 )
             case FileWikitext(path, _, file_page):
                 return self.mw.stat_page(path.raw, file_page, name="wikitext")
@@ -177,9 +175,9 @@ class WikisourceVfs:
     def stat_bulk(self, paths: list[str]) -> list[Stat]:
         """Batched stat() for refresh() sweeps over many cached paths at once.
 
-        Page-under-Pages/ paths (the dominant case at real-library scale — one
+        Title-under-Pages/ paths (the dominant case at real-library scale — one
         query per site+index_title rather than one per page) are batched via
-        `Page.title.in_(...)`; every other path shape falls back to `stat`,
+        `Title.title.in_(...)`; every other path shape falls back to `stat`,
         since sites/indexes/file-dirs are comparatively few per session.
         """
         results: dict[int, Stat] = {}
@@ -270,13 +268,13 @@ class WikisourceVfs:
         return ListChildrenResponse(
             parent_path=path.normalized,
             children=[
-                _dir_node(f"{path.normalized}/{p.title}", p.title, stable_id=p.pageid)
+                _dir_node(f"{path.normalized}/{p.title}", p.title, stable_id=p.pk)
                 for p in self.store.indexes(site)
             ],
         )
 
     def _index_children(
-        self, path: WikiPath, site: Site, index: Page
+        self, path: WikiPath, site: Site, index: Title
     ) -> ListChildrenResponse:
         parent = path.normalized
         children: list[Node] = [
@@ -288,9 +286,7 @@ class WikisourceVfs:
         file_page = self.store.page(site, file_title)
         if file_page is not None:
             children.append(
-                _dir_node(
-                    f"{parent}/{file_title}", file_title, stable_id=file_page.pageid
-                )
+                _dir_node(f"{parent}/{file_title}", file_title, stable_id=file_page.pk)
             )
 
         for asset in self._index_assets(site, index):
@@ -300,7 +296,7 @@ class WikisourceVfs:
         children.extend(_dir_node(f"{parent}/{stub}", stub) for stub in STUB_CONTAINERS)
         return ListChildrenResponse(parent_path=parent, children=children)
 
-    def _index_assets(self, site: Site, index: Page) -> list[Page]:
+    def _index_assets(self, site: Site, index: Title) -> list[Title]:
         """Non-index-content title-wise subpages of the Index page."""
         assets = {
             p.pk: p
@@ -310,7 +306,7 @@ class WikisourceVfs:
         return sorted(assets.values(), key=lambda p: p.title)
 
     def _pages_children(
-        self, path: WikiPath, site: Site, index: Page
+        self, path: WikiPath, site: Site, index: Title
     ) -> ListChildrenResponse:
         parent = path.normalized
         pages = self.store.proofread_pages(site, index.title)
@@ -318,7 +314,7 @@ class WikisourceVfs:
             [p.pk for p in pages if p.pk is not None]
         )
 
-        def page_number(p: Page) -> int:
+        def page_number(p: Title) -> int:
             meta = metas.get(p.pk)
             return meta.page_number or 0 if meta is not None else 0
 
@@ -334,7 +330,7 @@ class WikisourceVfs:
         return ListChildrenResponse(parent_path=parent, children=children)
 
     def _file_dir_children(
-        self, path: WikiPath, file_page: Page
+        self, path: WikiPath, file_page: Title
     ) -> ListChildrenResponse:
         parent = path.normalized
         return ListChildrenResponse(
@@ -346,7 +342,7 @@ class WikisourceVfs:
         )
 
     def _state_with_placeholder_default(
-        self, page: Page, state: EffectiveState, meta
+        self, page: Title, state: EffectiveState, meta
     ) -> EffectiveState:
         """The same state, with the content-model scaffold standing in for an
         empty body. A ProofreadPage stub with nothing in it should still report
@@ -355,7 +351,7 @@ class WikisourceVfs:
             return state
         return replace(state, body=self._placeholder_default(page, meta))
 
-    def _placeholder_default(self, page: Page, meta) -> str:
+    def _placeholder_default(self, page: Title, meta) -> str:
         """The opening body a placeholder serves when it has no body of its
         own — the wiki's prepopulated OCR default (stored at Index fan-out)
         or the content-model scaffold. Empty for real pages. Applied in

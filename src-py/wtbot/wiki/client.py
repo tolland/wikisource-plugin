@@ -352,7 +352,7 @@ class PywikibotClient:
         another fetch, and a redirect is returned as its own wikitext rather
         than raising -- which is what the previous ``page.text`` did too.
         """
-        page = self._pwb.Page(self.site, title)
+        page = self._pwb.Title(self.site, title)
         try:
             rev = page.latest_revision
         except (
@@ -572,7 +572,7 @@ class PywikibotClient:
         *,
         force: bool = False,
     ) -> SaveResult:
-        page = self._pwb.Page(self.site, title)
+        page = self._pwb.Title(self.site, title)
         if not force and base_revid is not None and page.exists():
             current_revid = page.latest_revision.revid
             if current_revid != base_revid:
@@ -609,7 +609,7 @@ class PywikibotClient:
         *,
         force: bool = False,
     ) -> SaveResult:
-        page = self._pwb.Page(self.site, title)
+        page = self._pwb.Title(self.site, title)
         page.text = text
         try:
             _save_with_exact_summary(page, comment or "", createonly=not force)
@@ -655,7 +655,7 @@ class PywikibotClient:
         )
 
     def get_history(self, title: str, *, limit: int) -> list[RemotePage]:
-        page = self._pwb.Page(self.site, title)
+        page = self._pwb.Title(self.site, title)
         if not page.exists():
             raise PageNotFound(title)
 

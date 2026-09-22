@@ -11,7 +11,7 @@ about to push, releases the SQLite transaction while the wiki save happens, and
 then marks only that snapshotted batch committed on success. New saves that
 arrive during the remote call remain pending for a later run.
 
-A successful push never mutates the Page row: Page is strictly the *fetched*
+A successful push never mutates the Title row: Title is strictly the *fetched*
 remote snapshot, written only by the fetch worker. The push's outcome lives on
 the Commit row (result_revid), a refetch of the page is enqueued to true the
 snapshot up (text, revid, pageid, contributor, ...), and until that lands
@@ -33,8 +33,8 @@ from wtbot.model import (
     EditJournal,
     FetchKind,
     FetchRequest,
-    Page,
     Site,
+    Title,
 )
 from wtbot.wiki.wiki_types import EditConflict
 
@@ -49,7 +49,7 @@ class _PendingPageCommit:
     transaction that loaded it can be closed before pywikibot does network I/O.
     """
 
-    page_pk: int
+    title_pk: int
     title: str
     site: Site
     journal_pks: tuple[int, ...]
@@ -61,7 +61,7 @@ class _PendingPageCommit:
 
 @dataclass(frozen=True)
 class _OrphanedPendingPage:
-    page_pk: int
+    title_pk: int
 
 
 @dataclass(frozen=True)
@@ -103,7 +103,7 @@ def run_pending_commits(
 
 def run_pending_commit_for_page(
     session: Session,
-    page_pk: int,
+    title_pk: int,
     client_factory: ClientFactory,
     *,
     force: bool = False,
@@ -118,7 +118,7 @@ def run_pending_commit_for_page(
     with _worker_lock:
         try:
             return _push_page(
-                session, page_pk, client_factory, force=force, comment=comment
+                session, title_pk, client_factory, force=force, comment=comment
             )
         finally:
             session.rollback()
@@ -135,13 +135,13 @@ def _run_pending_commits_unlocked(
     failed: set[int] = set()
     handled = 0
     while handled < limit:
-        page_pk = _claim_next_page(session, exclude=attempted)
-        if page_pk is None:
+        title_pk = _claim_next_page(session, exclude=attempted)
+        if title_pk is None:
             break
-        attempted.add(page_pk)
-        ok = _push_page(session, page_pk, client_factory)
+        attempted.add(title_pk)
+        ok = _push_page(session, title_pk, client_factory)
         if not ok:
-            failed.add(page_pk)
+            failed.add(title_pk)
         handled += 1
     return handled, failed
 
@@ -150,38 +150,38 @@ def _claim_next_page(session: Session, *, exclude: set[int]) -> int | None:
     """Return the oldest pending page not already attempted in this run."""
     with read_snapshot(session):
         rows = session.exec(
-            select(EditJournal.page_pk)
+            select(EditJournal.title_pk)
             .where(EditJournal.committed == False)  # noqa: E712
             .order_by(EditJournal.saved_at)
         ).all()
-        for page_pk in rows:
-            if page_pk not in exclude:
-                return page_pk
+        for title_pk in rows:
+            if title_pk not in exclude:
+                return title_pk
         return None
 
 
 def _push_page(
     session: Session,
-    page_pk: int,
+    title_pk: int,
     client_factory: ClientFactory,
     *,
     force: bool = False,
     comment: str | None = None,
 ) -> bool:
     """Return True if the page was successfully pushed, False on conflict/error."""
-    pending = _load_pending_page_commit(session, page_pk)
+    pending = _load_pending_page_commit(session, title_pk)
     if isinstance(pending, _OrphanedPendingPage):
         # Orphaned journal rows (page deleted locally) -- drop them rather
         # than spin forever on a page that no longer exists.
-        logging.debug("Orphaned journal row for page %s", page_pk)
-        _drop_orphaned_journal(session, page_pk)
+        logging.debug("Orphaned journal row for page %s", title_pk)
+        _drop_orphaned_journal(session, title_pk)
         return True  # removed from queue; not a retriable failure
     if pending is None:
         return True
 
     if comment is not None:
         pending = _PendingPageCommit(
-            page_pk=pending.page_pk,
+            title_pk=pending.title_pk,
             title=pending.title,
             site=pending.site,
             journal_pks=pending.journal_pks,
@@ -196,7 +196,7 @@ def _push_page(
 
 
 def _load_pending_page_commit(
-    session: Session, page_pk: int
+    session: Session, title_pk: int
 ) -> _PendingPageCommit | _OrphanedPendingPage | None:
     """Load and detach the exact local journal batch that will be pushed.
 
@@ -205,14 +205,14 @@ def _load_pending_page_commit(
     than live ORM objects attached to an open transaction.
     """
     with read_snapshot(session):
-        page = session.get(Page, page_pk)
+        page = session.get(Title, title_pk)
         if page is None:
-            return _OrphanedPendingPage(page_pk)
+            return _OrphanedPendingPage(title_pk)
 
         pending = session.exec(
             select(EditJournal)
             .where(
-                EditJournal.page_pk == page_pk,
+                EditJournal.title_pk == title_pk,
                 EditJournal.committed == False,  # noqa: E712
             )
             .order_by(EditJournal.saved_at)
@@ -222,11 +222,13 @@ def _load_pending_page_commit(
 
         site = session.get(Site, page.site_pk)
         if site is None:
-            raise RuntimeError(f"page {page_pk} references missing site {page.site_pk}")
+            raise RuntimeError(
+                f"page {title_pk} references missing site {page.site_pk}"
+            )
 
         journal_pks = tuple(row.pk for row in pending if row.pk is not None)
         if len(journal_pks) != len(pending):
-            raise RuntimeError(f"page {page_pk} has unpersisted journal rows")
+            raise RuntimeError(f"page {title_pk} has unpersisted journal rows")
 
         latest = pending[-1]
         # None stays None: a placeholder stub (never on the wiki) pushes as a
@@ -241,7 +243,7 @@ def _load_pending_page_commit(
         # is still ahead of it and still conflicts.
         last_push = session.exec(
             select(Commit)
-            .where(Commit.page_pk == page_pk, Commit.status == CommitStatus.success)
+            .where(Commit.title_pk == title_pk, Commit.status == CommitStatus.success)
             .order_by(Commit.created_at.desc(), Commit.pk.desc())
         ).first()
         if (
@@ -251,7 +253,7 @@ def _load_pending_page_commit(
         ):
             base_revid = last_push.result_revid
         return _PendingPageCommit(
-            page_pk=page_pk,
+            title_pk=title_pk,
             title=page.title,
             site=detached_site(site),
             journal_pks=journal_pks,
@@ -285,7 +287,7 @@ def _save_pending_page(
             FailureContext(
                 component="commit",
                 title=pending.title,
-                page_pk=pending.page_pk,
+                title_pk=pending.title_pk,
                 site_pk=pending.site.pk,
                 site_label=site_label(pending.site),
                 details={"base_revid": str(pending.base_revid), "force": str(force)},
@@ -302,7 +304,7 @@ def _record_commit_outcome(
     session: Session, pending: _PendingPageCommit, outcome: _CommitOutcome
 ) -> None:
     commit = Commit(
-        page_pk=pending.page_pk,
+        title_pk=pending.title_pk,
         base_revid=pending.base_revid,
         submitted_body=pending.body,
         comment=pending.comment,
@@ -312,7 +314,7 @@ def _record_commit_outcome(
     )
     with write_batch(session):
         if outcome.status == CommitStatus.success:
-            page = session.get(Page, pending.page_pk)
+            page = session.get(Title, pending.title_pk)
             if page is not None:
                 # dirty is local bookkeeping; the remote-snapshot columns
                 # (text/revid/...) are deliberately left untouched — the
@@ -345,7 +347,7 @@ def _has_uncaptured_pending_edits(
     row = session.exec(
         select(EditJournal.pk)
         .where(
-            EditJournal.page_pk == pending.page_pk,
+            EditJournal.title_pk == pending.title_pk,
             EditJournal.committed == False,  # noqa: E712
             ~EditJournal.pk.in_(pending.journal_pks),
         )
@@ -354,11 +356,11 @@ def _has_uncaptured_pending_edits(
     return row is not None
 
 
-def _drop_orphaned_journal(session: Session, page_pk: int) -> None:
+def _drop_orphaned_journal(session: Session, title_pk: int) -> None:
     with write_batch(session):
         rows = session.exec(
             select(EditJournal).where(
-                EditJournal.page_pk == page_pk,
+                EditJournal.title_pk == title_pk,
                 EditJournal.committed == False,  # noqa: E712
             )
         ).all()

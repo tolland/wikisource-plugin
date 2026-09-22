@@ -18,7 +18,7 @@ from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.api.errors import ApiError
 from wtbot.api.targets import resolve_target
 from wtbot.deps import get_session
-from wtbot.model import Page
+from wtbot.model import Title
 from wtbot.model.wikisource.proofread_page_meta import ProofreadPageMeta
 from wtbot.settings import WikiSettings
 from wtbot.vfs.store import PageStore
@@ -61,7 +61,7 @@ logger = logging.getLogger(__name__)
 
 _PX_TOKEN = re.compile(r"(page\d+-)(\d+)(px-)")
 
-# Page-ish aspect ratio, so a page with no scan yet lays out like one that has.
+# Title-ish aspect ratio, so a page with no scan yet lays out like one that has.
 _PLACEHOLDER_W = 800
 _PLACEHOLDER_H = 1100
 
@@ -93,10 +93,10 @@ def _rendition_url(meta: ProofreadPageMeta | None, width: int | None) -> str | N
     return rewritten if n else base
 
 
-def _cache_path(blob_root: Path, page_pk: int, width: int | None, url: str) -> Path:
+def _cache_path(blob_root: Path, title_pk: int, width: int | None, url: str) -> Path:
     ext = Path(url.split("?", 1)[0]).suffix or ".jpg"
     label = str(width) if width is not None else "src"
-    return blob_root / "page_images" / f"{page_pk}-{label}{ext}"
+    return blob_root / "page_images" / f"{title_pk}-{label}{ext}"
 
 
 def _fill_cache(cache: Path, url: str) -> None:
@@ -109,7 +109,7 @@ def serve_reference_image(
     request: Request,
     background: BackgroundTasks,
     session: Session,
-    page: Page,
+    page: Title,
     width: int | None,
 ) -> Response | None:
     """Cached scan-rendition bytes for [page], or None while no scan URL is
@@ -162,10 +162,10 @@ def _warm_next_page(
     try:
         with Session(engine) as session:
             nxt = session.exec(
-                select(Page)
-                .join(ProofreadPageMeta, ProofreadPageMeta.page_pk == Page.pk)
+                select(Title)
+                .join(ProofreadPageMeta, ProofreadPageMeta.title_pk == Title.pk)
                 .where(
-                    Page.site_pk == site_pk,
+                    Title.site_pk == site_pk,
                     ProofreadPageMeta.index_page_pk == index_page_pk,
                     ProofreadPageMeta.page_number == page_number + 1,
                 )
@@ -223,15 +223,15 @@ def reference_image(
     empty one. Never 404s on a missing scan: the pane is part of the editor
     layout, and a broken image there is worse than a blank sheet.
     """
-    page: Page | None = None
+    page: Title | None = None
     if path:
         site, resolved_title, _ = resolve_target(session, path)
         page = session.exec(
-            select(Page).where(Page.site_pk == site.pk, Page.title == resolved_title)
+            select(Title).where(Title.site_pk == site.pk, Title.title == resolved_title)
         ).first()
     elif title:
         resolved_title = title
-        page = session.exec(select(Page).where(Page.title == title)).first()
+        page = session.exec(select(Title).where(Title.title == title)).first()
     else:
         raise ApiError(
             status_code=422, detail="need either path or title", code="missing-target"

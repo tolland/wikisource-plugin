@@ -4,7 +4,7 @@ from fastapi import Request
 from sqlmodel import Session, select
 
 from wtbot.api.errors import ApiError
-from wtbot.model import Page, Site
+from wtbot.model import Site, Title
 from wtbot.wiki.client import WikiClient
 
 """Resolving a VFS path to the wiki thing it names.
@@ -61,7 +61,7 @@ def resolve_target(session: Session, path: str) -> tuple[Site, str, str | None]:
         title = f"{index_title}/{'/'.join(rest)}"  # index subpage, e.g. styles.css
 
     page = session.exec(
-        select(Page).where(Page.site_pk == site.pk, Page.title == title)
+        select(Title).where(Title.site_pk == site.pk, Title.title == title)
     ).first()
     return site, title, page.content_model if page else None
 

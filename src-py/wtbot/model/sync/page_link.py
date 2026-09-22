@@ -52,8 +52,8 @@ class PageLink(SQLModel, table=True):
 
     pk: int | None = Field(default=None, primary_key=True)
 
-    local_page_pk: int = Field(foreign_key="page.pk", index=True)
-    remote_page_pk: int = Field(foreign_key="page.pk", index=True)
+    local_page_pk: int = Field(foreign_key="title.pk", index=True)
+    remote_page_pk: int = Field(foreign_key="title.pk", index=True)
 
     index_link_pk: int | None = Field(
         default=None, foreign_key="indexlink.pk", index=True

@@ -26,48 +26,48 @@ added to a Session).
 
 
 class AnnotationStore(Protocol):
-    """Bounding boxes over a page's scan image, keyed (page_pk, annotation_id)."""
+    """Bounding boxes over a page's scan image, keyed (title_pk, annotation_id)."""
 
-    def list_for_page(self, page_pk: int) -> list[ScanAnnotation]: ...
+    def list_for_page(self, title_pk: int) -> list[ScanAnnotation]: ...
 
-    def get(self, page_pk: int, annotation_id: str) -> ScanAnnotation | None: ...
+    def get(self, title_pk: int, annotation_id: str) -> ScanAnnotation | None: ...
 
     def upsert(self, annotation: ScanAnnotation) -> ScanAnnotation:
-        """Insert, or update the row matching (page_pk, annotation_id).
+        """Insert, or update the row matching (title_pk, annotation_id).
         Geometry, label, and category are replaced wholesale."""
         ...
 
-    def delete(self, page_pk: int, annotation_id: str) -> bool:
+    def delete(self, title_pk: int, annotation_id: str) -> bool:
         """Remove the box; False if absent."""
         ...
 
 
 class TextAnchorStore(Protocol):
-    """Text-range anchors, keyed (page_pk, annotation_id) like the boxes."""
+    """Text-range anchors, keyed (title_pk, annotation_id) like the boxes."""
 
-    def list_for_page(self, page_pk: int) -> list[TextTargetAnchor]: ...
+    def list_for_page(self, title_pk: int) -> list[TextTargetAnchor]: ...
 
-    def get(self, page_pk: int, annotation_id: str) -> TextTargetAnchor | None: ...
+    def get(self, title_pk: int, annotation_id: str) -> TextTargetAnchor | None: ...
 
     def upsert(self, anchor: TextTargetAnchor) -> TextTargetAnchor: ...
 
-    def delete(self, page_pk: int, annotation_id: str) -> bool: ...
+    def delete(self, title_pk: int, annotation_id: str) -> bool: ...
 
 
 class BoxLinkStore(Protocol):
-    """Box→range links, keyed (page_pk, box_annotation_id) — one per box."""
+    """Box→range links, keyed (title_pk, box_annotation_id) — one per box."""
 
-    def list_for_page(self, page_pk: int) -> list[BoxRangeLink]: ...
+    def list_for_page(self, title_pk: int) -> list[BoxRangeLink]: ...
 
-    def get(self, page_pk: int, box_annotation_id: str) -> BoxRangeLink | None: ...
+    def get(self, title_pk: int, box_annotation_id: str) -> BoxRangeLink | None: ...
 
     def upsert(self, link: BoxRangeLink) -> BoxRangeLink:
         """Insert, or repoint the box's existing link at a new range."""
         ...
 
-    def delete(self, page_pk: int, box_annotation_id: str) -> bool: ...
+    def delete(self, title_pk: int, box_annotation_id: str) -> bool: ...
 
-    def delete_for_range(self, page_pk: int, range_annotation_id: str) -> int:
+    def delete_for_range(self, title_pk: int, range_annotation_id: str) -> int:
         """Drop every link targeting the range; returns how many were dropped.
         The cascade for a deleted (or replaced) text range."""
         ...
@@ -79,25 +79,25 @@ class SqlAnnotationStore:
     def __init__(self, session: Session):
         self._session = session
 
-    def list_for_page(self, page_pk: int) -> list[ScanAnnotation]:
+    def list_for_page(self, title_pk: int) -> list[ScanAnnotation]:
         return list(
             self._session.exec(
                 select(ScanAnnotation)
-                .where(ScanAnnotation.page_pk == page_pk)
+                .where(ScanAnnotation.title_pk == title_pk)
                 .order_by(ScanAnnotation.pk)
             ).all()
         )
 
-    def get(self, page_pk: int, annotation_id: str) -> ScanAnnotation | None:
+    def get(self, title_pk: int, annotation_id: str) -> ScanAnnotation | None:
         return self._session.exec(
             select(ScanAnnotation).where(
-                ScanAnnotation.page_pk == page_pk,
+                ScanAnnotation.title_pk == title_pk,
                 ScanAnnotation.annotation_id == annotation_id,
             )
         ).first()
 
     def upsert(self, annotation: ScanAnnotation) -> ScanAnnotation:
-        row = self.get(annotation.page_pk, annotation.annotation_id)
+        row = self.get(annotation.title_pk, annotation.annotation_id)
         if row is None:
             row = annotation
         else:
@@ -113,8 +113,8 @@ class SqlAnnotationStore:
         self._session.refresh(row)
         return row
 
-    def delete(self, page_pk: int, annotation_id: str) -> bool:
-        row = self.get(page_pk, annotation_id)
+    def delete(self, title_pk: int, annotation_id: str) -> bool:
+        row = self.get(title_pk, annotation_id)
         if row is None:
             return False
         self._session.delete(row)
@@ -128,25 +128,25 @@ class SqlBoxLinkStore:
     def __init__(self, session: Session):
         self._session = session
 
-    def list_for_page(self, page_pk: int) -> list[BoxRangeLink]:
+    def list_for_page(self, title_pk: int) -> list[BoxRangeLink]:
         return list(
             self._session.exec(
                 select(BoxRangeLink)
-                .where(BoxRangeLink.page_pk == page_pk)
+                .where(BoxRangeLink.title_pk == title_pk)
                 .order_by(BoxRangeLink.pk)
             ).all()
         )
 
-    def get(self, page_pk: int, box_annotation_id: str) -> BoxRangeLink | None:
+    def get(self, title_pk: int, box_annotation_id: str) -> BoxRangeLink | None:
         return self._session.exec(
             select(BoxRangeLink).where(
-                BoxRangeLink.page_pk == page_pk,
+                BoxRangeLink.title_pk == title_pk,
                 BoxRangeLink.box_annotation_id == box_annotation_id,
             )
         ).first()
 
     def upsert(self, link: BoxRangeLink) -> BoxRangeLink:
-        row = self.get(link.page_pk, link.box_annotation_id)
+        row = self.get(link.title_pk, link.box_annotation_id)
         if row is None:
             row = link
         else:
@@ -157,18 +157,18 @@ class SqlBoxLinkStore:
         self._session.refresh(row)
         return row
 
-    def delete(self, page_pk: int, box_annotation_id: str) -> bool:
-        row = self.get(page_pk, box_annotation_id)
+    def delete(self, title_pk: int, box_annotation_id: str) -> bool:
+        row = self.get(title_pk, box_annotation_id)
         if row is None:
             return False
         self._session.delete(row)
         self._session.commit()
         return True
 
-    def delete_for_range(self, page_pk: int, range_annotation_id: str) -> int:
+    def delete_for_range(self, title_pk: int, range_annotation_id: str) -> int:
         rows = self._session.exec(
             select(BoxRangeLink).where(
-                BoxRangeLink.page_pk == page_pk,
+                BoxRangeLink.title_pk == title_pk,
                 BoxRangeLink.range_annotation_id == range_annotation_id,
             )
         ).all()
@@ -185,25 +185,25 @@ class SqlTextAnchorStore:
     def __init__(self, session: Session):
         self._session = session
 
-    def list_for_page(self, page_pk: int) -> list[TextTargetAnchor]:
+    def list_for_page(self, title_pk: int) -> list[TextTargetAnchor]:
         return list(
             self._session.exec(
                 select(TextTargetAnchor)
-                .where(TextTargetAnchor.page_pk == page_pk)
+                .where(TextTargetAnchor.title_pk == title_pk)
                 .order_by(TextTargetAnchor.pk)
             ).all()
         )
 
-    def get(self, page_pk: int, annotation_id: str) -> TextTargetAnchor | None:
+    def get(self, title_pk: int, annotation_id: str) -> TextTargetAnchor | None:
         return self._session.exec(
             select(TextTargetAnchor).where(
-                TextTargetAnchor.page_pk == page_pk,
+                TextTargetAnchor.title_pk == title_pk,
                 TextTargetAnchor.annotation_id == annotation_id,
             )
         ).first()
 
     def upsert(self, anchor: TextTargetAnchor) -> TextTargetAnchor:
-        row = self.get(anchor.page_pk, anchor.annotation_id)
+        row = self.get(anchor.title_pk, anchor.annotation_id)
         if row is None:
             row = anchor
         else:
@@ -216,8 +216,8 @@ class SqlTextAnchorStore:
         self._session.refresh(row)
         return row
 
-    def delete(self, page_pk: int, annotation_id: str) -> bool:
-        row = self.get(page_pk, annotation_id)
+    def delete(self, title_pk: int, annotation_id: str) -> bool:
+        row = self.get(title_pk, annotation_id)
         if row is None:
             return False
         self._session.delete(row)

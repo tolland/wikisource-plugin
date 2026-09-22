@@ -20,6 +20,7 @@ from wtbot.promotion.promotion_store import (
     skip,
     source_is_unchanged,
     target_head_revid,
+    target_title_of,
 )
 from wtbot.timeutil import utcnow
 from wtbot.wiki.wiki_types import EditConflict
@@ -71,7 +72,7 @@ def push_one(
         target_site = detached_site(session.get(Site, batch.target_site_pk))
         snapshot = (
             promotion.pk,
-            batch.target_title,
+            target_title_of(session, batch),
             promotion.body,
             promotion.comment,
             promotion.intent,
@@ -276,7 +277,7 @@ def _enqueue_chain_refetch(session: Session, promotion: Promotion) -> None:
     session.add(
         FetchRequest(
             site_pk=batch.target_site_pk,
-            title=batch.target_title,
+            title=target_title_of(session, batch),
             kind=FetchKind.single,
             depth=0,
             revisions=max(1, chain_size),

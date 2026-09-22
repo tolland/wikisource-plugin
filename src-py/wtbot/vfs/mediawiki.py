@@ -10,8 +10,9 @@ from wtbot.api.schemas import (
     WriteResult,
     WriteStatus,
 )
-from wtbot.model import Page, Site
+from wtbot.model import Site, Title
 from wtbot.model.wikisource.proofread_page_meta import ProofreadPageMeta
+from wtbot.pages import content_model_of
 from wtbot.vfs.store import EffectiveState, PageStore, meta_has_image
 
 """mediawiki:// — the title-addressed layer.
@@ -72,7 +73,7 @@ class MediaWikiVfs:
             return True  # permissive until siteinfo populates the map
         return ns.subpages
 
-    def subpages(self, site: Site, title: str) -> list[Page]:
+    def subpages(self, site: Site, title: str) -> list[Title]:
         """Direct and nested subpages of [title]; empty when the namespace
         does not support subpages (the slash is then part of the title)."""
         if not self.subpages_enabled(site, title):
@@ -82,7 +83,7 @@ class MediaWikiVfs:
     # -- per-page content operations ------------------------------------------
 
     def _resolve_meta(
-        self, page: Page, meta: ProofreadPageMeta | None | object
+        self, page: Title, meta: ProofreadPageMeta | None | object
     ) -> ProofreadPageMeta | None:
         """`meta` may be precomputed by batched callers (one metadata query
         per listing); the _UNRESOLVED default means look it up here."""
@@ -93,7 +94,7 @@ class MediaWikiVfs:
     def page_node(
         self,
         path: str,
-        page: Page,
+        page: Title,
         name: str | None = None,
         meta: ProofreadPageMeta | None | object = _UNRESOLVED,
         state: EffectiveState | None = None,
@@ -105,12 +106,12 @@ class MediaWikiVfs:
             path=path,
             name=name if name is not None else page.title,
             kind=NodeKind.file,
-            stable_id=page.pageid,
+            stable_id=page.pk,
             revid=state.revid,
-            timestamp=ts_millis(page.local_modified_at or page.remote_timestamp),
+            timestamp=ts_millis(state.modified_at),
             length=len(body.encode()),
             writable=True,
-            content_model=page.content_model,
+            content_model=content_model_of(self.store.session, page),
             quality_level=resolved.quality_level if resolved is not None else None,
             dirty=page.dirty,
             has_reference_image=meta_has_image(resolved),
@@ -122,7 +123,7 @@ class MediaWikiVfs:
     def stat_page(
         self,
         raw_path: str,
-        page: Page,
+        page: Title,
         name: str,
         state: EffectiveState | None = None,
         meta: ProofreadPageMeta | None | object = _UNRESOLVED,
@@ -135,11 +136,11 @@ class MediaWikiVfs:
             exists=True,
             name=name,
             kind=NodeKind.file,
-            stable_id=page.pageid,
+            stable_id=page.pk,
             revid=state.revid,
-            timestamp=ts_millis(page.local_modified_at or page.remote_timestamp),
+            timestamp=ts_millis(state.modified_at),
             length=len(body.encode()),
-            content_model=page.content_model,
+            content_model=content_model_of(self.store.session, page),
             quality_level=resolved.quality_level if resolved is not None else None,
             dirty=page.dirty,
             has_reference_image=meta_has_image(resolved),
@@ -149,11 +150,11 @@ class MediaWikiVfs:
         )
 
     def read_page(
-        self, raw_path: str, page: Page, default_body: str | None = None
+        self, raw_path: str, page: Title, default_body: str | None = None
     ) -> ReadContentResponse:
-        """`default_body` is served when the page has no body at all (a
-        placeholder stub with no local edits) — the overlay passes the
-        content-model scaffold so a new transcription opens well-formed."""
+        """`default_body` is a caller-supplied fallback for the rare title with
+        no stored proposed content — the ordinary case is now handled inside
+        [PageStore.effective_state], whose fourth level is the proposed body."""
         state = self.store.effective_state(page)
         body = state.body or (default_body or "")
         return ReadContentResponse(
@@ -162,9 +163,9 @@ class MediaWikiVfs:
             content_base64=_b64(body),
         )
 
-    def write_page(self, req: WriteContentRequest, page: Page) -> WriteResult:
+    def write_page(self, req: WriteContentRequest, page: Title) -> WriteResult:
         """Local save via the edit journal (see PageStore.append_edit and
-        effective_state for the Page.text discipline). A base_revid mismatch
+        effective_state for the Title.text discipline). A base_revid mismatch
         against the cached remote revid is an edit conflict, not an error.
 
         The comparison is against the *effective* revid, the same value stat

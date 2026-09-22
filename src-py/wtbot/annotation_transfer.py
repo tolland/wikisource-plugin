@@ -15,8 +15,8 @@ from wtbot.annotation_store import (
 from wtbot.model.annotation.box_range_link import BoxRangeLink
 from wtbot.model.annotation.scan_annotation import AnnotationCategory, ScanAnnotation
 from wtbot.model.annotation.text_target_anchor import TextTargetAnchor
-from wtbot.model.wiki.page import Page
 from wtbot.model.wiki.site import Site
+from wtbot.model.wiki.title import Title
 from wtbot.timeutil import utcnow
 
 """Portable dump/load of the annotation tables.
@@ -30,7 +30,7 @@ otherwise disposable database awkward to migrate; this module removes it by
 making the annotation tables a file.
 
 The dump is keyed on identity a new database can still resolve: the site's
-``label`` and the page ``title``, not the page pk. Page pks are local to one
+``label`` and the page ``title``, not the page pk. Title pks are local to one
 database and change the moment the cache is rebuilt, so they are carried
 only as an informational echo of where a record came from. Within a page,
 the client-generated ``annotation_id`` is the join key, exactly as it is in
@@ -39,7 +39,7 @@ carried across unchanged.
 
 Loading is conservative. Nothing is created implicitly: a dumped record
 whose site or page is absent from the target database is reported and
-skipped rather than conjuring a Site or a placeholder Page. Rows that are
+skipped rather than conjuring a Site or a placeholder Title. Rows that are
 already present are left alone unless ``replace`` is asked for, so a load
 is safe to re-run and safe to point at a database that has moved on.
 """
@@ -161,25 +161,25 @@ class LoadReport:
 def dump_annotations(
     engine: Engine, *, site_label: str | None = None, title: str | None = None
 ) -> AnnotationDump:
-    """Collect the annotation tables, joined against Site and Page so each
+    """Collect the annotation tables, joined against Site and Title so each
     record carries a resolvable (label, title) address.
 
     [site_label] limits the dump to one registered wiki, [title] to one page
     within it. Pages with no annotation records of any kind are left out.
     """
     with Session(engine) as session:
-        query = select(Page, Site).join(Site, Site.pk == Page.site_pk)
+        query = select(Title, Site).join(Site, Site.pk == Title.site_pk)
         if site_label is not None:
             query = query.where(Site.label == site_label)
         if title is not None:
-            query = query.where(Page.title == title)
+            query = query.where(Title.title == title)
 
         boxes = SqlAnnotationStore(session)
         anchors = SqlTextAnchorStore(session)
         links = SqlBoxLinkStore(session)
 
         pages: list[PageAnnotations] = []
-        for page, site in session.exec(query.order_by(Page.pk)).all():
+        for page, site in session.exec(query.order_by(Title.pk)).all():
             assert page.pk is not None
             record = PageAnnotations(
                 site_label=site.label,
@@ -222,12 +222,12 @@ def dump_annotations(
     return AnnotationDump(pages=pages)
 
 
-def _resolve_page(session: Session, label: str | None, title: str) -> Page | None:
+def _resolve_page(session: Session, label: str | None, title: str) -> Title | None:
     site = session.exec(select(Site).where(Site.label == label)).first()
     if site is None:
         return None
     return session.exec(
-        select(Page).where(Page.site_pk == site.pk, Page.title == title)
+        select(Title).where(Title.site_pk == site.pk, Title.title == title)
     ).first()
 
 
@@ -271,11 +271,11 @@ def load_annotations(
                         report.missing_sites.append(label or "(unlabelled)")
                 report.missing_pages.append(f"{label}/{record.title}")
                 continue
-            page_pk = page.pk
-            assert page_pk is not None
+            title_pk = page.pk
+            assert title_pk is not None
 
             for box in record.boxes:
-                existing = boxes.get(page_pk, box.annotation_id)
+                existing = boxes.get(title_pk, box.annotation_id)
                 if existing is not None and not replace:
                     report.skipped_existing += 1
                     continue
@@ -284,7 +284,7 @@ def load_annotations(
                 if not dry_run:
                     boxes.upsert(
                         ScanAnnotation(
-                            page_pk=page_pk,
+                            title_pk=title_pk,
                             annotation_id=box.annotation_id,
                             normalized_x=box.x,
                             normalized_y=box.y,
@@ -297,7 +297,7 @@ def load_annotations(
                 report.boxes += 1
 
             for anchor in record.anchors:
-                existing_anchor = anchors.get(page_pk, anchor.annotation_id)
+                existing_anchor = anchors.get(title_pk, anchor.annotation_id)
                 if existing_anchor is not None and not replace:
                     report.skipped_existing += 1
                     continue
@@ -306,7 +306,7 @@ def load_annotations(
                 if not dry_run:
                     anchors.upsert(
                         TextTargetAnchor(
-                            page_pk=page_pk,
+                            title_pk=title_pk,
                             annotation_id=anchor.annotation_id,
                             text_start=anchor.text_start,
                             text_end=anchor.text_end,
@@ -320,8 +320,8 @@ def load_annotations(
             # reported rather than written as a dangling row.
             for link in record.links:
                 endpoints_present = (
-                    boxes.get(page_pk, link.box_annotation_id) is not None
-                    and anchors.get(page_pk, link.range_annotation_id) is not None
+                    boxes.get(title_pk, link.box_annotation_id) is not None
+                    and anchors.get(title_pk, link.range_annotation_id) is not None
                 )
                 if not endpoints_present and not dry_run:
                     report.warnings.append(
@@ -330,7 +330,7 @@ def load_annotations(
                         "has a missing endpoint, skipped"
                     )
                     continue
-                existing_link = links.get(page_pk, link.box_annotation_id)
+                existing_link = links.get(title_pk, link.box_annotation_id)
                 if existing_link is not None and not replace:
                     report.skipped_existing += 1
                     continue
@@ -339,7 +339,7 @@ def load_annotations(
                 if not dry_run:
                     links.upsert(
                         BoxRangeLink(
-                            page_pk=page_pk,
+                            title_pk=title_pk,
                             box_annotation_id=link.box_annotation_id,
                             range_annotation_id=link.range_annotation_id,
                         )

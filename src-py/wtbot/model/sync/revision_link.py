@@ -19,7 +19,7 @@ re-anchors two diverged sides by making them identical again, that is a new row
 with ``origin=reconciled``, not an edit to the old one. The rows for a page pair
 are the ladder; the most recently inserted is the current anchor.
 
-Page-level correspondence used to be *derived* from these rows. It is now
+Title-level correspondence used to be *derived* from these rows. It is now
 stored, as ``PageLink``, and every rung belongs to one -- see that module for
 why derivation could not represent the pairs that most need attention (a
 diverged pair, or one where a side is unfetched, has no linkable revision and
@@ -75,7 +75,7 @@ class RevisionLink(SQLModel, table=True):
 
     One revision may be linked once per *other site*: A may correspond to B on
     upstream1 and C on upstream2, but never to two different revisions on
-    upstream1. That rule depends on Revision -> Page -> Site joins and therefore
+    upstream1. That rule depends on Revision -> Title -> Site joins and therefore
     cannot be expressed by an index over this table; ``assert_link`` enforces it
     at the sole writing boundary.
     """

@@ -13,13 +13,13 @@ router = APIRouter(
 @router.get("/", response_model=list[FileBlob])
 def list_file_blobs(
     session: Session = Depends(get_session),
-    page_pk: int | None = None,
+    title_pk: int | None = None,
     offset: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
 ) -> list[FileBlob]:
     statement = select(FileBlob).order_by(FileBlob.pk).offset(offset).limit(limit)
-    if page_pk is not None:
-        statement = statement.where(FileBlob.page_pk == page_pk)
+    if title_pk is not None:
+        statement = statement.where(FileBlob.title_pk == title_pk)
     return list(session.exec(statement).all())
 
 

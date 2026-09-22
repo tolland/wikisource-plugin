@@ -12,12 +12,12 @@ from wtbot.model import (
     Content,
     LinkOrigin,
     NsRole,
-    Page,
     ProofreadPageMeta,
     Revision,
     RevisionLink,
     Site,
     Slot,
+    Title,
 )
 from wtbot.vfs.store import canonical_title
 
@@ -48,7 +48,7 @@ equally true claim, so the newest is the tightest, and an older anchor makes a
 page look diverged when it is not.
 
 The search is bounded by what the revision store holds, which is deliberately
-sparse. ``Page.history_complete_from_revid`` says how far back the run is known
+sparse. ``Title.history_complete_from_revid`` says how far back the run is known
 to be contiguous, and a search that reaches that boundary without a match says
 ``history_exhausted`` rather than ``diverged``: "we did not look far enough" is
 not "they disagree", and only one of them is fixed by fetching more.
@@ -194,8 +194,8 @@ def propose_index_links(
 
 def compare_pages(
     session: Session,
-    local_page: Page,
-    remote_page: Page | None,
+    local_page: Title,
+    remote_page: Title | None,
     *,
     page_number: int | None = None,
 ) -> LinkProposal:
@@ -288,7 +288,9 @@ class Anchor:
         return self.local_ahead_by == 0 and self.remote_ahead_by == 0
 
 
-def find_anchor(session: Session, local_page: Page, remote_page: Page) -> Anchor | None:
+def find_anchor(
+    session: Session, local_page: Title, remote_page: Title
+) -> Anchor | None:
     """The newest revision pair holding the same content, and what came after.
 
     Each head is compared against the other side's stored revisions, newest
@@ -357,7 +359,7 @@ def find_anchor(session: Session, local_page: Page, remote_page: Page) -> Anchor
 
 
 def _no_match_outcome(
-    session: Session, local_page: Page, remote_page: Page, heads
+    session: Session, local_page: Title, remote_page: Title, heads
 ) -> tuple[MatchOutcome, str | None]:
     """Nothing matched -- but "they disagree" and "we did not look far enough"
     are different answers, and only one of them is fixed by fetching."""
@@ -383,7 +385,7 @@ def _no_match_outcome(
     return MatchOutcome.diverged, None
 
 
-def history_is_complete(session: Session, page: Page) -> bool:
+def history_is_complete(session: Session, page: Title) -> bool:
     """Whether we hold this page back to its first revision.
 
     ``history_complete_from_revid`` marks the oldest revid of a contiguous run
@@ -394,7 +396,7 @@ def history_is_complete(session: Session, page: Page) -> bool:
     if marker is None:
         return False
     oldest = session.exec(
-        select(Revision).where(Revision.page_pk == page.pk, Revision.revid == marker)
+        select(Revision).where(Revision.title_pk == page.pk, Revision.revid == marker)
     ).first()
     return oldest is not None and oldest.parent_revid is None
 
@@ -402,7 +404,7 @@ def history_is_complete(session: Session, page: Page) -> bool:
 def _newest_match(
     session: Session,
     content,
-    other_page: Page,
+    other_page: Title,
     other_head: Revision,
 ) -> tuple[Revision, Significance, int] | None:
     """The newest revision of ``other_page`` holding ``content``'s text.
@@ -429,11 +431,11 @@ def _newest_match(
     return None
 
 
-def _revisions_newest_first(session: Session, page: Page) -> list[Revision]:
+def _revisions_newest_first(session: Session, page: Title) -> list[Revision]:
     return list(
         session.exec(
             select(Revision)
-            .where(Revision.page_pk == page.pk)
+            .where(Revision.title_pk == page.pk)
             .order_by(Revision.revid.desc())
         ).all()
     )
@@ -513,27 +515,27 @@ def confirm_proposals(
 
 def index_children(
     session: Session, site: Site, index_title: str
-) -> list[tuple[int | None, Page]]:
+) -> list[tuple[int | None, Title]]:
     """A work's Page: rows with their page numbers.
 
     Membership comes from ``ProofreadPageMeta.index_page_pk``. The title is
-    used only to resolve the Index Page identity.
+    used only to resolve the Index Title identity.
     """
     index_page = session.exec(
-        select(Page).where(
-            Page.site_pk == site.pk,
-            Page.namespace_role == NsRole.index,
-            func.replace(Page.title, "_", " ") == canonical_title(index_title),
+        select(Title).where(
+            Title.site_pk == site.pk,
+            Title.namespace_role == NsRole.index,
+            func.replace(Title.title, "_", " ") == canonical_title(index_title),
         )
     ).first()
     if index_page is None:
         return []
     rows = session.exec(
-        select(ProofreadPageMeta.page_number, Page)
-        .join(Page, Page.pk == ProofreadPageMeta.page_pk)
+        select(ProofreadPageMeta.page_number, Title)
+        .join(Title, Title.pk == ProofreadPageMeta.title_pk)
         .where(
-            Page.site_pk == site.pk,
-            Page.namespace_role == NsRole.page,
+            Title.site_pk == site.pk,
+            Title.namespace_role == NsRole.page,
             ProofreadPageMeta.index_page_pk == index_page.pk,
         )
     ).all()

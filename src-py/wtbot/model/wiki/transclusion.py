@@ -9,7 +9,7 @@ class Transclusion(SQLModel, table=True):
 
     pk: int | None = Field(default=None, primary_key=True)
     site_pk: int = Field(foreign_key="site.pk")
-    source_page_pk: int = Field(foreign_key="page.pk")  # the mainspace page
+    source_page_pk: int = Field(foreign_key="title.pk")  # the mainspace page
     index_title: str = Field(index=True)  # target Index: title
     from_page: int
     to_page: int

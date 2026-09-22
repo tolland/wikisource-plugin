@@ -145,9 +145,9 @@ def create_app(
 
     # ORDER IS LOAD-BEARING for the routers sharing the /pages prefix.
     # Routes are matched first-registered-wins (Starlette), and
-    # `pages.router` owns the catch-all `GET /pages/{page_pk}`. Every router
+    # `pages.router` owns the catch-all `GET /pages/{title_pk}`. Every router
     # contributing a *static* /pages/<segment> route must be registered
-    # before it, or that segment is swallowed by {page_pk} and 422s on the
+    # before it, or that segment is swallowed by {title_pk} and 422s on the
     # int parse. `test_route_order.py` pins this.
     # /pages/{annotations,text-anchors,box-links}
     app.include_router(annotations.router)
@@ -155,7 +155,7 @@ def create_app(
     app.include_router(page_meta.router)  # /pages/resolve, /pages/{pk}/*-meta
     app.include_router(page_nav.router)  # /pages/nav
     app.include_router(locator_index.router)  # /locator-index/{sections,page-numbers}
-    app.include_router(pages.router)  # /pages/, /pages/{page_pk} — must be last
+    app.include_router(pages.router)  # /pages/, /pages/{title_pk} — must be last
 
     return app
 

@@ -4,7 +4,7 @@ from enum import Enum
 
 from sqlmodel import Session, select
 
-from wtbot.model import Namespace, NsRole, Page, Site
+from wtbot.model import Namespace, NsRole, Site, Title
 from wtbot.timeutil import as_utc
 from wtbot.wiki.client import WikiClient
 from wtbot.wiki.wiki_types import RemoteChange
@@ -27,7 +27,7 @@ Three things this must not get wrong:
   revisions with identical content -- four of them in the Canadian patent
   fixture. This produces candidates, never verdicts; divergence is decided by
   content comparison after fetching.
-- **Namespace ids are per-site.** ``Page``/``Index`` are 104/106 on
+- **Namespace ids are per-site.** ``Title``/``Index`` are 104/106 on
   en.wikisource and different on a fresh ProofreadPage install, so the
   server-side filter is resolved from this site's Namespace rows by *role*.
 
@@ -141,9 +141,9 @@ def _full(
 
 
 def _known_titles(session: Session, site: Site, title_prefix: str | None) -> set[str]:
-    statement = select(Page.title).where(Page.site_pk == site.pk)
+    statement = select(Title.title).where(Title.site_pk == site.pk)
     if title_prefix:
-        statement = statement.where(Page.title.startswith(title_prefix))
+        statement = statement.where(Title.title.startswith(title_prefix))
     return set(session.exec(statement).all())
 
 

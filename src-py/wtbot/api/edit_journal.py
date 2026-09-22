@@ -13,7 +13,7 @@ router = APIRouter(
 @router.get("/", response_model=list[EditJournal])
 def list_edit_journal(
     session: Session = Depends(get_session),
-    page_pk: int | None = None,
+    title_pk: int | None = None,
     committed: bool | None = None,
     offset: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
@@ -21,8 +21,8 @@ def list_edit_journal(
     statement = (
         select(EditJournal).order_by(EditJournal.saved_at).offset(offset).limit(limit)
     )
-    if page_pk is not None:
-        statement = statement.where(EditJournal.page_pk == page_pk)
+    if title_pk is not None:
+        statement = statement.where(EditJournal.title_pk == title_pk)
     if committed is not None:
         statement = statement.where(EditJournal.committed == committed)
     return list(session.exec(statement).all())

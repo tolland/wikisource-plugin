@@ -12,7 +12,7 @@ from wtbot.matching import (
     compare_pages,
     index_children,
 )
-from wtbot.model import FetchState, FileBlob, NsRole, Page, PageLink, Revision, Site
+from wtbot.model import FetchState, FileBlob, NsRole, PageLink, Revision, Site, Title
 from wtbot.vfs.store import canonical_title
 
 """``sync --from Index:X [--to Index:Y]``: what it would take to make the target
@@ -379,8 +379,8 @@ def _asset_reports(
     *,
     source_site: Site,
     target_site: Site,
-    source_index: Page,
-    target_index: Page | None,
+    source_index: Title,
+    target_index: Title | None,
     target_index_title: str,
     scan: ScanCheck,
 ) -> list[SyncAsset]:
@@ -394,13 +394,13 @@ def _asset_reports(
     source_file_title, source_blob = _file_of(session, source_index)
     target_file_title = f"File:{target_index_title.partition(':')[2]}"
     target_file_page = session.exec(
-        select(Page).where(
-            Page.site_pk == target_site.pk, Page.title == target_file_title
+        select(Title).where(
+            Title.site_pk == target_site.pk, Title.title == target_file_title
         )
     ).first()
     target_blob = (
         session.exec(
-            select(FileBlob).where(FileBlob.page_pk == target_file_page.pk)
+            select(FileBlob).where(FileBlob.title_pk == target_file_page.pk)
         ).first()
         if target_file_page is not None
         else None
@@ -517,8 +517,8 @@ def _page_reports(
     *,
     source_site: Site,
     target_site: Site,
-    source_children: list[tuple[int | None, Page]],
-    target_children: list[tuple[int | None, Page]],
+    source_children: list[tuple[int | None, Title]],
+    target_children: list[tuple[int | None, Title]],
 ) -> list[SyncPage]:
     """One row per page of the work, from either side.
 
@@ -564,8 +564,8 @@ def _page_reports(
 def _page_report(
     session: Session,
     number: int | None,
-    source_page: Page,
-    target_page: Page | None,
+    source_page: Title,
+    target_page: Title | None,
 ) -> SyncPage:
     base = {
         "page_number": number,
@@ -588,7 +588,7 @@ def _page_report(
     if pairing is not None:
         base["pair_pk"] = pairing.pk
         base["rungs"] = len(
-            ladder(session, page_pk=source_page.pk, other_page_pk=target_page.pk)
+            ladder(session, title_pk=source_page.pk, other_page_pk=target_page.pk)
         )
 
     if head_revision(session, target_page) is None:
@@ -618,7 +618,7 @@ def _page_report(
 
 
 def _compared(
-    session: Session, source_page: Page, target_page: Page, base: dict
+    session: Session, source_page: Title, target_page: Title, base: dict
 ) -> SyncPage:
     """The verdict, read off the **stored ladder** rather than a comparison.
 
@@ -633,7 +633,7 @@ def _compared(
     ``linkable``, so the report can point at the button that would fix it
     without pretending the fix has happened.
     """
-    rungs = ladder(session, page_pk=source_page.pk, other_page_pk=target_page.pk)
+    rungs = ladder(session, title_pk=source_page.pk, other_page_pk=target_page.pk)
     base["rungs"] = len(rungs)
 
     if not rungs:
@@ -655,8 +655,8 @@ def _compared(
 
 def _from_anchor(
     session: Session,
-    source_page: Page,
-    target_page: Page,
+    source_page: Title,
+    target_page: Title,
     base: dict,
     rungs: list,
 ) -> SyncPage:
@@ -668,7 +668,7 @@ def _from_anchor(
     source_head = head_revision(session, source_page)
     target_head = head_revision(session, target_page)
     anchor = current_anchor(
-        session, page_pk=source_page.pk, other_page_pk=target_page.pk
+        session, title_pk=source_page.pk, other_page_pk=target_page.pk
     )
     if anchor is None:  # pragma: no cover - already_linked implies a rung
         return SyncPage(verdict=SyncVerdict.unlinked, **base)
@@ -703,7 +703,7 @@ def _revid(session: Session, revision_pk: int) -> int | None:
     return revision.revid if revision else None
 
 
-def _is_placeholder(session: Session, page: Page) -> bool:
+def _is_placeholder(session: Session, page: Title) -> bool:
     """A row for a page that is known not to exist on the wiki.
 
     The fan-out writes these for slots ProofreadPage paginates but nobody has
@@ -712,7 +712,7 @@ def _is_placeholder(session: Session, page: Page) -> bool:
     against a row we have simply not got to, where the answer is unknown.
 
     "Has no revision" is read through the revision store rather than off
-    ``Page.revid``. The head columns on ``Page`` are a denormalisation with
+    ``Title.revid``. The head columns on ``Title`` are a denormalisation with
     more than one writer (TODO: normalise them behind ``head_revision``), and
     trusting them here would make this answer "create" for a page that has
     revisions, on any path that filled one and not the other.
@@ -720,19 +720,19 @@ def _is_placeholder(session: Session, page: Page) -> bool:
     return head_revision(session, page) is None and page.fetch_status == FetchState.done
 
 
-def _index_page(session: Session, site: Site, title: str) -> Page | None:
+def _index_page(session: Session, site: Site, title: str) -> Title | None:
     return session.exec(
-        select(Page).where(
-            Page.site_pk == site.pk,
-            Page.title == title,
-            Page.namespace_role == NsRole.index,
+        select(Title).where(
+            Title.site_pk == site.pk,
+            Title.title == title,
+            Title.namespace_role == NsRole.index,
         )
     ).first()
 
 
-def _page(session: Session, site: Site, title: str) -> Page | None:
+def _page(session: Session, site: Site, title: str) -> Title | None:
     return session.exec(
-        select(Page).where(Page.site_pk == site.pk, Page.title == title)
+        select(Title).where(Title.site_pk == site.pk, Title.title == title)
     ).first()
 
 
@@ -772,8 +772,8 @@ def _side(
     session: Session,
     site: Site,
     index_title: str,
-    index_page: Page | None,
-    children: list[tuple[int | None, Page]],
+    index_page: Title | None,
+    children: list[tuple[int | None, Title]],
 ) -> SyncSide:
     placeholders = sum(1 for _, page in children if _is_placeholder(session, page))
     return SyncSide(
@@ -787,7 +787,7 @@ def _side(
 
 
 def _scan_check(
-    session: Session, source_index: Page, target_index: Page | None
+    session: Session, source_index: Title, target_index: Title | None
 ) -> ScanCheck:
     """Discussion §6: do the two sides transcribe the same upload?
 
@@ -850,7 +850,7 @@ def _scan_check(
     )
 
 
-def _file_of(session: Session, index_page: Page) -> tuple[str | None, FileBlob | None]:
+def _file_of(session: Session, index_page: Title) -> tuple[str | None, FileBlob | None]:
     """The ``File:`` backing an ``Index:``, and its downloaded blob record.
 
     By title -- ``Index:Foo.djvu`` -> ``File:Foo.djvu`` -- which is how the
@@ -861,11 +861,13 @@ def _file_of(session: Session, index_page: Page) -> tuple[str | None, FileBlob |
     _, _, basename = index_page.title.partition(":")
     file_title = f"File:{basename}"
     page = session.exec(
-        select(Page).where(Page.site_pk == index_page.site_pk, Page.title == file_title)
+        select(Title).where(
+            Title.site_pk == index_page.site_pk, Title.title == file_title
+        )
     ).first()
     if page is None:
         return file_title, None
-    blob = session.exec(select(FileBlob).where(FileBlob.page_pk == page.pk)).first()
+    blob = session.exec(select(FileBlob).where(FileBlob.title_pk == page.pk)).first()
     return file_title, blob
 
 
@@ -873,7 +875,9 @@ def _site_name(site: Site) -> str:
     return site.label or f"{site.family}:{site.code}"
 
 
-def work_pk_for(session: Session, source_index: Page, target_index: Page) -> int | None:
+def work_pk_for(
+    session: Session, source_index: Title, target_index: Title
+) -> int | None:
     """The tracked work for two index pages, if they are tracked."""
     pairing: PageLink | None = find_pair(session, source_index.pk, target_index.pk)
     if pairing is None:

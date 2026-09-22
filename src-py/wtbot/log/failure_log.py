@@ -37,7 +37,7 @@ class FailureContext:
     component: str  # 'fetch' | 'commit'
     title: str | None = None
     request_pk: int | None = None
-    page_pk: int | None = None
+    title_pk: int | None = None
     site_pk: int | None = None
     site_label: str | None = None  # 'wikisource:en @ https://.../api.php'
     details: dict[str, str] = field(default_factory=dict)
@@ -46,7 +46,7 @@ class FailureContext:
         parts = [f"component={self.component}"]
         for key, value in (
             ("request_pk", self.request_pk),
-            ("page_pk", self.page_pk),
+            ("title_pk", self.title_pk),
             ("site_pk", self.site_pk),
             ("site", self.site_label),
             ("title", self.title),
