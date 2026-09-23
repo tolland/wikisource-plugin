@@ -17,7 +17,7 @@ revision ID, while a fresh database creates that schema directly.
 
 BASELINE = "8ac41e2d7f90"
 THROTTLE = "e7f3b415fd0a"
-HEAD = "b72e8c913a04"
+HEAD = "c38d2e7f901a"
 
 
 @pytest.fixture
@@ -42,6 +42,7 @@ def test_history_starts_at_the_squashed_baseline() -> None:
     assert script.get_heads() == [HEAD]
     assert [revision.revision for revision in script.walk_revisions()] == [
         HEAD,
+        "cddd162bf081",
         "b72e8c913a04",
         "a21d6430c902",
         "a21d6430c901",
@@ -84,6 +85,7 @@ def test_datetime_defaults_revision_preserves_schema_in_both_directions(
     baseline_engine: Engine,
 ) -> None:
     previous = "b72e8c913a04"
+    head = "cddd162bf081"
     _run(baseline_engine, command.upgrade, previous)
 
     def schema():
@@ -93,7 +95,7 @@ def test_datetime_defaults_revision_preserves_schema_in_both_directions(
             ).all()
 
     original = schema()
-    _run(baseline_engine, command.upgrade, HEAD)
+    _run(baseline_engine, command.upgrade, head)
     assert schema() == original
     _run(baseline_engine, command.downgrade, previous)
     assert schema() == original
