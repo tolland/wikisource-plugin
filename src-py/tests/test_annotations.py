@@ -12,7 +12,6 @@ from wtbot.model import (
     Site,
     TextTargetAnchor,
 )
-from wtbot.model.wiki.namespace import NsRole
 from wtbot.model.wikisource.index_meta import IndexMeta
 
 """Tests for scan annotations: the SQL-backed stores (boxes and text anchors
@@ -35,7 +34,6 @@ def _seed(engine) -> int:
         index = Page(
             site_pk=site.pk,
             title=INDEX,
-            namespace_role=NsRole.index,
             content_model="proofread-index",
         )
         s.add(index)
@@ -51,7 +49,6 @@ def _seed(engine) -> int:
         page = Page(
             site_pk=site.pk,
             title=PAGE_TITLE,
-            namespace_role=NsRole.page,
             content_model="proofread-page",
             revid=42,
         )

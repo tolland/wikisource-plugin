@@ -3,7 +3,6 @@
 from sqlmodel import Session, select
 
 from wtbot.model import Namespace, Site
-from wtbot.model.wiki.namespace import role_for_canonical
 
 
 def sync_namespaces(session: Session, site: Site, namespaces) -> None:
@@ -24,7 +23,6 @@ def sync_namespaces(session: Session, site: Site, namespaces) -> None:
         row = existing or Namespace(site_pk=site.pk, key=key)
         row.canonical_name = canonical
         row.local_name = local
-        row.role = role_for_canonical(canonical)
         row.subpages = bool(getattr(ns, "subpages", False))
         row.content = bool(getattr(ns, "content", False))
         row.case = getattr(ns, "case", None)

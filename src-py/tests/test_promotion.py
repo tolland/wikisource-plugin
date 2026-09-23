@@ -11,7 +11,6 @@ from wtbot.main import create_app
 from wtbot.model import (
     FetchRequest,
     FileBlob,
-    NsRole,
     Page,
     Promotion,
     PromotionBatch,
@@ -82,14 +81,13 @@ def seed(
             index = Page(
                 site_pk=site.pk,
                 title=INDEX,
-                namespace_role=NsRole.index,
                 content_model="proofread-index",
                 revid=1,
             )
             session.add(index)
             session.commit()
             file_page = Page(
-                site_pk=site.pk, title="File:Varieties.djvu", namespace_role=NsRole.file
+                site_pk=site.pk, title="File:Varieties.djvu", namespace_key=6
             )
             session.add(file_page)
             session.commit()
@@ -102,7 +100,6 @@ def seed(
             row = Page(
                 site_pk=sites[label].pk,
                 title=title,
-                namespace_role=NsRole.page,
                 content_model="proofread-page",
             )
             session.add(row)

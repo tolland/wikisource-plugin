@@ -52,6 +52,7 @@ def test_query_api_filters_pages_and_returns_joined_revision_records(
         title="Page:Book.djvu/1",
         pageid=101,
         revid=12,
+        namespace_key=250,
         content_model="proofread-page",
     )
     same_title_elsewhere = Page(
@@ -93,7 +94,7 @@ def test_query_api_filters_pages_and_returns_joined_revision_records(
         revid=12,
         pk=None,
         title_contains=None,
-        namespace_role=None,
+        namespace_key=250,
         content_model=None,
         limit=100,
     )
@@ -169,6 +170,8 @@ def test_cli_page_query_passes_filters_and_formats_single_and_multi_slots(
             "local",
             "--pageid",
             "101",
+            "--namespace-key",
+            "250",
         ],
     )
 
@@ -178,6 +181,7 @@ def test_cli_page_query_passes_filters_and_formats_single_and_multi_slots(
     assert params["title"] == "Page:Book.djvu/1"
     assert params["site_label"] == "local"
     assert params["pageid"] == 101
+    assert params["namespace_key"] == 250
 
     lines = result.output.splitlines()
     assert lines[0].startswith("page #7 local:Page:Book.djvu/1")

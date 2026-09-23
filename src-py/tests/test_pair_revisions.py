@@ -4,7 +4,7 @@ from conftest import add_proofread_meta
 from sqlmodel import Session, select
 
 from wtbot.fetch.revision_store import record_head_revision, record_history
-from wtbot.model import NsRole, Page, RevisionLink, Site
+from wtbot.model import Page, RevisionLink, Site
 from wtbot.wiki.wiki_types import RemotePage
 
 """The revision drill-down: resolving a pair the anchor search will not propose.
@@ -56,7 +56,7 @@ def build_site(session: Session, family: str) -> Site:
 
 def build_page(session: Session, site: Site, revisions: list[RemotePage]) -> Page:
     """A page with a real history: head first, older revisions behind it."""
-    page = Page(site_pk=site.pk, title=TITLE, namespace_role=NsRole.page)
+    page = Page(site_pk=site.pk, title=TITLE, content_model="proofread-page")
     session.add(page)
     session.commit()
     session.refresh(page)

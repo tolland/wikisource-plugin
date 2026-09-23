@@ -10,18 +10,9 @@ from wtbot.model import (
     FetchKind,
     FetchRequest,
     Namespace,
-    NsRole,
     Page,
     Site,
-    role_for_canonical,
 )
-
-
-def test_role_resolution_is_id_independent():
-    # Same canonical name -> same role regardless of the numeric key.
-    assert role_for_canonical("Index") is NsRole.index
-    assert role_for_canonical("Page") is NsRole.page
-    assert role_for_canonical("Wibble") is NsRole.other
 
 
 def test_per_site_namespace_map(session):
@@ -34,11 +25,12 @@ def test_per_site_namespace_map(session):
         key=106,
         canonical_name="Index",
         local_name="Index",
-        role=role_for_canonical("Index"),
     )
     session.add(ns)
     session.commit()
-    got = session.exec(select(Namespace).where(Namespace.role == NsRole.index)).one()
+    got = session.exec(
+        select(Namespace).where(Namespace.canonical_name == "Index")
+    ).one()
     assert got.key == 106
 
 
@@ -50,7 +42,7 @@ def test_index_fanout_and_journal(session):
     index = Page(
         site_pk=site.pk,
         title="Index:Tractatus.djvu",
-        namespace_role=NsRole.index,
+        content_model="proofread-index",
     )
     session.add(index)
     session.commit()

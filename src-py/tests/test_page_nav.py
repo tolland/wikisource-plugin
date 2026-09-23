@@ -3,7 +3,6 @@ from conftest import add_proofread_meta
 from sqlmodel import Session
 
 from wtbot.model import Page, Site
-from wtbot.model.wiki.namespace import NsRole
 from wtbot.model.wikisource.index_meta import IndexMeta
 
 """Tests for GET /pages/nav — the split editor's page-navigation metadata:
@@ -28,7 +27,6 @@ def _seed(engine, page_numbers: list[int]) -> None:
         index = Page(
             site_pk=site.pk,
             title=INDEX,
-            namespace_role=NsRole.index,
             content_model="proofread-index",
         )
         s.add(index)
@@ -45,7 +43,6 @@ def _seed(engine, page_numbers: list[int]) -> None:
             page = Page(
                 site_pk=site.pk,
                 title=f"Page:Tractatus.djvu/{n}",
-                namespace_role=NsRole.page,
                 content_model="proofread-page",
             )
             s.add(page)

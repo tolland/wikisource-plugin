@@ -11,7 +11,6 @@ from sqlmodel import Session, select
 
 from wtbot.main import create_app
 from wtbot.model import Commit, CommitStatus, EditJournal, Page, Site
-from wtbot.model.wiki.namespace import NsRole
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import RemotePage
 
@@ -38,14 +37,12 @@ def _setup(engine):
             Page(
                 site_pk=site.pk,
                 title=INDEX_TITLE,
-                namespace_role=NsRole.index,
                 content_model="proofread-index",
             )
         )
         page = Page(
             site_pk=site.pk,
             title=TITLE,
-            namespace_role=NsRole.page,
             content_model="proofread-page",
             text="original",
             revid=100,

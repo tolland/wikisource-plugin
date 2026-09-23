@@ -3,7 +3,6 @@ from conftest import add_proofread_meta
 from sqlmodel import Session, select
 
 from wtbot.model import EditJournal, Page, Site
-from wtbot.model.wiki.namespace import NsRole
 
 """Tests for GET /locator-index/{page-numbers,sections} — resolving a
 back-of-book locator to the Page: that holds it. Mirrors test_page_nav.py's
@@ -37,7 +36,6 @@ def _seed(engine) -> None:
         index = Page(
             site_pk=site.pk,
             title=INDEX,
-            namespace_role=NsRole.index,
             content_model="proofread-index",
             text=_PAGELIST_BODY,
         )
@@ -46,7 +44,6 @@ def _seed(engine) -> None:
         page_155 = Page(
             site_pk=site.pk,
             title="Page:Principles_of_mechanics.pdf/155",
-            namespace_role=NsRole.page,
             content_model="proofread-page",
             text="the explicit pagelist anchor page",
         )
@@ -57,7 +54,6 @@ def _seed(engine) -> None:
         page_163 = Page(
             site_pk=site.pk,
             title="Page:Principles_of_mechanics.pdf/163",
-            namespace_role=NsRole.page,
             content_model="proofread-page",
             text=_PARAGRAPH_273_BODY,
         )
@@ -68,7 +64,6 @@ def _seed(engine) -> None:
         page_164 = Page(
             site_pk=site.pk,
             title="Page:Principles_of_mechanics.pdf/164",
-            namespace_role=NsRole.page,
             content_model="proofread-page",
             text="no section markers on this one",
         )
@@ -97,7 +92,6 @@ def _seed_bare_pagelist(engine) -> None:
         index = Page(
             site_pk=site.pk,
             title=BARE_INDEX,
-            namespace_role=NsRole.index,
             content_model="proofread-index",
             text="<pagelist />",
         )
@@ -106,7 +100,6 @@ def _seed_bare_pagelist(engine) -> None:
             page = Page(
                 site_pk=site.pk,
                 title=f"Page:NeglectedArgument.pdf/{n}",
-                namespace_role=NsRole.page,
                 content_model="proofread-page",
                 text="",
             )

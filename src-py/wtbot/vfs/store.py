@@ -14,7 +14,7 @@ from wtbot.model import (
     Page,
     Site,
 )
-from wtbot.model.wiki.namespace import Namespace, NsRole
+from wtbot.model.wiki.namespace import Namespace
 from wtbot.model.wikisource.proofread_page_meta import (
     ProofreadPageMeta,
     default_short_name,
@@ -104,7 +104,7 @@ class PageStore:
         return self.session.exec(
             select(Page).where(
                 Page.site_pk == site.pk,
-                Page.namespace_role == NsRole.index,
+                Page.content_model == "proofread-index",
                 func.replace(Page.title, "_", " ") == canonical_title(title),
             )
         ).first()
@@ -130,7 +130,7 @@ class PageStore:
                 .join(ProofreadPageMeta, ProofreadPageMeta.page_pk == Page.pk)
                 .where(
                     Page.site_pk == site.pk,
-                    Page.namespace_role == NsRole.page,
+                    Page.content_model == "proofread-page",
                     ProofreadPageMeta.index_page_pk == index.pk,
                 )
             ).all()
@@ -148,7 +148,7 @@ class PageStore:
             .where(
                 Page.site_pk == site.pk,
                 Page.title == title,
-                Page.namespace_role == NsRole.page,
+                Page.content_model == "proofread-page",
                 ProofreadPageMeta.index_page_pk == index.pk,
             )
         ).first()
@@ -168,7 +168,7 @@ class PageStore:
                 .where(
                     Page.site_pk == site.pk,
                     Page.title.in_(titles),
-                    Page.namespace_role == NsRole.page,
+                    Page.content_model == "proofread-page",
                     ProofreadPageMeta.index_page_pk == index.pk,
                 )
             ).all()

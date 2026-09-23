@@ -8,10 +8,10 @@ from wtbot.model import (
     FileMeta,
     FileOrigin,
     IndexMeta,
-    NsRole,
     Page,
     ProofreadPageMeta,
 )
+from wtbot.model.wiki.namespace import FILE_NAMESPACE_KEY
 from wtbot.model.wikisource.proofread_page_meta import SHORT_NAME_RE
 from wtbot.vfs.nodes import (
     FileBlobLeaf,
@@ -197,9 +197,9 @@ def put_page_meta(
     session: Session = Depends(get_session),
 ) -> ProofreadPageMeta:
     page = _get_page(session, page_pk)
-    if page.namespace_role != NsRole.page:
+    if page.content_model != "proofread-page":
         raise HTTPException(
-            status_code=400, detail=f"not a Page:-namespace page: {page.title}"
+            status_code=400, detail=f"not a proofread-page: {page.title}"
         )
     meta = PageStore(session).proofread_page_meta(page)
     values = update.model_dump(exclude_unset=True)
@@ -213,7 +213,7 @@ def put_page_meta(
         index_page = _get_page(session, index_page_pk)
         if (
             index_page.site_pk != page.site_pk
-            or index_page.namespace_role != NsRole.index
+            or index_page.content_model != "proofread-index"
         ):
             raise HTTPException(
                 status_code=400,
@@ -249,7 +249,7 @@ def put_file_meta(
     session: Session = Depends(get_session),
 ) -> FileMeta:
     page = _get_page(session, page_pk)
-    if page.namespace_role != NsRole.file:
+    if page.namespace_key != FILE_NAMESPACE_KEY:
         raise HTTPException(
             status_code=400, detail=f"not a File:-namespace page: {page.title}"
         )

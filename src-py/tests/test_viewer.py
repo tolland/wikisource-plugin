@@ -3,13 +3,12 @@ from fastapi import HTTPException
 from sqlmodel import Session, select
 
 from wtbot.api.viewer import get_index_page, list_index_pages
-from wtbot.model import IndexMeta, NsRole, Page, Site
+from wtbot.model import IndexMeta, Page, Site
 
 
 def _add_page(
     engine,
     title: str,
-    role: NsRole,
     text: str | None,
     content_model: str | None = None,
 ) -> Page:
@@ -26,7 +25,6 @@ def _add_page(
     page = Page(
         site_pk=site.pk,
         title=title,
-        namespace_role=role,
         content_model=content_model,
         text=text,
         revid=123,
@@ -53,21 +51,18 @@ def test_viewer_lists_only_index_pages(engine):
     index_page = _add_page(
         engine,
         "Index:Example.djvu",
-        NsRole.index,
         "index body",
         content_model="proofread-index",
     )
     _add_page(
         engine,
         "Index:Example.djvu/styles.css",
-        NsRole.index,
         ".pagetext {}",
         content_model="sanitized-css",
     )
     _add_page(
         engine,
         "Page:Example.djvu/1",
-        NsRole.page,
         "page body",
         content_model="proofread-page",
     )
@@ -93,7 +88,6 @@ def test_viewer_returns_index_page_body(engine):
     index_page = _add_page(
         engine,
         "Index:Example.djvu",
-        NsRole.index,
         "{{Header}}",
         content_model="proofread-index",
     )
@@ -108,7 +102,6 @@ def test_viewer_404s_for_non_index_page(engine):
     page = _add_page(
         engine,
         "Page:Example.djvu/1",
-        NsRole.page,
         "page body",
         content_model="proofread-page",
     )
@@ -124,7 +117,6 @@ def test_viewer_404s_for_index_namespace_asset(engine):
     page = _add_page(
         engine,
         "Index:Example.djvu/styles.css",
-        NsRole.index,
         ".pagetext {}",
         content_model="sanitized-css",
     )

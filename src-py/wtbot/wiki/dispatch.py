@@ -9,7 +9,7 @@ binary scan, so the namespace decides before content_model does.
 
 from enum import Enum
 
-from wtbot.model import NsRole, role_for_canonical
+from wtbot.model.wiki.namespace import FILE_NAMESPACE_KEY
 from wtbot.wiki.wiki_types import RemotePage
 
 
@@ -28,12 +28,11 @@ _MODEL_TO_HANDLING = {
 }
 
 
-def classify(content_model: str, namespace_role: NsRole | None = None) -> Handling:
-    if namespace_role is NsRole.file:
+def classify(content_model: str, namespace_key: int | None = None) -> Handling:
+    if namespace_key == FILE_NAMESPACE_KEY:
         return Handling.file
     return _MODEL_TO_HANDLING.get(content_model, Handling.unknown)
 
 
 def classify_remote(page: RemotePage) -> Handling:
-    role = role_for_canonical(page.namespace_canonical or "")
-    return classify(page.content_model, role)
+    return classify(page.content_model, page.namespace_key)

@@ -2,7 +2,7 @@ import pytest
 from conftest import add_proofread_meta
 
 from wtbot.model import Page, Site
-from wtbot.model.wiki.namespace import Namespace, NsRole
+from wtbot.model.wiki.namespace import Namespace
 from wtbot.vfs.mediawiki import MediaWikiVfs, title_namespace_name
 from wtbot.vfs.store import PageStore
 from wtbot.vfs.wikisource import WikisourceVfs
@@ -32,14 +32,12 @@ def site(session) -> Site:
         Page(
             site_pk=site.pk,
             title=INDEX,
-            namespace_role=NsRole.index,
             content_model="proofread-index",
         )
     )
     linked = Page(
         site_pk=site.pk,
         title=LINKED_SUBPAGE,
-        namespace_role=NsRole.index,
         content_model="sanitized-css",
     )
     session.add(linked)
@@ -47,7 +45,6 @@ def site(session) -> Site:
         Page(
             site_pk=site.pk,
             title=UNLINKED_SUBPAGE,
-            namespace_role=NsRole.index,
             content_model="sanitized-css",
         )
     )
@@ -62,7 +59,6 @@ def _add_index_namespace(session, site, *, subpages: bool) -> None:
             key=252,
             canonical_name="Index",
             local_name="Index",
-            role=NsRole.index,
             subpages=subpages,
         )
     )
@@ -128,13 +124,11 @@ def test_proofread_pages_match_across_underscore_space(session):
     real = Page(
         site_pk=site.pk,
         title="Page:Unreported RTT Pathway Removals at MSE FT.pdf/5",
-        namespace_role=NsRole.page,
         content_model="proofread-page",
     )
     stub = Page(
         site_pk=site.pk,
         title="Page:Unreported_RTT_Pathway_Removals_at_MSE_FT.pdf/1",
-        namespace_role=NsRole.page,
         content_model="proofread-page",
     )
     session.add(real)

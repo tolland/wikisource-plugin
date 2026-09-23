@@ -6,9 +6,9 @@ from sqlalchemy import func
 from sqlmodel import Session, select
 
 from wtbot.log.fetch_log import activity, fetch_stage
-from wtbot.model import FetchState, FileBlob, Page, Site, role_for_canonical
+from wtbot.model import FetchState, FileBlob, Page, Site
 from wtbot.model.fetch.fetch_request import FetchKind, FetchRequest, FetchStatus
-from wtbot.model.wiki.namespace import NsRole
+from wtbot.model.wiki.namespace import FILE_NAMESPACE_KEY
 from wtbot.model.wikisource.proofread_page_meta import ProofreadPageMeta
 from wtbot.timeutil import utcnow
 from wtbot.vfs.store import PageStore
@@ -56,7 +56,6 @@ class CachedPage:
 
     pk: int
     title: str
-    namespace_role: NsRole
     content_model: str | None
     text: str | None
 
@@ -209,15 +208,12 @@ _FILE = FilePageProcessor()
 
 def processor_for(remote: RemotePage) -> PageProcessor:
     """Select by what was actually fetched, never by the request's kind."""
-    role = role_for_canonical(remote.namespace_canonical or "")
-    if role == NsRole.file:
+    if remote.namespace_key == FILE_NAMESPACE_KEY:
         return _FILE
     if remote.content_model == "proofread-index":
         return _PROOFREAD_INDEX
     if remote.content_model == "proofread-page":
         return _PROOFREAD_PAGE
-    if role == NsRole.index:
-        return _INDEX_ASSET
     return _DEFAULT
 
 
@@ -554,7 +550,6 @@ def _ensure_placeholder_page(
     page = Page(
         site_pk=site_pk,
         title=title,
-        namespace_role=NsRole.page,
         content_model="proofread-page",
         # We *know* the remote state: absent. The fetch is complete.
         fetch_status=FetchState.done,
@@ -582,7 +577,7 @@ def ensure_index_page(session: Session, site_pk: int, title: str) -> Page:
         )
     ).first()
     if index is not None:
-        if index.namespace_role != NsRole.index:
+        if index.content_model != "proofread-index":
             raise RuntimeError(
                 f"owning Index title {title!r} resolves to non-Index page {index.pk}"
             )
@@ -590,7 +585,6 @@ def ensure_index_page(session: Session, site_pk: int, title: str) -> Page:
     index = Page(
         site_pk=site_pk,
         title=title,
-        namespace_role=NsRole.index,
         content_model="proofread-index",
     )
     session.add(index)

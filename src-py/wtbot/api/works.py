@@ -29,7 +29,6 @@ from wtbot.model import (
     IndexLink,
     IndexMeta,
     LinkOrigin,
-    NsRole,
     Page,
     PageLink,
     ProofreadPageMeta,
@@ -488,7 +487,7 @@ def list_candidates(
         session.exec(
             select(ProofreadPageMeta.index_page_pk, func.count())
             .join(Page, Page.pk == ProofreadPageMeta.page_pk)
-            .where(Page.site_pk == site.pk, Page.namespace_role == NsRole.page)
+            .where(Page.site_pk == site.pk, Page.content_model == "proofread-page")
             .group_by(ProofreadPageMeta.index_page_pk)
         ).all()
     )

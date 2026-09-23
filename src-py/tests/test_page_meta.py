@@ -3,15 +3,14 @@ from conftest import add_proofread_meta
 from sqlmodel import Session
 
 from wtbot.model import Page, Site
-from wtbot.model.wiki.namespace import NsRole
 from wtbot.model.wikisource.proofread_page_meta import (
     default_short_name,
 )
 from wtbot.vfs.store import PageStore
 
-"""Tests for the per-role Page metadata extensions (IndexMeta / ProofreadPageMeta /
+"""Tests for the content-specific Page metadata extensions (IndexMeta / ProofreadPageMeta /
 FileMeta): short_name derivation, store fetch-or-create, and the HTTP
-upsert endpoints with their role guards and per-site uniqueness."""
+upsert endpoints with their content-model and namespace guards and per-site uniqueness."""
 
 FAMILY = "wikisource"
 CODE = "en"
@@ -32,15 +31,15 @@ def _add_page(
     session: Session,
     site: Site,
     title: str,
-    role: NsRole,
     cm: str,
     index_title: str | None = None,
+    namespace_key: int | None = None,
 ) -> Page:
     page = Page(
         site_pk=site.pk,
         title=title,
-        namespace_role=role,
         content_model=cm,
+        namespace_key=namespace_key,
     )
     session.add(page)
     session.flush()
@@ -52,7 +51,7 @@ def _add_page(
 
 
 def _seed_index(session: Session, site: Site, title: str = INDEX) -> Page:
-    return _add_page(session, site, title, NsRole.index, "proofread-index")
+    return _add_page(session, site, title, "proofread-index")
 
 
 # -- default_short_name --------------------------------------------------------
@@ -116,10 +115,8 @@ def seeded(engine):
     with Session(engine) as s:
         site = _seed_site(s)
         index = _seed_index(s, site)
-        page = _add_page(
-            s, site, PAGE_1, NsRole.page, "proofread-page", index_title=INDEX
-        )
-        file_page = _add_page(s, site, FILE, NsRole.file, "wikitext")
+        page = _add_page(s, site, PAGE_1, "proofread-page", index_title=INDEX)
+        file_page = _add_page(s, site, FILE, "wikitext", namespace_key=6)
         other_index = _seed_index(s, site, "Index:Other.djvu")
         pks = {
             "index_pk": index.pk,
@@ -282,3 +279,59 @@ def test_resolve_then_meta_roundtrip(client, seeded):
     ).json()["pk"]
     r = client.put(f"/pages/{pk}/page-meta", json={"thumb_width": 240})
     assert r.status_code == 200
+
+
+@pytest.mark.parametrize("content_model", ["sanitized-css", "json"])
+def test_proofread_metadata_rejects_other_content_in_page_namespace(
+    session, content_model
+):
+    from fastapi import HTTPException
+
+    from wtbot.api.page_meta import ProofreadPageMetaUpdate, put_page_meta
+
+    site = _seed_site(session)
+    index = _seed_index(session, site)
+    asset = _add_page(
+        session, site, "Page:Book.djvu/metadata", content_model, namespace_key=104
+    )
+    with pytest.raises(HTTPException) as exc:
+        put_page_meta(
+            asset.pk, ProofreadPageMetaUpdate(index_page_pk=index.pk), session
+        )
+    assert exc.value.status_code == 400
+
+
+def test_css_in_index_namespace_cannot_own_proofread_metadata(session):
+    from fastapi import HTTPException
+
+    from wtbot.api.page_meta import ProofreadPageMetaUpdate, put_page_meta
+    from wtbot.page_processors import ensure_index_page
+
+    site = _seed_site(session)
+    css = _add_page(
+        session, site, "Index:Book.djvu/styles.css", "sanitized-css", namespace_key=106
+    )
+    page = _add_page(session, site, "Page:Book.djvu/1", "proofread-page")
+    assert PageStore(session).index_page(site, css.title) is None
+    with pytest.raises(HTTPException) as exc:
+        put_page_meta(page.pk, ProofreadPageMetaUpdate(index_page_pk=css.pk), session)
+    assert exc.value.status_code == 400
+    with pytest.raises(RuntimeError, match="non-Index"):
+        ensure_index_page(session, site.pk, css.title)
+
+
+def test_proofread_metadata_accepts_content_model_in_custom_namespace(session):
+    from wtbot.api.page_meta import ProofreadPageMetaUpdate, put_page_meta
+
+    site = _seed_site(session)
+    index = _add_page(
+        session, site, "Custom:Book", "proofread-index", namespace_key=900
+    )
+    page = _add_page(
+        session, site, "Custom:Book/1", "proofread-page", namespace_key=900
+    )
+    meta = put_page_meta(
+        page.pk, ProofreadPageMetaUpdate(index_page_pk=index.pk), session
+    )
+    assert meta.index_page_pk == index.pk
+    assert PageStore(session).proofread_pages(site, index.title) == [page]

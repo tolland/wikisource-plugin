@@ -165,7 +165,7 @@ simply *the* Index-listing endpoint, sitting under a prefix that names one
 consumer of it. The `/viewer` prefix implies "debug UI only, don't rely on
 this", which is the opposite of true — an Index listing is the natural entry
 point for the tool window's tree too, and today the plugin would have to
-reconstruct it from `GET /pages/?namespace_role=…` plus its own summarising.
+reconstruct it from `GET /pages/?content_model=…` plus its own summarising.
 
 ### 3.8 `ScanAnnotation` is keyed to a page, but describes an image
 

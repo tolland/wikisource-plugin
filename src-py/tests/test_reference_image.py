@@ -14,7 +14,6 @@ from sqlmodel import Session
 
 from wtbot.main import create_app
 from wtbot.model import Page, Site
-from wtbot.model.wiki.namespace import NsRole
 from wtbot.wiki.client import FakeWikiClient
 
 FAMILY = "wikisource"
@@ -34,7 +33,6 @@ def client(engine) -> TestClient:
         page = Page(
             site_pk=site.pk,
             title=PAGE,
-            namespace_role=NsRole.page,
             content_model="proofread-page",
             text="old cached body",
         )

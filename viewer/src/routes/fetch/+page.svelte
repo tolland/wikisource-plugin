@@ -128,7 +128,7 @@
       </div>
       <div>
         <dt>Cached page</dt>
-        <dd>{result.page ? `${result.page.namespace_role} #${result.page.pk}` : 'not written'}</dd>
+        <dd>{result.page ? `${result.page.content_model ?? 'unknown'} #${result.page.pk}` : 'not written'}</dd>
       </div>
     </dl>
     {#if result.request.error_message}

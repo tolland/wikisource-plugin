@@ -12,7 +12,7 @@ from wtbot.matching import (
     compare_pages,
     index_children,
 )
-from wtbot.model import FetchState, FileBlob, NsRole, Page, PageLink, Revision, Site
+from wtbot.model import FetchState, FileBlob, Page, PageLink, Revision, Site
 from wtbot.vfs.store import canonical_title
 
 """``sync --from Index:X [--to Index:Y]``: what it would take to make the target
@@ -725,7 +725,7 @@ def _index_page(session: Session, site: Site, title: str) -> Page | None:
         select(Page).where(
             Page.site_pk == site.pk,
             Page.title == title,
-            Page.namespace_role == NsRole.index,
+            Page.content_model == "proofread-index",
         )
     ).first()
 

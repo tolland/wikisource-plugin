@@ -3,7 +3,7 @@ from sqlmodel import Session, select
 
 from wtbot.api.pages import get_page, list_pages
 from wtbot.main import create_app
-from wtbot.model import FileBlob, NsRole, Page, Site
+from wtbot.model import FileBlob, Page, Site
 
 
 def test_app_exposes_object_routes(engine):
@@ -26,7 +26,6 @@ def test_pages_route_returns_raw_text_and_content_model(session: Session):
     page = Page(
         site_pk=site.pk,
         title="Template:TOC templates/style.css",
-        namespace_role=NsRole.template,
         content_model="sanitized-css",
         text=".wst-toc-table { border-collapse: collapse; }",
         revid=268,
@@ -75,7 +74,7 @@ def test_file_blob_model_available_for_object_routes(session: Session):
     session.add(site)
     session.commit()
     session.refresh(site)
-    page = Page(site_pk=site.pk, title="File:Example.pdf", namespace_role=NsRole.file)
+    page = Page(site_pk=site.pk, title="File:Example.pdf", namespace_key=6)
     session.add(page)
     session.commit()
     session.refresh(page)

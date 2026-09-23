@@ -56,8 +56,10 @@ def query(
     title_contains: str | None = typer.Option(
         None, "--title-contains", help="Match this text anywhere in the title."
     ),
-    namespace_role: str | None = typer.Option(
-        None, "--namespace-role", help="Namespace role, such as page or index."
+    namespace_key: int | None = typer.Option(
+        None,
+        "--namespace-key",
+        help="Site-local namespace ID; combine with --label to scope to a site.",
     ),
     content_model: str | None = typer.Option(
         None, "--content-model", help="Remote page content model."
@@ -75,7 +77,7 @@ def query(
             "pageid": pageid,
             "revid": revid,
             "site_label": label,
-            "namespace_role": namespace_role,
+            "namespace_key": namespace_key,
             "content_model": content_model,
             "limit": limit,
         }.items()

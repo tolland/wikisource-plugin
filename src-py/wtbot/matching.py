@@ -11,7 +11,6 @@ from wtbot.model import (
     MAIN_SLOT,
     Content,
     LinkOrigin,
-    NsRole,
     Page,
     ProofreadPageMeta,
     Revision,
@@ -164,7 +163,7 @@ def propose_index_links(
     Pages are matched on **page number within the index**, not on title text:
     ``--to`` exists precisely because the two sides' titles can differ, and the
     scan offset is the thing that actually has to line up (discussion section
-    6). Namespace roles are read from the rows, never numeric ids, which differ
+    6). Content models are read from the rows, never namespace ids, which differ
     between installs.
     """
     remote_index_title = remote_index_title or local_index_title
@@ -522,7 +521,7 @@ def index_children(
     index_page = session.exec(
         select(Page).where(
             Page.site_pk == site.pk,
-            Page.namespace_role == NsRole.index,
+            Page.content_model == "proofread-index",
             func.replace(Page.title, "_", " ") == canonical_title(index_title),
         )
     ).first()
@@ -533,7 +532,7 @@ def index_children(
         .join(Page, Page.pk == ProofreadPageMeta.page_pk)
         .where(
             Page.site_pk == site.pk,
-            Page.namespace_role == NsRole.page,
+            Page.content_model == "proofread-page",
             ProofreadPageMeta.index_page_pk == index_page.pk,
         )
     ).all()

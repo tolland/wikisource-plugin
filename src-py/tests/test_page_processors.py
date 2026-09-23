@@ -1,7 +1,6 @@
 from wtbot.page_processors import (
     DefaultProcessor,
     FilePageProcessor,
-    IndexAssetProcessor,
     ProofreadIndexProcessor,
     ProofreadPageProcessor,
     processor_for,
@@ -16,7 +15,7 @@ namespace as a structural override."""
 def _remote(content_model: str, ns_canonical: str | None) -> RemotePage:
     return RemotePage(
         title="T",
-        namespace_key=0,
+        namespace_key=6 if ns_canonical == "File" else 0,
         namespace_canonical=ns_canonical,
         content_model=content_model,
         text="",
@@ -40,7 +39,7 @@ def test_proofread_models_selected_by_content_model_not_namespace():
 
 def test_index_namespace_non_index_content_is_an_asset():
     assert isinstance(
-        processor_for(_remote("sanitized-css", "Index")), IndexAssetProcessor
+        processor_for(_remote("sanitized-css", "Index")), DefaultProcessor
     )
 
 

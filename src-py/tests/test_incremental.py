@@ -4,7 +4,7 @@ from conftest import credential_for, drain
 from sqlmodel import Session, select
 
 from wtbot.incremental import RefreshBasis, plan_refresh
-from wtbot.model import FetchRequest, Namespace, NsRole, Page, Site
+from wtbot.model import FetchRequest, Namespace, Page, Site
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import RemoteChange, RemotePage
 
@@ -27,7 +27,7 @@ LABEL = "en.wikisource"
 
 def _site(session: Session, **kwargs) -> Site:
     """A site with its Page:/Index: namespaces synced, as a fetch would leave
-    them. The numbers are en.wikisource's; the point of the role lookup is that
+    them. The numbers are en.wikisource's; the point of the namespace lookup is that
     nothing depends on that."""
     site = Site(family="wikisource", code="en", label=LABEL, **kwargs)
     session.add(site)
@@ -35,14 +35,13 @@ def _site(session: Session, **kwargs) -> Site:
     session.refresh(site)
     credential_for(session, site)
 
-    for key, role in ((PAGE_NS, NsRole.page), (INDEX_NS, NsRole.index)):
+    for key, name in ((PAGE_NS, "Page"), (INDEX_NS, "Index")):
         session.add(
             Namespace(
                 site_pk=site.pk,
                 key=key,
-                canonical_name=role.value.title(),
-                local_name=role.value.title(),
-                role=role,
+                canonical_name=name,
+                local_name=name,
             )
         )
     session.commit()
@@ -169,7 +168,7 @@ def test_one_title_edited_twice_is_fetched_once(session: Session) -> None:
     assert len(plan.changes) == 2
 
 
-def test_namespaces_are_filtered_by_role_not_by_number(session: Session) -> None:
+def test_namespaces_are_resolved_from_site_namespace_names(session: Session) -> None:
     """Page:/Index: ids differ between installs, so the server-side filter is
     resolved from this site's rows."""
     site = _site(session)

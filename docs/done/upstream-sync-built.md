@@ -194,7 +194,7 @@ renders described fields and an example rather than an opaque JSON blob, and
   are interpreted as UTC. The caller controls the window and must not treat
   enqueueing as confirmation that it has received the fetched content.
 - **Namespace ids are per-site**, so the `rcnamespace` filter is resolved
-  from this site's `Namespace` rows by role. An unresolved table sends no
+  from this site's `Namespace` rows by canonical name. An unresolved table sends no
   filter at all: an empty `rcnamespace` matches nothing, which looks
   exactly like a wiki where nothing ever changes.
 - **A changed revid is not a changed page.** Null and touch edits bump the
@@ -296,8 +296,8 @@ and `wtbot link propose|add|show`.
   different actions, and a boolean-plus-message loses which.
 - `POST /links` to confirm one pair by title. `DELETE` to retract is still
   absent, and stays absent while links are append-only.
-- Title normalisation compares namespace *roles* resolved per site, never
-  numeric ids. Pages pair on **page number within the index** rather than
+- Proofread candidates are selected by content model, independently of
+  namespace IDs. Pages pair on **page number within the index** rather than
   title text: `--to` exists because the titles can differ, and the scan
   offset is what has to line up (§6). Title equality is only a fallback for
   pages with no number.

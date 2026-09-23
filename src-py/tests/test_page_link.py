@@ -10,7 +10,6 @@ from wtbot.linking.remote_link_store import LinkError
 from wtbot.matching import compare_pages, confirm_proposals
 from wtbot.model import (
     LinkOrigin,
-    NsRole,
     Page,
     PageLink,
     RevisionLink,
@@ -46,7 +45,7 @@ def build_page(
     session: Session, site: Site, number: int, *, body: str | None, revid: int
 ) -> Page:
     title = f"Page:Canadian patent 29537.djvu/{number}"
-    page = Page(site_pk=site.pk, title=title, namespace_role=NsRole.page)
+    page = Page(site_pk=site.pk, title=title, content_model="proofread-page")
     session.add(page)
     session.commit()
     session.refresh(page)

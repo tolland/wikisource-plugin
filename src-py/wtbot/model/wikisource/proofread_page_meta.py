@@ -2,12 +2,12 @@ import re
 
 from sqlmodel import Field, SQLModel
 
-"""Per-role attribute extensions for Page.
+"""Content-specific attribute extensions for Page.
 
 Page stays one table (whole-work scans are a core use case) and keeps the
 *fetched remote state*. Everything else — curated values a user sets, or
 locally derived values with their own lifecycle — lives in these side
-tables, one row per page, keyed by page_pk. Adding a new role-specific
+tables, one row per page, keyed by page_pk. Adding a new content-specific
 attribute means a column here, not another nullable column on Page.
 
 These tables store values only. Whether/how they surface to the client

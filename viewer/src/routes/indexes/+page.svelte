@@ -52,7 +52,7 @@
     {#if loadingList}
       <p class="state">Loading index pages...</p>
     {:else if indexes.length === 0}
-      <p class="state">No records found with namespace_role "index".</p>
+      <p class="state">No records found with content model "proofread-index".</p>
     {:else}
       <nav class="index-list">
         {#each indexes as item}

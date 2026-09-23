@@ -9,7 +9,6 @@ from wtbot.model import (
     FetchState,
     FileBlob,
     IndexMeta,
-    NsRole,
     Page,
     PageLink,
     RevisionLink,
@@ -68,7 +67,6 @@ def build_index(session: Session, site: Site, title: str, *, sha1: str | None) -
     page = Page(
         site_pk=site.pk,
         title=title,
-        namespace_role=NsRole.index,
         content_model="proofread-index",
         revid=1,
     )
@@ -85,9 +83,7 @@ def build_index(session: Session, site: Site, title: str, *, sha1: str | None) -
     session.commit()
     if sha1 is not None:
         _, _, basename = title.partition(":")
-        file_page = Page(
-            site_pk=site.pk, title=f"File:{basename}", namespace_role=NsRole.file
-        )
+        file_page = Page(site_pk=site.pk, title=f"File:{basename}", namespace_key=6)
         session.add(file_page)
         session.commit()
         session.refresh(file_page)
@@ -117,7 +113,6 @@ def build_page(
     page = Page(
         site_pk=site.pk,
         title=title,
-        namespace_role=NsRole.page,
         content_model="proofread-page",
         fetch_status=FetchState.done if fetched else FetchState.unfetched,
     )
