@@ -4,6 +4,8 @@ from enum import StrEnum
 from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, SQLModel
 
+from wtbot.timeutil import utcnow
+
 """Scan annotations: bounding boxes drawn over a proofread page's scan image.
 
 One row per box, in normalized full-page coordinates (fractions from 0 to 1,
@@ -48,5 +50,5 @@ class ScanAnnotation(SQLModel, table=True):
     label: str | None = None
     category: AnnotationCategory | None = None
 
-    created_at: datetime = Field(default_factory=datetime.now)
-    updated_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)

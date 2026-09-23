@@ -17,7 +17,7 @@ revision ID, while a fresh database creates that schema directly.
 
 BASELINE = "8ac41e2d7f90"
 THROTTLE = "e7f3b415fd0a"
-HEAD = "b72e8c913a04"
+HEAD = "cddd162bf081"
 
 
 @pytest.fixture
@@ -42,6 +42,7 @@ def test_history_starts_at_the_squashed_baseline() -> None:
     assert script.get_heads() == [HEAD]
     assert [revision.revision for revision in script.walk_revisions()] == [
         HEAD,
+        "b72e8c913a04",
         "a21d6430c902",
         "a21d6430c901",
         "f19c2d4a7b31",
@@ -77,6 +78,25 @@ def test_baseline_creates_the_current_model_schema(baseline_engine: Engine) -> N
         # Alembic cannot reflect SQLite expression indexes, so command.check()
         # deliberately skips them and they need an explicit assertion.
         assert {"uq_pagelink_pair", "uq_revisionlink_pair"} <= indexes
+
+
+def test_datetime_defaults_revision_preserves_schema_in_both_directions(
+    baseline_engine: Engine,
+) -> None:
+    previous = "b72e8c913a04"
+    _run(baseline_engine, command.upgrade, previous)
+
+    def schema():
+        with baseline_engine.connect() as connection:
+            return connection.execute(
+                text("SELECT type, name, sql FROM sqlite_master ORDER BY type, name")
+            ).all()
+
+    original = schema()
+    _run(baseline_engine, command.upgrade, HEAD)
+    assert schema() == original
+    _run(baseline_engine, command.downgrade, previous)
+    assert schema() == original
 
 
 def test_an_existing_final_database_at_the_retained_revision_is_untouched(

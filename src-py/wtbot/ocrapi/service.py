@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlmodel import Session, select
 
@@ -82,7 +82,7 @@ def upsert_backend(
     row.default_langs = ",".join(default_langs) if default_langs else None
     row.default_prompt = default_prompt
     row.enabled = enabled
-    row.updated_at = datetime.now()
+    row.updated_at = datetime.now(timezone.utc)
     session.add(row)
     session.commit()
     session.refresh(row)

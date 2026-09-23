@@ -55,6 +55,8 @@ __pycache__/
 *.db-shm
 # File blobs created by the sidecar runtime cache
 /blobs/
+# Offline database exports include credentials and OCR tokens.
+/backups/
 
 ### User added ###
 /.ctxsync/

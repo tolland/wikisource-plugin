@@ -1,12 +1,14 @@
 from datetime import datetime
+from typing import ClassVar
 
 from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, SQLModel
 
+from wtbot.model.natural_keys import NaturalKeyMixin
 from wtbot.timeutil import utcnow
 
 
-class Site(SQLModel, table=True):
+class Site(NaturalKeyMixin, SQLModel, table=True):
     """One MediaWiki instance, registered before anything fetches from it.
 
     Two identities, for two audiences. The pywikibot (family, code) pair is
@@ -33,6 +35,8 @@ class Site(SQLModel, table=True):
         UniqueConstraint("family", "code", name="uq_site_family_code"),
         UniqueConstraint("label", name="uq_site_label"),
     )
+
+    natural_key_fields: ClassVar[tuple[str, ...]] = ("family", "code")
 
     pk: int | None = Field(default=None, primary_key=True)
 

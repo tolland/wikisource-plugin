@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Protocol
 
 from sqlmodel import Session, select
@@ -107,7 +107,7 @@ class SqlAnnotationStore:
             row.normalized_height = annotation.normalized_height
             row.label = annotation.label
             row.category = annotation.category
-            row.updated_at = datetime.now()
+            row.updated_at = datetime.now(timezone.utc)
         self._session.add(row)
         self._session.commit()
         self._session.refresh(row)
@@ -151,7 +151,7 @@ class SqlBoxLinkStore:
             row = link
         else:
             row.range_annotation_id = link.range_annotation_id
-            row.updated_at = datetime.now()
+            row.updated_at = datetime.now(timezone.utc)
         self._session.add(row)
         self._session.commit()
         self._session.refresh(row)
@@ -210,7 +210,7 @@ class SqlTextAnchorStore:
             row.text_start = anchor.text_start
             row.text_end = anchor.text_end
             row.anchor_revid = anchor.anchor_revid
-            row.updated_at = datetime.now()
+            row.updated_at = datetime.now(timezone.utc)
         self._session.add(row)
         self._session.commit()
         self._session.refresh(row)

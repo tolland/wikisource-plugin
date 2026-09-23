@@ -100,12 +100,11 @@ def create_app(
     the file-blob download cache (all three are used by tests)."""
     configure_logging(logging_config)
     engine = engine or create_db_engine(echo=configured_sqlalchemy_echo(logging_config))
-    # Migrate synchronously so callers can use the returned app immediately.
-    # Leaving this in lifespan as well keeps a real ASGI boot self-healing.
-    init_db(engine)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        # Importing the module constructs the default app, including in pytest
+        # before fixtures run. Only migrate when this app actually starts.
         init_db(engine)
         yield
 

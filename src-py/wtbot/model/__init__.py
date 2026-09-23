@@ -1,17 +1,16 @@
-"""Single source of truth for the wtbot data model.
+# noqa: E402
+from sqlmodel import SQLModel
 
-These SQLModel classes define the SQLite schema shared by the IntelliJ plugin
-(via JDBC) and the pywikibot worker. The former hand-written
-``schema/schema.sql`` was removed so the model has one authority -- these
-classes. See ``src-py/DESIGN.md`` for the rationale behind each table.
-"""
+from .conventions import NAMING_CONVENTION
+
+SQLModel.metadata.naming_convention = NAMING_CONVENTION
 
 from wtbot.model.annotation.box_range_link import BoxRangeLink
 from wtbot.model.annotation.scan_annotation import AnnotationCategory, ScanAnnotation
 from wtbot.model.annotation.text_target_anchor import TextTargetAnchor
 from wtbot.model.commit import Commit, CommitStatus
 from wtbot.model.edit_journal import EditJournal
-from wtbot.model.fetch_request import FetchKind, FetchRequest, FetchStatus
+from wtbot.model.fetch.fetch_request import FetchKind, FetchRequest, FetchStatus
 from wtbot.model.file_blob import FileBlob
 from wtbot.model.ocr_backend import OcrBackendConfig, OcrBackendKind
 from wtbot.model.sync.index_link import IndexLink
@@ -38,6 +37,14 @@ from wtbot.model.wikisource.proofread_page_meta import (
     ProofreadPageMeta,
     default_short_name,
 )
+
+"""Single source of truth for the wtbot data model.
+
+These SQLModel classes define the SQLite schema shared by the IntelliJ plugin
+(via JDBC) and the pywikibot worker. The former hand-written
+``schema/schema.sql`` was removed so the model has one authority -- these
+classes. See ``src-py/DESIGN.md`` for the rationale behind each table.
+"""
 
 __all__ = [
     "AnnotationCategory",

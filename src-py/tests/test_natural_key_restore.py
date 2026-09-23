@@ -1,0 +1,111 @@
+import sqlite3
+from pathlib import Path
+
+import pytest
+from alembic.script import ScriptDirectory
+from test_natural_key_dump import make_database
+
+from wtbot.db import alembic_config
+from wtbot.maintenance.dump import OMITTED_TABLES, read_dump, write_dump
+from wtbot.maintenance.restore import restore_dump
+
+
+def test_restore_roundtrip_with_new_ids_and_named_constraints(tmp_path: Path) -> None:
+    original, archive, rebuilt = (
+        tmp_path / name for name in ("source.db", "dump.json", "rebuilt.db")
+    )
+    make_database(original, offset=100)
+    before = write_dump(original, archive)
+    result = restore_dump(
+        archive, rebuilt, ignore_columns=frozenset({"site.legacy_note"})
+    )
+    after = read_dump(rebuilt)
+    assert result.rows == sum(len(table.rows) for table in before.tables)
+    assert result.tables == 19
+    for table in before.tables:
+        for row in table.rows:
+            row.fields.pop("legacy_note", None)
+    assert before.tables == after.tables
+    assert before.external_files == after.external_files
+    assert rebuilt.stat().st_mode & 0o777 == 0o600
+    with sqlite3.connect(rebuilt) as connection:
+        assert connection.execute("SELECT pk FROM site ORDER BY pk").fetchall() == [
+            (1,),
+            (2,),
+        ]
+        assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
+        for name in OMITTED_TABLES:
+            assert connection.execute(f'SELECT count(*) FROM "{name}"').fetchone() == (
+                0,
+            )
+        ddl = connection.execute(
+            "SELECT sql FROM sqlite_master WHERE name='pagelink'"
+        ).fetchone()[0]
+        assert "fk_pagelink_index_link_pk_indexlink" in ddl
+        assert (
+            connection.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+            == ScriptDirectory.from_config(alembic_config()).get_current_head()
+        )
+
+
+def test_restore_refuses_to_discard_legacy_fields_implicitly(tmp_path: Path) -> None:
+    original, archive, rebuilt = (
+        tmp_path / name for name in ("source.db", "dump.json", "rebuilt.db")
+    )
+    make_database(original)
+    write_dump(original, archive)
+    with pytest.raises(ValueError, match="Unknown legacy column: site.legacy_note"):
+        restore_dump(archive, rebuilt)
+    assert not rebuilt.exists()
+
+
+def test_restore_preserves_existing_destination(tmp_path: Path) -> None:
+    destination = tmp_path / "existing.db"
+    destination.write_bytes(b"do not overwrite")
+    with pytest.raises(FileExistsError):
+        restore_dump(tmp_path / "missing.json", destination)
+    assert destination.read_bytes() == b"do not overwrite"
+
+
+@pytest.mark.parametrize(
+    "damage", ["dangling", "wrong_target", "key_mismatch", "duplicate", "missing_table"]
+)
+def test_restore_rejects_invalid_archives(tmp_path: Path, damage: str) -> None:
+    original, archive, rebuilt = (
+        tmp_path / name for name in ("source.db", "dump.json", "rebuilt.db")
+    )
+    make_database(original)
+    dump = write_dump(original, archive)
+    tables = {table.name: table for table in dump.tables}
+    if damage == "dangling":
+        tables["page"].rows[0].references["latest_revision_pk"].key = ("missing",)
+    elif damage == "wrong_target":
+        tables["page"].rows[0].references["latest_revision_pk"].table = "site"
+    elif damage == "key_mismatch":
+        tables["site"].rows[0].fields["family"] = "mismatch"
+    elif damage == "duplicate":
+        tables["site"].rows.append(tables["site"].rows[0])
+    else:
+        dump.tables.pop()
+    archive.write_text(dump.model_dump_json())
+    with pytest.raises(ValueError):
+        restore_dump(archive, rebuilt, ignore_columns=frozenset({"site.legacy_note"}))
+    assert not rebuilt.exists()
+    assert not list(tmp_path.glob(".wtbot-restore-*"))
+
+
+def test_restore_cleans_up_after_database_constraint_failure(tmp_path: Path) -> None:
+    original, archive, rebuilt = (
+        tmp_path / name for name in ("source.db", "dump.json", "rebuilt.db")
+    )
+    make_database(original)
+    dump = write_dump(original, archive)
+    for table in dump.tables:
+        if table.name == "site":
+            for row in table.rows:
+                row.fields["label"] = "duplicate-label"
+    archive.write_text(dump.model_dump_json())
+    with pytest.raises(sqlite3.IntegrityError):
+        restore_dump(archive, rebuilt, ignore_columns=frozenset({"site.legacy_note"}))
+    assert not rebuilt.exists()
+    assert not list(tmp_path.glob(".wtbot-restore-*"))
