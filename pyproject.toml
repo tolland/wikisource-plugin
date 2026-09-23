@@ -64,6 +64,7 @@ packages = ["src-py/wtbot"]
 pythonpath = ["src-py"]
 testpaths = ["src-py/tests"]
 addopts = "-ra -q --strict-markers"
+env = ["_TYPER_FORCE_DISABLE_TERMINAL=1", "TERMINAL_WIDTH=200"]
 markers = [
     "slow: marks a test as longrunning"
     ]
@@ -99,3 +100,39 @@ select = [
 
 [tool.ruff.lint.per-file-ignores]
 "src-py/wtbot/model/__init__.py" = ["E402"]
+
+[tool.tox]
+legacy_tox_ini = """
+[tox]
+requires =
+    tox>=4.30
+    tox-uv>=1.30
+env_list = floor, naive-ok, naive-strict, latest
+
+[gh-actions]
+python =
+    3.13: floor, naive-ok, naive-strict, latest
+    3.14: floor, naive-ok, naive-strict, latest
+
+[testenv]
+description = pytest against one resolution of the dependency ranges
+runner = uv-venv-runner
+package = wheel
+dependency_groups = test
+commands = pytest {posargs}
+
+[testenv:floor]
+description = the declared sqlmodel floor -- proves the minimum really runs
+deps = sqlmodel==0.0.39
+
+[testenv:naive-ok]
+description = last sqlmodel that stores naive datetimes without complaint
+deps = sqlmodel==0.0.44
+
+[testenv:naive-strict]
+description = first sqlmodel whose UTCDateTime rejects naive datetimes
+deps = sqlmodel==0.0.45
+
+[testenv:latest]
+description = unpinned -- what CI or a fresh clone resolves today
+"""
