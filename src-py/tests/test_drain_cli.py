@@ -72,7 +72,7 @@ def test_base_url_is_not_accepted_after_the_subcommand(api):
     )
 
     assert result.exit_code == 2
-    # remove any ANSI escape codes that appoear in GitHub Actions terminal
+    # remove any ANSI escape codes that appear in GitHub Actions terminal
     reaesc = re.compile(r"\x1b[^m]*m")
     assert "No such option: --base-url" in reaesc.sub("", result.output)
     assert "get_url" not in api

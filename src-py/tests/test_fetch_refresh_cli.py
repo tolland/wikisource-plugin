@@ -1,3 +1,5 @@
+import re
+
 import httpx
 import pytest
 from typer.testing import CliRunner
@@ -187,5 +189,6 @@ def test_since_is_required_before_any_http_request(posted):
         create_app(), ["--base-url", "http://x", "fetch", "refresh", "--label", "local"]
     )
     assert result.exit_code == 2
-    assert "--since" in result.output
+    reaesc = re.compile(r"\x1b[^m]*m")
+    assert "--since" in reaesc.sub("", result.output)
     assert "url" not in posted
