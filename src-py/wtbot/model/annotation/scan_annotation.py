@@ -29,6 +29,7 @@ class AnnotationCategory(StrEnum):
     section = "section"
     ignore = "ignore"
     equation = "equation"
+    unknown = "unknown"
 
 
 class ScanAnnotation(SQLModel, table=True):
@@ -48,7 +49,7 @@ class ScanAnnotation(SQLModel, table=True):
     normalized_height: float
 
     label: str | None = None
-    category: AnnotationCategory | None = None
+    category: AnnotationCategory = AnnotationCategory.unknown
 
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)

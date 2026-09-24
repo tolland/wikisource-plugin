@@ -135,7 +135,7 @@ def test_store_upsert_inserts_then_updates(engine, page_pk):
             row.normalized_width,
             row.normalized_height,
         ) == (0.01, 0.02, 0.03, 0.04)
-        assert row.label is None and row.category is None
+        assert row.label is None and row.category is AnnotationCategory.unknown
         assert len(store.list_for_page(page_pk)) == 1
 
 

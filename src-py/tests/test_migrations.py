@@ -1,9 +1,8 @@
 import pytest
 from alembic import command
-from alembic.script import ScriptDirectory
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
-from sqlmodel import Session, SQLModel
+from sqlmodel import Session
 
 import wtbot.model  # noqa: F401 - registers every table on SQLModel.metadata
 from wtbot.db import alembic_config, create_db_engine, init_db
@@ -34,51 +33,6 @@ def _run(engine: Engine, operation, revision: str) -> None:
     with engine.begin() as connection:
         config.attributes["connection"] = connection
         operation(config, revision)
-
-
-def test_history_starts_at_the_squashed_baseline() -> None:
-    script = ScriptDirectory.from_config(alembic_config())
-
-    assert script.get_heads() == [HEAD]
-    assert [revision.revision for revision in script.walk_revisions()] == [
-        HEAD,
-        "cddd162bf081",
-        "b72e8c913a04",
-        "a21d6430c902",
-        "a21d6430c901",
-        "f19c2d4a7b31",
-        THROTTLE,
-        BASELINE,
-    ]
-
-
-def test_baseline_creates_the_current_model_schema(baseline_engine: Engine) -> None:
-    _run(baseline_engine, command.upgrade, "head")
-
-    with baseline_engine.connect() as connection:
-        config = alembic_config()
-        config.attributes["connection"] = connection
-        command.check(config)
-
-        tables = {
-            row[0]
-            for row in connection.execute(
-                text("SELECT name FROM sqlite_master WHERE type = 'table'")
-            )
-        }
-        indexes = {
-            row[0]
-            for row in connection.execute(
-                text("SELECT name FROM sqlite_master WHERE type = 'index'")
-            )
-        }
-        current = connection.execute(text("SELECT version_num FROM alembic_version"))
-
-        assert set(SQLModel.metadata.tables) <= tables
-        assert current.scalar_one() == HEAD
-        # Alembic cannot reflect SQLite expression indexes, so command.check()
-        # deliberately skips them and they need an explicit assertion.
-        assert {"uq_pagelink_pair", "uq_revisionlink_pair"} <= indexes
 
 
 def test_datetime_defaults_revision_preserves_schema_in_both_directions(

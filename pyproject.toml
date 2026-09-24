@@ -37,6 +37,7 @@ test = [
     "pytest>=9.1.1",
     "black>=26.0",
     "ruff>=0.15",
+    "pytest-env>=1.7.1",
 ]
 
 dev = [

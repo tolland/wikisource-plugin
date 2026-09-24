@@ -71,7 +71,7 @@ __pycache__/
 /throttle.ctrl
 /fixtures/vcr_cassettes/
 /docker/wtbot/wtbot_18574_data/
-/query
+/local/query
 
 # Rotating wtbot activity logs
 /logs/
