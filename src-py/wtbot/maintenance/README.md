@@ -11,7 +11,7 @@ The source is opened read-only inside a SQLite read transaction. An existing
 output is never overwritten. The JSON file is created with mode 0600 because
 site credentials and OCR API tokens are included. `backups/` is ignored by Git.
 
-The export includes the 19 tables in `NATURAL_KEYS`, excluding `editjournal`,
+The export includes the 20 tables in `NATURAL_KEYS`, excluding `editjournal`,
 `fetchrequest`, `commit`, `promotion`, and `promotionbatch`. It does not export
 schema DDL, Alembic temporary tables, or migration bookkeeping as application
 data. The original Alembic revision is recorded for provenance only.
@@ -19,6 +19,8 @@ data. The original Alembic revision is recorded for provenance only.
 Site identity comes from `Site.natural_key_fields`, declared through
 `NaturalKeyMixin`. Other table identities are explicitly listed in `NATURAL_KEYS`.
 For example, a Page key combines a Site reference `(family, code)` with its title;
+a Title key is the same pair, and a Page's `pk` is a reference to the Title at
+its address, because the two share a primary key (every Page is a Title);
 a Revision key combines a Page reference with its wiki-local revid. Page and
 revision link keys retain local/remote orientation. FileBlob uses page, SHA-1,
 and upload timestamp. Transclusion uses site, source page, index title, and range.
@@ -49,7 +51,10 @@ current Alembic head. The five omitted tables exist but remain empty. This is a
 fresh rebuild, not an in-place migration or a merge into an existing database.
 
 New primary keys are allocated up front, and `(table, key)` references are
-resolved to those IDs. Foreign-key checks are deferred until the import
+resolved to those IDs. A table whose `pk` is itself a reference (Page) takes the
+number allocated to the row it references rather than one of its own. A dump
+taken before the Title table existed is upgraded on the way in: each page yields
+the title at its address, using the same rule as the in-place migration. Foreign-key checks are deferred until the import
 transaction commits, allowing Page/Revision and IndexLink/PageLink cycles.
 The importer checks foreign keys and SQLite integrity before publishing the
 completed database atomically. Failures leave no destination database; existing

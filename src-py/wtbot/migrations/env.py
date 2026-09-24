@@ -7,6 +7,7 @@ from sqlalchemy import Connection, engine_from_config, pool
 from sqlmodel import SQLModel
 
 import wtbot.model  # noqa: F401
+from wtbot.db import migration_connection
 
 config = context.config
 
@@ -64,7 +65,7 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
 
-    with connectable.connect() as connection:
+    with migration_connection(connectable) as connection:
         run_migrations_for_connection(connection)
 
 

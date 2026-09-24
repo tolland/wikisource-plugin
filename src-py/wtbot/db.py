@@ -1,10 +1,11 @@
 import os
 from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import event
+from sqlalchemy import Connection, event
 from sqlalchemy.engine import Engine
 from sqlmodel import Session, create_engine
 
@@ -76,13 +77,73 @@ def alembic_config(url: str | None = None) -> Config:
     return cfg
 
 
+class MigrationIntegrityError(RuntimeError):
+    """A migration left rows whose foreign keys point at nothing."""
+
+
+@contextmanager
+def migration_connection(engine: Engine) -> Iterator[Connection]:
+    """A connection fit for changing the schema, not just the data.
+
+    SQLite changes a table's structure by rebuilding it: copy into a new table,
+    drop the old one, rename. With ``foreign_keys=ON`` the drop fails whenever
+    another table points at the old one, which in this schema is most of them
+    -- the reason earlier migrations reached for native ``DROP COLUMN`` rather
+    than rebuild. This follows SQLite's own procedure for that case
+    (https://sqlite.org/lang_altertable.html#otheralter):
+
+    1. foreign keys off, *before* the transaction, since the pragma is ignored
+       inside one;
+    2. every migration in one real transaction;
+    3. ``PRAGMA foreign_key_check`` over the finished state, and roll the lot
+       back if anything points at nothing;
+    4. foreign keys back on.
+
+    Checking the finished state is stricter than per-statement enforcement,
+    not looser: it asks the same question of every row, after everything has
+    moved.
+
+    Step 2 needs the driver's transaction handling out of the way. pysqlite
+    issues ``BEGIN`` only before INSERT/UPDATE/DELETE, so DDL ran outside any
+    transaction and a failed migration rolled back only its data -- which is
+    what alembic's "Will assume non-transactional DDL" was saying. Here the
+    driver is set to autocommit and the transaction is ours.
+    """
+    with engine.connect() as connection:
+        raw = connection.connection.dbapi_connection
+        previous_isolation = raw.isolation_level
+        raw.isolation_level = None
+        try:
+            connection.exec_driver_sql("PRAGMA foreign_keys=OFF")
+            connection.exec_driver_sql("BEGIN")
+            try:
+                yield connection
+                violations = connection.exec_driver_sql(
+                    "PRAGMA foreign_key_check"
+                ).all()
+                if violations:
+                    raise MigrationIntegrityError(
+                        f"{len(violations)} row(s) reference nothing after "
+                        f"migrating; rolled back. First: {tuple(violations[0])}"
+                    )
+                connection.exec_driver_sql("COMMIT")
+            except BaseException:
+                connection.exec_driver_sql("ROLLBACK")
+                raise
+        finally:
+            connection.exec_driver_sql("PRAGMA foreign_keys=ON")
+            raw.isolation_level = previous_isolation
+
+
 def upgrade_db(engine: Engine | None = None, revision: str = "head") -> None:
     cfg = alembic_config()
     if engine is None:
+        # The standalone path: env.py opens its own connection and applies the
+        # same discipline there.
         command.upgrade(cfg, revision)
         return
 
-    with engine.begin() as connection:
+    with migration_connection(engine) as connection:
         cfg.attributes["connection"] = connection
         command.upgrade(cfg, revision)
 
@@ -94,7 +155,7 @@ def init_db(engine: Engine) -> None:
 
 def stamp_db(engine: Engine, revision: str = "head") -> None:
     cfg = alembic_config()
-    with engine.begin() as connection:
+    with migration_connection(engine) as connection:
         cfg.attributes["connection"] = connection
         command.stamp(cfg, revision)
 

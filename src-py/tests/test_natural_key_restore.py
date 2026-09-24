@@ -1,3 +1,4 @@
+import json
 import sqlite3
 from pathlib import Path
 
@@ -21,7 +22,7 @@ def test_restore_roundtrip_with_new_ids_and_named_constraints(tmp_path: Path) ->
     )
     after = read_dump(rebuilt)
     assert result.rows == sum(len(table.rows) for table in before.tables)
-    assert result.tables == 19
+    assert result.tables == 20
     for table in before.tables:
         for row in table.rows:
             row.fields.pop("legacy_note", None)
@@ -34,6 +35,18 @@ def test_restore_roundtrip_with_new_ids_and_named_constraints(tmp_path: Path) ->
             (2,),
         ]
         assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
+        # Every page came back sharing its pk with the title at its address,
+        # and the revision that cites the page cites that same number.
+        assert (
+            connection.execute("""
+            SELECT count(*) FROM page p JOIN title t
+              ON t.pk = p.pk AND t.site_pk = p.site_pk AND t.title = p.title
+            """).fetchone()
+            == connection.execute("SELECT count(*) FROM page").fetchone()
+        )
+        assert connection.execute("""
+            SELECT count(*) FROM revision r JOIN title t ON t.pk = r.page_pk
+            """).fetchone() == (1,)
         for name in OMITTED_TABLES:
             assert connection.execute(f'SELECT count(*) FROM "{name}"').fetchone() == (
                 0,
@@ -109,3 +122,42 @@ def test_restore_cleans_up_after_database_constraint_failure(tmp_path: Path) -> 
         restore_dump(archive, rebuilt, ignore_columns=frozenset({"site.legacy_note"}))
     assert not rebuilt.exists()
     assert not list(tmp_path.glob(".wtbot-restore-*"))
+
+
+def test_a_dump_taken_before_titles_existed_restores_with_them(tmp_path: Path) -> None:
+    """The backup taken before a schema change is older than the code restoring
+    it. A pre-Title dump has no title table and no page->title reference; the
+    restore supplies both, with the same rule the in-place migration uses."""
+    original, archive, legacy, rebuilt = (
+        tmp_path / name
+        for name in ("source.db", "dump.json", "legacy.json", "rebuilt.db")
+    )
+    make_database(original, offset=100)
+    write_dump(original, archive)
+
+    raw = json.loads(archive.read_text())
+    raw["tables"] = [t for t in raw["tables"] if t["name"] != "title"]
+    for table in raw["tables"]:
+        if table["name"] == "page":
+            for row in table["rows"]:
+                row["references"].pop("pk")
+                row["fields"]["content_model"] = (
+                    "proofread-index"
+                    if row["key"][0]["key"] == ["source", "en"]
+                    else None
+                )
+    legacy.write_text(json.dumps(raw))
+
+    restore_dump(legacy, rebuilt, ignore_columns=frozenset({"site.legacy_note"}))
+    with sqlite3.connect(rebuilt) as connection:
+        titles = connection.execute("""
+            SELECT s.family, t.title, t.expected_content_model, t.pk = p.pk
+            FROM title t JOIN page p ON p.pk = t.pk JOIN site s ON s.pk = t.site_pk
+            ORDER BY s.family
+            """).fetchall()
+        assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
+    assert titles == [
+        ("source", "Index:Book", "proofread-index", 1),
+        # No model on record: MediaWiki's own fallback, as in the migration.
+        ("target", "Index:Book", "wikitext", 1),
+    ]

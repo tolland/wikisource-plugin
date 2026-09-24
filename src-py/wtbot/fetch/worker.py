@@ -20,6 +20,7 @@ from wtbot.model import (
     FetchStatus,
     Page,
     Site,
+    Title,
 )
 from wtbot.model.wikisource.proofread_page_meta import ProofreadPageMeta
 from wtbot.page_processors import (
@@ -33,6 +34,7 @@ from wtbot.page_processors import (
 )
 from wtbot.promotion.promotion_store import materialize_promotion_links
 from wtbot.timeutil import utcnow
+from wtbot.title_store import ensure_title, record_fetched_content_model
 from wtbot.wiki.client import WikiClient
 from wtbot.wiki.failures import WikiFailure
 from wtbot.wiki.namespaces import sync_namespaces
@@ -376,8 +378,21 @@ def _upsert_page(
         page = session.exec(
             select(Page).where(Page.site_pk == site.pk, Page.title == remote.title)
         ).first()
+        # The wiki has now said what this title is. A new title records that
+        # as its expectation; an existing one gets its earlier guess checked.
+        # An existing page reaches its title through the shared pk, not by
+        # matching the string again.
         if page is None:
-            page = Page(site_pk=site.pk, title=remote.title)
+            title_row = ensure_title(
+                session,
+                site_pk=site.pk,
+                title=remote.title,
+                expected_content_model=remote.content_model,
+            )
+            page = Page(pk=title_row.pk, site_pk=site.pk, title=remote.title)
+        else:
+            title_row = session.get(Title, page.pk)
+        record_fetched_content_model(session, title_row, remote.content_model)
 
         # pageid and revid are identities within one MediaWiki database, not
         # merely mutable metadata. Check before overwriting the cached values:

@@ -22,6 +22,7 @@ from wtbot.maintenance.dump import (
     Record,
     Reference,
     Scalar,
+    TableDump,
     _quote,
     _relationships,
 )
@@ -46,7 +47,68 @@ def _identity(table: str, row: Record) -> str:
     return Reference(table=table, key=row.key).model_dump_json()
 
 
+def _add_titles_to_legacy_dump(dump: DatabaseDump) -> DatabaseDump:
+    """Give a dump taken before Title existed the titles its pages imply.
+
+    A dump is the backup taken *before* a schema change, so it is normally
+    older than the code restoring it. Before the Title table, every page was
+    its own address; now every page shares its pk with a Title at the same
+    (site, title). So each page row yields one title row with the same natural
+    key, and the page gains the ``pk`` reference that states the sharing.
+
+    The expected content model is the page's own where it had one, else
+    MediaWiki's ``wikitext`` -- the same rule the migration applies in place,
+    so an old database reaches the same state whichever route it takes.
+    """
+    if any(table.name == "title" for table in dump.tables):
+        return dump
+    pages = next((table for table in dump.tables if table.name == "page"), None)
+    if pages is None:
+        return dump  # let _prepare report the missing tables
+    titles = []
+    upgraded_pages = []
+    for row in pages.rows:
+        title_ref = Reference(table="title", key=row.key)
+        titles.append(
+            Record(
+                key=row.key,
+                fields={
+                    "title": row.fields.get("title"),
+                    "expected_content_model": row.fields.get("content_model")
+                    or "wikitext",
+                },
+                references={"site_pk": row.references.get("site_pk")},
+            )
+        )
+        upgraded_pages.append(
+            row.model_copy(update={"references": {**row.references, "pk": title_ref}})
+        )
+    tables = [
+        (
+            table.model_copy(update={"rows": upgraded_pages})
+            if table.name == "page"
+            else table
+        )
+        for table in dump.tables
+    ]
+    tables.append(
+        TableDump(name="title", key_fields=NATURAL_KEYS["title"], rows=titles)
+    )
+    return dump.model_copy(update={"tables": tables})
+
+
+def _shares_primary_key(table_name: str) -> bool:
+    """Whether this table's ``pk`` is also a foreign key into another table.
+
+    Such a row has no identity of its own to allocate: it *is* the row it
+    references (every Page is a Title), so it takes that row's number, and
+    everything referencing it resolves to the same number.
+    """
+    return "pk" in _relationships(table_name)
+
+
 def _prepare(dump: DatabaseDump, ignore_columns: frozenset[str]) -> list[PreparedTable]:
+    dump = _add_titles_to_legacy_dump(dump)
     names = [table.name for table in dump.tables]
     if len(set(names)) != len(names) or set(names) != set(NATURAL_KEYS):
         raise ValueError("Dump must contain exactly the selected natural-key tables")
@@ -71,8 +133,21 @@ def _prepare(dump: DatabaseDump, ignore_columns: frozenset[str]) -> list[Prepare
             if identity in identities:
                 raise ValueError(f"Duplicate natural key in {table.name}")
             identities.add(identity)
-            if "pk" in SQLModel.metadata.tables[table.name].columns:
+            if "pk" in SQLModel.metadata.tables[
+                table.name
+            ].columns and not _shares_primary_key(table.name):
                 allocated[identity] = number
+    # Second pass, now every independent identity has its number: a row whose
+    # pk is a reference takes the number of the row it refers to.
+    for table in dump.tables:
+        if not _shares_primary_key(table.name):
+            continue
+        for row in table.rows:
+            ref = row.references.get("pk")
+            target = ref.model_dump_json() if ref is not None else None
+            if target not in allocated:
+                raise ValueError(f"Unresolved shared primary key in {table.name}")
+            allocated[_identity(table.name, row)] = allocated[target]
 
     prepared = []
     for table in dump.tables:

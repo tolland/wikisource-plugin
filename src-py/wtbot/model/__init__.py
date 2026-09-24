@@ -30,6 +30,7 @@ from wtbot.model.wiki.revision import Revision
 from wtbot.model.wiki.site import Site
 from wtbot.model.wiki.site_credential import SiteCredential
 from wtbot.model.wiki.slot import MAIN_SLOT, Slot
+from wtbot.model.wiki.title import Title
 from wtbot.model.wiki.transclusion import Transclusion
 from wtbot.model.wikisource.file_meta import FileMeta, FileOrigin
 from wtbot.model.wikisource.index_meta import IndexMeta
@@ -56,6 +57,7 @@ __all__ = [
     "Site",
     "Namespace",
     "Page",
+    "Title",
     "FetchState",
     "Revision",
     "BatchStatus",
