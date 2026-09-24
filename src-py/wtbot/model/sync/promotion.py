@@ -87,30 +87,38 @@ class PromotionIntent(str, Enum):
 
 
 class PromotionBatch(SQLModel, table=True):
-    """One page push: its correspondence, direction, and approval."""
+    """One page push: from a page the source wiki holds, to an address on the target.
+
+    **Only what identifies the push, and what was reviewed.** Everything else
+    is implied by the two ends and is resolved when needed rather than copied
+    in here, where it could go stale or dangle:
+
+    - the sites are the sites of the source page and the target title;
+    - the page correspondence is ``find_pair`` of the two, and a stored pk to
+      it could outlive an ``unpair``;
+    - the tracked work and the page number come from the source's
+      ``ProofreadPageMeta``;
+    - the titles are the rows' own. A frozen title string was also a hazard:
+      a page moved between staging and push would have been written to by its
+      old name, which edits the redirect left behind and forks the content.
+
+    What *is* frozen stays: ``source_head_revid`` and ``anchor_link_pk`` record
+    what was reviewed, and ``Promotion.body`` what will be sent.
+    """
 
     pk: int | None = Field(default=None, primary_key=True)
 
-    source_site_pk: int = Field(foreign_key="site.pk", index=True)
-    target_site_pk: int = Field(foreign_key="site.pk", index=True)
-    index_link_pk: int | None = Field(
-        default=None,
-        foreign_key="indexlink.pk",
-        index=True,
-        description="The tracked work, when the pair is tracked.",
-    )
-    page_link_pk: int | None = Field(
-        default=None,
-        foreign_key="pagelink.pk",
-        index=True,
-        description="The page correspondence; null only while creating the target.",
-    )
     source_page_pk: int = Field(foreign_key="page.pk", index=True)
-    target_page_pk: int | None = Field(default=None, foreign_key="page.pk", index=True)
+    """A Page, not a Title: there is nothing to promote from a page the source
+    wiki does not hold. That it also has a revision to push is checked when the
+    batch is staged, which is where a refusal can say what to do about it."""
 
-    source_title: str
-    target_title: str
-    page_number: int | None = None
+    target_title_pk: int = Field(foreign_key="title.pk", index=True)
+    """A Title: the target is an address, and a create is the case where the
+    wiki holds nothing there yet. Never null -- a title exists as soon as it
+    can be named -- so a create and an update differ only in each promotion's
+    recorded ``intent``, not in which columns of this row are filled."""
+
     source_head_revid: int | None = None
     anchor_link_pk: int | None = Field(
         default=None,

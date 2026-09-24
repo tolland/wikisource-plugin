@@ -39,12 +39,8 @@ def _seed_reset_rows(engine) -> None:
         session.flush()
 
         batch = PromotionBatch(
-            source_site_pk=source_site.pk,
-            target_site_pk=target_site.pk,
             source_page_pk=source_page.pk,
-            target_page_pk=target_page.pk,
-            source_title=source_page.title,
-            target_title=target_page.title,
+            target_title_pk=target_page.pk,  # every Page is a Title, same pk
         )
         session.add(batch)
         session.flush()

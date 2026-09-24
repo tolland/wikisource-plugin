@@ -130,7 +130,9 @@ def test_old_multi_page_promotion_batch_is_split_by_page(
                      'two', 'staged', CURRENT_TIMESTAMP)
                 """))
 
-    _run(baseline_engine, command.upgrade, "head")
+    # Pinned to the migration under test: later steps reshape promotionbatch
+    # (b41d8e2c7f60 reduces it to its two ends), and they have their own tests.
+    _run(baseline_engine, command.upgrade, "f19c2d4a7b31")
 
     with baseline_engine.connect() as connection:
         batches = connection.execute(
@@ -527,3 +529,87 @@ def test_the_migrated_schema_matches_the_models(baseline_engine: Engine) -> None
             SQLModel.metadata,
         )
     assert differences == []
+
+
+# -- step 2: PromotionBatch reduced to its two ends ---------------------------
+
+BATCH_TWO_ENDS = "b41d8e2c7f60"
+_T = "'2026-01-01 00:00:00+00:00'"
+
+
+def test_a_batch_keeps_its_ends_and_a_create_gets_its_target_title(
+    baseline_engine: Engine,
+) -> None:
+    _run(baseline_engine, command.upgrade, JOURNAL_TO_TITLE)
+    with baseline_engine.begin() as connection:
+        run = connection.exec_driver_sql
+        run(
+            "INSERT INTO site (pk, family, code, articlepath, created_at) VALUES"
+            f" (1, 'up', 'en', '/wiki/$1', {_T}), (2, 'down', 'en', '/wiki/$1', {_T})"
+        )
+        for pk, site, title in ((7, 1, "P/1"), (8, 2, "P/1"), (9, 1, "P/2")):
+            run(
+                "INSERT INTO title (pk, site_pk, title, expected_content_model)"
+                f" VALUES ({pk}, {site}, '{title}', 'proofread-page')"
+            )
+            run(
+                "INSERT INTO page (pk, site_pk, title, content_model, dirty,"
+                f" fetch_status) VALUES ({pk}, {site}, '{title}', 'proofread-page',"
+                " 0, 'done')"
+            )
+        # An update (the target page exists) and a create (it does not).
+        for pk, source, target, name in ((1, 7, 8, "P/1"), (2, 9, "NULL", "P/2")):
+            run(
+                "INSERT INTO promotionbatch (pk, source_site_pk, target_site_pk,"
+                " source_page_pk, target_page_pk, source_title, target_title,"
+                f" status, created_at) VALUES ({pk}, 1, 2, {source}, {target},"
+                f" '{name}', '{name}', 'draft', {_T})"
+            )
+
+    _run(baseline_engine, command.upgrade, BATCH_TWO_ENDS)
+
+    assert _foreign_keys(baseline_engine, "promotionbatch") == {
+        ("source_page_pk", "page"),
+        ("target_title_pk", "title"),
+        ("anchor_link_pk", "revisionlink"),
+    }
+    with baseline_engine.connect() as connection:
+        run = connection.exec_driver_sql
+        rows = run("""
+            SELECT b.pk, b.source_page_pk, t.site_pk, t.title,
+                   t.expected_content_model,
+                   EXISTS (SELECT 1 FROM page p WHERE p.pk = t.pk)
+            FROM promotionbatch b JOIN title t ON t.pk = b.target_title_pk
+            ORDER BY b.pk
+            """).all()
+        assert run("PRAGMA foreign_key_check").all() == []
+    assert rows == [
+        (1, 7, 2, "P/1", "proofread-page", 1),
+        # The create's target had no page, so it gets a title at that address,
+        # expecting the source's content model -- and still no page.
+        (2, 9, 2, "P/2", "proofread-page", 0),
+    ]
+
+
+def test_the_two_ends_step_downgrades_with_its_copies_refilled(
+    baseline_engine: Engine,
+) -> None:
+    # Seeded in the pre-title shape, which is what _seed_address_rows writes.
+    _run(baseline_engine, command.upgrade, BEFORE_TITLE)
+    _seed_address_rows(baseline_engine)
+    with baseline_engine.begin() as connection:
+        connection.exec_driver_sql(
+            "INSERT INTO promotionbatch (pk, source_site_pk, target_site_pk,"
+            " source_page_pk, target_page_pk, source_title, target_title,"
+            f" status, created_at) VALUES (1, 1, 1, 7, 9, 'Page:A.djvu/1',"
+            f" 'Index:A.djvu/styles.css', 'draft', {_T})"
+        )
+    _run(baseline_engine, command.upgrade, BATCH_TWO_ENDS)
+
+    _run(baseline_engine, command.downgrade, JOURNAL_TO_TITLE)
+
+    with baseline_engine.connect() as connection:
+        assert connection.exec_driver_sql(
+            "SELECT source_site_pk, target_site_pk, target_page_pk, source_title,"
+            " target_title, page_number FROM promotionbatch"
+        ).all() == [(1, 1, 9, "Page:A.djvu/1", "Index:A.djvu/styles.css", 1)]

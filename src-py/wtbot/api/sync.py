@@ -21,11 +21,14 @@ from wtbot.model import (
     Revision,
     RevisionLink,
     Site,
+    Title,
 )
 from wtbot.promotion.promotion_store import (
     PromotionError,
     abort,
+    batch_ends,
     next_staged,
+    page_number_of,
     promotions,
     skip,
     source_is_unchanged,
@@ -33,6 +36,8 @@ from wtbot.promotion.promotion_store import (
     stage_next_change,
     stage_page,
     target_head_revid,
+    target_of,
+    work_of,
 )
 from wtbot.promotion.promotion_worker import push_one
 from wtbot.site_store import require_credentialed_site, resolve_pair
@@ -457,11 +462,12 @@ def _transformations(source_body: str, submitted_body: str) -> list[str]:
 
 def _correspondence_materialized(session: Session, promotion: Promotion) -> bool:
     batch = session.get(PromotionBatch, promotion.batch_pk)
-    if promotion.result_revid is None or batch.target_page_pk is None:
+    if promotion.result_revid is None:
         return False
     target_revision = session.exec(
         select(Revision).where(
-            Revision.page_pk == batch.target_page_pk,
+            # Shared primary key: the target's revisions hang off its title pk.
+            Revision.page_pk == batch.target_title_pk,
             Revision.revid == promotion.result_revid,
         )
     ).first()
@@ -501,24 +507,23 @@ def _change_blockers(session: Session, promotion: Promotion) -> list[str]:
 
 def _change_review(session: Session, promotion: Promotion) -> ChangeReviewOut:
     batch = session.get(PromotionBatch, promotion.batch_pk)
-    source_site = session.get(Site, batch.source_site_pk)
-    target_site = session.get(Site, batch.target_site_pk)
-    source_page = session.get(Page, batch.source_page_pk)
+    ends = batch_ends(session, batch)
+    source_site, target_site = ends.source_site, ends.target_site
+    source_page, target_title = ends.source_page, ends.target_title.title
     source_revision = session.get(Revision, promotion.source_revision_pk)
     source_content = content_of(session, source_revision)
     target_body = ""
-    if batch.target_page_pk is not None:
-        target_page = session.get(Page, batch.target_page_pk)
+    if ends.target_page is not None:
         from wtbot.fetch.revision_store import head_revision
 
-        target_head = head_revision(session, target_page)
+        target_head = head_revision(session, ends.target_page)
         target_content = content_of(session, target_head) if target_head else None
         target_body = target_content.text if target_content else ""
     diff = "".join(
         unified_diff(
             target_body.splitlines(keepends=True),
             promotion.body.splitlines(keepends=True),
-            fromfile=f"{batch.target_title}@{promotion.base_revid or 'missing'}",
+            fromfile=f"{target_title}@{promotion.base_revid or 'missing'}",
             tofile=f"{source_page.title}@{source_revision.revid}",
         )
     )
@@ -538,9 +543,9 @@ def _change_review(session: Session, promotion: Promotion) -> ChangeReviewOut:
         ),
         target=ChangeTargetOut(
             site=_site_name(target_site),
-            title=batch.target_title,
+            title=target_title,
             base_revid=promotion.base_revid,
-            url=_page_url(target_site, batch.target_title),
+            url=_page_url(target_site, target_title),
         ),
         submitted_body=promotion.body,
         diff=diff,
@@ -551,10 +556,11 @@ def _change_review(session: Session, promotion: Promotion) -> ChangeReviewOut:
 
 def _verification_status(session: Session, promotion: Promotion) -> str:
     batch = session.get(PromotionBatch, promotion.batch_pk)
+    target = target_of(session, batch)
     requests = session.exec(
         select(FetchRequest).where(
-            FetchRequest.site_pk == batch.target_site_pk,
-            FetchRequest.title == batch.target_title,
+            FetchRequest.site_pk == target.site_pk,
+            FetchRequest.title == target.title,
         )
     ).all()
     if not requests:
@@ -564,7 +570,8 @@ def _verification_status(session: Session, promotion: Promotion) -> str:
 
 def _change_result(session: Session, promotion: Promotion) -> ChangePushOut:
     batch = session.get(PromotionBatch, promotion.batch_pk)
-    target_site = session.get(Site, batch.target_site_pk)
+    target = target_of(session, batch)
+    target_site = session.get(Site, target.site_pk)
     status = (
         "already_present"
         if promotion.status is PromotionStatus.skipped
@@ -575,7 +582,7 @@ def _change_result(session: Session, promotion: Promotion) -> ChangePushOut:
         status=status,
         new_target_revid=promotion.result_revid,
         target_revision_url=(
-            _page_url(target_site, batch.target_title, promotion.result_revid)
+            _page_url(target_site, target.title, promotion.result_revid)
             if promotion.result_revid is not None
             else None
         ),
@@ -613,6 +620,32 @@ def sync_page_report(
     )
 
 
+def _single_change(
+    session: Session,
+    source_page: Page,
+    target: Title | None,
+    status: PromotionStatus,
+) -> Promotion | None:
+    """The latest single-change promotion in ``status`` for this page pair.
+
+    Matched on the two keys, which imply both sites. A target with no Title
+    yet has never been staged against, so there is nothing to find.
+    """
+    if target is None:
+        return None
+    return session.exec(
+        select(Promotion)
+        .join(PromotionBatch, Promotion.batch_pk == PromotionBatch.pk)
+        .where(
+            PromotionBatch.label == _SINGLE_CHANGE_LABEL,
+            PromotionBatch.source_page_pk == source_page.pk,
+            PromotionBatch.target_title_pk == target.pk,
+            Promotion.status == status,
+        )
+        .order_by(Promotion.pk.desc())
+    ).first()
+
+
 @router.post("/changes/next", response_model=ChangeReviewOut)
 def next_change(
     payload: NextChangeRequest,
@@ -639,37 +672,19 @@ def next_change(
             Page.title == payload.source_title,
         )
     ).one()
-    existing = session.exec(
-        select(Promotion)
-        .join(PromotionBatch, Promotion.batch_pk == PromotionBatch.pk)
-        .where(
-            PromotionBatch.label == _SINGLE_CHANGE_LABEL,
-            PromotionBatch.source_site_pk == source_site.pk,
-            PromotionBatch.target_site_pk == target_site.pk,
-            PromotionBatch.source_page_pk == source_page.pk,
-            PromotionBatch.target_title
-            == (payload.target_title or payload.source_title),
-            Promotion.status == PromotionStatus.staged,
+    target = session.exec(
+        select(Title).where(
+            Title.site_pk == target_site.pk,
+            Title.title == (payload.target_title or payload.source_title),
         )
-        .order_by(Promotion.pk.desc())
     ).first()
+    existing = _single_change(session, source_page, target, PromotionStatus.staged)
     if existing is not None:
         return _change_review(session, existing)
 
-    awaiting_verification = session.exec(
-        select(Promotion)
-        .join(PromotionBatch, Promotion.batch_pk == PromotionBatch.pk)
-        .where(
-            PromotionBatch.label == _SINGLE_CHANGE_LABEL,
-            PromotionBatch.source_site_pk == source_site.pk,
-            PromotionBatch.target_site_pk == target_site.pk,
-            PromotionBatch.source_page_pk == source_page.pk,
-            PromotionBatch.target_title
-            == (payload.target_title or payload.source_title),
-            Promotion.status == PromotionStatus.pushed,
-        )
-        .order_by(Promotion.pk.desc())
-    ).first()
+    awaiting_verification = _single_change(
+        session, source_page, target, PromotionStatus.pushed
+    )
     if awaiting_verification is not None and not _correspondence_materialized(
         session, awaiting_verification
     ):
@@ -850,16 +865,20 @@ def _batch_out(
         )
         base_body = row.body
 
+    # The response keeps its shape; its values are now read off the batch's
+    # two ends rather than copies taken when it was staged.
+    ends = batch_ends(session, batch)
+    work = work_of(session, batch)
     return BatchOut(
         pk=batch.pk,
         label=batch.label,
         status=batch.status,
-        source_site=_site_name(session.get(Site, batch.source_site_pk)),
-        target_site=_site_name(session.get(Site, batch.target_site_pk)),
-        source_title=batch.source_title,
-        target_title=batch.target_title,
-        page_number=batch.page_number,
-        work_pk=batch.index_link_pk,
+        source_site=_site_name(ends.source_site),
+        target_site=_site_name(ends.target_site),
+        source_title=ends.source_page.title,
+        target_title=ends.target_title.title,
+        page_number=page_number_of(session, batch),
+        work_pk=work.pk if work is not None else None,
         counts=counts,
         remaining=counts.get(PromotionStatus.staged.value, 0),
         promotions=promotion_rows,
@@ -868,14 +887,14 @@ def _batch_out(
 
 def _batch_anchor_body(session: Session, batch: PromotionBatch) -> str | None:
     """The exact target-side anchor body frozen as the first diff base."""
-    if batch.anchor_link_pk is None or batch.target_page_pk is None:
+    if batch.anchor_link_pk is None:
         return None
     anchor = session.get(RevisionLink, batch.anchor_link_pk)
     if anchor is None:  # pragma: no cover - foreign key holds
         return None
     for revision_pk in (anchor.local_revision_pk, anchor.remote_revision_pk):
         revision = session.get(Revision, revision_pk)
-        if revision is None or revision.page_pk != batch.target_page_pk:
+        if revision is None or revision.page_pk != batch.target_title_pk:
             continue
         content = content_of(session, revision)
         return content.text if content is not None else None
