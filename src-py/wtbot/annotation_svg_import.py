@@ -195,7 +195,7 @@ def import_svg_annotations(
                 if not dry_run:
                     store.upsert(
                         ScanAnnotation(
-                            page_pk=page_pk,
+                            title_pk=page_pk,
                             annotation_id=rect.id,
                             normalized_x=(rect.x - origin_x) / image_width,
                             normalized_y=(rect.y - origin_y) / image_height,

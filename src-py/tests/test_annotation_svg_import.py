@@ -90,7 +90,7 @@ def test_import_existing_rows_win(engine, tmp_path):
     with Session(engine) as s:
         SqlAnnotationStore(s).upsert(
             ScanAnnotation(
-                page_pk=page_pk,
+                title_pk=page_pk,
                 annotation_id="r1",
                 normalized_x=0.999,
                 normalized_y=0,

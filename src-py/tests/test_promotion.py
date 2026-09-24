@@ -17,10 +17,13 @@ from wtbot.model import (
     Revision,
     Site,
     SiteCredential,
+    Title,
 )
 from wtbot.promotion.promotion_store import (
     _promotion_comment,
+    batch_ends,
     materialize_promotion_links,
+    page_number_of,
     stage_batch,
 )
 from wtbot.sync import build_report
@@ -286,9 +289,10 @@ def test_a_work_report_stages_one_page_batch_with_ordered_revisions(engine):
             .where(Promotion.batch_pk == batch.pk)
             .order_by(Promotion.pk)
         ).all()
-        assert batch.source_title == "Page:Varieties.djvu/1"
-        assert batch.target_title == "Page:Varieties.djvu/1"
-        assert batch.page_number == 1
+        ends = batch_ends(session, batch)
+        assert ends.source_page.title == "Page:Varieties.djvu/1"
+        assert ends.target_title.title == "Page:Varieties.djvu/1"
+        assert page_number_of(session, batch) == 1  # from the source meta
         assert len(rows) == 2
         assert rows[0].predecessor_promotion_pk is None
         assert rows[1].predecessor_promotion_pk == rows[0].pk
@@ -697,7 +701,7 @@ def test_a_target_that_already_holds_the_body_is_skipped(pushing_client, engine)
     with Session(engine) as session:
         (promotion,) = session.exec(select(Promotion)).all()
         batch = session.get(PromotionBatch, promotion.batch_pk)
-        target = session.get(Page, batch.target_page_pk)
+        target = session.get(Page, batch.target_title_pk)
         record_head_revision(
             session,
             target,
@@ -943,7 +947,7 @@ def test_next_change_reviews_then_create_only_pushes_and_verifies(engine):
 
 def _correspondence_exists(session: Session, promotion: Promotion) -> bool:
     batch = session.get(PromotionBatch, promotion.batch_pk)
-    target = session.get(Page, batch.target_page_pk)
+    target = session.get(Page, batch.target_title_pk)
     source = session.get(Page, batch.source_page_pk)
     return any(
         {
@@ -1020,3 +1024,29 @@ def test_granular_update_refuses_a_moved_cached_target_without_writing(engine):
         assert "target has moved" in result["error"]
         assert wiki.create_calls == []
         assert wiki.update_calls == []
+
+
+def test_a_push_writes_to_the_targets_current_name(session):
+    """The batch holds the target's pk, not its title string, so a page moved
+    on the wiki after staging is written to by its new name -- not to the
+    redirect its old name now holds, which would fork the content."""
+    source_site = Site(family="up", code="en")
+    target_site = Site(family="down", code="en")
+    session.add_all([source_site, target_site])
+    session.commit()
+    source = Page(site_pk=source_site.pk, title="Page:Book.djvu/1")
+    target = Page(site_pk=target_site.pk, title="Page:Book.djvu/1")
+    session.add_all([source, target])
+    session.commit()
+    batch = PromotionBatch(source_page_pk=source.pk, target_title_pk=target.pk)
+    session.add(batch)
+    session.commit()
+
+    moved = session.get(Title, target.pk)
+    moved.title = target.title = "Page:Book (1901).djvu/1"
+    session.add_all([moved, target])
+    session.commit()
+
+    ends = batch_ends(session, batch)
+    assert ends.target_title.title == "Page:Book (1901).djvu/1"
+    assert ends.target_page is not None and ends.target_site.pk == target_site.pk

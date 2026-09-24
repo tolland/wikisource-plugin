@@ -35,12 +35,12 @@ class AnnotationCategory(StrEnum):
 class ScanAnnotation(SQLModel, table=True):
     __table_args__ = (
         UniqueConstraint(
-            "page_pk", "annotation_id", name="uq_scan_annotation_page_annotation"
+            "title_pk", "annotation_id", name="uq_scan_annotation_page_annotation"
         ),
     )
 
     pk: int | None = Field(default=None, primary_key=True)
-    page_pk: int = Field(foreign_key="page.pk", index=True)
+    title_pk: int = Field(foreign_key="title.pk", index=True)
     annotation_id: str = Field(index=True)
 
     normalized_x: float

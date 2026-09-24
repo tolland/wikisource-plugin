@@ -23,11 +23,11 @@ type Scalar = str | int | float | None
 # Keys containing foreign-key columns are expanded recursively to target keys.
 # These describe identity, not the order in which tables should be restored.
 NATURAL_KEYS: dict[str, tuple[str, ...]] = {
-    "boxrangelink": ("page_pk", "box_annotation_id"),
+    "boxrangelink": ("title_pk", "box_annotation_id"),
     "content": ("content_sha1", "content_model"),
     "fileblob": ("page_pk", "file_sha1", "upload_timestamp"),
     "filemeta": ("page_pk",),
-    "indexlink": ("page_link_pk",),
+    "indexlink": ("pk",),  # shared with the pairing it tracks
     "indexmeta": ("page_pk",),
     "namespace": ("site_pk", "key"),
     "ocrbackendconfig": ("scope", "name"),
@@ -36,11 +36,11 @@ NATURAL_KEYS: dict[str, tuple[str, ...]] = {
     "proofreadpagemeta": ("title_pk",),
     "revision": ("page_pk", "revid"),
     "revisionlink": ("local_revision_pk", "remote_revision_pk"),
-    "scanannotation": ("page_pk", "annotation_id"),
+    "scanannotation": ("title_pk", "annotation_id"),
     "site": Site.natural_key_fields,
     "sitecredential": ("site_pk",),
     "slot": ("revision_pk", "role"),
-    "texttargetanchor": ("page_pk", "annotation_id"),
+    "texttargetanchor": ("title_pk", "annotation_id"),
     "title": ("site_pk", "title"),
     "transclusion": (
         "site_pk",

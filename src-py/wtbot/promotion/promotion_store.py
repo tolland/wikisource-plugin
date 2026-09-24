@@ -1,29 +1,34 @@
 import re
+from dataclasses import dataclass
 
 from sqlmodel import Session, select
 
 from wtbot.content_model import ProofreadPageDocument, parse_document
 from wtbot.fetch.revision_store import head_revision
-from wtbot.linking.page_link_store import find_pair
+from wtbot.linking.page_link_store import pair_for_page
 from wtbot.linking.remote_link_store import assert_link, current_anchor, ladder
 from wtbot.matching import content_of
 from wtbot.model import (
     MAIN_SLOT,
     BatchStatus,
     Content,
+    IndexLink,
     LinkOrigin,
     Page,
     Promotion,
     PromotionBatch,
     PromotionIntent,
     PromotionStatus,
+    ProofreadPageMeta,
     Revision,
     RevisionLink,
     Site,
     SiteCredential,
     Slot,
+    Title,
 )
 from wtbot.sync import SyncPage, SyncReport, SyncVerdict
+from wtbot.title_store import ensure_title
 
 """Staging a push run from a sync report, one source revision at a time.
 
@@ -58,6 +63,74 @@ class PromotionError(ValueError):
     """A batch or promotion that cannot be staged or run as asked."""
 
 
+@dataclass(frozen=True)
+class BatchEnds:
+    """A batch's two ends, resolved from its two keys.
+
+    Everything a batch used to copy in -- sites, titles, the target's page --
+    is read from here instead, so it cannot disagree with the rows it came
+    from. ``target_page`` is None exactly when the wiki holds nothing at the
+    target yet: the shared primary key makes "the target's page" a lookup by
+    the title's own pk, with no title string to match.
+    """
+
+    source_page: Page
+    source_site: Site
+    target_title: Title
+    target_site: Site
+    target_page: Page | None
+
+
+def target_of(session: Session, batch: PromotionBatch) -> Title:
+    """The batch's target title. Never missing: the foreign key requires it."""
+    target = session.get(Title, batch.target_title_pk)
+    if target is None:  # pragma: no cover - foreign key holds
+        raise PromotionError(f"batch {batch.pk} names a missing target title")
+    return target
+
+
+def batch_ends(session: Session, batch: PromotionBatch) -> BatchEnds:
+    source_page = session.get(Page, batch.source_page_pk)
+    target_title = target_of(session, batch)
+    source_site = session.get(Site, source_page.site_pk) if source_page else None
+    target_site = session.get(Site, target_title.site_pk)
+    if source_page is None or source_site is None or target_site is None:
+        raise PromotionError(  # pragma: no cover - foreign keys hold
+            f"batch {batch.pk} names a missing source page or site"
+        )
+    return BatchEnds(
+        source_page=source_page,
+        source_site=source_site,
+        target_title=target_title,
+        target_site=target_site,
+        target_page=session.get(Page, target_title.pk),
+    )
+
+
+def page_number_of(session: Session, batch: PromotionBatch) -> int | None:
+    """The source page's number in its work, from its proofread metadata."""
+    meta = session.get(ProofreadPageMeta, batch.source_page_pk)
+    return meta.page_number if meta is not None else None
+
+
+def work_of(session: Session, batch: PromotionBatch) -> IndexLink | None:
+    """The tracked work this push belongs to, if any.
+
+    Derived rather than stored: the source page's index, paired with an index
+    on the target's site, tracked as a work. A batch that stored the answer
+    would keep it after the work was untracked.
+    """
+    meta = session.get(ProofreadPageMeta, batch.source_page_pk)
+    target = session.get(Title, batch.target_title_pk)
+    if meta is None or target is None:
+        return None
+    pairing = pair_for_page(session, meta.index_title_pk, target.site_pk)
+    if pairing is None:
+        return None
+    # A work shares its pairing's key.
+    return session.get(IndexLink, pairing.pk)
+
+
 def stage_batch(
     session: Session,
     report: SyncReport,
@@ -80,7 +153,6 @@ def stage_batch(
         source_site=source_site,
         target_site=target_site,
         label=label,
-        index_link_pk=report.work_pk,
     )
 
 
@@ -91,7 +163,6 @@ def stage_page(
     source_site: Site,
     target_site: Site,
     label: str | None = None,
-    index_link_pk: int | None = None,
     limit: int | None = None,
 ) -> PromotionBatch:
     """Stage a single-page push run: this page, this direction, nothing else.
@@ -117,30 +188,23 @@ def stage_page(
             Page.site_pk == source_site.pk, Page.title == page.source_title
         )
     ).one()
-    target_page = (
-        session.exec(
-            select(Page).where(
-                Page.site_pk == target_site.pk, Page.title == page.target_title
-            )
-        ).first()
-        if page.target_title
-        else None
+    # The target is an address, whether or not the wiki holds a page there: a
+    # create stages against a title as surely as an update does.
+    target_name = page.target_title or page.source_title
+    if target_name is None or target_site.pk is None or source_page.pk is None:
+        raise PromotionError(  # pragma: no cover - an actionable row names both
+            "a push needs a source page and a target title"
+        )
+    target_title = ensure_title(
+        session,
+        site_pk=target_site.pk,
+        title=target_name,
+        expected_content_model=source_page.content_model or "wikitext",
     )
-    pairing = (
-        find_pair(session, source_page.pk, target_page.pk)
-        if target_page is not None
-        else None
-    )
+    assert target_title.pk is not None  # flushed by ensure_title
     batch = PromotionBatch(
-        source_site_pk=source_site.pk,
-        target_site_pk=target_site.pk,
-        index_link_pk=index_link_pk,
-        page_link_pk=pairing.pk if pairing else None,
         source_page_pk=source_page.pk,
-        target_page_pk=target_page.pk if target_page else None,
-        source_title=page.source_title or "",
-        target_title=page.target_title or page.source_title or "",
-        page_number=page.page_number,
+        target_title_pk=target_title.pk,
         label=label,
     )
     session.add(batch)
@@ -188,11 +252,7 @@ def _stage_promotions_for(
     if source_head is None:  # pragma: no cover - actionable implies a head
         raise PromotionError(f"{page.source_title} has no cached revision to push")
 
-    target_page = (
-        session.get(Page, batch.target_page_pk)
-        if batch.target_page_pk is not None
-        else None
-    )
+    target_page = session.get(Page, batch.target_title_pk)
 
     intent = (
         PromotionIntent.create
@@ -470,18 +530,8 @@ def target_head_revid(session: Session, promotion: Promotion) -> int | None:
         predecessor = session.get(Promotion, promotion.predecessor_promotion_pk)
         return predecessor.result_revid if predecessor is not None else None
     batch = session.get(PromotionBatch, promotion.batch_pk)
-    target = (
-        session.get(Page, batch.target_page_pk)
-        if batch.target_page_pk is not None
-        else None
-    )
-    if target is None:
-        target = session.exec(
-            select(Page).where(
-                Page.site_pk == batch.target_site_pk,
-                Page.title == batch.target_title,
-            )
-        ).first()
+    # The shared primary key: the target title's page, if the wiki holds one.
+    target = session.get(Page, batch.target_title_pk)
     head = head_revision(session, target) if target else None
     return head.revid if head else None
 
@@ -498,18 +548,8 @@ def body_matches_target(session: Session, promotion: Promotion) -> bool:
     if promotion.predecessor_promotion_pk is not None:
         return False
     batch = session.get(PromotionBatch, promotion.batch_pk)
-    target = (
-        session.get(Page, batch.target_page_pk)
-        if batch.target_page_pk is not None
-        else None
-    )
-    if target is None:
-        target = session.exec(
-            select(Page).where(
-                Page.site_pk == batch.target_site_pk,
-                Page.title == batch.target_title,
-            )
-        ).first()
+    # The shared primary key: the target title's page, if the wiki holds one.
+    target = session.get(Page, batch.target_title_pk)
     head = head_revision(session, target) if target else None
     if head is None:
         return False
@@ -533,8 +573,9 @@ def materialize_promotion_links(
         select(Promotion)
         .join(PromotionBatch, Promotion.batch_pk == PromotionBatch.pk)
         .where(
-            PromotionBatch.target_site_pk == target_page.site_pk,
-            PromotionBatch.target_title == target_page.title,
+            # Every Page is a Title with the same pk: a batch aimed at this
+            # page's address is aimed at this page, whatever it is now called.
+            PromotionBatch.target_title_pk == target_page.pk,
             Promotion.status == PromotionStatus.pushed,
             Promotion.result_revid.is_not(None),
         )
@@ -542,7 +583,6 @@ def materialize_promotion_links(
     ).all()
     linked: list[RevisionLink] = []
     for promotion in rows:
-        batch = session.get(PromotionBatch, promotion.batch_pk)
         target_revision = session.exec(
             select(Revision).where(
                 Revision.page_pk == target_page.pk,
@@ -556,10 +596,6 @@ def materialize_promotion_links(
             local_revision_pk=promotion.source_revision_pk,
             remote_revision_pk=target_revision.pk,
             origin=LinkOrigin.copy,
-            page_link_pk=batch.page_link_pk,
         )
-        batch.target_page_pk = target_page.pk
-        batch.page_link_pk = link.page_link_pk
-        session.add(batch)
         linked.append(link)
     return linked

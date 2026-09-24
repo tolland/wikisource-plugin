@@ -5,12 +5,15 @@ from sqlmodel import Session, select
 
 from wtbot.fetch.worker import run_pending
 from wtbot.model import (
+    BoxRangeLink,
     Commit,
     EditJournal,
     FetchRequest,
     Page,
     ProofreadPageMeta,
+    ScanAnnotation,
     Site,
+    TextTargetAnchor,
     Title,
 )
 from wtbot.page_processors import _ensure_placeholder_page, ensure_index_page
@@ -234,3 +237,37 @@ def test_saves_commits_and_meta_can_hang_off_a_bare_title(session, site):
     assert session.get(Page, leaf.pk) is None
     assert session.get(Page, index.pk) is None
     assert session.get(ProofreadPageMeta, leaf.pk).index_title_pk == index.pk
+
+
+def test_annotations_can_be_drawn_on_a_bare_title(session, site):
+    """The scan exists before the page does -- ProofreadPage serves it for an
+    untranscribed page -- so marking it up needs a Title, not a Page."""
+    leaf = ensure_title(
+        session,
+        site_pk=site.pk,
+        title="Page:Unfetched.djvu/5",
+        expected_content_model="proofread-page",
+    )
+    session.add(
+        ScanAnnotation(
+            title_pk=leaf.pk,
+            annotation_id="box-1",
+            normalized_x=0.1,
+            normalized_y=0.1,
+            normalized_width=0.2,
+            normalized_height=0.2,
+        )
+    )
+    session.add(
+        TextTargetAnchor(
+            title_pk=leaf.pk, annotation_id="range-1", text_start=0, text_end=5
+        )
+    )
+    session.add(
+        BoxRangeLink(
+            title_pk=leaf.pk, box_annotation_id="box-1", range_annotation_id="range-1"
+        )
+    )
+    session.commit()
+
+    assert session.get(Page, leaf.pk) is None

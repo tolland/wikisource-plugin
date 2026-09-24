@@ -11,15 +11,16 @@ from wtbot.model import (
     PromotionBatch,
     PromotionIntent,
     PromotionStatus,
-    Site,
 )
 from wtbot.promotion.promotion_store import (
     PromotionError,
+    batch_ends,
     body_matches_target,
     settle_batch,
     skip,
     source_is_unchanged,
     target_head_revid,
+    target_of,
 )
 from wtbot.timeutil import utcnow
 from wtbot.wiki.wiki_types import EditConflict
@@ -68,10 +69,13 @@ def push_one(
         if promotion is None:
             raise PromotionError(f"no promotion {promotion_pk}")
         batch = session.get(PromotionBatch, promotion.batch_pk)
-        target_site = detached_site(session.get(Site, batch.target_site_pk))
+        # Resolved now, not frozen at staging: a page moved since then is
+        # written to by its current name, not a redirect's.
+        ends = batch_ends(session, batch)
+        target_site = detached_site(ends.target_site)
         snapshot = (
             promotion.pk,
-            batch.target_title,
+            ends.target_title.title,
             promotion.body,
             promotion.comment,
             promotion.intent,
@@ -273,10 +277,11 @@ def _enqueue_chain_refetch(session: Session, promotion: Promotion) -> None:
         ).all()
     )
     batch = session.get(PromotionBatch, promotion.batch_pk)
+    target_title = target_of(session, batch)
     session.add(
         FetchRequest(
-            site_pk=batch.target_site_pk,
-            title=batch.target_title,
+            site_pk=target_title.site_pk,
+            title=target_title.title,
             kind=FetchKind.single,
             depth=0,
             revisions=max(1, chain_size),

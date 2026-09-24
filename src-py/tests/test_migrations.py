@@ -6,6 +6,7 @@ from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, SQLModel
 
 import wtbot.model  # noqa: F401 - registers every table on SQLModel.metadata
@@ -130,7 +131,9 @@ def test_old_multi_page_promotion_batch_is_split_by_page(
                      'two', 'staged', CURRENT_TIMESTAMP)
                 """))
 
-    _run(baseline_engine, command.upgrade, "head")
+    # Pinned to the migration under test: later steps reshape promotionbatch
+    # (b41d8e2c7f60 reduces it to its two ends), and they have their own tests.
+    _run(baseline_engine, command.upgrade, "f19c2d4a7b31")
 
     with baseline_engine.connect() as connection:
         batches = connection.execute(
@@ -202,8 +205,10 @@ def test_annotation_migration_requires_backfill_and_preserves_identity(
                 "INSERT INTO scanannotation (pk,page_pk,annotation_id,x,y,width,height,created_at,updated_at) VALUES (1,1,'box',20,60,100,120,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)"
             )
         )
+    # Pinned to the migration under test: later steps rename scanannotation's
+    # page_pk (e5f2a8d1c349), and they have their own tests.
     with pytest.raises(RuntimeError, match="need backfilling"):
-        _run(baseline_engine, command.upgrade, "head")
+        _run(baseline_engine, command.upgrade, "a21d6430c902")
     dump = tmp_path / "dump.json"
     dump.write_text(
         json.dumps(
@@ -228,7 +233,7 @@ def test_annotation_migration_requires_backfill_and_preserves_identity(
     from pathlib import Path
 
     backfill(Path(baseline_engine.url.database), dump, apply=True)
-    _run(baseline_engine, command.upgrade, "head")
+    _run(baseline_engine, command.upgrade, "a21d6430c902")
     with baseline_engine.connect() as c:
         assert c.execute(
             text(
@@ -527,3 +532,252 @@ def test_the_migrated_schema_matches_the_models(baseline_engine: Engine) -> None
             SQLModel.metadata,
         )
     assert differences == []
+
+
+# -- step 2: PromotionBatch reduced to its two ends ---------------------------
+
+BATCH_TWO_ENDS = "b41d8e2c7f60"
+_T = "'2026-01-01 00:00:00+00:00'"
+
+
+def test_a_batch_keeps_its_ends_and_a_create_gets_its_target_title(
+    baseline_engine: Engine,
+) -> None:
+    _run(baseline_engine, command.upgrade, JOURNAL_TO_TITLE)
+    with baseline_engine.begin() as connection:
+        run = connection.exec_driver_sql
+        run(
+            "INSERT INTO site (pk, family, code, articlepath, created_at) VALUES"
+            f" (1, 'up', 'en', '/wiki/$1', {_T}), (2, 'down', 'en', '/wiki/$1', {_T})"
+        )
+        for pk, site, title in ((7, 1, "P/1"), (8, 2, "P/1"), (9, 1, "P/2")):
+            run(
+                "INSERT INTO title (pk, site_pk, title, expected_content_model)"
+                f" VALUES ({pk}, {site}, '{title}', 'proofread-page')"
+            )
+            run(
+                "INSERT INTO page (pk, site_pk, title, content_model, dirty,"
+                f" fetch_status) VALUES ({pk}, {site}, '{title}', 'proofread-page',"
+                " 0, 'done')"
+            )
+        # An update (the target page exists) and a create (it does not).
+        for pk, source, target, name in ((1, 7, 8, "P/1"), (2, 9, "NULL", "P/2")):
+            run(
+                "INSERT INTO promotionbatch (pk, source_site_pk, target_site_pk,"
+                " source_page_pk, target_page_pk, source_title, target_title,"
+                f" status, created_at) VALUES ({pk}, 1, 2, {source}, {target},"
+                f" '{name}', '{name}', 'draft', {_T})"
+            )
+
+    _run(baseline_engine, command.upgrade, BATCH_TWO_ENDS)
+
+    assert _foreign_keys(baseline_engine, "promotionbatch") == {
+        ("source_page_pk", "page"),
+        ("target_title_pk", "title"),
+        ("anchor_link_pk", "revisionlink"),
+    }
+    with baseline_engine.connect() as connection:
+        run = connection.exec_driver_sql
+        rows = run("""
+            SELECT b.pk, b.source_page_pk, t.site_pk, t.title,
+                   t.expected_content_model,
+                   EXISTS (SELECT 1 FROM page p WHERE p.pk = t.pk)
+            FROM promotionbatch b JOIN title t ON t.pk = b.target_title_pk
+            ORDER BY b.pk
+            """).all()
+        assert run("PRAGMA foreign_key_check").all() == []
+    assert rows == [
+        (1, 7, 2, "P/1", "proofread-page", 1),
+        # The create's target had no page, so it gets a title at that address,
+        # expecting the source's content model -- and still no page.
+        (2, 9, 2, "P/2", "proofread-page", 0),
+    ]
+
+
+def test_the_two_ends_step_downgrades_with_its_copies_refilled(
+    baseline_engine: Engine,
+) -> None:
+    # Seeded in the pre-title shape, which is what _seed_address_rows writes.
+    _run(baseline_engine, command.upgrade, BEFORE_TITLE)
+    _seed_address_rows(baseline_engine)
+    with baseline_engine.begin() as connection:
+        connection.exec_driver_sql(
+            "INSERT INTO promotionbatch (pk, source_site_pk, target_site_pk,"
+            " source_page_pk, target_page_pk, source_title, target_title,"
+            f" status, created_at) VALUES (1, 1, 1, 7, 9, 'Page:A.djvu/1',"
+            f" 'Index:A.djvu/styles.css', 'draft', {_T})"
+        )
+    _run(baseline_engine, command.upgrade, BATCH_TWO_ENDS)
+
+    _run(baseline_engine, command.downgrade, JOURNAL_TO_TITLE)
+
+    with baseline_engine.connect() as connection:
+        assert connection.exec_driver_sql(
+            "SELECT source_site_pk, target_site_pk, target_page_pk, source_title,"
+            " target_title, page_number FROM promotionbatch"
+        ).all() == [(1, 1, 9, "Page:A.djvu/1", "Index:A.djvu/styles.css", 1)]
+
+
+# -- step 2: IndexLink shares PageLink's key ---------------------------------
+
+WORK_SHARES_KEY = "d7a3c9e5b184"
+
+
+def _seed_work(engine: Engine) -> None:
+    """A tracked work (pairing 50 of two indexes, tracked as work 3) with one
+    page pair under it, pointed at the work the old way."""
+    with engine.begin() as connection:
+        run = connection.exec_driver_sql
+        run(
+            "INSERT INTO site (pk, family, code, articlepath, created_at) VALUES"
+            f" (1, 'up', 'en', '/wiki/$1', {_T}), (2, 'down', 'en', '/wiki/$1', {_T})"
+        )
+        rows = (
+            (10, 1, "Index:B.djvu", "proofread-index"),
+            (20, 2, "Index:B.djvu", "proofread-index"),
+            (11, 1, "Page:B.djvu/1", "proofread-page"),
+            (21, 2, "Page:B.djvu/1", "proofread-page"),
+        )
+        for pk, site, title, model in rows:
+            run(
+                "INSERT INTO title (pk, site_pk, title, expected_content_model)"
+                f" VALUES ({pk}, {site}, '{title}', '{model}')"
+            )
+            run(
+                "INSERT INTO page (pk, site_pk, title, content_model, dirty,"
+                f" fetch_status) VALUES ({pk}, {site}, '{title}', '{model}', 0,"
+                " 'done')"
+            )
+        run(
+            "INSERT INTO proofreadpagemeta (title_pk, index_title_pk, page_number)"
+            " VALUES (11, 10, 1), (21, 20, 1)"
+        )
+        run(
+            "INSERT INTO pagelink (pk, local_page_pk, remote_page_pk, origin,"
+            f" created_at) VALUES (50, 10, 20, 'manual', {_T})"
+        )
+        run(
+            f"INSERT INTO indexlink (pk, page_link_pk, created_at) VALUES (3, 50, {_T})"
+        )
+        run(
+            "INSERT INTO pagelink (pk, local_page_pk, remote_page_pk, index_link_pk,"
+            f" origin, created_at) VALUES (51, 11, 21, 3, 'title_match', {_T})"
+        )
+
+
+def test_a_work_takes_its_pairings_key_and_pairs_lose_their_pointer(
+    baseline_engine: Engine,
+) -> None:
+    _run(baseline_engine, command.upgrade, BATCH_TWO_ENDS)
+    _seed_work(baseline_engine)
+
+    _run(baseline_engine, command.upgrade, WORK_SHARES_KEY)
+
+    assert _foreign_keys(baseline_engine, "indexlink") == {("pk", "pagelink")}
+    assert _foreign_keys(baseline_engine, "pagelink") == {
+        ("local_page_pk", "page"),
+        ("remote_page_pk", "page"),
+    }
+    with baseline_engine.begin() as connection:
+        run = connection.exec_driver_sql
+        assert run("SELECT pk FROM indexlink").all() == [(50,)]
+        assert "index_link_pk" not in {
+            row[1] for row in run("PRAGMA table_info(pagelink)")
+        }
+        assert run("PRAGMA foreign_key_check").all() == []
+        # The rebuild restated the expression index batch mode cannot see: a
+        # pairing asserted the other way round is still refused.
+        with pytest.raises(IntegrityError):
+            run(
+                "INSERT INTO pagelink (pk, local_page_pk, remote_page_pk, origin,"
+                f" created_at) VALUES (52, 21, 11, 'manual', {_T})"
+            )
+
+
+def test_the_shared_key_step_downgrades_with_pointers_restored(
+    baseline_engine: Engine,
+) -> None:
+    _run(baseline_engine, command.upgrade, BATCH_TWO_ENDS)
+    _seed_work(baseline_engine)
+    _run(baseline_engine, command.upgrade, WORK_SHARES_KEY)
+
+    _run(baseline_engine, command.downgrade, BATCH_TWO_ENDS)
+
+    with baseline_engine.connect() as connection:
+        run = connection.exec_driver_sql
+        assert run("SELECT pk, page_link_pk FROM indexlink").all() == [(50, 50)]
+        assert run("SELECT pk, index_link_pk FROM pagelink ORDER BY pk").all() == [
+            (50, None),
+            (51, 50),
+        ]
+        assert run("PRAGMA foreign_key_check").all() == []
+
+
+# -- step 2: annotations keyed to Title --------------------------------------
+
+ANNOTATIONS_TO_TITLE = "e5f2a8d1c349"
+_ANNOTATION_TABLES = ("scanannotation", "boxrangelink", "texttargetanchor")
+
+
+def _seed_annotations(engine: Engine) -> None:
+    with engine.begin() as connection:
+        run = connection.exec_driver_sql
+        run(
+            "INSERT INTO site (pk, family, code, articlepath, created_at)"
+            f" VALUES (1, 'up', 'en', '/wiki/$1', {_T})"
+        )
+        run(
+            "INSERT INTO title (pk, site_pk, title, expected_content_model)"
+            " VALUES (7, 1, 'Page:A/1', 'proofread-page')"
+        )
+        run(
+            "INSERT INTO page (pk, site_pk, title, content_model, dirty, fetch_status)"
+            " VALUES (7, 1, 'Page:A/1', 'proofread-page', 0, 'done')"
+        )
+        run(
+            "INSERT INTO scanannotation (page_pk, annotation_id, category, created_at,"
+            " updated_at, normalized_x, normalized_y, normalized_width,"
+            f" normalized_height) VALUES (7, 'box-1', 'unknown', {_T}, {_T},"
+            " 0.1, 0.1, 0.2, 0.2)"
+        )
+        run(
+            "INSERT INTO boxrangelink (page_pk, box_annotation_id,"
+            " range_annotation_id, created_at, updated_at)"
+            f" VALUES (7, 'box-1', 'range-1', {_T}, {_T})"
+        )
+        run(
+            "INSERT INTO texttargetanchor (page_pk, annotation_id, text_start,"
+            f" text_end, updated_at) VALUES (7, 'range-1', 0, 5, {_T})"
+        )
+
+
+def test_annotations_point_at_titles(baseline_engine: Engine) -> None:
+    _run(baseline_engine, command.upgrade, WORK_SHARES_KEY)
+    _seed_annotations(baseline_engine)
+
+    _run(baseline_engine, command.upgrade, ANNOTATIONS_TO_TITLE)
+
+    with baseline_engine.connect() as connection:
+        run = connection.exec_driver_sql
+        for table in _ANNOTATION_TABLES:
+            assert _foreign_keys(baseline_engine, table) == {("title_pk", "title")}
+            assert run(f"SELECT title_pk FROM {table}").all() == [(7,)]
+            # The unique constraint followed the rename rather than being lost.
+            ddl = run(f"SELECT sql FROM sqlite_master WHERE name = '{table}'").scalar()
+            assert "UNIQUE (title_pk," in ddl
+        assert run("PRAGMA foreign_key_check").all() == []
+
+
+def test_the_annotation_step_downgrades_cleanly(baseline_engine: Engine) -> None:
+    _run(baseline_engine, command.upgrade, WORK_SHARES_KEY)
+    _seed_annotations(baseline_engine)
+    _run(baseline_engine, command.upgrade, ANNOTATIONS_TO_TITLE)
+
+    _run(baseline_engine, command.downgrade, WORK_SHARES_KEY)
+
+    with baseline_engine.connect() as connection:
+        for table in _ANNOTATION_TABLES:
+            assert _foreign_keys(baseline_engine, table) == {("page_pk", "page")}
+            assert connection.exec_driver_sql(f"SELECT page_pk FROM {table}").all() == [
+                (7,)
+            ]

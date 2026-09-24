@@ -2,13 +2,13 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlmodel import Session, func, select
+from sqlmodel import Session, col, func, select
 
 from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.deps import get_session
 from wtbot.fetch.revision_store import head_revision
 from wtbot.linking.index_link_store import (
-    adopt_children,
+    children_of,
     link_indexes,
     unlink_index,
     work_for_index_page,
@@ -171,7 +171,12 @@ class LinkWorkResult(BaseModel):
     created: bool = Field(description="False when the work was already tracked.")
     paired: int = Field(default=0, description="Page pairs created by this call.")
     adopted: int = Field(
-        default=0, description="Existing page pairs claimed by the work."
+        default=0,
+        description=(
+            "Page pairs that already existed and belong to the work. Membership "
+            "is derived from each page's index, so nothing is claimed; this "
+            "counts what the work picked up without this call creating it."
+        ),
     )
     unpaired: list[str] = Field(
         default_factory=list, description="Local page titles with no counterpart."
@@ -310,26 +315,26 @@ def _index_page(session: Session, site: Site, title: str) -> Page:
 
 
 def _summary(session: Session, work: IndexLink) -> WorkSummary:
-    pairing = session.get(PageLink, work.page_link_pk)
+    pairing = session.get(PageLink, work.pk)
     local_page = session.get(Page, pairing.local_page_pk)
     remote_page = session.get(Page, pairing.remote_page_pk)
 
-    pairs = session.exec(
-        select(func.count())
-        .select_from(PageLink)
-        .where(PageLink.index_link_pk == work.pk)
-    ).one()
-    linked = session.exec(
-        select(func.count(func.distinct(RevisionLink.page_link_pk)))
-        .select_from(RevisionLink)
-        .join(PageLink, PageLink.pk == RevisionLink.page_link_pk)
-        .where(PageLink.index_link_pk == work.pk)
-    ).one()
+    child_pks = [child.pk for child in children_of(session, work)]
+    pairs = len(child_pks)
+    linked = (
+        session.exec(
+            select(func.count(func.distinct(RevisionLink.page_link_pk))).where(
+                col(RevisionLink.page_link_pk).in_(child_pks)
+            )
+        ).one()
+        if child_pks
+        else 0
+    )
     local_site = session.get(Site, local_page.site_pk)
 
     return WorkSummary(
         pk=work.pk,
-        page_link_pk=work.page_link_pk,
+        page_link_pk=work.pk,  # a work shares its pairing's key
         created_at=work.created_at,
         local_title=local_page.title,
         remote_title=remote_page.title,
@@ -351,7 +356,7 @@ def _work(session: Session, work_pk: int) -> IndexLink:
 
 
 def _sides(session: Session, work: IndexLink) -> tuple[Page, Page, Site, Site]:
-    pairing = session.get(PageLink, work.page_link_pk)
+    pairing = session.get(PageLink, work.pk)
     local_page = session.get(Page, pairing.local_page_pk)
     remote_page = session.get(Page, pairing.remote_page_pk)
     return (
@@ -497,7 +502,7 @@ def list_candidates(
         work = work_for_index_page(session, page.pk)
         paired_with = None
         if work is not None:
-            pairing = session.get(PageLink, work.page_link_pk)
+            pairing = session.get(PageLink, work.pk)
             other_pk = (
                 pairing.remote_page_pk
                 if pairing.local_page_pk == page.pk
@@ -574,13 +579,10 @@ def create_work(
                 continue
             if find_pair(session, local_page.pk, remote_page.pk) is None:
                 paired += 1
-            pairing = pair_pages(
-                session, local_page, remote_page, origin=LinkOrigin.title_match
-            )
-            pairing.index_link_pk = work.pk
-            session.add(pairing)
+            pair_pages(session, local_page, remote_page, origin=LinkOrigin.title_match)
 
-    adopted = adopt_children(session, work)
+    session.flush()
+    adopted = max(0, len(children_of(session, work)) - paired)
     session.commit()
     session.refresh(work)
 
@@ -679,9 +681,8 @@ def propose_work(
         confirmed = len(
             confirm_proposals(session, [p for p in proposals if p.proposable])
         )
-        # The rungs just written belong to this work; their pairings were
-        # created on demand by assert_link and have no pointer yet.
-        adopt_children(session, work)
+        # The pairings assert_link created on demand belong to this work by
+        # derivation; there is nothing to point at it.
         session.commit()
 
     return ProposeWorkResult(counts=counts, confirmed=confirmed)
