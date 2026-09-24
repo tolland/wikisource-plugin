@@ -102,6 +102,10 @@ class Page(SQLModel, table=True):
 
 _WIKITEXT = "wikitext"
 
+# @TODO this is patching Page to Title, creating the Title if missing
+# while the rest of the code base is migrated to the shared primary key
+# association model relationship. Needs to be removed.
+
 
 @event.listens_for(Session, "before_flush")
 def _every_page_is_a_title(session: Session, _flush_context, _instances) -> None:

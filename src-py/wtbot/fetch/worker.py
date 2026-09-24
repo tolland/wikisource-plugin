@@ -392,6 +392,7 @@ def _upsert_page(
             page = Page(pk=title_row.pk, site_pk=site.pk, title=remote.title)
         else:
             title_row = session.get(Title, page.pk)
+
         record_fetched_content_model(session, title_row, remote.content_model)
 
         # pageid and revid are identities within one MediaWiki database, not

@@ -137,3 +137,9 @@ deps = sqlmodel==0.0.45
 [testenv:latest]
 description = unpinned -- what CI or a fresh clone resolves today
 """
+
+[tool.mypy]
+exclude = [
+    '^src-py/wtbot/notebooks',
+    '^src-py/wtbot/migrations/versions',
+]
