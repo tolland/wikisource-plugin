@@ -138,7 +138,7 @@ private class SwapPanesAction(
 }
 
 /**
- * The scan pane's own toolbar: zoom and OCR, which only make sense for the
+ * The scan pane's own toolbar: zoom, box visibility, and OCR, which only make sense for the
  * reference image. Lives inside the image pane so it travels with it in the
  * tiled layout.
  */
@@ -152,6 +152,7 @@ internal class PrpImagePreviewToolbar(
             ZoomInAction(imagePane),
             ZoomOutAction(imagePane),
             ResetZoomAction(imagePane),
+            ShowBoxesAction(imagePane),
             SendToOcrAction(imagePane),
         )
         val toolbar = ActionManager.getInstance()
@@ -187,6 +188,23 @@ private class ResetZoomAction(
     AllIcons.General.ActualZoom,
 ) {
     override fun actionPerformed(event: AnActionEvent) = imagePane.resetZoom()
+
+    override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
+}
+
+/** Hides the bounding boxes to see the bare scan (they can obscure the text). */
+private class ShowBoxesAction(
+    private val imagePane: ReferenceImagePane,
+) : ToggleAction(
+    "Show Bounding Boxes",
+    "Draw the annotation boxes over the reference image; turn off to see the bare scan",
+    AllIcons.Actions.Show,
+) {
+    override fun isSelected(event: AnActionEvent): Boolean = imagePane.boxesVisible
+
+    override fun setSelected(event: AnActionEvent, state: Boolean) {
+        imagePane.boxesVisible = state
+    }
 
     override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
 }

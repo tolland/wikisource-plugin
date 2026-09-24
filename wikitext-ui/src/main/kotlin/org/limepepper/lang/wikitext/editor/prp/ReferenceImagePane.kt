@@ -1,5 +1,6 @@
 package org.limepepper.lang.wikitext.editor.prp
 
+import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
@@ -23,6 +24,8 @@ import javax.swing.JPopupMenu
 import kotlin.math.roundToInt
 
 private val IMAGE_LOG = logger<ReferenceImagePane>()
+
+private const val BOXES_VISIBLE_KEY = "wikitext.referenceImage.boxesVisible"
 
 /**
  * The reference-scan half of the proofread preview, drawn on a plain Swing
@@ -52,7 +55,20 @@ class ReferenceImagePane(
         // fit-to-page would leave the scan tiny with room to spare on each
         // side. See WtEditingFlags.previewImageFitMode.
         defaultFitMode = WtEditingFlags.previewImageFitMode()
+        canvas.boxesVisible = PropertiesComponent.getInstance().getBoolean(BOXES_VISIBLE_KEY, true)
     }
+
+    /**
+     * Whether the boxes are drawn over the scan (see
+     * [org.limepepper.lang.wikitext.annotation.ImageAnnotationCanvas.boxesVisible]).
+     * Remembered app-wide, so hiding them sticks while paging through a book.
+     */
+    var boxesVisible: Boolean
+        get() = annotationPane.canvas.boxesVisible
+        set(value) {
+            annotationPane.canvas.boxesVisible = value
+            PropertiesComponent.getInstance().setValue(BOXES_VISIBLE_KEY, value, true)
+        }
 
     val component: JComponent
         get() = annotationPane.component
@@ -99,7 +115,11 @@ class ReferenceImagePane(
         private set
 
     /** Selects [boxId] and scrolls the canvas to it (gutter-icon click path). */
-    fun revealBox(boxId: String) = annotationPane.revealBox(boxId)
+    /** Selects [boxId] and scrolls to it, showing the boxes if they were hidden. */
+    fun revealBox(boxId: String) {
+        boxesVisible = true
+        annotationPane.revealBox(boxId)
+    }
 
     @Volatile
     private var disposed = false

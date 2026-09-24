@@ -101,6 +101,27 @@ class ImageAnnotationCanvas(
     /** Whether a box is currently linked — drives the handle glyph fill. */
     var linkedBoxProvider: (String) -> Boolean = { false }
 
+    /**
+     * Whether boxes are painted and editable. Off shows the bare scan:
+     * nothing is drawn over it, and drawing, the box menu, link drags, and
+     * Delete are all inert so an invisible box can't be edited by accident.
+     * Zoom and pan still work.
+     */
+    var boxesVisible: Boolean = true
+        set(value) {
+            if (field == value) {
+                return
+            }
+            if (!value) {
+                if (gesture != null) {
+                    cancelGesture()
+                }
+                cursor = Cursor.getDefaultCursor()
+            }
+            field = value
+            repaint()
+        }
+
     /** The drag in progress, if any. All coordinates are image pixels. */
     private sealed interface Gesture {
         /** Rubber-banding a new box; becomes a model box on release. */
@@ -138,7 +159,7 @@ class ImageAnnotationCanvas(
                     panScreenOrigin = e.locationOnScreen
                     panViewOrigin = scrollPaneProvider().viewport.viewPosition
                     cursor = Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR)
-                } else if (SwingUtilities.isLeftMouseButton(e) && image != null) {
+                } else if (SwingUtilities.isLeftMouseButton(e) && image != null && boxesVisible) {
                     val linkBox = linkHandleAt(e.point)
                     if (linkBox != null) {
                         model.select(linkBox)
@@ -207,7 +228,7 @@ class ImageAnnotationCanvas(
             override fun keyPressed(e: KeyEvent) {
                 when (e.keyCode) {
                     KeyEvent.VK_DELETE, KeyEvent.VK_BACK_SPACE ->
-                        model.selectedId?.let(model::remove)
+                        if (boxesVisible) model.selectedId?.let(model::remove)
                     KeyEvent.VK_ESCAPE -> cancelGesture()
                 }
             }
@@ -305,6 +326,9 @@ class ImageAnnotationCanvas(
     /** Selects the box under a popup click, then delegates to the host menu. */
     private fun showPopup(e: MouseEvent) {
         if (image == null) {
+            return
+        }
+        if (!boxesVisible) {
             return
         }
         val p = toImagePoint(e.point)
@@ -449,6 +473,10 @@ class ImageAnnotationCanvas(
             cursor = Cursor.getDefaultCursor()
             return
         }
+        if (!boxesVisible) {
+            cursor = Cursor.getDefaultCursor()
+            return
+        }
         if (canvasPoint != null && linkHandleAt(canvasPoint) != null) {
             cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
             return
@@ -466,7 +494,7 @@ class ImageAnnotationCanvas(
 
     /** The box whose link handle is under [p] (topmost first), if any. */
     private fun linkHandleAt(p: Point): String? {
-        if (linkDropHandler == null || image == null) {
+        if (linkDropHandler == null || image == null || !boxesVisible) {
             return null
         }
         for (box in model.boxes().asReversed()) {
@@ -532,6 +560,9 @@ class ImageAnnotationCanvas(
             RenderingHints.VALUE_INTERPOLATION_BILINEAR,
         )
         g2.drawImage(img, AffineTransform.getScaleInstance(zoom, zoom), null)
+        if (!boxesVisible) {
+            return
+        }
 
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
         val boxes = model.boxes()
