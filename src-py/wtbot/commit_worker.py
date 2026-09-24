@@ -150,7 +150,7 @@ def _claim_next_page(session: Session, *, exclude: set[int]) -> int | None:
     """Return the oldest pending page not already attempted in this run."""
     with read_snapshot(session):
         rows = session.exec(
-            select(EditJournal.page_pk)
+            select(EditJournal.title_pk)
             .where(EditJournal.committed == False)  # noqa: E712
             .order_by(EditJournal.saved_at)
         ).all()
@@ -212,7 +212,7 @@ def _load_pending_page_commit(
         pending = session.exec(
             select(EditJournal)
             .where(
-                EditJournal.page_pk == page_pk,
+                EditJournal.title_pk == page_pk,
                 EditJournal.committed == False,  # noqa: E712
             )
             .order_by(EditJournal.saved_at)
@@ -241,7 +241,7 @@ def _load_pending_page_commit(
         # is still ahead of it and still conflicts.
         last_push = session.exec(
             select(Commit)
-            .where(Commit.page_pk == page_pk, Commit.status == CommitStatus.success)
+            .where(Commit.title_pk == page_pk, Commit.status == CommitStatus.success)
             .order_by(Commit.created_at.desc(), Commit.pk.desc())
         ).first()
         if (
@@ -302,7 +302,7 @@ def _record_commit_outcome(
     session: Session, pending: _PendingPageCommit, outcome: _CommitOutcome
 ) -> None:
     commit = Commit(
-        page_pk=pending.page_pk,
+        title_pk=pending.page_pk,
         base_revid=pending.base_revid,
         submitted_body=pending.body,
         comment=pending.comment,
@@ -345,7 +345,7 @@ def _has_uncaptured_pending_edits(
     row = session.exec(
         select(EditJournal.pk)
         .where(
-            EditJournal.page_pk == pending.page_pk,
+            EditJournal.title_pk == pending.page_pk,
             EditJournal.committed == False,  # noqa: E712
             ~EditJournal.pk.in_(pending.journal_pks),
         )
@@ -358,7 +358,7 @@ def _drop_orphaned_journal(session: Session, page_pk: int) -> None:
     with write_batch(session):
         rows = session.exec(
             select(EditJournal).where(
-                EditJournal.page_pk == page_pk,
+                EditJournal.title_pk == page_pk,
                 EditJournal.committed == False,  # noqa: E712
             )
         ).all()

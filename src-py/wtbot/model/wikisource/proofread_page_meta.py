@@ -7,7 +7,7 @@ from sqlmodel import Field, SQLModel
 Page stays one table (whole-work scans are a core use case) and keeps the
 *fetched remote state*. Everything else — curated values a user sets, or
 locally derived values with their own lifecycle — lives in these side
-tables, one row per page, keyed by page_pk. Adding a new content-specific
+tables, one row per page, keyed by the page's title_pk. Adding a new content-specific
 attribute means a column here, not another nullable column on Page.
 
 These tables store values only. Whether/how they surface to the client
@@ -42,10 +42,13 @@ File: titles (no spaces, slashes, colons or other reserved characters)."""
 class ProofreadPageMeta(SQLModel, table=True):
     """Optional Wikisource metadata for one proofread ``Page:``.
 
-    ``page_pk`` is both identity and ownership: this row cannot exist apart
-    from its vanilla MediaWiki Page. ``index_page_pk`` is the authoritative
-    structural link to the owning ``Index:`` Page; titles are presentation,
-    not relational identity.
+    ``title_pk`` is both identity and ownership: this row cannot exist apart
+    from the Title it describes. It keys to the Title rather than the Page
+    because the metadata exists before the page does -- an untranscribed page
+    already has a scan, a page number and a proposed body, and those are what
+    make it worth opening. ``index_title_pk`` is the authoritative structural
+    link to the owning ``Index:``, which is equally an address first: the
+    fan-out names an index before anyone has fetched it.
 
     The remaining fields hold proofread quality and scan-page image values for
     showing the page scan and its thumbnail next to the transcription.
@@ -55,10 +58,10 @@ class ProofreadPageMeta(SQLModel, table=True):
     backing DjVu/PDF into blob_root.
     """
 
-    page_pk: int = Field(foreign_key="page.pk", primary_key=True)
+    title_pk: int = Field(foreign_key="title.pk", primary_key=True)
 
     # ProofreadPage structure (resolved from the title / Index fan-out)
-    index_page_pk: int = Field(foreign_key="page.pk", index=True)
+    index_title_pk: int = Field(foreign_key="title.pk", index=True)
     page_number: int | None = None
     quality_level: int | None = None  # ProofreadPage <pagequality level="N"/>, 0-4
 

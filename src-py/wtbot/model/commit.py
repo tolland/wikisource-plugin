@@ -20,7 +20,9 @@ class Commit(SQLModel, table=True):
     "this save failed, here's why" after the fact."""
 
     pk: int | None = Field(default=None, primary_key=True)
-    page_pk: int = Field(foreign_key="page.pk", index=True)
+    title_pk: int = Field(foreign_key="title.pk", index=True)
+    """The address pushed to. A Title, not a Page: a commit is how a page comes
+    to exist on the wiki, so it cannot require one to exist first."""
 
     base_revid: int | None = None  # revid the edit was based on; None = page creation
     submitted_body: str

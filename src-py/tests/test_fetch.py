@@ -386,7 +386,7 @@ def test_worker_index_fanout_queues_index_subpages(
     }
     styles = session.exec(select(Page).where(Page.title == asset_title)).one()
     styles_meta = session.exec(
-        select(ProofreadPageMeta).where(ProofreadPageMeta.page_pk == styles.pk)
+        select(ProofreadPageMeta).where(ProofreadPageMeta.title_pk == styles.pk)
     ).first()
     assert styles_meta is None
 
@@ -414,9 +414,9 @@ def test_proofread_page_metadata_uses_content_model(session):
     assert run_pending(session, lambda _: wiki) == 1
     page = session.exec(select(Page).where(Page.title == remote.title)).one()
     meta = session.exec(
-        select(ProofreadPageMeta).where(ProofreadPageMeta.page_pk == page.pk)
+        select(ProofreadPageMeta).where(ProofreadPageMeta.title_pk == page.pk)
     ).one()
-    assert session.get(Page, meta.index_page_pk).title == "Index:Tractatus.djvu"
+    assert session.get(Page, meta.index_title_pk).title == "Index:Tractatus.djvu"
     assert meta.page_number == 7
 
 
@@ -457,7 +457,7 @@ def test_proofread_page_fetch_populates_page_meta(session):
 
     page = session.exec(select(Page).where(Page.title == title)).one()
     meta = session.exec(
-        select(ProofreadPageMeta).where(ProofreadPageMeta.page_pk == page.pk)
+        select(ProofreadPageMeta).where(ProofreadPageMeta.title_pk == page.pk)
     ).one()
     assert meta.quality_level == 1
     assert meta.thumb_url == "https://upload.example/thumb/page45-500px.jpg"
@@ -491,9 +491,9 @@ def test_proofread_page_fetch_without_images_leaves_image_fields_empty(session):
     page = session.exec(select(Page).where(Page.title == title)).one()
     assert page.fetch_status == "done"
     meta = session.exec(
-        select(ProofreadPageMeta).where(ProofreadPageMeta.page_pk == page.pk)
+        select(ProofreadPageMeta).where(ProofreadPageMeta.title_pk == page.pk)
     ).one()
-    assert session.get(Page, meta.index_page_pk).title == "Index:Tractatus.djvu"
+    assert session.get(Page, meta.index_title_pk).title == "Index:Tractatus.djvu"
     assert meta.page_number == 46
     assert meta.quality_level is None
     assert meta.thumb_url is None
@@ -536,7 +536,7 @@ def test_refetch_updates_existing_page_meta(session):
 
     page = session.exec(select(Page).where(Page.title == title)).one()
     metas = session.exec(
-        select(ProofreadPageMeta).where(ProofreadPageMeta.page_pk == page.pk)
+        select(ProofreadPageMeta).where(ProofreadPageMeta.title_pk == page.pk)
     ).all()
     assert len(metas) == 1
     assert metas[0].quality_level == 3

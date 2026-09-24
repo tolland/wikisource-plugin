@@ -127,11 +127,11 @@ class PageStore:
         return list(
             self.session.exec(
                 select(Page)
-                .join(ProofreadPageMeta, ProofreadPageMeta.page_pk == Page.pk)
+                .join(ProofreadPageMeta, ProofreadPageMeta.title_pk == Page.pk)
                 .where(
                     Page.site_pk == site.pk,
                     Page.content_model == "proofread-page",
-                    ProofreadPageMeta.index_page_pk == index.pk,
+                    ProofreadPageMeta.index_title_pk == index.pk,
                 )
             ).all()
         )
@@ -144,12 +144,12 @@ class PageStore:
             return None
         return self.session.exec(
             select(Page)
-            .join(ProofreadPageMeta, ProofreadPageMeta.page_pk == Page.pk)
+            .join(ProofreadPageMeta, ProofreadPageMeta.title_pk == Page.pk)
             .where(
                 Page.site_pk == site.pk,
                 Page.title == title,
                 Page.content_model == "proofread-page",
-                ProofreadPageMeta.index_page_pk == index.pk,
+                ProofreadPageMeta.index_title_pk == index.pk,
             )
         ).first()
 
@@ -164,12 +164,12 @@ class PageStore:
         return list(
             self.session.exec(
                 select(Page)
-                .join(ProofreadPageMeta, ProofreadPageMeta.page_pk == Page.pk)
+                .join(ProofreadPageMeta, ProofreadPageMeta.title_pk == Page.pk)
                 .where(
                     Page.site_pk == site.pk,
                     Page.title.in_(titles),
                     Page.content_model == "proofread-page",
-                    ProofreadPageMeta.index_page_pk == index.pk,
+                    ProofreadPageMeta.index_title_pk == index.pk,
                 )
             ).all()
         )
@@ -242,7 +242,7 @@ class PageStore:
 
     def proofread_page_meta(self, page: Page) -> ProofreadPageMeta | None:
         return self.session.exec(
-            select(ProofreadPageMeta).where(ProofreadPageMeta.page_pk == page.pk)
+            select(ProofreadPageMeta).where(ProofreadPageMeta.title_pk == page.pk)
         ).first()
 
     def proofread_page_metas_by_pks(
@@ -253,9 +253,9 @@ class PageStore:
         if not page_pks:
             return {}
         rows = self.session.exec(
-            select(ProofreadPageMeta).where(ProofreadPageMeta.page_pk.in_(page_pks))
+            select(ProofreadPageMeta).where(ProofreadPageMeta.title_pk.in_(page_pks))
         ).all()
-        return {row.page_pk: row for row in rows}
+        return {row.title_pk: row for row in rows}
 
     def has_reference_image(self, page: Page) -> bool:
         """A scan reference image is known once the fetch worker stored a
@@ -332,7 +332,7 @@ class PageStore:
         """The most recent local save not yet pushed, if any."""
         latest = self.session.exec(
             select(EditJournal)
-            .where(EditJournal.page_pk == page.pk)
+            .where(EditJournal.title_pk == page.pk)
             .where(EditJournal.committed == False)  # noqa: E712
             .order_by(EditJournal.saved_at.desc())
             .limit(1)
@@ -346,12 +346,12 @@ class PageStore:
             return {}
         rows = self.session.exec(
             select(Commit)
-            .where(Commit.page_pk.in_(page_pks))
+            .where(Commit.title_pk.in_(page_pks))
             .where(Commit.status == CommitStatus.success)
             .order_by(Commit.created_at, Commit.pk)
         ).all()
         # Rows are ascending, so the newest commit per page_pk wins.
-        return {row.page_pk: row for row in rows}
+        return {row.title_pk: row for row in rows}
 
     @staticmethod
     def pushed_revid_ahead_of_snapshot(commit: Commit | None, page: Page) -> int | None:
@@ -388,12 +388,12 @@ class PageStore:
             return {}
         rows = self.session.exec(
             select(EditJournal)
-            .where(EditJournal.page_pk.in_(page_pks))
+            .where(EditJournal.title_pk.in_(page_pks))
             .where(EditJournal.committed == False)  # noqa: E712
             .order_by(EditJournal.saved_at)
         ).all()
         # Rows are ascending by saved_at, so the last write per page_pk wins.
-        return {row.page_pk: row.body for row in rows}
+        return {row.title_pk: row.body for row in rows}
 
     def append_edit(
         self, page: Page, *, body: str, base_revid: int | None, comment: str | None
@@ -402,7 +402,7 @@ class PageStore:
         Page.text (the cached remote body / conflict diff base)."""
         self.session.add(
             EditJournal(
-                page_pk=page.pk,
+                title_pk=page.pk,
                 base_revid=base_revid,
                 body=body,
                 comment=comment,

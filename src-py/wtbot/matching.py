@@ -515,7 +515,7 @@ def index_children(
 ) -> list[tuple[int | None, Page]]:
     """A work's Page: rows with their page numbers.
 
-    Membership comes from ``ProofreadPageMeta.index_page_pk``. The title is
+    Membership comes from ``ProofreadPageMeta.index_title_pk``. The title is
     used only to resolve the Index Page identity.
     """
     index_page = session.exec(
@@ -529,11 +529,11 @@ def index_children(
         return []
     rows = session.exec(
         select(ProofreadPageMeta.page_number, Page)
-        .join(Page, Page.pk == ProofreadPageMeta.page_pk)
+        .join(Page, Page.pk == ProofreadPageMeta.title_pk)
         .where(
             Page.site_pk == site.pk,
             Page.content_model == "proofread-page",
-            ProofreadPageMeta.index_page_pk == index_page.pk,
+            ProofreadPageMeta.index_title_pk == index_page.pk,
         )
     ).all()
     return [(number, page) for number, page in rows]

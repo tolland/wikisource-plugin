@@ -44,7 +44,7 @@ def list_commits(
     """
     statement = select(Commit).order_by(Commit.created_at).offset(offset).limit(limit)
     if page_pk is not None:
-        statement = statement.where(Commit.page_pk == page_pk)
+        statement = statement.where(Commit.title_pk == page_pk)
     if status is not None:
         statement = statement.where(Commit.status == status)
     return list(session.exec(statement).all())
@@ -64,7 +64,7 @@ def list_pending_commits(
 
     grouped: dict[int, list[EditJournal]] = {}
     for row in rows:
-        grouped.setdefault(row.page_pk, []).append(row)
+        grouped.setdefault(row.title_pk, []).append(row)
 
     pending_pages: list[PendingCommitPage] = []
     for page_pk, journals in list(grouped.items())[offset : offset + limit]:
@@ -139,7 +139,7 @@ def run_commit_for_page(
     pending = session.exec(
         select(EditJournal.pk)
         .where(
-            EditJournal.page_pk == page_pk,
+            EditJournal.title_pk == page_pk,
             EditJournal.committed == False,  # noqa: E712
         )
         .limit(1)
@@ -154,7 +154,7 @@ def run_commit_for_page(
     )
     commit = session.exec(
         select(Commit)
-        .where(Commit.page_pk == page_pk)
+        .where(Commit.title_pk == page_pk)
         .order_by(Commit.created_at.desc(), Commit.pk.desc())
     ).first()
     if commit is None:
@@ -168,7 +168,7 @@ def cancel_pending_commit_for_page(
 ) -> CommitRunResponse:
     rows = session.exec(
         select(EditJournal).where(
-            EditJournal.page_pk == page_pk,
+            EditJournal.title_pk == page_pk,
             EditJournal.committed == False,  # noqa: E712
         )
     ).all()

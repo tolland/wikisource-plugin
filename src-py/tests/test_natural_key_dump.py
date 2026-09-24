@@ -17,6 +17,7 @@ from wtbot.model import (
     IndexLink,
     Page,
     PageLink,
+    ProofreadPageMeta,
     Revision,
     Site,
     SiteCredential,
@@ -62,6 +63,12 @@ def make_database(path: Path, offset: int = 0) -> None:
             )
         )
         session.add(IndexLink(pk=offset + 8, page_link_pk=offset + 7))
+        session.add(Page(pk=offset + 9, site_pk=offset + 1, title="Page:Book/1"))
+        session.add(
+            ProofreadPageMeta(
+                title_pk=offset + 9, index_title_pk=offset + 3, page_number=1
+            )
+        )
         session.commit()
     engine.dispose()
     with sqlite3.connect(path) as connection:

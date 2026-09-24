@@ -485,10 +485,10 @@ def list_candidates(
 
     counts = dict(
         session.exec(
-            select(ProofreadPageMeta.index_page_pk, func.count())
-            .join(Page, Page.pk == ProofreadPageMeta.page_pk)
+            select(ProofreadPageMeta.index_title_pk, func.count())
+            .join(Page, Page.pk == ProofreadPageMeta.title_pk)
             .where(Page.site_pk == site.pk, Page.content_model == "proofread-page")
-            .group_by(ProofreadPageMeta.index_page_pk)
+            .group_by(ProofreadPageMeta.index_title_pk)
         ).all()
     )
 

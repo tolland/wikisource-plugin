@@ -13,7 +13,9 @@ class EditJournal(SQLModel, table=True):
     wiki"."""
 
     pk: int | None = Field(default=None, primary_key=True)
-    page_pk: int = Field(foreign_key="page.pk", index=True)
+    title_pk: int = Field(foreign_key="title.pk", index=True)
+    """The address saved to. A Title, not a Page: a save needs nothing on the
+    wiki, and the first save of an untranscribed page is the ordinary case."""
 
     base_revid: int | None = None  # remote revid this edit started from
     body: str  # the saved buffer

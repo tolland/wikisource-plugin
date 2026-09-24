@@ -109,11 +109,11 @@ def test_commit_endpoint_pushes_pending_edits(engine):
         assert updated.dirty is False
 
         journal = s.exec(
-            select(EditJournal).where(EditJournal.page_pk == page.pk)
+            select(EditJournal).where(EditJournal.title_pk == page.pk)
         ).all()
         assert all(j.committed for j in journal)
 
-        commit = s.exec(select(Commit).where(Commit.page_pk == page.pk)).first()
+        commit = s.exec(select(Commit).where(Commit.title_pk == page.pk)).first()
         assert commit.status == CommitStatus.success
         assert commit.result_revid == 101
 
@@ -222,7 +222,7 @@ def test_cancel_pending_commit_discards_local_edits(engine):
 
     with Session(engine) as s:
         assert (
-            s.exec(select(EditJournal).where(EditJournal.page_pk == page.pk)).all()
+            s.exec(select(EditJournal).where(EditJournal.title_pk == page.pk)).all()
             == []
         )
         updated = s.get(Page, page.pk)

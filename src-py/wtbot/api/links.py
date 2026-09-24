@@ -388,7 +388,9 @@ def _pair_out(session: Session, link: PageLink) -> PairOut:
     remote_head = head_revision(session, remote_page)
 
     meta = session.exec(
-        select(ProofreadPageMeta).where(ProofreadPageMeta.page_pk == link.local_page_pk)
+        select(ProofreadPageMeta).where(
+            ProofreadPageMeta.title_pk == link.local_page_pk
+        )
     ).first()
 
     return PairOut(

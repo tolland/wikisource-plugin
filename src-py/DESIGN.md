@@ -319,7 +319,7 @@ that records every local save before it is ever committed:
 # wtbot/sqlmodel/edit_journal.py  (proposed)
 class EditJournal(SQLModel, table=True):
     pk: int | None = Field(default=None, primary_key=True)
-    page_pk: int = Field(foreign_key="page.pk")
+    title_pk: int = Field(foreign_key="title.pk")  # the address saved to; no Page needed
     base_revid: int | None = None        # remote revid this edit started from
     body: str                            # the saved buffer
     comment: str | None = None           # edit summary (filled at commit time)

@@ -64,8 +64,8 @@ def add_proofread_meta(
         session.add(index)
         session.flush()
     meta = ProofreadPageMeta(
-        page_pk=page_pk,
-        index_page_pk=index.pk,
+        title_pk=page_pk,
+        index_title_pk=index.pk,
         page_number=page_number,
         **values,
     )

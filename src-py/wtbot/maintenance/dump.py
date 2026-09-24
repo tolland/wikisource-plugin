@@ -33,7 +33,7 @@ NATURAL_KEYS: dict[str, tuple[str, ...]] = {
     "ocrbackendconfig": ("scope", "name"),
     "page": ("site_pk", "title"),
     "pagelink": ("local_page_pk", "remote_page_pk"),
-    "proofreadpagemeta": ("page_pk",),
+    "proofreadpagemeta": ("title_pk",),
     "revision": ("page_pk", "revid"),
     "revisionlink": ("local_revision_pk", "remote_revision_pk"),
     "scanannotation": ("page_pk", "annotation_id"),

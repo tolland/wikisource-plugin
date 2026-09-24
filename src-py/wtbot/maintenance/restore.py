@@ -97,6 +97,68 @@ def _add_titles_to_legacy_dump(dump: DatabaseDump) -> DatabaseDump:
     return dump.model_copy(update={"tables": tables})
 
 
+# Columns that later schema steps renamed, and the table their reference now
+# targets. A Page and its Title share a natural key (site, title), so a
+# reference to a page's key is equally a reference to its title's key; only the
+# target table name changes.
+_RENAMED_REFERENCES: dict[tuple[str, str], tuple[str, str]] = {
+    ("proofreadpagemeta", "page_pk"): ("title_pk", "title"),
+    ("proofreadpagemeta", "index_page_pk"): ("index_title_pk", "title"),
+}
+
+
+def _rename_legacy_references(dump: DatabaseDump) -> DatabaseDump:
+    """Carry references across columns renamed since the dump was taken.
+
+    Step 2 of the Title/WikiPage split keyed ProofreadPageMeta to its Title:
+    ``page_pk`` became ``title_pk`` and ``index_page_pk`` ``index_title_pk``.
+    A dump from before that names the old columns, both in its references and
+    in the natural key built from them. Renaming is safe because the values
+    are the same row: step 1 gave every page a title at the same address.
+    """
+
+    def retarget(ref: Reference | None, target: str) -> Reference | None:
+        return None if ref is None else ref.model_copy(update={"table": target})
+
+    tables = []
+    for table in dump.tables:
+        renames = {
+            old: new
+            for (name, old), new in _RENAMED_REFERENCES.items()
+            if name == table.name
+        }
+        if not any(field in renames for field in table.key_fields) and not any(
+            column in renames for row in table.rows for column in row.references
+        ):
+            tables.append(table)
+            continue
+        key_fields = tuple(renames.get(f, (f, None))[0] for f in table.key_fields)
+        rows = []
+        for row in table.rows:
+            references = {
+                renames[column][0] if column in renames else column: (
+                    retarget(ref, renames[column][1]) if column in renames else ref
+                )
+                for column, ref in row.references.items()
+            }
+            key = tuple(
+                (
+                    retarget(value, renames[field][1])
+                    if field in renames and isinstance(value, Reference)
+                    else value
+                )
+                for field, value in zip(table.key_fields, row.key, strict=True)
+            )
+            rows.append(row.model_copy(update={"key": key, "references": references}))
+        tables.append(table.model_copy(update={"key_fields": key_fields, "rows": rows}))
+    return dump.model_copy(update={"tables": tables})
+
+
+# Applied in order: each brings a dump from one schema step to the next, and
+# does nothing to a dump that is already past it.
+_LEGACY_UPGRADES = (_add_titles_to_legacy_dump, _rename_legacy_references)
+
+
 def _shares_primary_key(table_name: str) -> bool:
     """Whether this table's ``pk`` is also a foreign key into another table.
 
@@ -108,7 +170,8 @@ def _shares_primary_key(table_name: str) -> bool:
 
 
 def _prepare(dump: DatabaseDump, ignore_columns: frozenset[str]) -> list[PreparedTable]:
-    dump = _add_titles_to_legacy_dump(dump)
+    for upgrade in _LEGACY_UPGRADES:
+        dump = upgrade(dump)
     names = [table.name for table in dump.tables]
     if len(set(names)) != len(names) or set(names) != set(NATURAL_KEYS):
         raise ValueError("Dump must contain exactly the selected natural-key tables")

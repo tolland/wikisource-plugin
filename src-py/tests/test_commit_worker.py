@@ -81,7 +81,7 @@ def test_push_single_save_succeeds(engine):
 
     with Session(engine) as s:
         s.add(
-            EditJournal(page_pk=page.pk, base_revid=100, body="edited", comment="fix")
+            EditJournal(title_pk=page.pk, base_revid=100, body="edited", comment="fix")
         )
         s.commit()
 
@@ -106,12 +106,12 @@ def test_push_single_save_succeeds(engine):
 
         journal = s.exec(
             select(EditJournal)
-            .where(EditJournal.page_pk == page.pk)
+            .where(EditJournal.title_pk == page.pk)
             .order_by(EditJournal.pk)
         ).all()
         assert all(j.committed for j in journal)
 
-        commit = s.exec(select(Commit).where(Commit.page_pk == page.pk)).first()
+        commit = s.exec(select(Commit).where(Commit.title_pk == page.pk)).first()
         assert commit.status == CommitStatus.success
         assert commit.result_revid == 101
 
@@ -142,14 +142,14 @@ def test_multiple_saves_collapse_into_one_push(engine):
     )
 
     with Session(engine) as s:
-        s.add(EditJournal(page_pk=page.pk, base_revid=100, body="draft 1"))
-        s.add(EditJournal(page_pk=page.pk, base_revid=100, body="draft 2 final"))
+        s.add(EditJournal(title_pk=page.pk, base_revid=100, body="draft 1"))
+        s.add(EditJournal(title_pk=page.pk, base_revid=100, body="draft 2 final"))
         s.commit()
 
     with Session(engine) as s:
         handled, _failed = run_pending_commits(s, _client_factory(fake))
         assert handled == 1
-        commits = s.exec(select(Commit).where(Commit.page_pk == page.pk)).all()
+        commits = s.exec(select(Commit).where(Commit.title_pk == page.pk)).all()
         assert len(commits) == 1
         assert commits[0].submitted_body == "draft 2 final"
 
@@ -160,7 +160,7 @@ def test_local_save_during_remote_push_remains_pending(engine):
     site, page = _setup(engine)
 
     with Session(engine) as s:
-        s.add(EditJournal(page_pk=page.pk, base_revid=100, body="first edit"))
+        s.add(EditJournal(title_pk=page.pk, base_revid=100, body="first edit"))
         db_page = s.get(Page, page.pk)
         db_page.dirty = True
         s.add(db_page)
@@ -172,7 +172,7 @@ def test_local_save_during_remote_push_remains_pending(engine):
             db_page.text = "second edit"
             db_page.dirty = True
             s.add(db_page)
-            s.add(EditJournal(page_pk=page.pk, base_revid=100, body="second edit"))
+            s.add(EditJournal(title_pk=page.pk, base_revid=100, body="second edit"))
             s.commit()
 
     fake = SaveHookClient(
@@ -204,13 +204,13 @@ def test_local_save_during_remote_push_remains_pending(engine):
 
         journal = s.exec(
             select(EditJournal)
-            .where(EditJournal.page_pk == page.pk)
+            .where(EditJournal.title_pk == page.pk)
             .order_by(EditJournal.pk)
         ).all()
         assert [row.body for row in journal] == ["first edit", "second edit"]
         assert [row.committed for row in journal] == [True, False]
 
-        commits = s.exec(select(Commit).where(Commit.page_pk == page.pk)).all()
+        commits = s.exec(select(Commit).where(Commit.title_pk == page.pk)).all()
         assert len(commits) == 1
         assert commits[0].status == CommitStatus.success
         assert commits[0].submitted_body == "first edit"
@@ -236,19 +236,19 @@ def test_second_edit_before_refetch_does_not_conflict_with_own_push(engine):
     )
 
     with Session(engine) as s:
-        s.add(EditJournal(page_pk=page.pk, base_revid=100, body="first edit"))
+        s.add(EditJournal(title_pk=page.pk, base_revid=100, body="first edit"))
         s.commit()
         handled, failed = run_pending_commits(s, _client_factory(fake))
         assert (handled, failed) == (1, set())  # remote is now revid 101
 
         # Refetch deliberately not drained; the next save still says base 100.
-        s.add(EditJournal(page_pk=page.pk, base_revid=100, body="second edit"))
+        s.add(EditJournal(title_pk=page.pk, base_revid=100, body="second edit"))
         s.commit()
         handled, failed = run_pending_commits(s, _client_factory(fake))
         assert (handled, failed) == (1, set())
 
         commits = s.exec(
-            select(Commit).where(Commit.page_pk == page.pk).order_by(Commit.pk)
+            select(Commit).where(Commit.title_pk == page.pk).order_by(Commit.pk)
         ).all()
         assert [c.status for c in commits] == [CommitStatus.success] * 2
         assert commits[1].base_revid == 101
@@ -273,7 +273,7 @@ def test_remote_conflict_recorded_not_raised(engine):
     )
 
     with Session(engine) as s:
-        s.add(EditJournal(page_pk=page.pk, base_revid=100, body="my edit"))
+        s.add(EditJournal(title_pk=page.pk, base_revid=100, body="my edit"))
         s.commit()
 
     with Session(engine) as s:
@@ -281,12 +281,12 @@ def test_remote_conflict_recorded_not_raised(engine):
         assert handled == 1
         assert page.pk in failed  # caller must exclude from subsequent sweeps
 
-        commit = s.exec(select(Commit).where(Commit.page_pk == page.pk)).first()
+        commit = s.exec(select(Commit).where(Commit.title_pk == page.pk)).first()
         assert commit.status == CommitStatus.conflict
 
         # Not committed -- stays in the queue for the user to resolve/retry.
         journal = s.exec(
-            select(EditJournal).where(EditJournal.page_pk == page.pk)
+            select(EditJournal).where(EditJournal.title_pk == page.pk)
         ).first()
         assert journal.committed is False
 
@@ -310,7 +310,7 @@ def test_remote_conflict_releases_db_lock(engine):
     )
 
     with Session(engine) as s:
-        s.add(EditJournal(page_pk=page.pk, base_revid=100, body="my edit"))
+        s.add(EditJournal(title_pk=page.pk, base_revid=100, body="my edit"))
         s.commit()
 
     with Session(engine) as worker_session:
@@ -340,8 +340,8 @@ def test_pending_commit_api_lists_and_pushes_one_page(engine):
     )
 
     with Session(engine) as s:
-        s.add(EditJournal(page_pk=page.pk, base_revid=100, body="draft 1"))
-        s.add(EditJournal(page_pk=page.pk, base_revid=100, body="draft 2 final"))
+        s.add(EditJournal(title_pk=page.pk, base_revid=100, body="draft 1"))
+        s.add(EditJournal(title_pk=page.pk, base_revid=100, body="draft 2 final"))
         s.commit()
 
     request = SimpleNamespace(
@@ -384,7 +384,7 @@ def test_pending_commit_api_can_force_overwrite_conflict(engine):
     )
 
     with Session(engine) as s:
-        s.add(EditJournal(page_pk=page.pk, base_revid=100, body="my edit"))
+        s.add(EditJournal(title_pk=page.pk, base_revid=100, body="my edit"))
         s.commit()
 
     request = SimpleNamespace(
@@ -414,7 +414,7 @@ def test_pending_commit_api_can_cancel_local_edits(engine):
         db_page = s.get(Page, page.pk)
         db_page.dirty = True
         s.add(db_page)
-        s.add(EditJournal(page_pk=page.pk, base_revid=100, body="draft"))
+        s.add(EditJournal(title_pk=page.pk, base_revid=100, body="draft"))
         s.commit()
 
     with Session(engine) as s:
@@ -426,7 +426,7 @@ def test_pending_commit_api_can_cancel_local_edits(engine):
         assert updated.dirty is False
         assert updated.text == "original"
         assert (
-            s.exec(select(EditJournal).where(EditJournal.page_pk == page.pk)).all()
+            s.exec(select(EditJournal).where(EditJournal.title_pk == page.pk)).all()
             == []
         )
 
