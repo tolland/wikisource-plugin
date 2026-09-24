@@ -7,9 +7,11 @@ import org.limepepper.lang.wikitext.annotation.BoundingBox
 import org.limepepper.lang.wikitext.annotation.BoundingBoxModel
 import org.limepepper.lang.wikitext.vfs.backend.OcrBackendInfo
 import org.limepepper.lang.wikitext.vfs.settings.OcrFavorite
+import javax.swing.ButtonGroup
 import javax.swing.JMenu
 import javax.swing.JMenuItem
 import javax.swing.JPopupMenu
+import javax.swing.JRadioButtonMenuItem
 
 /**
  * The image canvas's right-click menu for a bounding box: pick the OCR
