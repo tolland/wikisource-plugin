@@ -199,7 +199,9 @@ def upsert_annotation(
             normalized_width=body.width,
             normalized_height=body.height,
             label=body.label,
-            category=body.category,
+            # A table model skips validation, so an explicit None would bypass
+            # the column default and hit the NOT NULL constraint.
+            category=body.category or AnnotationCategory.unknown,
         )
     )
     return _annotation_out(row)

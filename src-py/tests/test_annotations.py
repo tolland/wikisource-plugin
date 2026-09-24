@@ -201,6 +201,16 @@ def test_upsert_and_list_boxes(client, page_pk):
     assert ann["category"] == "paragraph"
 
 
+def test_upsert_clearing_category_stores_unknown(client, page_pk):
+    assert _put_box(client, "a1", category="header").status_code == 200
+    resp = _put_box(client, "a1", category=None)
+    assert resp.status_code == 200, resp.text
+    [ann] = client.get("/pages/annotations", params={"path": PAGE_PATH}).json()[
+        "annotations"
+    ]
+    assert ann["category"] == "unknown"
+
+
 def test_upsert_rejects_unknown_category(client, page_pk):
     assert _put_box(client, "a1", category="marginalia").status_code == 422
 

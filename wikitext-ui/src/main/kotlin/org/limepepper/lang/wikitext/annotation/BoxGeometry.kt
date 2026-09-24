@@ -74,7 +74,10 @@ object BoxGeometry {
         var y2 = original.bottom
         when (handle.dx) { -1 -> x1 = px; 1 -> x2 = px }
         when (handle.dy) { -1 -> y1 = py; 1 -> y2 = py }
-        return BoundingBox.fromCorners(x1, y1, x2, y2, id = original.id).copy(label = original.label)
+        // Geometry only: copying onto [original] keeps label, category, and
+        // anything else a box carries.
+        val corners = BoundingBox.fromCorners(x1, y1, x2, y2)
+        return original.copy(x = corners.x, y = corners.y, width = corners.width, height = corners.height)
     }
 
     /** [box] moved so its origin is ([px], [py]), kept fully inside the image. */

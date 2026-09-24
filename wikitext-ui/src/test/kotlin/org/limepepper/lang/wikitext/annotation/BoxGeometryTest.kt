@@ -87,11 +87,12 @@ class BoxGeometryTest {
     }
 
     @Test
-    fun resizeKeepsIdAndLabel() {
-        val labeled = box.copy(label = "figure 1")
+    fun resizeKeepsIdLabelAndCategory() {
+        val labeled = box.copy(label = "figure 1", category = AnnotationCategory.HEADER)
         val resized = BoxGeometry.resize(labeled, Handle.SE, 300.0, 300.0)
         assertEquals("a", resized.id)
         assertEquals("figure 1", resized.label)
+        assertEquals(AnnotationCategory.HEADER, resized.category)
     }
 
     // ---- move / clamp ----------------------------------------------------
