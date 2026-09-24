@@ -99,7 +99,7 @@ def test_store_upsert_inserts_then_updates(engine, page_pk):
         store = SqlAnnotationStore(s)
         store.upsert(
             ScanAnnotation(
-                page_pk=page_pk,
+                title_pk=page_pk,
                 annotation_id="a1",
                 normalized_x=0.1,
                 normalized_y=0.2,
@@ -120,7 +120,7 @@ def test_store_upsert_inserts_then_updates(engine, page_pk):
 
         store.upsert(
             ScanAnnotation(
-                page_pk=page_pk,
+                title_pk=page_pk,
                 annotation_id="a1",
                 normalized_x=0.01,
                 normalized_y=0.02,
@@ -144,7 +144,7 @@ def test_store_delete(engine, page_pk):
         store = SqlAnnotationStore(s)
         store.upsert(
             ScanAnnotation(
-                page_pk=page_pk,
+                title_pk=page_pk,
                 annotation_id="a",
                 normalized_x=0.0,
                 normalized_y=0.0,
@@ -162,7 +162,7 @@ def test_anchor_store_is_independent_of_boxes(engine, page_pk):
         anchors = SqlTextAnchorStore(s)
         anchors.upsert(
             TextTargetAnchor(
-                page_pk=page_pk, annotation_id="a1", text_start=3, text_end=9
+                title_pk=page_pk, annotation_id="a1", text_start=3, text_end=9
             )
         )
         # No box exists for a1 — the text-first workflow is legitimate.
@@ -172,7 +172,7 @@ def test_anchor_store_is_independent_of_boxes(engine, page_pk):
 
         anchors.upsert(
             TextTargetAnchor(
-                page_pk=page_pk,
+                title_pk=page_pk,
                 annotation_id="a1",
                 text_start=7,
                 text_end=7,

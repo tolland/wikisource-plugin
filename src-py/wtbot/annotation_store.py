@@ -83,7 +83,7 @@ class SqlAnnotationStore:
         return list(
             self._session.exec(
                 select(ScanAnnotation)
-                .where(ScanAnnotation.page_pk == page_pk)
+                .where(ScanAnnotation.title_pk == page_pk)
                 .order_by(ScanAnnotation.pk)
             ).all()
         )
@@ -91,13 +91,13 @@ class SqlAnnotationStore:
     def get(self, page_pk: int, annotation_id: str) -> ScanAnnotation | None:
         return self._session.exec(
             select(ScanAnnotation).where(
-                ScanAnnotation.page_pk == page_pk,
+                ScanAnnotation.title_pk == page_pk,
                 ScanAnnotation.annotation_id == annotation_id,
             )
         ).first()
 
     def upsert(self, annotation: ScanAnnotation) -> ScanAnnotation:
-        row = self.get(annotation.page_pk, annotation.annotation_id)
+        row = self.get(annotation.title_pk, annotation.annotation_id)
         if row is None:
             row = annotation
         else:
@@ -132,7 +132,7 @@ class SqlBoxLinkStore:
         return list(
             self._session.exec(
                 select(BoxRangeLink)
-                .where(BoxRangeLink.page_pk == page_pk)
+                .where(BoxRangeLink.title_pk == page_pk)
                 .order_by(BoxRangeLink.pk)
             ).all()
         )
@@ -140,13 +140,13 @@ class SqlBoxLinkStore:
     def get(self, page_pk: int, box_annotation_id: str) -> BoxRangeLink | None:
         return self._session.exec(
             select(BoxRangeLink).where(
-                BoxRangeLink.page_pk == page_pk,
+                BoxRangeLink.title_pk == page_pk,
                 BoxRangeLink.box_annotation_id == box_annotation_id,
             )
         ).first()
 
     def upsert(self, link: BoxRangeLink) -> BoxRangeLink:
-        row = self.get(link.page_pk, link.box_annotation_id)
+        row = self.get(link.title_pk, link.box_annotation_id)
         if row is None:
             row = link
         else:
@@ -168,7 +168,7 @@ class SqlBoxLinkStore:
     def delete_for_range(self, page_pk: int, range_annotation_id: str) -> int:
         rows = self._session.exec(
             select(BoxRangeLink).where(
-                BoxRangeLink.page_pk == page_pk,
+                BoxRangeLink.title_pk == page_pk,
                 BoxRangeLink.range_annotation_id == range_annotation_id,
             )
         ).all()
@@ -189,7 +189,7 @@ class SqlTextAnchorStore:
         return list(
             self._session.exec(
                 select(TextTargetAnchor)
-                .where(TextTargetAnchor.page_pk == page_pk)
+                .where(TextTargetAnchor.title_pk == page_pk)
                 .order_by(TextTargetAnchor.pk)
             ).all()
         )
@@ -197,13 +197,13 @@ class SqlTextAnchorStore:
     def get(self, page_pk: int, annotation_id: str) -> TextTargetAnchor | None:
         return self._session.exec(
             select(TextTargetAnchor).where(
-                TextTargetAnchor.page_pk == page_pk,
+                TextTargetAnchor.title_pk == page_pk,
                 TextTargetAnchor.annotation_id == annotation_id,
             )
         ).first()
 
     def upsert(self, anchor: TextTargetAnchor) -> TextTargetAnchor:
-        row = self.get(anchor.page_pk, anchor.annotation_id)
+        row = self.get(anchor.title_pk, anchor.annotation_id)
         if row is None:
             row = anchor
         else:

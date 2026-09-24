@@ -125,8 +125,16 @@ def test_restore_cleans_up_after_database_constraint_failure(tmp_path: Path) -> 
 
 
 def _as_before_meta_was_keyed_to_titles(raw: dict) -> None:
-    """Rewrite a current dump's ProofreadPageMeta into its pre-step-2 shape."""
+    """Rewrite a current dump's ProofreadPageMeta and annotations into their
+    pre-step-2 shape: keyed by ``page_pk``, referencing pages."""
     for table in raw["tables"]:
+        if table["name"] == "scanannotation":
+            table["key_fields"] = ["page_pk", "annotation_id"]
+            for row in table["rows"]:
+                row["key"][0]["table"] = "page"
+                refs = row["references"]
+                refs["page_pk"] = {**refs.pop("title_pk"), "table": "page"}
+            continue
         if table["name"] != "proofreadpagemeta":
             continue
         table["key_fields"] = ["page_pk"]
@@ -231,4 +239,8 @@ def test_a_dump_taken_before_meta_was_keyed_to_titles_restores(
             JOIN title page ON page.pk = meta.title_pk
             JOIN title idx ON idx.pk = meta.index_title_pk
             """).fetchall() == [("Page:Book/1", "Index:Book", 1)]
+        assert connection.execute("""
+            SELECT t.title, a.annotation_id FROM scanannotation a
+            JOIN title t ON t.pk = a.title_pk
+            """).fetchall() == [("Page:Book/1", "box-1")]
         assert connection.execute("PRAGMA foreign_key_check").fetchall() == []

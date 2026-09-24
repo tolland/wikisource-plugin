@@ -27,12 +27,12 @@ the page is *stale*, which the client must surface rather than trust.
 class TextTargetAnchor(SQLModel, table=True):
     __table_args__ = (
         UniqueConstraint(
-            "page_pk", "annotation_id", name="uq_text_target_anchor_page_annotation"
+            "title_pk", "annotation_id", name="uq_text_target_anchor_page_annotation"
         ),
     )
 
     pk: int | None = Field(default=None, primary_key=True)
-    page_pk: int = Field(foreign_key="page.pk", index=True)
+    title_pk: int = Field(foreign_key="title.pk", index=True)
     annotation_id: str = Field(index=True)
 
     # text_start == text_end is an insertion point; < is a replace range.

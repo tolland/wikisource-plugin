@@ -27,11 +27,11 @@ neither endpoint table declares real foreign keys to the other).
 
 class BoxRangeLink(SQLModel, table=True):
     __table_args__ = (
-        UniqueConstraint("page_pk", "box_annotation_id", name="uq_box_range_link_box"),
+        UniqueConstraint("title_pk", "box_annotation_id", name="uq_box_range_link_box"),
     )
 
     pk: int | None = Field(default=None, primary_key=True)
-    page_pk: int = Field(foreign_key="page.pk", index=True)
+    title_pk: int = Field(foreign_key="title.pk", index=True)
 
     box_annotation_id: str = Field(index=True)
     range_annotation_id: str = Field(index=True)

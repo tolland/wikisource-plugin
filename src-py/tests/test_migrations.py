@@ -205,8 +205,10 @@ def test_annotation_migration_requires_backfill_and_preserves_identity(
                 "INSERT INTO scanannotation (pk,page_pk,annotation_id,x,y,width,height,created_at,updated_at) VALUES (1,1,'box',20,60,100,120,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)"
             )
         )
+    # Pinned to the migration under test: later steps rename scanannotation's
+    # page_pk (e5f2a8d1c349), and they have their own tests.
     with pytest.raises(RuntimeError, match="need backfilling"):
-        _run(baseline_engine, command.upgrade, "head")
+        _run(baseline_engine, command.upgrade, "a21d6430c902")
     dump = tmp_path / "dump.json"
     dump.write_text(
         json.dumps(
@@ -231,7 +233,7 @@ def test_annotation_migration_requires_backfill_and_preserves_identity(
     from pathlib import Path
 
     backfill(Path(baseline_engine.url.database), dump, apply=True)
-    _run(baseline_engine, command.upgrade, "head")
+    _run(baseline_engine, command.upgrade, "a21d6430c902")
     with baseline_engine.connect() as c:
         assert c.execute(
             text(
@@ -709,3 +711,73 @@ def test_the_shared_key_step_downgrades_with_pointers_restored(
             (51, 50),
         ]
         assert run("PRAGMA foreign_key_check").all() == []
+
+
+# -- step 2: annotations keyed to Title --------------------------------------
+
+ANNOTATIONS_TO_TITLE = "e5f2a8d1c349"
+_ANNOTATION_TABLES = ("scanannotation", "boxrangelink", "texttargetanchor")
+
+
+def _seed_annotations(engine: Engine) -> None:
+    with engine.begin() as connection:
+        run = connection.exec_driver_sql
+        run(
+            "INSERT INTO site (pk, family, code, articlepath, created_at)"
+            f" VALUES (1, 'up', 'en', '/wiki/$1', {_T})"
+        )
+        run(
+            "INSERT INTO title (pk, site_pk, title, expected_content_model)"
+            " VALUES (7, 1, 'Page:A/1', 'proofread-page')"
+        )
+        run(
+            "INSERT INTO page (pk, site_pk, title, content_model, dirty, fetch_status)"
+            " VALUES (7, 1, 'Page:A/1', 'proofread-page', 0, 'done')"
+        )
+        run(
+            "INSERT INTO scanannotation (page_pk, annotation_id, category, created_at,"
+            " updated_at, normalized_x, normalized_y, normalized_width,"
+            f" normalized_height) VALUES (7, 'box-1', 'unknown', {_T}, {_T},"
+            " 0.1, 0.1, 0.2, 0.2)"
+        )
+        run(
+            "INSERT INTO boxrangelink (page_pk, box_annotation_id,"
+            " range_annotation_id, created_at, updated_at)"
+            f" VALUES (7, 'box-1', 'range-1', {_T}, {_T})"
+        )
+        run(
+            "INSERT INTO texttargetanchor (page_pk, annotation_id, text_start,"
+            f" text_end, updated_at) VALUES (7, 'range-1', 0, 5, {_T})"
+        )
+
+
+def test_annotations_point_at_titles(baseline_engine: Engine) -> None:
+    _run(baseline_engine, command.upgrade, WORK_SHARES_KEY)
+    _seed_annotations(baseline_engine)
+
+    _run(baseline_engine, command.upgrade, ANNOTATIONS_TO_TITLE)
+
+    with baseline_engine.connect() as connection:
+        run = connection.exec_driver_sql
+        for table in _ANNOTATION_TABLES:
+            assert _foreign_keys(baseline_engine, table) == {("title_pk", "title")}
+            assert run(f"SELECT title_pk FROM {table}").all() == [(7,)]
+            # The unique constraint followed the rename rather than being lost.
+            ddl = run(f"SELECT sql FROM sqlite_master WHERE name = '{table}'").scalar()
+            assert "UNIQUE (title_pk," in ddl
+        assert run("PRAGMA foreign_key_check").all() == []
+
+
+def test_the_annotation_step_downgrades_cleanly(baseline_engine: Engine) -> None:
+    _run(baseline_engine, command.upgrade, WORK_SHARES_KEY)
+    _seed_annotations(baseline_engine)
+    _run(baseline_engine, command.upgrade, ANNOTATIONS_TO_TITLE)
+
+    _run(baseline_engine, command.downgrade, WORK_SHARES_KEY)
+
+    with baseline_engine.connect() as connection:
+        for table in _ANNOTATION_TABLES:
+            assert _foreign_keys(baseline_engine, table) == {("page_pk", "page")}
+            assert connection.exec_driver_sql(f"SELECT page_pk FROM {table}").all() == [
+                (7,)
+            ]

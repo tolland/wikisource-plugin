@@ -19,6 +19,7 @@ from wtbot.model import (
     PageLink,
     ProofreadPageMeta,
     Revision,
+    ScanAnnotation,
     Site,
     SiteCredential,
     Slot,
@@ -66,6 +67,16 @@ def make_database(path: Path, offset: int = 0) -> None:
         session.add(
             ProofreadPageMeta(
                 title_pk=offset + 9, index_title_pk=offset + 3, page_number=1
+            )
+        )
+        session.add(
+            ScanAnnotation(
+                title_pk=offset + 9,
+                annotation_id="box-1",
+                normalized_x=0.1,
+                normalized_y=0.1,
+                normalized_width=0.2,
+                normalized_height=0.2,
             )
         )
         session.commit()

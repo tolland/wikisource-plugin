@@ -192,7 +192,7 @@ def upsert_annotation(
     page = _page_for(session, path)
     row = store.upsert(
         ScanAnnotation(
-            page_pk=page.pk,
+            title_pk=page.pk,
             annotation_id=annotation_id,
             normalized_x=body.x,
             normalized_y=body.y,
@@ -254,7 +254,7 @@ def upsert_text_anchor(
     page = _page_for(session, path)
     row = anchors.upsert(
         TextTargetAnchor(
-            page_pk=page.pk,
+            title_pk=page.pk,
             annotation_id=annotation_id,
             text_start=body.text_start,
             text_end=body.text_end,
@@ -309,7 +309,7 @@ def upsert_box_link(
         )
     row = links.upsert(
         BoxRangeLink(
-            page_pk=page.pk,
+            title_pk=page.pk,
             box_annotation_id=box_annotation_id,
             range_annotation_id=body.range_annotation_id,
         )

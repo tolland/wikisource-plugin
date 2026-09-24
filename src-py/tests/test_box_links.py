@@ -111,7 +111,7 @@ def test_store_upsert_inserts_then_repoints(engine, page_pk):
         store = SqlBoxLinkStore(s)
         store.upsert(
             BoxRangeLink(
-                page_pk=page_pk, box_annotation_id="b1", range_annotation_id="r1"
+                title_pk=page_pk, box_annotation_id="b1", range_annotation_id="r1"
             )
         )
         [row] = store.list_for_page(page_pk)
@@ -119,7 +119,7 @@ def test_store_upsert_inserts_then_repoints(engine, page_pk):
 
         store.upsert(
             BoxRangeLink(
-                page_pk=page_pk, box_annotation_id="b1", range_annotation_id="r2"
+                title_pk=page_pk, box_annotation_id="b1", range_annotation_id="r2"
             )
         )
         [row] = store.list_for_page(page_pk)
@@ -132,7 +132,7 @@ def test_store_delete_and_delete_for_range(engine, page_pk):
         for box in ("b1", "b2"):
             store.upsert(
                 BoxRangeLink(
-                    page_pk=page_pk, box_annotation_id=box, range_annotation_id="r1"
+                    title_pk=page_pk, box_annotation_id=box, range_annotation_id="r1"
                 )
             )
         assert store.delete(page_pk, "b1") is True
@@ -140,7 +140,7 @@ def test_store_delete_and_delete_for_range(engine, page_pk):
         # Both remaining links target r1 — a range cascade removes them all.
         store.upsert(
             BoxRangeLink(
-                page_pk=page_pk, box_annotation_id="b3", range_annotation_id="r9"
+                title_pk=page_pk, box_annotation_id="b3", range_annotation_id="r9"
             )
         )
         assert store.delete_for_range(page_pk, "r1") == 1

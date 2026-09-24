@@ -27,11 +27,36 @@ change of constraint, never of data.
      `ProofreadPageMeta.title_pk` and `.index_title_pk`. A save, a push, and
      the scan/number/proposed body of an untranscribed page now need no Page
      behind them.
-   - **Next:** the annotation tables, `PageLink`, `PromotionBatch`; and the
-     columns that belong to the address (`namespace_key`, `dirty`,
-     `fetch_status`, `history_complete_from_revid`).
+   - **Done** (`b41d8e2c7f60`): `PromotionBatch` reduced to its two ends,
+     `source_page_pk` (a Page -- nothing to promote from a page the source
+     wiki lacks) and `target_title_pk` (an address, never null). Sites,
+     titles, correspondence, work and page number are resolved from those
+     two (`promotion_store.batch_ends`); `source_head_revid` and
+     `anchor_link_pk` stay as the freeze. Resolving the target's title at
+     push time also fixed the redirect hazard of writing to a frozen name.
+   - **Done** (`d7a3c9e5b184`): `IndexLink` shares `PageLink`'s primary key
+     (every work *is* a pairing), and `PageLink.index_link_pk` is gone: a
+     work's page pairs are derived from each page's
+     `ProofreadPageMeta.index_title_pk` plus the other side's site
+     (`index_link_store.children_of`). That removed the `indexlink` <->
+     `pagelink` foreign-key cycle.
+   - **Done** (`e5f2a8d1c349`): `ScanAnnotation`, `BoxRangeLink`,
+     `TextTargetAnchor` keyed to `title_pk`: the scan exists before the page.
+   - **Deferred, to be revisited:** directed, mirrored `PageLink` and
+     `RevisionLink` on titles -- one row per direction, the mirror enforced
+     by a deferred composite foreign key, removing the two expression
+     indexes and the either-way lookups. It also fixes `sync.py`'s anchor
+     report, which reads a rung's `local` as the sync's source.
+   - **Next:** the columns that belong to the address (`namespace_key`,
+     `dirty`, `fetch_status`, `history_complete_from_revid`).
 
-   Two things learned doing the first batch. Alembic's batch mode silently
+   Two things learned doing the first batch, and a third since. Tables whose
+   constraints are not conventionally named, or which carry an expression
+   index batch mode cannot reflect (`uq_pagelink_pair`), are rebuilt by
+   SQLite's own procedure -- final DDL stated, rows copied, drop, rename --
+   because batch mode would fail on the names or silently drop the index.
+
+   The first two: Alembic's batch mode silently
    drops a foreign key or index created on a column renamed in the same
    batch -- the table rebuilds, every row survives, the constraint is gone,
    and `foreign_key_check` still passes because there is nothing to check.

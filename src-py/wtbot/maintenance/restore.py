@@ -106,6 +106,10 @@ _RENAMED_REFERENCES: dict[tuple[str, str], tuple[str, str]] = {
     ("proofreadpagemeta", "index_page_pk"): ("index_title_pk", "title"),
     # A work used to point at its pairing; now it shares the pairing's key.
     ("indexlink", "page_link_pk"): ("pk", "pagelink"),
+    # Annotations are drawn on a title's scan, whether or not it is saved yet.
+    ("scanannotation", "page_pk"): ("title_pk", "title"),
+    ("boxrangelink", "page_pk"): ("title_pk", "title"),
+    ("texttargetanchor", "page_pk"): ("title_pk", "title"),
 }
 
 # References that later steps dropped because they were derivable. A work's
