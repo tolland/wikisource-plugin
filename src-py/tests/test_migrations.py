@@ -6,6 +6,7 @@ from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, SQLModel
 
 import wtbot.model  # noqa: F401 - registers every table on SQLModel.metadata
@@ -613,3 +614,98 @@ def test_the_two_ends_step_downgrades_with_its_copies_refilled(
             "SELECT source_site_pk, target_site_pk, target_page_pk, source_title,"
             " target_title, page_number FROM promotionbatch"
         ).all() == [(1, 1, 9, "Page:A.djvu/1", "Index:A.djvu/styles.css", 1)]
+
+
+# -- step 2: IndexLink shares PageLink's key ---------------------------------
+
+WORK_SHARES_KEY = "d7a3c9e5b184"
+
+
+def _seed_work(engine: Engine) -> None:
+    """A tracked work (pairing 50 of two indexes, tracked as work 3) with one
+    page pair under it, pointed at the work the old way."""
+    with engine.begin() as connection:
+        run = connection.exec_driver_sql
+        run(
+            "INSERT INTO site (pk, family, code, articlepath, created_at) VALUES"
+            f" (1, 'up', 'en', '/wiki/$1', {_T}), (2, 'down', 'en', '/wiki/$1', {_T})"
+        )
+        rows = (
+            (10, 1, "Index:B.djvu", "proofread-index"),
+            (20, 2, "Index:B.djvu", "proofread-index"),
+            (11, 1, "Page:B.djvu/1", "proofread-page"),
+            (21, 2, "Page:B.djvu/1", "proofread-page"),
+        )
+        for pk, site, title, model in rows:
+            run(
+                "INSERT INTO title (pk, site_pk, title, expected_content_model)"
+                f" VALUES ({pk}, {site}, '{title}', '{model}')"
+            )
+            run(
+                "INSERT INTO page (pk, site_pk, title, content_model, dirty,"
+                f" fetch_status) VALUES ({pk}, {site}, '{title}', '{model}', 0,"
+                " 'done')"
+            )
+        run(
+            "INSERT INTO proofreadpagemeta (title_pk, index_title_pk, page_number)"
+            " VALUES (11, 10, 1), (21, 20, 1)"
+        )
+        run(
+            "INSERT INTO pagelink (pk, local_page_pk, remote_page_pk, origin,"
+            f" created_at) VALUES (50, 10, 20, 'manual', {_T})"
+        )
+        run(
+            f"INSERT INTO indexlink (pk, page_link_pk, created_at) VALUES (3, 50, {_T})"
+        )
+        run(
+            "INSERT INTO pagelink (pk, local_page_pk, remote_page_pk, index_link_pk,"
+            f" origin, created_at) VALUES (51, 11, 21, 3, 'title_match', {_T})"
+        )
+
+
+def test_a_work_takes_its_pairings_key_and_pairs_lose_their_pointer(
+    baseline_engine: Engine,
+) -> None:
+    _run(baseline_engine, command.upgrade, BATCH_TWO_ENDS)
+    _seed_work(baseline_engine)
+
+    _run(baseline_engine, command.upgrade, WORK_SHARES_KEY)
+
+    assert _foreign_keys(baseline_engine, "indexlink") == {("pk", "pagelink")}
+    assert _foreign_keys(baseline_engine, "pagelink") == {
+        ("local_page_pk", "page"),
+        ("remote_page_pk", "page"),
+    }
+    with baseline_engine.begin() as connection:
+        run = connection.exec_driver_sql
+        assert run("SELECT pk FROM indexlink").all() == [(50,)]
+        assert "index_link_pk" not in {
+            row[1] for row in run("PRAGMA table_info(pagelink)")
+        }
+        assert run("PRAGMA foreign_key_check").all() == []
+        # The rebuild restated the expression index batch mode cannot see: a
+        # pairing asserted the other way round is still refused.
+        with pytest.raises(IntegrityError):
+            run(
+                "INSERT INTO pagelink (pk, local_page_pk, remote_page_pk, origin,"
+                f" created_at) VALUES (52, 21, 11, 'manual', {_T})"
+            )
+
+
+def test_the_shared_key_step_downgrades_with_pointers_restored(
+    baseline_engine: Engine,
+) -> None:
+    _run(baseline_engine, command.upgrade, BATCH_TWO_ENDS)
+    _seed_work(baseline_engine)
+    _run(baseline_engine, command.upgrade, WORK_SHARES_KEY)
+
+    _run(baseline_engine, command.downgrade, BATCH_TWO_ENDS)
+
+    with baseline_engine.connect() as connection:
+        run = connection.exec_driver_sql
+        assert run("SELECT pk, page_link_pk FROM indexlink").all() == [(50, 50)]
+        assert run("SELECT pk, index_link_pk FROM pagelink ORDER BY pk").all() == [
+            (50, None),
+            (51, 50),
+        ]
+        assert run("PRAGMA foreign_key_check").all() == []

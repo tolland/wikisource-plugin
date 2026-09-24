@@ -4,7 +4,11 @@ from conftest import add_proofread_meta
 from sqlmodel import Session, select
 
 from wtbot.fetch.revision_store import record_head_revision
-from wtbot.linking.index_link_store import link_indexes, work_for_index_page
+from wtbot.linking.index_link_store import (
+    children_of,
+    link_indexes,
+    work_for_index_page,
+)
 from wtbot.model import (
     FetchRequest,
     IndexLink,
@@ -187,7 +191,7 @@ def test_a_work_is_a_pairing_of_two_index_pages(session: Session) -> None:
     work = link_indexes(session, local_index, remote_index)
     session.commit()
 
-    pairing = session.get(PageLink, work.page_link_pk)
+    pairing = session.get(PageLink, work.pk)  # a work shares its pairing's key
     assert {pairing.local_page_pk, pairing.remote_page_pk} == {
         local_index.pk,
         remote_index.pk,
@@ -211,9 +215,10 @@ def test_linking_a_work_twice_returns_the_same_work(session: Session) -> None:
     assert len(session.exec(select(IndexLink)).all()) == 1
 
 
-def test_a_work_adopts_page_pairs_made_before_it(session: Session) -> None:
+def test_a_work_includes_page_pairs_made_before_it(session: Session) -> None:
     """Pairing a work's pages and declaring the work tracked happen in either
-    order, so linking claims what is already there."""
+    order. Membership is derived from each page's index, so a pair made first
+    belongs to the work the moment the work exists -- nothing adopts it."""
     local, remote = build_site(session, "mywikisource"), build_site(
         session, "wikisource"
     )
@@ -226,12 +231,10 @@ def test_a_work_adopts_page_pairs_made_before_it(session: Session) -> None:
 
     pairing = pair_pages(session, local_page, remote_page)
     session.commit()
-    assert pairing.index_link_pk is None
 
     work = link_indexes(session, local_index, remote_index)
     session.commit()
-    session.refresh(pairing)
-    assert pairing.index_link_pk == work.pk
+    assert [pair.pk for pair in children_of(session, work)] == [pairing.pk]
 
 
 def test_only_pages_with_index_meta_can_be_a_work(session: Session) -> None:
@@ -481,7 +484,6 @@ def test_untracking_a_work_releases_its_pairs(client, engine) -> None:
     with Session(engine) as session:
         pairs = session.exec(select(PageLink)).all()
         assert len(pairs) == 3  # the index pairing went; the page pairs stayed
-        assert all(pair.index_link_pk is None for pair in pairs)
         assert len(session.exec(select(RevisionLink)).all()) == 1
 
 
@@ -593,3 +595,50 @@ def test_a_linked_pair_that_has_moved_still_needs_attention(client, engine) -> N
     assert row["linked"] is True
     assert row["anchor_is_current"] is False
     assert row["needs_attention"] is True
+
+
+def test_a_pair_belongs_even_when_the_other_page_has_no_meta(session: Session) -> None:
+    """Only one side has to be a known child: a target page nobody has fanned
+    out yet has no proofread metadata, and still pairs into the work."""
+    local, remote = build_site(session, "mywikisource"), build_site(
+        session, "wikisource"
+    )
+    local_index = build_index(session, local, INDEX)
+    remote_index = build_index(session, remote, REMOTE_INDEX)
+    local_page = build_page(session, local, INDEX, 1, text="a", revid=5)
+    bare = Page(site_pk=remote.pk, title="Page:Canadian patent 29537.djvu/1")
+    session.add(bare)
+    session.commit()
+
+    from wtbot.linking.page_link_store import pair_pages
+
+    pairing = pair_pages(session, local_page, bare)
+    work = link_indexes(session, local_index, remote_index)
+    session.commit()
+
+    assert [pair.pk for pair in children_of(session, work)] == [pairing.pk]
+
+
+def test_one_index_tracked_against_two_wikis_is_two_works(session: Session) -> None:
+    """The site condition is what tells them apart: each work holds only the
+    pairs whose other side is on its own other wiki."""
+    local = build_site(session, "mywikisource")
+    upstream = build_site(session, "wikisource")
+    mirror = build_site(session, "mirror")
+    local_index = build_index(session, local, INDEX)
+    upstream_index = build_index(session, upstream, REMOTE_INDEX)
+    mirror_index = build_index(session, mirror, REMOTE_INDEX)
+    local_page = build_page(session, local, INDEX, 1, text="a", revid=5)
+    upstream_page = build_page(session, upstream, REMOTE_INDEX, 1, text="a", revid=9)
+    mirror_page = build_page(session, mirror, REMOTE_INDEX, 1, text="a", revid=7)
+
+    from wtbot.linking.page_link_store import pair_pages
+
+    to_upstream = pair_pages(session, local_page, upstream_page)
+    to_mirror = pair_pages(session, local_page, mirror_page)
+    upstream_work = link_indexes(session, local_index, upstream_index)
+    mirror_work = link_indexes(session, local_index, mirror_index)
+    session.commit()
+
+    assert [p.pk for p in children_of(session, upstream_work)] == [to_upstream.pk]
+    assert [p.pk for p in children_of(session, mirror_work)] == [to_mirror.pk]

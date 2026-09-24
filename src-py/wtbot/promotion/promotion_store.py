@@ -127,9 +127,8 @@ def work_of(session: Session, batch: PromotionBatch) -> IndexLink | None:
     pairing = pair_for_page(session, meta.index_title_pk, target.site_pk)
     if pairing is None:
         return None
-    return session.exec(
-        select(IndexLink).where(IndexLink.page_link_pk == pairing.pk)
-    ).first()
+    # A work shares its pairing's key.
+    return session.get(IndexLink, pairing.pk)
 
 
 def stage_batch(

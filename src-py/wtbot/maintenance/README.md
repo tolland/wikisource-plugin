@@ -55,7 +55,8 @@ resolved to those IDs. A table whose `pk` is itself a reference (Page) takes the
 number allocated to the row it references rather than one of its own. A dump
 taken before the Title table existed is upgraded on the way in: each page yields
 the title at its address, using the same rule as the in-place migration. Foreign-key checks are deferred until the import
-transaction commits, allowing Page/Revision and IndexLink/PageLink cycles.
+transaction commits, allowing the Page/Revision cycle (`latest_revision_pk`) and
+forward references between tables in any order.
 The importer checks foreign keys and SQLite integrity before publishing the
 completed database atomically. Failures leave no destination database; existing
 files are never replaced. The result has owner-only permissions (0600).

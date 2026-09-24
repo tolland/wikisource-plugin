@@ -104,7 +104,15 @@ def _add_titles_to_legacy_dump(dump: DatabaseDump) -> DatabaseDump:
 _RENAMED_REFERENCES: dict[tuple[str, str], tuple[str, str]] = {
     ("proofreadpagemeta", "page_pk"): ("title_pk", "title"),
     ("proofreadpagemeta", "index_page_pk"): ("index_title_pk", "title"),
+    # A work used to point at its pairing; now it shares the pairing's key.
+    ("indexlink", "page_link_pk"): ("pk", "pagelink"),
 }
+
+# References that later steps dropped because they were derivable. A work's
+# page pairs are now derived from each page's index, so the pointer goes.
+_DROPPED_REFERENCES: frozenset[tuple[str, str]] = frozenset(
+    {("pagelink", "index_link_pk")}
+)
 
 
 def _rename_legacy_references(dump: DatabaseDump) -> DatabaseDump:
@@ -115,6 +123,10 @@ def _rename_legacy_references(dump: DatabaseDump) -> DatabaseDump:
     A dump from before that names the old columns, both in its references and
     in the natural key built from them. Renaming is safe because the values
     are the same row: step 1 gave every page a title at the same address.
+
+    IndexLink's ``page_link_pk`` became its ``pk`` the same way: the work now
+    shares its pairing's key, and the reference it held already named that
+    pairing, so only the column name changes.
     """
 
     def retarget(ref: Reference | None, target: str) -> Reference | None:
@@ -154,9 +166,37 @@ def _rename_legacy_references(dump: DatabaseDump) -> DatabaseDump:
     return dump.model_copy(update={"tables": tables})
 
 
+def _drop_legacy_references(dump: DatabaseDump) -> DatabaseDump:
+    """Discard references to columns that later steps derived instead."""
+    tables = []
+    for table in dump.tables:
+        dropped = {column for name, column in _DROPPED_REFERENCES if name == table.name}
+        if not dropped:
+            tables.append(table)
+            continue
+        rows = [
+            row.model_copy(
+                update={
+                    "references": {
+                        column: ref
+                        for column, ref in row.references.items()
+                        if column not in dropped
+                    }
+                }
+            )
+            for row in table.rows
+        ]
+        tables.append(table.model_copy(update={"rows": rows}))
+    return dump.model_copy(update={"tables": tables})
+
+
 # Applied in order: each brings a dump from one schema step to the next, and
 # does nothing to a dump that is already past it.
-_LEGACY_UPGRADES = (_add_titles_to_legacy_dump, _rename_legacy_references)
+_LEGACY_UPGRADES = (
+    _add_titles_to_legacy_dump,
+    _rename_legacy_references,
+    _drop_legacy_references,
+)
 
 
 def _shares_primary_key(table_name: str) -> bool:

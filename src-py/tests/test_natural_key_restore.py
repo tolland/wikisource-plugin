@@ -52,9 +52,9 @@ def test_restore_roundtrip_with_new_ids_and_named_constraints(tmp_path: Path) ->
                 0,
             )
         ddl = connection.execute(
-            "SELECT sql FROM sqlite_master WHERE name='pagelink'"
+            "SELECT sql FROM sqlite_master WHERE name='indexlink'"
         ).fetchone()[0]
-        assert "fk_pagelink_index_link_pk_indexlink" in ddl
+        assert "fk_indexlink_pk_pagelink" in ddl
         assert (
             connection.execute("SELECT version_num FROM alembic_version").fetchone()[0]
             == ScriptDirectory.from_config(alembic_config()).get_current_head()
@@ -137,6 +137,21 @@ def _as_before_meta_was_keyed_to_titles(raw: dict) -> None:
             refs["index_page_pk"] = {**refs.pop("index_title_pk"), "table": "page"}
 
 
+def _as_before_works_shared_their_pairings_key(raw: dict) -> None:
+    """Rewrite a current dump's IndexLink/PageLink into their earlier shape:
+    the work keyed by its own ``page_link_pk`` reference, and every pairing
+    carrying an ``index_link_pk`` (null here: the only pairing is the work's
+    own, which never pointed at itself in practice)."""
+    for table in raw["tables"]:
+        if table["name"] == "indexlink":
+            table["key_fields"] = ["page_link_pk"]
+            for row in table["rows"]:
+                row["references"]["page_link_pk"] = row["references"].pop("pk")
+        if table["name"] == "pagelink":
+            for row in table["rows"]:
+                row["references"]["index_link_pk"] = None
+
+
 def test_a_dump_taken_before_titles_existed_restores_with_them(tmp_path: Path) -> None:
     """The backup taken before a schema change is older than the code restoring
     it. A pre-Title dump has no title table, no page->title reference, and the
@@ -161,10 +176,15 @@ def test_a_dump_taken_before_titles_existed_restores_with_them(tmp_path: Path) -
                     models.get(row["fields"]["title"]) if on_source else None
                 )
     _as_before_meta_was_keyed_to_titles(raw)
+    _as_before_works_shared_their_pairings_key(raw)
     legacy.write_text(json.dumps(raw))
 
     restore_dump(legacy, rebuilt, ignore_columns=frozenset({"site.legacy_note"}))
     with sqlite3.connect(rebuilt) as connection:
+        # The work came back sharing its pairing's key.
+        assert connection.execute(
+            "SELECT count(*) FROM indexlink w JOIN pagelink p ON p.pk = w.pk"
+        ).fetchone() == (1,)
         titles = connection.execute("""
             SELECT s.family, t.title, t.expected_content_model, t.pk = p.pk
             FROM title t JOIN page p ON p.pk = t.pk JOIN site s ON s.pk = t.site_pk

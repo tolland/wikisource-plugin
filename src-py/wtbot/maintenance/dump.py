@@ -27,7 +27,7 @@ NATURAL_KEYS: dict[str, tuple[str, ...]] = {
     "content": ("content_sha1", "content_model"),
     "fileblob": ("page_pk", "file_sha1", "upload_timestamp"),
     "filemeta": ("page_pk",),
-    "indexlink": ("page_link_pk",),
+    "indexlink": ("pk",),  # shared with the pairing it tracks
     "indexmeta": ("page_pk",),
     "namespace": ("site_pk", "key"),
     "ocrbackendconfig": ("scope", "name"),

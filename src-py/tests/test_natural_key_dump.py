@@ -59,10 +59,9 @@ def make_database(path: Path, offset: int = 0) -> None:
                 pk=offset + 7,
                 local_page_pk=offset + 3,
                 remote_page_pk=offset + 4,
-                index_link_pk=offset + 8,
             )
         )
-        session.add(IndexLink(pk=offset + 8, page_link_pk=offset + 7))
+        session.add(IndexLink(pk=offset + 7))  # a work shares its pairing's key
         session.add(Page(pk=offset + 9, site_pk=offset + 1, title="Page:Book/1"))
         session.add(
             ProofreadPageMeta(

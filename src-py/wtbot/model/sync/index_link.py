@@ -26,13 +26,13 @@ same relationship ``IndexMeta`` has to ``Page``, which is the established shape
 here. ``Page`` stays one table and content-specific attributes hang off it; page
 pairings stay one table and the work-level ones hang off this.
 
-**Children are pointed at their work.** ``PageLink.index_link_pk`` is set when
-a work is linked, so the viewer drills work -> page pairs with a join rather
-than by matching copied titles. Membership is
-still *derived* from the index at pairing time -- this is a materialised
-shortcut, not a second source of truth -- and a page pair with no work (a
-mainspace or Portal pairing, or one asserted by hand) is a legitimate row with
-a null pointer.
+**A work's page pairs are derived, not claimed.** A pair belongs to a work when
+one of its pages is a child of either of the work's indexes -- read off that
+page's ``ProofreadPageMeta.index_title_pk`` -- and the other page is on the other
+index's site. Keyed through the index's *pk*, this does not have the problem
+title matching had (the two sides' index titles may differ), and it cannot go
+stale the way a stored pointer could. Pairs asserted before the work was
+tracked belong to it the moment it is; nothing has to adopt them.
 """
 
 
@@ -46,16 +46,10 @@ class IndexLink(SQLModel, table=True):
     has: when tracking started, and (later) where its sync got to.
     """
 
-    __table_args__ = ()
-
-    pk: int | None = Field(default=None, primary_key=True)
-
-    page_link_pk: int = Field(
-        foreign_key="pagelink.pk",
-        index=True,
-        unique=True,
-        description="The pairing of the two Index: pages. One work per pairing.",
-    )
+    pk: int = Field(primary_key=True, foreign_key="pagelink.pk")
+    """Shared with the ``PageLink`` pairing the two ``Index:`` pages: every work
+    *is* a pairing, and at most one work per pairing follows from the key
+    itself -- no separate reference, no separate unique index."""
 
     created_at: datetime = Field(default_factory=utcnow)
     """When the work was put under tracking -- distinct from the pairing's own
@@ -63,4 +57,4 @@ class IndexLink(SQLModel, table=True):
     before anyone declares the work itself tracked."""
 
     def __repr__(self) -> str:  # pragma: no cover - convenience only
-        return f"IndexLink(pk={self.pk}, page_link_pk={self.page_link_pk})"
+        return f"IndexLink(pk={self.pk})"
