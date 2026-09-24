@@ -106,6 +106,7 @@ def test_the_plan_names_every_table_and_deletes_nothing(client, engine, seeded):
         "commit": 1,
         "fetchrequest": 2,  # parent and fan-out child both
         "page": 1,
+        "title": 1,  # every page is a title; the title goes with its site
         "namespace": 1,
         "sitecredential": 1,
         "site": 1,

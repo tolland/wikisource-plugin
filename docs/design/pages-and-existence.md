@@ -1,8 +1,57 @@
 # Pages, existence, and the nullables that follow from it
 
-Status: **design note. Nothing here is implemented.** It records why
+Status: **in progress — step 1 of 3 landed.** It records why
 `PromotionBatch` is hard to read, why the reason is not where it looks, and
 the model change that removes the cause rather than the symptom.
+
+## 0. How it is being done, and what changed since this was written
+
+The sections below were written for a single big change. That was tried
+(branch `claude/confident-feynman-5p3l85`, kept for reference) and replaced by
+a progressive route, because every step then ships and migrates on its own.
+
+**The route: a shared primary key.** `page.pk` is a foreign key to `title.pk`.
+Every existing page got a title *with the same pk*, so every foreign key that
+points at `page.pk` already holds a valid `title.pk`. Moving a table over is a
+change of constraint, never of data.
+
+1. **Done.** Add `Title` (`site_pk`, `title`, `expected_content_model`), copy
+   every page into it with the same pk, make `page.pk` reference it
+   (migration `5d2a7c41e9b3`). The fan-out, `ensure_index_page` and the fetch
+   worker create the Title first, with their own guess; a `before_flush` hook
+   on `Page` covers everything else during the transition.
+2. **Next, one table at a time.** Repoint the foreign keys that are about an
+   *address* from `page.pk` to `title.pk`: `EditJournal`, `ProofreadPageMeta`,
+   the annotation tables, `PageLink`, `PromotionBatch`. Move the columns that
+   belong to the address (`namespace_key`, `dirty`, `fetch_status`,
+   `history_complete_from_revid`) with them.
+3. **Last.** Delete `page` rows for titles the wiki holds nothing at, make the
+   remaining columns NOT NULL, rename `page` to `wikipage`, drop the hook and
+   `page.title`. The only step that removes data.
+
+**What changed from the text below:**
+
+- **The name is `Title`,** MediaWiki's own, as below. `TitlePage` was
+  considered and dropped: in Wikisource a title page is a leaf of a book.
+- **Namespace roles are gone** (`c38d2e7f901a`), so the `namespace_role`
+  columns in §4 no longer exist. `namespace_key` identifies an address's
+  namespace and belongs on `Title`.
+- **`content_model` lives on both sides, under different names** — a
+  refinement of §4. `Title.expected_content_model` is a guess, NOT NULL,
+  needed before any fetch because the editor must open a title as something
+  and `ProofreadPageMeta` hangs off what it is expected to be. It comes from
+  context (fan-out, a file's extension, else `wikitext`), never from the
+  namespace: `Index:Foo.pdf/styles.css` is in the Index namespace and is
+  `sanitized-css`. `Page.content_model` (later `WikiPage.content_model`) is
+  what the wiki said. The fetch compares them, logs a wrong guess, and adopts
+  the wiki's answer (`wtbot.title_store`).
+- **Migrations now run with foreign keys off**, in one real transaction, with
+  `PRAGMA foreign_key_check` before commit (`wtbot.db.migration_connection`).
+  Without that, rebuilding a table other tables reference — which every step
+  here does — was impossible, and DDL was never rolled back on failure.
+- **Dump/restore understand the shared key.** A restored page takes its
+  title's number, and a dump taken before `title` existed is upgraded on the
+  way in with the same rule as the migration.
 
 The motivating complaint, stated plainly: *the promotion/sync path is reliable
 on top of existing pages, but it is littered with checks for pages that do not

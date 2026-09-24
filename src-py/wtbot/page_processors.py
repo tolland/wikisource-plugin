@@ -11,6 +11,7 @@ from wtbot.model.fetch.fetch_request import FetchKind, FetchRequest, FetchStatus
 from wtbot.model.wiki.namespace import FILE_NAMESPACE_KEY
 from wtbot.model.wikisource.proofread_page_meta import ProofreadPageMeta
 from wtbot.timeutil import utcnow
+from wtbot.title_store import ensure_title
 from wtbot.vfs.store import PageStore
 from wtbot.wiki.client import WikiClient
 from wtbot.wiki.wiki_types import PageNotFound, RemotePage, RemotePageImages
@@ -547,7 +548,16 @@ def _ensure_placeholder_page(
             _apply_placeholder_enrichment(meta, enrichment)
         session.add(meta)
         return
+    # The fan-out knows its children are proofread pages before any of them is
+    # fetched; that guess is the title's to hold (see Title.expected_content_model).
+    title_row = ensure_title(
+        session,
+        site_pk=site_pk,
+        title=title,
+        expected_content_model="proofread-page",
+    )
     page = Page(
+        pk=title_row.pk,
         site_pk=site_pk,
         title=title,
         content_model="proofread-page",
@@ -582,7 +592,15 @@ def ensure_index_page(session: Session, site_pk: int, title: str) -> Page:
                 f"owning Index title {title!r} resolves to non-Index page {index.pk}"
             )
         return index
+    # Named as the owning Index of a proofread page, so expected to be one.
+    title_row = ensure_title(
+        session,
+        site_pk=site_pk,
+        title=title,
+        expected_content_model="proofread-index",
+    )
     index = Page(
+        pk=title_row.pk,
         site_pk=site_pk,
         title=title,
         content_model="proofread-index",

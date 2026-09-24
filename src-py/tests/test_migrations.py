@@ -5,7 +5,13 @@ from sqlalchemy.engine import Engine
 from sqlmodel import Session
 
 import wtbot.model  # noqa: F401 - registers every table on SQLModel.metadata
-from wtbot.db import alembic_config, create_db_engine, init_db
+from wtbot.db import (
+    MigrationIntegrityError,
+    alembic_config,
+    create_db_engine,
+    init_db,
+    migration_connection,
+)
 
 """The pre-release history starts from one squashed schema baseline.
 
@@ -30,7 +36,7 @@ def baseline_engine(tmp_path) -> Engine:
 
 def _run(engine: Engine, operation, revision: str) -> None:
     config = alembic_config()
-    with engine.begin() as connection:
+    with migration_connection(engine) as connection:
         config.attributes["connection"] = connection
         operation(config, revision)
 
@@ -291,3 +297,141 @@ def test_namespace_classification_removal_preserves_pages_and_links(baseline_eng
             text("SELECT namespace_role FROM page ORDER BY pk")
         ).scalars().all() == ["index", "page", "index", "page", "file", "index"]
     _run(baseline_engine, command.upgrade, "head")
+
+
+# -- the migration runner ----------------------------------------------------
+#
+# Schema changes in SQLite rebuild tables, and a rebuild drops the old table.
+# With foreign keys on, that drop fails whenever anything references the
+# table -- which is why earlier migrations avoided rebuilds altogether.
+# migration_connection follows SQLite's own procedure instead: keys off, one
+# real transaction, a key check over the finished state.
+
+
+def _parent_and_child(engine: Engine) -> None:
+    with engine.begin() as connection:
+        connection.exec_driver_sql("CREATE TABLE parent (pk INTEGER PRIMARY KEY)")
+        connection.exec_driver_sql(
+            "CREATE TABLE child (pk INTEGER PRIMARY KEY,"
+            " parent_pk INTEGER REFERENCES parent(pk))"
+        )
+        connection.exec_driver_sql("INSERT INTO parent VALUES (1)")
+        connection.exec_driver_sql("INSERT INTO child VALUES (1, 1)")
+
+
+def _tables(engine: Engine) -> set[str]:
+    with engine.connect() as connection:
+        return {
+            row[0]
+            for row in connection.exec_driver_sql(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )
+        }
+
+
+def test_a_referenced_table_can_be_rebuilt(baseline_engine: Engine) -> None:
+    _parent_and_child(baseline_engine)
+
+    with migration_connection(baseline_engine) as connection:
+        connection.exec_driver_sql(
+            "CREATE TABLE parent_new (pk INTEGER PRIMARY KEY, extra TEXT)"
+        )
+        connection.exec_driver_sql("INSERT INTO parent_new (pk) SELECT pk FROM parent")
+        connection.exec_driver_sql("DROP TABLE parent")
+        connection.exec_driver_sql("ALTER TABLE parent_new RENAME TO parent")
+
+    with baseline_engine.connect() as connection:
+        columns = [
+            r[1] for r in connection.exec_driver_sql("PRAGMA table_info(parent)")
+        ]
+        assert columns == ["pk", "extra"]
+        assert connection.exec_driver_sql("PRAGMA foreign_keys").scalar() == 1
+
+
+def test_a_dangling_reference_rolls_back_the_whole_migration(
+    baseline_engine: Engine,
+) -> None:
+    """Including its DDL: pysqlite would otherwise have committed the CREATE
+    before the DELETE opened a transaction."""
+    _parent_and_child(baseline_engine)
+
+    with pytest.raises(MigrationIntegrityError, match="reference nothing"):
+        with migration_connection(baseline_engine) as connection:
+            connection.exec_driver_sql("CREATE TABLE should_vanish (x INTEGER)")
+            connection.exec_driver_sql("DELETE FROM parent")
+
+    assert "should_vanish" not in _tables(baseline_engine)
+    with baseline_engine.connect() as connection:
+        assert connection.exec_driver_sql("SELECT count(*) FROM parent").scalar() == 1
+        assert connection.exec_driver_sql("PRAGMA foreign_keys").scalar() == 1
+
+
+# -- step 1 of the Title/WikiPage split --------------------------------------
+
+BEFORE_TITLE = "76940b0f1272"
+TITLE = "5d2a7c41e9b3"
+
+
+def _seed_pages(engine: Engine) -> None:
+    with engine.begin() as connection:
+        run = connection.exec_driver_sql
+        run(
+            "INSERT INTO site (pk, family, code, articlepath, created_at)"
+            " VALUES (1, 'ws', 'en', '/wiki/$1', '2026-01-01 00:00:00+00:00')"
+        )
+        run(
+            "INSERT INTO page (pk, site_pk, title, content_model, dirty, fetch_status)"
+            " VALUES (7, 1, 'Page:A.djvu/1', 'proofread-page', 0, 'done')"
+        )
+        run(
+            "INSERT INTO page (pk, site_pk, title, content_model, dirty, fetch_status)"
+            " VALUES (9, 1, 'Index:A.djvu/styles.css', NULL, 1, 'unfetched')"
+        )
+        run(
+            "INSERT INTO editjournal (page_pk, body, committed, saved_at)"
+            " VALUES (9, 'draft', 0, '2026-01-01 00:00:00+00:00')"
+        )
+        run(
+            "INSERT INTO proofreadpagemeta (page_pk, index_page_pk, page_number)"
+            " VALUES (7, 9, 1)"
+        )
+
+
+def test_every_existing_page_gets_a_title_with_the_same_pk(
+    baseline_engine: Engine,
+) -> None:
+    _run(baseline_engine, command.upgrade, BEFORE_TITLE)
+    _seed_pages(baseline_engine)
+
+    _run(baseline_engine, command.upgrade, TITLE)
+
+    with baseline_engine.connect() as connection:
+        run = connection.exec_driver_sql
+        assert run(
+            "SELECT pk, title, expected_content_model FROM title ORDER BY pk"
+        ).all() == [
+            (7, "Page:A.djvu/1", "proofread-page"),
+            # No model on record: MediaWiki's fallback, not a namespace guess.
+            (9, "Index:A.djvu/styles.css", "wikitext"),
+        ]
+        assert ("title", "pk", "pk") in [
+            (r[2], r[3], r[4]) for r in run("PRAGMA foreign_key_list(page)")
+        ]
+        # page was rebuilt; what referenced it still does.
+        assert run("SELECT count(*) FROM editjournal").scalar() == 1
+        assert run("SELECT count(*) FROM proofreadpagemeta").scalar() == 1
+        assert run("PRAGMA foreign_key_check").all() == []
+
+
+def test_the_title_step_downgrades_cleanly(baseline_engine: Engine) -> None:
+    _run(baseline_engine, command.upgrade, BEFORE_TITLE)
+    _seed_pages(baseline_engine)
+    _run(baseline_engine, command.upgrade, TITLE)
+
+    _run(baseline_engine, command.downgrade, BEFORE_TITLE)
+
+    assert "title" not in _tables(baseline_engine)
+    with baseline_engine.connect() as connection:
+        run = connection.exec_driver_sql
+        assert run("SELECT count(*) FROM page").scalar() == 2
+        assert "title" not in [r[2] for r in run("PRAGMA foreign_key_list(page)")]

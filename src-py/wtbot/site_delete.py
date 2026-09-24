@@ -21,6 +21,7 @@ from wtbot.model import (
     SiteCredential,
     Slot,
     TextTargetAnchor,
+    Title,
     Transclusion,
 )
 
@@ -130,6 +131,9 @@ def _predicates(site_pk: int) -> list[tuple[type, object]]:
         ),
         (FetchRequest, FetchRequest.site_pk == site_pk),
         (Page, Page.site_pk == site_pk),
+        # After Page: every page is a title, sharing its pk. By site rather
+        # than by page, so a title we know about but never fetched goes too.
+        (Title, Title.site_pk == site_pk),
         (Namespace, Namespace.site_pk == site_pk),
         (SiteCredential, SiteCredential.site_pk == site_pk),
         (Site, Site.pk == site_pk),

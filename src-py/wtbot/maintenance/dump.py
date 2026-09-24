@@ -41,6 +41,7 @@ NATURAL_KEYS: dict[str, tuple[str, ...]] = {
     "sitecredential": ("site_pk",),
     "slot": ("revision_pk", "role"),
     "texttargetanchor": ("page_pk", "annotation_id"),
+    "title": ("site_pk", "title"),
     "transclusion": (
         "site_pk",
         "source_page_pk",
