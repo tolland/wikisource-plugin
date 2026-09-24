@@ -113,15 +113,15 @@ def _predicates(site_pk: int) -> list[tuple[type, object]]:
         (Slot, Slot.revision_pk.in_(revisions)),
         (Content, Content.pk.in_(_orphaned_content_pks(site_pk))),
         (Revision, Revision.page_pk.in_(pages)),
-        (ProofreadPageMeta, ProofreadPageMeta.page_pk.in_(pages)),
+        (ProofreadPageMeta, ProofreadPageMeta.title_pk.in_(pages)),
         (IndexMeta, or_(IndexMeta.site_pk == site_pk, IndexMeta.page_pk.in_(pages))),
         (FileMeta, FileMeta.page_pk.in_(pages)),
         (FileBlob, FileBlob.page_pk.in_(pages)),
         (ScanAnnotation, ScanAnnotation.page_pk.in_(pages)),
         (BoxRangeLink, BoxRangeLink.page_pk.in_(pages)),
         (TextTargetAnchor, TextTargetAnchor.page_pk.in_(pages)),
-        (EditJournal, EditJournal.page_pk.in_(pages)),
-        (Commit, Commit.page_pk.in_(pages)),
+        (EditJournal, EditJournal.title_pk.in_(pages)),
+        (Commit, Commit.title_pk.in_(pages)),
         (
             Transclusion,
             or_(

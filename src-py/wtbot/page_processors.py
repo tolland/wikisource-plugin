@@ -251,7 +251,7 @@ def _store_page_images(
     """Upsert ProofreadPageMeta scan-image URLs and proofread quality."""
     try:
         meta = session.exec(
-            select(ProofreadPageMeta).where(ProofreadPageMeta.page_pk == page_pk)
+            select(ProofreadPageMeta).where(ProofreadPageMeta.title_pk == page_pk)
         ).first()
         if meta is None:
             # A proofread fetch creates structural metadata during its page
@@ -465,7 +465,7 @@ def _gather_placeholder_enrichment(
             select(Page, ProofreadPageMeta)
             .join(
                 ProofreadPageMeta,
-                ProofreadPageMeta.page_pk == Page.pk,
+                ProofreadPageMeta.title_pk == Page.pk,
                 isouter=True,
             )
             .where(Page.site_pk == site_pk, Page.title.in_(titles))
@@ -533,13 +533,13 @@ def _ensure_placeholder_page(
     ).first()
     if existing is not None:
         meta = session.exec(
-            select(ProofreadPageMeta).where(ProofreadPageMeta.page_pk == existing.pk)
+            select(ProofreadPageMeta).where(ProofreadPageMeta.title_pk == existing.pk)
         ).first()
         if meta is None:
             index_page = ensure_index_page(session, site_pk, index_title)
             meta = ProofreadPageMeta(
-                page_pk=existing.pk,
-                index_page_pk=index_page.pk,
+                title_pk=existing.pk,
+                index_title_pk=index_page.pk,
                 page_number=page_number,
             )
         else:
@@ -568,8 +568,8 @@ def _ensure_placeholder_page(
     session.flush()
     index_page = ensure_index_page(session, site_pk, index_title)
     meta = ProofreadPageMeta(
-        page_pk=page.pk,
-        index_page_pk=index_page.pk,
+        title_pk=page.pk,
+        index_title_pk=index_page.pk,
         page_number=page_number,
     )
     if enrichment is not None:

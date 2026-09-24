@@ -593,7 +593,7 @@ def test_write_page_ok(vfs_client, engine):
         assert page.dirty is True
 
         journal = s.exec(
-            select(EditJournal).where(EditJournal.page_pk == page.pk)
+            select(EditJournal).where(EditJournal.title_pk == page.pk)
         ).first()
         assert journal is not None
         assert journal.body == new_body
@@ -668,7 +668,7 @@ def test_write_index_namespace_asset(engine):
 
         page = s.exec(select(Page).where(Page.title == INDEX_STYLES)).one()
         journal = s.exec(
-            select(EditJournal).where(EditJournal.page_pk == page.pk)
+            select(EditJournal).where(EditJournal.title_pk == page.pk)
         ).one()
 
     assert result.status == "ok"
@@ -723,7 +723,7 @@ def test_read_content_falls_back_to_page_text_once_journal_is_committed(
     with Session(engine) as s:
         page = s.exec(select(Page).where(Page.title == PAGE_1)).one()
         journal = s.exec(
-            select(EditJournal).where(EditJournal.page_pk == page.pk)
+            select(EditJournal).where(EditJournal.title_pk == page.pk)
         ).one()
         journal.committed = True
         s.add(journal)

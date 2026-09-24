@@ -175,7 +175,8 @@ export type CommitStatus = 'pending' | 'success' | 'conflict' | 'error';
 
 export interface Commit {
   pk: number;
-  page_pk: number;
+  /** The Title pushed to; the same number as its page's pk. */
+  title_pk: number;
   base_revid: number;
   submitted_body?: string | null;
   comment?: string | null;

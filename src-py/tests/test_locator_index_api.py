@@ -304,7 +304,7 @@ def test_unsaved_local_edit_is_visible_to_section_lookup(client, engine, seeded)
         ).first()
         s.add(
             EditJournal(
-                page_pk=page.pk,
+                title_pk=page.pk,
                 body='<section begin="p-999" />new paragraph<section end="p-999" />',
             )
         )

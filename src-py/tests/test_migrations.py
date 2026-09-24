@@ -1,8 +1,12 @@
+import warnings
+
 import pytest
 from alembic import command
+from alembic.autogenerate import compare_metadata
+from alembic.migration import MigrationContext
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
-from sqlmodel import Session
+from sqlmodel import Session, SQLModel
 
 import wtbot.model  # noqa: F401 - registers every table on SQLModel.metadata
 from wtbot.db import (
@@ -288,7 +292,8 @@ def test_namespace_classification_removal_preserves_pages_and_links(baseline_eng
             (6, 252, None, 0),
         ]
         assert c.execute(
-            text("SELECT page_pk, index_page_pk FROM proofreadpagemeta")
+            # Renamed at head: the meta row is keyed to the Title (step 2).
+            text("SELECT title_pk, index_title_pk FROM proofreadpagemeta")
         ).all() == [(2, 1)]
         assert c.execute(text("PRAGMA foreign_key_check")).all() == []
     _run(baseline_engine, command.downgrade, "b72e8c913a04")
@@ -435,3 +440,90 @@ def test_the_title_step_downgrades_cleanly(baseline_engine: Engine) -> None:
         run = connection.exec_driver_sql
         assert run("SELECT count(*) FROM page").scalar() == 2
         assert "title" not in [r[2] for r in run("PRAGMA foreign_key_list(page)")]
+
+
+# -- step 2: journal, commit and proofread meta keyed to Title ---------------
+
+JOURNAL_TO_TITLE = "8e3f1b6d0a27"
+
+
+def _foreign_keys(engine: Engine, table: str) -> set[tuple[str, str]]:
+    with engine.connect() as connection:
+        return {
+            (row[3], row[2])  # (column, target table)
+            for row in connection.exec_driver_sql(f"PRAGMA foreign_key_list('{table}')")
+        }
+
+
+def _seed_address_rows(engine: Engine) -> None:
+    _seed_pages(engine)
+    with engine.begin() as connection:
+        connection.exec_driver_sql(
+            'INSERT INTO "commit" (page_pk, submitted_body, status, created_at)'
+            " VALUES (7, 'pushed', 'success', '2026-01-01 00:00:00+00:00')"
+        )
+
+
+def test_journal_commit_and_meta_point_at_titles(baseline_engine: Engine) -> None:
+    """Asserts the foreign keys themselves, not just a clean key check: a check
+    passes trivially over a table whose keys were silently dropped, which is
+    exactly what a first draft of this migration did."""
+    _run(baseline_engine, command.upgrade, BEFORE_TITLE)
+    _seed_address_rows(baseline_engine)
+    _run(baseline_engine, command.upgrade, JOURNAL_TO_TITLE)
+
+    assert _foreign_keys(baseline_engine, "editjournal") == {("title_pk", "title")}
+    assert _foreign_keys(baseline_engine, "commit") == {("title_pk", "title")}
+    assert _foreign_keys(baseline_engine, "proofreadpagemeta") == {
+        ("title_pk", "title"),
+        ("index_title_pk", "title"),
+    }
+    with baseline_engine.connect() as connection:
+        run = connection.exec_driver_sql
+        # No data moved: each page_pk already was the right title_pk.
+        assert run("SELECT title_pk, body FROM editjournal").all() == [(9, "draft")]
+        assert run('SELECT title_pk FROM "commit"').all() == [(7,)]
+        assert run(
+            "SELECT title_pk, index_title_pk, page_number FROM proofreadpagemeta"
+        ).all() == [(7, 9, 1)]
+        assert run("PRAGMA foreign_key_check").all() == []
+
+
+def test_journal_commit_and_meta_step_downgrades_cleanly(
+    baseline_engine: Engine,
+) -> None:
+    _run(baseline_engine, command.upgrade, BEFORE_TITLE)
+    _seed_address_rows(baseline_engine)
+    _run(baseline_engine, command.upgrade, JOURNAL_TO_TITLE)
+
+    _run(baseline_engine, command.downgrade, TITLE)
+
+    assert _foreign_keys(baseline_engine, "editjournal") == {("page_pk", "page")}
+    assert _foreign_keys(baseline_engine, "commit") == {("page_pk", "page")}
+    assert _foreign_keys(baseline_engine, "proofreadpagemeta") == {
+        ("page_pk", "page"),
+        ("index_page_pk", "page"),
+    }
+    with baseline_engine.connect() as connection:
+        assert connection.exec_driver_sql(
+            "SELECT page_pk, index_page_pk FROM proofreadpagemeta"
+        ).all() == [(7, 9)]
+
+
+def test_the_migrated_schema_matches_the_models(baseline_engine: Engine) -> None:
+    """Every migration, end to end, lands exactly on what the models declare.
+
+    Fresh databases are built from the migrations, restores from the models;
+    this is what keeps the two the same. It is also the check that catches a
+    batch rebuild quietly losing a constraint.
+    """
+    init_db(baseline_engine)
+    with baseline_engine.connect() as connection, warnings.catch_warnings():
+        # SQLite cannot reflect the two expression-based unique indexes, so
+        # autogenerate skips them (with a warning) rather than comparing them.
+        warnings.simplefilter("ignore")
+        differences = compare_metadata(
+            MigrationContext.configure(connection, opts={"compare_type": True}),
+            SQLModel.metadata,
+        )
+    assert differences == []

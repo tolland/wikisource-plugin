@@ -116,8 +116,8 @@ def test_fanout_creates_stubs_and_fetches_only_existing(engine, tmp_path):
         index = s.exec(select(Page).where(Page.title == INDEX)).one()
         rows = s.exec(
             select(Page, ProofreadPageMeta)
-            .join(ProofreadPageMeta, ProofreadPageMeta.page_pk == Page.pk)
-            .where(ProofreadPageMeta.index_page_pk == index.pk)
+            .join(ProofreadPageMeta, ProofreadPageMeta.title_pk == Page.pk)
+            .where(ProofreadPageMeta.index_title_pk == index.pk)
             .order_by(ProofreadPageMeta.page_number)
         ).all()
         assert [meta.page_number for _, meta in rows] == [1, 2, 3, 4, 5]
@@ -166,9 +166,9 @@ def test_fanout_enriches_placeholders_with_scan_and_ocr(engine, tmp_path):
             meta.page_number: meta
             for meta in s.exec(
                 select(ProofreadPageMeta)
-                .join(Page, Page.pk == ProofreadPageMeta.page_pk)
+                .join(Page, Page.pk == ProofreadPageMeta.title_pk)
                 .where(
-                    ProofreadPageMeta.index_page_pk == index.pk,
+                    ProofreadPageMeta.index_title_pk == index.pk,
                     Page.revid.is_(None),
                 )
             ).all()
@@ -228,7 +228,7 @@ def test_refanout_does_not_clobber_edited_stub(engine, tmp_path):
     wiki = _seed_and_fan_out(engine, tmp_path)
     with Session(engine) as s:
         stub = s.exec(select(Page).where(Page.title == "Page:Sparse.pdf/2")).one()
-        s.add(EditJournal(page_pk=stub.pk, base_revid=None, body="typed text"))
+        s.add(EditJournal(title_pk=stub.pk, base_revid=None, body="typed text"))
         stub.dirty = True
         s.add(stub)
         s.commit()
@@ -242,7 +242,7 @@ def test_refanout_does_not_clobber_edited_stub(engine, tmp_path):
         assert again.pk == stub_pk
         assert again.dirty is True
         journal = s.exec(
-            select(EditJournal).where(EditJournal.page_pk == stub_pk)
+            select(EditJournal).where(EditJournal.title_pk == stub_pk)
         ).one()
         assert journal.body == "typed text"
 
@@ -371,6 +371,6 @@ def test_committing_placeholder_creates_remote_page(engine, tmp_path):
         assert page.pageid is not None
         assert page.text == "fresh transcription"
         journal = s.exec(
-            select(EditJournal).where(EditJournal.page_pk == page.pk)
+            select(EditJournal).where(EditJournal.title_pk == page.pk)
         ).one()
         assert journal.committed is True

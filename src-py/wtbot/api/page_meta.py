@@ -93,7 +93,8 @@ class IndexMetaUpdate(BaseModel):
 
 
 class ProofreadPageMetaUpdate(BaseModel):
-    index_page_pk: int | None = None
+    # Named after the column it sets: the update is applied with setattr.
+    index_title_pk: int | None = None
     page_number: int | None = None
     quality_level: int | None = None
     source_image_url: str | None = None
@@ -203,25 +204,25 @@ def put_page_meta(
         )
     meta = PageStore(session).proofread_page_meta(page)
     values = update.model_dump(exclude_unset=True)
-    index_page_pk = values.get("index_page_pk")
-    if meta is None and index_page_pk is None:
+    index_title_pk = values.get("index_title_pk")
+    if meta is None and index_title_pk is None:
         raise HTTPException(
             status_code=400,
-            detail="index_page_pk is required when creating proofread page metadata",
+            detail="index_title_pk is required when creating proofread page metadata",
         )
-    if index_page_pk is not None:
-        index_page = _get_page(session, index_page_pk)
+    if index_title_pk is not None:
+        index_page = _get_page(session, index_title_pk)
         if (
             index_page.site_pk != page.site_pk
             or index_page.content_model != "proofread-index"
         ):
             raise HTTPException(
                 status_code=400,
-                detail="index_page_pk must identify an Index page on the same site",
+                detail="index_title_pk must identify an Index page on the same site",
             )
     if meta is None:
-        assert index_page_pk is not None  # guarded above; narrows the model input
-        meta = ProofreadPageMeta(page_pk=page.pk, index_page_pk=index_page_pk)
+        assert index_title_pk is not None  # guarded above; narrows the model input
+        meta = ProofreadPageMeta(title_pk=page.pk, index_title_pk=index_title_pk)
     for field, value in values.items():
         setattr(meta, field, value)
     session.add(meta)

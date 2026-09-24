@@ -22,7 +22,7 @@ def list_edit_journal(
         select(EditJournal).order_by(EditJournal.saved_at).offset(offset).limit(limit)
     )
     if page_pk is not None:
-        statement = statement.where(EditJournal.page_pk == page_pk)
+        statement = statement.where(EditJournal.title_pk == page_pk)
     if committed is not None:
         statement = statement.where(EditJournal.committed == committed)
     return list(session.exec(statement).all())

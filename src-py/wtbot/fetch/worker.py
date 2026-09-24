@@ -430,10 +430,10 @@ def _upsert_page(
             index_page = ensure_index_page(session, site.pk, index_title)
             meta = session.get(ProofreadPageMeta, page.pk)
             target = meta or ProofreadPageMeta(
-                page_pk=page.pk,
-                index_page_pk=index_page.pk,
+                title_pk=page.pk,
+                index_title_pk=index_page.pk,
             )
-            target.index_page_pk = index_page.pk
+            target.index_title_pk = index_page.pk
             target.page_number = page_number
             session.add(target)
 

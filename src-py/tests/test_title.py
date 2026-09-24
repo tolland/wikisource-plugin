@@ -4,7 +4,15 @@ import pytest
 from sqlmodel import Session, select
 
 from wtbot.fetch.worker import run_pending
-from wtbot.model import FetchRequest, Page, Site, Title
+from wtbot.model import (
+    Commit,
+    EditJournal,
+    FetchRequest,
+    Page,
+    ProofreadPageMeta,
+    Site,
+    Title,
+)
 from wtbot.page_processors import _ensure_placeholder_page, ensure_index_page
 from wtbot.title_store import ensure_title, record_fetched_content_model
 from wtbot.wiki.client import FakeWikiClient
@@ -200,3 +208,29 @@ def test_the_fetch_worker_corrects_a_wrong_guess(session, site, caplog):
     assert title.expected_content_model == "sanitized-css"
     assert session.get(Page, title.pk).content_model == "sanitized-css"
     assert any("'sanitized-css'" in r.getMessage() for r in caplog.records)
+
+
+def test_saves_commits_and_meta_can_hang_off_a_bare_title(session, site):
+    """Step 2: these three are about an address, so they key to a Title and
+    need no Page behind it -- neither for the page itself nor for its index.
+    Before, their foreign keys pointed at page.pk and refused this."""
+    index = ensure_title(
+        session,
+        site_pk=site.pk,
+        title="Index:Unfetched.djvu",
+        expected_content_model="proofread-index",
+    )
+    leaf = ensure_title(
+        session,
+        site_pk=site.pk,
+        title="Page:Unfetched.djvu/4",
+        expected_content_model="proofread-page",
+    )
+    session.add(ProofreadPageMeta(title_pk=leaf.pk, index_title_pk=index.pk))
+    session.add(EditJournal(title_pk=leaf.pk, body="first transcription"))
+    session.add(Commit(title_pk=leaf.pk, submitted_body="first transcription"))
+    session.commit()
+
+    assert session.get(Page, leaf.pk) is None
+    assert session.get(Page, index.pk) is None
+    assert session.get(ProofreadPageMeta, leaf.pk).index_title_pk == index.pk

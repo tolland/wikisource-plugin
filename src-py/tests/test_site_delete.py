@@ -77,8 +77,8 @@ def seeded(engine):
                 FetchRequest(
                     site_pk=doomed.pk, parent_pk=parent.pk, title="Page:Book.djvu/1"
                 ),
-                EditJournal(page_pk=doomed_page.pk, body="draft"),
-                Commit(page_pk=doomed_page.pk, submitted_body="pushed"),
+                EditJournal(title_pk=doomed_page.pk, body="draft"),
+                Commit(title_pk=doomed_page.pk, submitted_body="pushed"),
             ]
         )
         s.commit()

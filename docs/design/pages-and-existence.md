@@ -1,6 +1,6 @@
 # Pages, existence, and the nullables that follow from it
 
-Status: **in progress — step 1 of 3 landed.** It records why
+Status: **in progress — step 1 landed; step 2 under way.** It records why
 `PromotionBatch` is hard to read, why the reason is not where it looks, and
 the model change that removes the cause rather than the symptom.
 
@@ -20,11 +20,26 @@ change of constraint, never of data.
    (migration `5d2a7c41e9b3`). The fan-out, `ensure_index_page` and the fetch
    worker create the Title first, with their own guess; a `before_flush` hook
    on `Page` covers everything else during the transition.
-2. **Next, one table at a time.** Repoint the foreign keys that are about an
-   *address* from `page.pk` to `title.pk`: `EditJournal`, `ProofreadPageMeta`,
-   the annotation tables, `PageLink`, `PromotionBatch`. Move the columns that
-   belong to the address (`namespace_key`, `dirty`, `fetch_status`,
-   `history_complete_from_revid`) with them.
+2. **Under way, a few tables at a time.** Repoint the foreign keys that are
+   about an *address* from `page.pk` to `title.pk`, renaming the column to say
+   so. No data moves: every `page_pk` value already is the right `title_pk`.
+   - **Done** (`8e3f1b6d0a27`): `EditJournal.title_pk`, `Commit.title_pk`,
+     `ProofreadPageMeta.title_pk` and `.index_title_pk`. A save, a push, and
+     the scan/number/proposed body of an untranscribed page now need no Page
+     behind them.
+   - **Next:** the annotation tables, `PageLink`, `PromotionBatch`; and the
+     columns that belong to the address (`namespace_key`, `dirty`,
+     `fetch_status`, `history_complete_from_revid`).
+
+   Two things learned doing the first batch. Alembic's batch mode silently
+   drops a foreign key or index created on a column renamed in the same
+   batch -- the table rebuilds, every row survives, the constraint is gone,
+   and `foreign_key_check` still passes because there is nothing to check.
+   So the rename is SQLite's native `RENAME COLUMN`, the constraint swap a
+   separate batch, and `test_the_migrated_schema_matches_the_models` now
+   compares the migrated schema with the models on every run. And renamed
+   columns reach old dumps: `restore` upgrades a dump through each schema
+   step in turn (`_LEGACY_UPGRADES`).
 3. **Last.** Delete `page` rows for titles the wiki holds nothing at, make the
    remaining columns NOT NULL, rename `page` to `wikipage`, drop the hook and
    `page.title`. The only step that removes data.

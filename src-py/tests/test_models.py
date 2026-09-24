@@ -62,14 +62,14 @@ def test_index_fanout_and_journal(session):
 
     # An IDE save: journal row + dirty flag, distinct from any remote state.
     index.dirty = True
-    session.add(EditJournal(page_pk=index.pk, body="== edited ==", base_revid=None))
+    session.add(EditJournal(title_pk=index.pk, body="== edited ==", base_revid=None))
     session.add(index)
     session.commit()
-    j = session.exec(select(EditJournal).where(EditJournal.page_pk == index.pk)).one()
+    j = session.exec(select(EditJournal).where(EditJournal.title_pk == index.pk)).one()
     assert j.committed is False
 
     # An outbound push attempt.
-    session.add(Commit(page_pk=index.pk, base_revid=1, submitted_body="== edited =="))
+    session.add(Commit(title_pk=index.pk, base_revid=1, submitted_body="== edited =="))
     session.commit()
     c = session.exec(select(Commit)).one()
     assert c.status.value == "pending"

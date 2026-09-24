@@ -124,10 +124,74 @@ def test_restore_cleans_up_after_database_constraint_failure(tmp_path: Path) -> 
     assert not list(tmp_path.glob(".wtbot-restore-*"))
 
 
+def _as_before_meta_was_keyed_to_titles(raw: dict) -> None:
+    """Rewrite a current dump's ProofreadPageMeta into its pre-step-2 shape."""
+    for table in raw["tables"]:
+        if table["name"] != "proofreadpagemeta":
+            continue
+        table["key_fields"] = ["page_pk"]
+        for row in table["rows"]:
+            row["key"][0]["table"] = "page"
+            refs = row["references"]
+            refs["page_pk"] = {**refs.pop("title_pk"), "table": "page"}
+            refs["index_page_pk"] = {**refs.pop("index_title_pk"), "table": "page"}
+
+
 def test_a_dump_taken_before_titles_existed_restores_with_them(tmp_path: Path) -> None:
     """The backup taken before a schema change is older than the code restoring
-    it. A pre-Title dump has no title table and no page->title reference; the
-    restore supplies both, with the same rule the in-place migration uses."""
+    it. A pre-Title dump has no title table, no page->title reference, and the
+    old ProofreadPageMeta column names; the restore upgrades it step by step,
+    with the same rules the in-place migrations use."""
+    original, archive, legacy, rebuilt = (
+        tmp_path / name
+        for name in ("source.db", "dump.json", "legacy.json", "rebuilt.db")
+    )
+    make_database(original, offset=100)
+    write_dump(original, archive)
+
+    models = {"Index:Book": "proofread-index", "Page:Book/1": "proofread-page"}
+    raw = json.loads(archive.read_text())
+    raw["tables"] = [t for t in raw["tables"] if t["name"] != "title"]
+    for table in raw["tables"]:
+        if table["name"] == "page":
+            for row in table["rows"]:
+                row["references"].pop("pk")
+                on_source = row["key"][0]["key"] == ["source", "en"]
+                row["fields"]["content_model"] = (
+                    models.get(row["fields"]["title"]) if on_source else None
+                )
+    _as_before_meta_was_keyed_to_titles(raw)
+    legacy.write_text(json.dumps(raw))
+
+    restore_dump(legacy, rebuilt, ignore_columns=frozenset({"site.legacy_note"}))
+    with sqlite3.connect(rebuilt) as connection:
+        titles = connection.execute("""
+            SELECT s.family, t.title, t.expected_content_model, t.pk = p.pk
+            FROM title t JOIN page p ON p.pk = t.pk JOIN site s ON s.pk = t.site_pk
+            ORDER BY s.family, t.title
+            """).fetchall()
+        meta = connection.execute("""
+            SELECT page.title, idx.title FROM proofreadpagemeta meta
+            JOIN title page ON page.pk = meta.title_pk
+            JOIN title idx ON idx.pk = meta.index_title_pk
+            """).fetchall()
+        assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
+    assert titles == [
+        ("source", "Index:Book", "proofread-index", 1),
+        ("source", "Page:Book/1", "proofread-page", 1),
+        # No model on record: MediaWiki's own fallback, as in the migration.
+        ("target", "Index:Book", "wikitext", 1),
+    ]
+    assert meta == [("Page:Book/1", "Index:Book")]
+
+
+def test_a_dump_taken_before_meta_was_keyed_to_titles_restores(
+    tmp_path: Path,
+) -> None:
+    """Between steps 1 and 2 of the Title split, ProofreadPageMeta still named
+    its columns page_pk / index_page_pk and referenced pages. A backup from
+    then carries those names in its references *and* in its natural key; the
+    restore renames both and retargets them at the title with the same key."""
     original, archive, legacy, rebuilt = (
         tmp_path / name
         for name in ("source.db", "dump.json", "legacy.json", "rebuilt.db")
@@ -136,28 +200,15 @@ def test_a_dump_taken_before_titles_existed_restores_with_them(tmp_path: Path) -
     write_dump(original, archive)
 
     raw = json.loads(archive.read_text())
-    raw["tables"] = [t for t in raw["tables"] if t["name"] != "title"]
-    for table in raw["tables"]:
-        if table["name"] == "page":
-            for row in table["rows"]:
-                row["references"].pop("pk")
-                row["fields"]["content_model"] = (
-                    "proofread-index"
-                    if row["key"][0]["key"] == ["source", "en"]
-                    else None
-                )
+    _as_before_meta_was_keyed_to_titles(raw)
     legacy.write_text(json.dumps(raw))
 
     restore_dump(legacy, rebuilt, ignore_columns=frozenset({"site.legacy_note"}))
     with sqlite3.connect(rebuilt) as connection:
-        titles = connection.execute("""
-            SELECT s.family, t.title, t.expected_content_model, t.pk = p.pk
-            FROM title t JOIN page p ON p.pk = t.pk JOIN site s ON s.pk = t.site_pk
-            ORDER BY s.family
-            """).fetchall()
+        assert connection.execute("""
+            SELECT page.title, idx.title, meta.page_number
+            FROM proofreadpagemeta meta
+            JOIN title page ON page.pk = meta.title_pk
+            JOIN title idx ON idx.pk = meta.index_title_pk
+            """).fetchall() == [("Page:Book/1", "Index:Book", 1)]
         assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
-    assert titles == [
-        ("source", "Index:Book", "proofread-index", 1),
-        # No model on record: MediaWiki's own fallback, as in the migration.
-        ("target", "Index:Book", "wikitext", 1),
-    ]

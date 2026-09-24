@@ -138,7 +138,7 @@ def serve_reference_image(
         request.app.state.engine,
         blob_root,
         page.site_pk,
-        meta.index_page_pk if meta is not None else None,
+        meta.index_title_pk if meta is not None else None,
         meta.page_number if meta is not None else None,
         width,
     )
@@ -163,10 +163,10 @@ def _warm_next_page(
         with Session(engine) as session:
             nxt = session.exec(
                 select(Page)
-                .join(ProofreadPageMeta, ProofreadPageMeta.page_pk == Page.pk)
+                .join(ProofreadPageMeta, ProofreadPageMeta.title_pk == Page.pk)
                 .where(
                     Page.site_pk == site_pk,
-                    ProofreadPageMeta.index_page_pk == index_page_pk,
+                    ProofreadPageMeta.index_title_pk == index_page_pk,
                     ProofreadPageMeta.page_number == page_number + 1,
                 )
             ).first()

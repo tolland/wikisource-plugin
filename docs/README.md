@@ -34,7 +34,7 @@ backend data model and fetch/edit/commit contract live in `src-py/DESIGN.md`.
 | [`upstream-sync-discussion.md`](design/upstream-sync-discussion.md) | wtbot | living rationale for the sync feature | Read before touching anything in `todo/upstream-sync-TODO.md`; it is the *why* behind every item there. |
 | [`scan-image-modeling.md`](design/scan-image-modeling.md) | wtbot model + plugin | speculative; nothing implemented | Decide whether to normalise annotation coordinates to fractions — the one item worth doing on its own merits. |
 | [`templatedata-future.md`](design/templatedata-future.md) | plugin + wtbot | speculative; nothing implemented | Nothing to build. Keep the editing-feature seams (pure renderers, sidecar-mediated data) compatible. |
-| [`pages-and-existence.md`](design/pages-and-existence.md) | wtbot model | in progress — step 1 of 3 (`Title`, shared pk with `Page`) landed | **Step 2:** repoint the address-keyed foreign keys to `title.pk`, one table at a time, starting with `EditJournal` and `ProofreadPageMeta`. §0 has the route. |
+| [`pages-and-existence.md`](design/pages-and-existence.md) | wtbot model | in progress — step 1 landed; step 2 has moved `EditJournal`, `Commit` and `ProofreadPageMeta` onto `title.pk` | **Step 2 continued:** the annotation tables, `PageLink`, `PromotionBatch`, then the address columns. §0 has the route and what the first batch taught. |
 
 ## `reference/` — how it works now
 
