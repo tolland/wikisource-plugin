@@ -16,4 +16,11 @@ class AnnotationCoordinatesTest {
         assertEquals(annotation, small.toNormalizedAnnotation(500, 800))
         assertEquals(annotation, large.toNormalizedAnnotation(2000, 3200))
     }
+
+    @Test fun `missing or unrecognized category loads as unknown`() {
+        for (wire in listOf(null, "unknown", "marginalia")) {
+            val box = PageAnnotation("box", 0.1, 0.2, 0.3, 0.4, null, wire).toPixelBox(100, 100)
+            assertEquals(AnnotationCategory.UNKNOWN, box.category)
+        }
+    }
 }

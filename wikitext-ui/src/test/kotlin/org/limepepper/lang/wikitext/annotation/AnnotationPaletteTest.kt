@@ -6,17 +6,18 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 
 class AnnotationPaletteTest {
+    private val assigned = AnnotationCategory.entries.filter { it.isAssigned }
 
     @Test
     fun everyCategoryHasItsOwnColor() {
-        val colors = AnnotationCategory.entries.map { colorFor(it, fallbackIndex = 0) }
+        val colors = assigned.map { colorFor(it, fallbackIndex = 0) }
         assertEquals(colors.size, colors.toSet().size, "two categories share a color")
     }
 
     @Test
     fun aCategorysColorIgnoresTheFallbackIndex() {
         // The whole point: a category's color is an identity, not a position.
-        for (category in AnnotationCategory.entries) {
+        for (category in assigned) {
             assertEquals(colorFor(category, 0), colorFor(category, 7))
         }
     }
@@ -37,7 +38,14 @@ class AnnotationPaletteTest {
     @Test
     fun uncategorizedCycleWrapsAround() {
         val first = colorFor(null, 0)
-        val wrapped = colorFor(null, AnnotationCategory.entries.size)
+        val wrapped = colorFor(null, assigned.size)
         assertEquals(first, wrapped)
+    }
+
+    @Test
+    fun unknownIsColoredAsUncategorized() {
+        for (index in 0..3) {
+            assertEquals(colorFor(null, index), colorFor(AnnotationCategory.UNKNOWN, index))
+        }
     }
 }

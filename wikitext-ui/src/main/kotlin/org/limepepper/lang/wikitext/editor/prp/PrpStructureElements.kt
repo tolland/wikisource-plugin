@@ -81,7 +81,7 @@ class PrpBoxStructureElement(
 
     private fun title(): String =
         box.label?.takeIf { it.isNotBlank() }
-            ?: box.category?.displayName
+            ?: box.category.takeIf { it.isAssigned }?.displayName
             ?: "Region"
 
     private fun coordinates(): String {

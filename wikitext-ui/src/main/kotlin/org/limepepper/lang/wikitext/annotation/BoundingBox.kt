@@ -14,7 +14,7 @@ import kotlin.math.min
  * the canvas (persisted rows, text anchors).
  *
  * [category] classifies the region for the OCR pipeline (see
- * [AnnotationCategory]); null = uncategorized.
+ * [AnnotationCategory]); [AnnotationCategory.UNKNOWN] = not classified yet.
  *
  * The box carries no text offsets: a transcription text range is an
  * independent, editor-managed object (see
@@ -29,7 +29,7 @@ data class BoundingBox(
     val width: Double,
     val height: Double,
     val label: String? = null,
-    val category: AnnotationCategory? = null,
+    val category: AnnotationCategory = AnnotationCategory.UNKNOWN,
 ) {
     val right: Double get() = x + width
     val bottom: Double get() = y + height

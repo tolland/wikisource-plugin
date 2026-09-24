@@ -88,7 +88,9 @@ class PrpFileEditor private constructor(
             // several boxes may link to one range, so the first with a
             // category wins rather than picking arbitrarily between equals.
             categoryForRange = { rangeId ->
-                linkModel.boxesFor(rangeId).firstNotNullOfOrNull { boxId -> pane.model[boxId]?.category }
+                linkModel.boxesFor(rangeId).firstNotNullOfOrNull { boxId ->
+                    pane.model[boxId]?.category?.takeIf { it.isAssigned }
+                }
             },
         )
         Disposer.register(this, anchorManager)

@@ -12,7 +12,7 @@ fun PageAnnotation.toPixelBox(imageWidth: Int, imageHeight: Int): BoundingBox {
         width = width * imageWidth,
         height = height * imageHeight,
         label = label,
-        category = AnnotationCategory.fromWire(category),
+        category = AnnotationCategory.fromWire(category) ?: AnnotationCategory.UNKNOWN,
     )
 }
 
@@ -25,6 +25,6 @@ fun BoundingBox.toNormalizedAnnotation(imageWidth: Int, imageHeight: Int): PageA
         width = width / imageWidth,
         height = height / imageHeight,
         label = label,
-        category = category?.wire,
+        category = category.wire,
     )
 }

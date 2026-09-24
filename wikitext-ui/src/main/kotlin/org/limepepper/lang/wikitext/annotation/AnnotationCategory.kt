@@ -7,6 +7,8 @@ package org.limepepper.lang.wikitext.annotation
  * contributes: [BODY]/[PARAGRAPH]/[SECTION] regions are transcribed,
  * [HEADER]/[FOOTER] route to the page header/footer fields, [IGNORE] is
  * skipped. [EQUATION] is is sent to a "Tex" specific OCR backend.
+ * [UNKNOWN] is "not classified yet" — the default for a new box, and what the
+ * sidecar stores when no category is given.
  */
 enum class AnnotationCategory(val wire: String, val displayName: String) {
     HEADER("header", "Header"),
@@ -15,8 +17,12 @@ enum class AnnotationCategory(val wire: String, val displayName: String) {
     PARAGRAPH("paragraph", "Paragraph"),
     SECTION("section", "Section"),
     IGNORE("ignore", "Ignore"),
-    EQUATION("equation", "equation"),
+    EQUATION("equation", "Equation"),
+    UNKNOWN("unknown", "Unknown"),
     ;
+
+    /** False for [UNKNOWN]: the box has nothing to be colored or titled by. */
+    val isAssigned: Boolean get() = this != UNKNOWN
 
     companion object {
         /** Null for null or an unrecognized wire value (a newer sidecar). */

@@ -16,7 +16,8 @@ import java.awt.Color
  * kind of region this is, consistently across the whole page and across
  * pages.
  *
- * A box with no category yet (the common case right after drawing, before
+ * A box with no category yet ([AnnotationCategory.UNKNOWN], or a range with
+ * no linked box — the common case right after drawing, before
  * the user assigns one) has nothing to color it by, so it falls back to
  * cycling through the same hues by [colorFor]'s `fallbackIndex` — merely
  * distinguishable from its neighbors, not a stable identity the way a
@@ -37,14 +38,14 @@ object AnnotationPalette {
     private val UNCATEGORIZED_CYCLE: List<Color> = CATEGORY_COLORS.values.toList()
 
     init {
-        check(CATEGORY_COLORS.keys == AnnotationCategory.entries.toSet()) {
+        check(CATEGORY_COLORS.keys == AnnotationCategory.entries.filter { it.isAssigned }.toSet()) {
             "AnnotationPalette is missing a color for one of ${AnnotationCategory.entries}"
         }
     }
 
     /**
      * The color for a box/range: fixed for [category], or — when it is null
-     * — cycled through the same palette by [fallbackIndex] so uncategorized
+     * or [AnnotationCategory.UNKNOWN] — cycled through the same palette by [fallbackIndex] so uncategorized
      * boxes on one page still read as distinct from each other.
      */
     fun colorFor(category: AnnotationCategory?, fallbackIndex: Int): Color =

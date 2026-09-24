@@ -1,15 +1,15 @@
 package org.limepepper.lang.wikitext.editor.prp
 
+import com.intellij.icons.AllIcons
+import com.intellij.util.ui.EmptyIcon
 import org.limepepper.lang.wikitext.annotation.AnnotationCategory
 import org.limepepper.lang.wikitext.annotation.BoundingBox
 import org.limepepper.lang.wikitext.annotation.BoundingBoxModel
 import org.limepepper.lang.wikitext.vfs.backend.OcrBackendInfo
 import org.limepepper.lang.wikitext.vfs.settings.OcrFavorite
-import javax.swing.ButtonGroup
 import javax.swing.JMenu
 import javax.swing.JMenuItem
 import javax.swing.JPopupMenu
-import javax.swing.JRadioButtonMenuItem
 
 /**
  * The image canvas's right-click menu for a bounding box: pick the OCR
@@ -156,23 +156,26 @@ class BoxCanvasPopup(
         else -> "Range ${index + 1}: ${range.start}–${range.end} (${range.length} chars)"
     }
 
-    /** Region-category submenu — a radio group over [AnnotationCategory]. */
+    /**
+     * Region-category submenu, the current one marked with a check icon.
+     * Plain items with an explicit icon rather than a `JRadioButtonMenuItem`
+     * group: the IDE look-and-feel didn't paint the radio selection, so the
+     * current category was invisible.
+     */
     private fun categoryMenu(box: BoundingBox): JMenu {
         val boxModel = model
-        fun setCategory(category: AnnotationCategory?) {
-            boxModel[box.id]?.let { boxModel.update(it.copy(category = category)) }
-        }
         val menu = JMenu("Category")
-        val group = ButtonGroup()
-        menu.add(JRadioButtonMenuItem("None", box.category == null).apply {
-            group.add(this)
-            addActionListener { setCategory(null) }
-        })
-        for (category in AnnotationCategory.entries) {
-            menu.add(JRadioButtonMenuItem(category.displayName, box.category == category).apply {
-                group.add(this)
-                addActionListener { setCategory(category) }
+        val unassignedFirst = AnnotationCategory.entries.sortedBy { it.isAssigned }
+        for (category in unassignedFirst) {
+            val icon = if (box.category == category) AllIcons.Actions.Checked else EmptyIcon.ICON_16
+            menu.add(JMenuItem(category.displayName, icon).apply {
+                addActionListener {
+                    boxModel[box.id]?.let { boxModel.update(it.copy(category = category)) }
+                }
             })
+            if (!category.isAssigned) {
+                menu.addSeparator()
+            }
         }
         return menu
     }
