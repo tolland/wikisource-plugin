@@ -3,13 +3,13 @@ from datetime import datetime, timezone
 import pytest
 from sqlmodel import Session, select
 
+from wtbot.fetch.fetch_worker import run_pending
 from wtbot.fetch.revision_store import (
     RemoteIdentityError,
     record_head_revision,
     upsert_content,
     validate_remote_identity,
 )
-from wtbot.fetch.worker import run_pending
 from wtbot.model import (
     MAIN_SLOT,
     Content,

@@ -282,7 +282,9 @@ def download_file_blob(
     client: WikiClient,
     blob_root: Path | None,
 ) -> None:
-    """Fetch imageinfo + download binary for a File: page; upsert a FileBlob row."""
+    """Fetch imageinfo + download binary for its owning File: page."""
+    if page.title != file_title:
+        raise ValueError("the blob owner must be the fetched File: page")
     dest = _blob_path(blob_root, site, file_title)
     try:
         with fetch_stage("file_info", f"title={file_title!r}"):
@@ -322,7 +324,7 @@ def download_file_blob(
 def _fan_out_index(
     ctx: ProcessContext, index_page: CachedPage, remote: RemotePage
 ) -> int:
-    """Download the File: blob, enumerate the index pagination, enqueue
+    """Enqueue the backing File:, enumerate the index pagination, enqueue
     fetches for pages that exist remotely and create placeholder stub rows
     for the ones that do not. Placeholders are enriched from the wiki up
     front (scan image URLs + prepopulated OCR body) so transcription can
@@ -340,12 +342,10 @@ def _fan_out_index(
 
     file_title = _index_to_file_title(req.title)
 
-    download_file_blob(
-        session, ctx.site, index_page, file_title, ctx.client, ctx.blob_root
-    )
-
     store = PageStore(session)
+
     db_index_page = session.get(Page, index_page.pk)
+
     index_meta = (
         store.ensure_index_meta(db_index_page) if db_index_page is not None else None
     )
@@ -358,7 +358,7 @@ def _fan_out_index(
     with fetch_stage("index_pagination"):
         entries = ctx.client.list_index_pages(req.title)
 
-    child_specs: list[tuple[str, FetchKind]] = []
+    child_specs: list[tuple[str, FetchKind]] = [(file_title, FetchKind.single)]
     stub_specs: list[tuple[str, int]] = []  # (title, page_number)
     if entries is not None:
         page_count = page_count or len(entries)

@@ -110,7 +110,7 @@ def test_drain_keeps_going_after_a_fan_out_enqueues_children(engine, seeded, tmp
             session, lambda _site: wiki, blob_root=tmp_path / "blobs", batch=1
         )
 
-    assert result.handled == 4  # the index plus three children
+    assert result.handled == 5  # index, missing backing file, three pages
     assert result.complete
     assert result.passes > 1
 

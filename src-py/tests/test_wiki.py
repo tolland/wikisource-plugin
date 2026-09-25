@@ -130,6 +130,53 @@ class TestRateLimitPolicy:
 
 
 class TestConfigInjection:
+    @pytest.mark.parametrize("api_url", [None, "https://example.org/w/api.php"])
+    @pytest.mark.parametrize(
+        "repository", [("commons", "commons"), ("en", "wikipedia"), (None, None)]
+    )
+    def test_shared_image_repository(self, monkeypatch, api_url, repository):
+        import pywikibot
+
+        from wtbot.wiki.client import _make_pywikibot_site
+
+        def site(*, interface, **kwargs):
+            # Exercise the real APISite.image_repository without HTTP or login.
+            result = object.__new__(interface)
+            result.username = lambda: None
+            return result
+
+        monkeypatch.setattr(pywikibot, "Site", site)
+        default = _make_pywikibot_site(
+            pywikibot, WikiSettings(family="wikisource", code="en", api_url=api_url)
+        )
+        configured = _make_pywikibot_site(
+            pywikibot,
+            WikiSettings(
+                family="wikisource",
+                code="en",
+                api_url=api_url,
+                shared_image_repository=repository,
+            ),
+        )
+        assert default.shared_image_repository() == ("commons", "commons")
+        assert configured.shared_image_repository() == repository
+        assert type(default) is not type(configured)
+
+        calls = []
+        expected_repository = object()
+
+        def repository_site(code, family, username):
+            calls.append((code, family, username))
+            return expected_repository
+
+        monkeypatch.setattr(pywikibot, "Site", repository_site)
+        if repository == (None, None):
+            assert configured.image_repository() is None
+            assert calls == []
+        else:
+            assert configured.image_repository() is expected_repository
+            assert calls == [(*repository, None)]
+
     def test_api_url_constructs_autofamily_without_scanning_known_families(
         self, monkeypatch
     ):

@@ -12,6 +12,7 @@ from wtbot.fetch.revision_store import (
     record_history,
     validate_remote_identity,
 )
+from wtbot.fetch.utils import _claim_batch, _maybe_sync_namespaces
 from wtbot.log.failure_log import FailureContext, record_failure, site_label
 from wtbot.log.fetch_log import activity, fetch_context, fetch_stage
 from wtbot.model import (
@@ -36,9 +37,8 @@ from wtbot.promotion.promotion_store import materialize_promotion_links
 from wtbot.timeutil import utcnow
 from wtbot.title_store import ensure_title, record_fetched_content_model
 from wtbot.wiki.client import WikiClient
-from wtbot.wiki.failures import WikiFailure
-from wtbot.wiki.namespaces import sync_namespaces
-from wtbot.wiki.wiki_types import PageNotFound, RemotePage
+from wtbot.wiki.failures import FailureKind, WikiFailure
+from wtbot.wiki.wiki_types import PageNotFound, RemotePage, RemotePageImages
 
 """Fetch worker: drains the FetchRequest queue, calls the wiki, writes results
 back into the cache.
@@ -70,90 +70,99 @@ def run_pending(
     limit: int = 100,
     blob_root: Path | None = None,
     on_failure: FailureObserver | None = None,
-    image_cache: dict | None = None,
+    image_cache: dict[int, dict[str, RemotePageImages | None]] | None = None,
 ) -> int:
     """Process up to ``limit`` pending requests. Returns how many were handled.
 
     ``image_cache`` is shared enrichment fetched in bulk (see
     ``page_processors``): an Index fan-out fills it for its children, and each
     child reads its own entry instead of asking the wiki again. Passing None
-    disables the sharing -- every page then asks for itself, which is correct
-    but costs a request each.
+    uses a cache local to this call. Caches are separated by site so identical
+    titles on different wikis cannot share scan metadata.
     """
+    if image_cache is None:
+        image_cache = {}
     handled = 0
+    rate_limited = False
+
+    def observe(failure: WikiFailure) -> None:
+        nonlocal rate_limited
+        rate_limited |= failure.kind is FailureKind.rate_limited
+        if on_failure is not None:
+            on_failure(failure)
+
     while handled < limit:
-        req = _claim_next(session)
-        if req is None:
+        requests = _claim_batch(session, min(50, limit - handled))
+        if not requests:
             break
-        with fetch_context(req.pk, req.site_pk, req.title), fetch_stage("request"):
-            _process(
-                session,
-                req,
-                client_factory,
-                blob_root=blob_root,
-                on_failure=on_failure,
-                image_cache=image_cache,
+        with fetch_stage("load_site"):
+            site = _load_site_snapshot(session, requests[0].site_pk)
+        client = None
+        try:
+            client = client_factory(site)
+            _maybe_sync_namespaces(session, site, client)
+            with fetch_stage("get_pages", f"site_pk={site.pk} titles={len(requests)}"):
+                fetched = client.get_pages([req.title for req in requests])
+            if [item.title for item in fetched] != [req.title for req in requests]:
+                raise ValueError("batch results must match requested titles in order")
+            results = [item.result for item in fetched]
+        except Exception as exc:
+            # A failed batch is not retried as fifty individual API requests.
+            results = [exc] * len(requests)
+
+        site_images = image_cache.setdefault(requests[0].site_pk, {})
+        image_titles = list(
+            dict.fromkeys(
+                result.title
+                for result in results
+                if isinstance(result, RemotePage)
+                and result.content_model == "proofread-page"
+                and result.title not in site_images
             )
-        handled += 1
+        )
+        if client is not None and image_titles:
+            try:
+                images = client.get_page_images_bulk(image_titles)
+                site_images.update((title, images.get(title)) for title in image_titles)
+            except Exception:
+                log.warning("batch image enrichment failed", exc_info=True)
+        for index, (req, result) in enumerate(zip(requests, results, strict=True)):
+            with fetch_context(req.pk, req.site_pk, req.title), fetch_stage("request"):
+                _process(
+                    session,
+                    req,
+                    site,
+                    client,
+                    result,
+                    blob_root=blob_root,
+                    on_failure=observe,
+                    image_cache=site_images,
+                )
+            handled += 1
+            if rate_limited:
+                # These rows have not been processed. Leave them available to
+                # the next drain rather than stranded in_progress.
+                with write_batch(session):
+                    for remaining in requests[index + 1 :]:
+                        row = session.get(FetchRequest, remaining.pk)
+                        if row is not None and row.status == FetchStatus.in_progress:
+                            row.status = FetchStatus.pending
+                            row.updated_at = utcnow()
+                            session.add(row)
+                return handled
     return handled
-
-
-def _claim_next(session: Session) -> ClaimedFetchRequest | None:
-    with read_snapshot(session):
-        req = session.exec(
-            select(FetchRequest)
-            .where(FetchRequest.status == FetchStatus.pending)
-            .order_by(FetchRequest.priority.desc(), FetchRequest.requested_at)
-        ).first()
-        if req is None:
-            return None
-        req.status = FetchStatus.in_progress
-        req.updated_at = utcnow()
-        session.add(req)
-        claimed = _snapshot_request(req)
-        session.commit()
-        return claimed
-
-
-def _snapshot_request(req: FetchRequest) -> ClaimedFetchRequest:
-    if req.pk is None:
-        raise RuntimeError("cannot process an unpersisted fetch request")
-    return ClaimedFetchRequest(
-        pk=req.pk,
-        site_pk=req.site_pk,
-        parent_pk=req.parent_pk,
-        title=req.title,
-        kind=req.kind,
-        depth=req.depth,
-        revisions=req.revisions,
-    )
-
-
-def _maybe_sync_namespaces(session: Session, site: Site, client: WikiClient) -> None:
-    """Sync siteinfo namespaces on first use of a site (no-op on subsequent calls)."""
-    from wtbot.model import Namespace
-
-    with read_snapshot(session):
-        already = session.exec(
-            select(Namespace).where(Namespace.site_pk == site.pk)
-        ).first()
-    if already is not None:
-        return
-    ns_dict = client.get_namespaces()
-    if ns_dict is None:
-        return
-    sync_namespaces(session, site, ns_dict)
-    session.rollback()
 
 
 def _process(
     session: Session,
     req: ClaimedFetchRequest,
-    client_factory: ClientFactory,
+    site: Site,
+    client: WikiClient | None,
+    result: RemotePage | Exception,
     *,
     blob_root: Path | None = None,
     on_failure: FailureObserver | None = None,
-    image_cache: dict | None = None,
+    image_cache: dict[str, RemotePageImages | None] | None = None,
 ) -> None:
     activity(
         "claimed parent_pk=%s kind=%s depth=%d revisions=%d",
@@ -162,20 +171,17 @@ def _process(
         req.depth,
         req.revisions,
     )
-    with fetch_stage("load_site"):
-        site = _load_site_snapshot(session, req.site_pk)
     activity("site=%s", site_label(site))
     status = FetchStatus.error
     progress_total = None
     progress_done = 0
     error_message = None
     try:
-        with fetch_stage("client_setup"):
-            client = client_factory(site)
-        with fetch_stage("namespace_sync"):
-            _maybe_sync_namespaces(session, site, client)
-        with fetch_stage("get_page"):
-            remote = client.get_page(req.title)
+        if isinstance(result, Exception):
+            raise result
+        if client is None:
+            raise RuntimeError("batch returned a page without a wiki client")
+        remote = result
 
         # Drive behaviour from what was actually fetched, not from req.kind.
         processor = processor_for(remote)
@@ -203,6 +209,7 @@ def _process(
 
         with fetch_stage("postprocess"):
             outcome = processor.postprocess(ctx, page, remote)
+
         status = outcome.status
         progress_total = outcome.progress_total
         progress_done = outcome.progress_done

@@ -4,7 +4,7 @@ from conftest import drain
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
-from wtbot.fetch.worker import run_pending
+from wtbot.fetch.fetch_worker import run_pending
 from wtbot.main import create_app
 from wtbot.model import EditJournal, FetchRequest, FetchStatus, IndexMeta, Page, Site
 from wtbot.model.wikisource.proofread_page_meta import ProofreadPageMeta
@@ -141,14 +141,14 @@ def test_fanout_creates_stubs_and_fetches_only_existing(engine, tmp_path):
                 select(FetchRequest).where(FetchRequest.parent_pk.is_not(None))
             ).all()
         ]
-        assert child_titles == [PAGE_5]
+        assert child_titles == [INDEX.replace("Index:", "File:", 1), PAGE_5]
 
-        # The parent request completed (1 index + 1 child).
+        # The parent request completed (index + backing file + existing page).
         parent = s.exec(
             select(FetchRequest).where(FetchRequest.parent_pk.is_(None))
         ).one()
         assert parent.status == FetchStatus.done
-        assert parent.progress_total == 2
+        assert parent.progress_total == 3
         # page_count derived from the pagination when <pagelist> is bare,
         # recorded on the Index's IndexMeta row.
         index_row = s.exec(select(Page).where(Page.title == INDEX)).one()

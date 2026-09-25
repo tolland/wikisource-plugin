@@ -7,7 +7,7 @@ from time import monotonic
 
 from sqlmodel import Session, func, select
 
-from wtbot.fetch.worker import ClientFactory, run_pending
+from wtbot.fetch.fetch_worker import ClientFactory, run_pending
 from wtbot.log.fetch_log import activity
 from wtbot.model import FetchRequest, FetchStatus
 from wtbot.wiki.failures import FailureKind, WikiFailure
@@ -31,8 +31,8 @@ throttle can be as slow as the wiki demands without any caller timing out.
 
 log = logging.getLogger(__name__)
 
-#: Requests claimed per pass. Each pass is one transaction's worth of claiming;
-#: the loop below repeats until nothing is left.
+#: Requests processed per drain pass, in same-site API batches of up to 50.
+#: The loop below repeats until nothing is left.
 DEFAULT_BATCH = 200
 
 #: A fan-out enqueues children, so several passes are normal. This bound exists

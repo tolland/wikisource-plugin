@@ -139,3 +139,11 @@ class RemotePage:
     size: int | None = None
     # ProofreadPage: total page count from IndexPage.num_pages (not <pagelist> parsing)
     page_count: int | None = None
+
+
+@dataclass(frozen=True)
+class PageFetchResult:
+    """One outcome, keyed by the original requested title, including failures."""
+
+    title: str
+    result: RemotePage | Exception

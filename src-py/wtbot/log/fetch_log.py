@@ -1,6 +1,7 @@
 """Fetch activity timings, correlated across worker and processor calls."""
 
 import logging
+import traceback
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -54,9 +55,15 @@ def fetch_stage(name: str, detail: str = "") -> Iterator[None]:
     activity("stage=%s started %s", name, detail)
     try:
         yield
-    except BaseException:
+    except BaseException as err:
+        traceback.print_exc()
         activity(
-            "stage=%s failed elapsed=%.3fs %s", name, monotonic() - started, detail
+            "stage=%s failed elapsed=%.3fs %s (%s) %s",
+            name,
+            monotonic() - started,
+            detail,
+            err,
+            type(err).__name__,
         )
         raise
     else:

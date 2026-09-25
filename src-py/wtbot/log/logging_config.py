@@ -197,6 +197,9 @@ def configure_logging(config: LoggingConfig = LOGGING_CONFIG) -> None:
         level = TRACE if tag in trace_tags else logging.NOTSET
         logging.getLogger(debug_route_logger_name(tag)).setLevel(level)
 
+    vcr_log = logging.getLogger("vcr")
+    vcr_log.setLevel(logging.WARNING)
+
 
 def sqlalchemy_echo(config: LoggingConfig = LOGGING_CONFIG) -> bool | str:
     return config.sqlalchemy_echo

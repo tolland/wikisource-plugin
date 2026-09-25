@@ -9,7 +9,7 @@ from wtbot.fetch.queue_runner import drain_queue
 from wtbot.model import FetchRequest, FetchStatus, Site
 from wtbot.wiki.client import PywikibotClient
 from wtbot.wiki.failures import FailureKind, classify
-from wtbot.wiki.wiki_types import RemotePage
+from wtbot.wiki.wiki_types import PageFetchResult, RemotePage
 
 
 class NoUsernameError(Exception):
@@ -104,8 +104,11 @@ def test_drain_records_terminal_status_after_login_recovery(engine, persistent):
         text="body",
         revid=1,
     )
-    client._get_page = Mock(
-        side_effect=[timeout(), timeout() if persistent else remote]
+    client._get_pages = Mock(
+        side_effect=[
+            timeout(),
+            timeout() if persistent else [PageFetchResult("Title", remote)],
+        ]
     )
     with Session(engine) as session:
         site = Site(family="test", code="en")
@@ -122,3 +125,5 @@ def test_drain_records_terminal_status_after_login_recovery(engine, persistent):
         assert request.status is (FetchStatus.error if persistent else FetchStatus.done)
         if persistent:
             assert "session most likely timed out" in request.error_message
+        assert client._get_pages.call_count == 2
+        client.site._relogin.assert_called_once()

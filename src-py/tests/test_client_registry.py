@@ -57,6 +57,19 @@ def test_same_site_reuses_one_client():
     assert all(c is clients[0] for c in clients)
 
 
+def test_changed_image_repository_builds_a_new_client():
+    builder = _CountingBuilder()
+    registry = ClientRegistry(builder=builder)
+    site = _site()
+    first = registry.get(site, _settings())
+    overridden = _settings(shared_image_repository=("en", "wikipedia"))
+    second = registry.get(site, overridden)
+
+    assert first is not second
+    assert registry.get(site, overridden) is second
+    assert len(builder.calls) == 2
+
+
 def test_concurrent_requests_do_not_build_duplicate_clients():
     """pywikibot client construction mutates process-global state, so two
     requests missing the cache together must not construct in parallel."""
@@ -178,7 +191,7 @@ def test_worker_run_builds_one_client_for_a_whole_fan_out(engine):
     """End to end through the fetch worker: N queued requests, one client."""
     from sqlmodel import Session
 
-    from wtbot.fetch.worker import run_pending
+    from wtbot.fetch.fetch_worker import run_pending
     from wtbot.model import FetchKind, FetchRequest
     from wtbot.wiki.wiki_types import RemotePage
 

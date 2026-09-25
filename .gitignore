@@ -69,7 +69,7 @@ __pycache__/
 /editorStateDump-*.txt
 /apicache/
 /throttle.ctrl
-/fixtures/vcr_cassettes/
+/local/cassettes/
 /docker/wtbot/wtbot_18574_data/
 /local/query
 

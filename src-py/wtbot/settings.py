@@ -29,6 +29,10 @@ class WikiSettings:
     # together -- see wtbot.wiki.rate_limits for the tiers they are set against.
     rate_limits: RateLimitPolicy = field(default_factory=RateLimitPolicy)
 
+    # Pywikibot (code, family) for shared files and their description wikitext.
+    # Use (None, None) for a wiki without a shared image repository.
+    shared_image_repository: tuple[str | None, str | None] = ("commons", "commons")
+
     @property
     def read_throttle(self) -> float:
         """Convenience for the number most often reasoned about. The policy is

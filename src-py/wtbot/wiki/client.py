@@ -5,11 +5,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
+import vcr
+
 from wtbot.settings import WikiSettings
-from wtbot.wiki.failures import is_login_session_timeout
+from wtbot.wiki.failures import FailureKind, classify, is_login_session_timeout
 from wtbot.wiki.wiki_types import (
     EditConflict,
     IndexPageEntry,
+    PageFetchResult,
     PageNotFound,
     RemoteChange,
     RemoteFileInfo,
@@ -29,6 +32,19 @@ and ``download_file`` are all the fetch path needs. Two implementations:
 - ``FakeWikiClient`` — in-memory, for tests/dev/CLI demos with no network.
 """
 
+
+# @TODO wire this into a setting that can be changed at runtime
+def before_record_cb(request):
+    return False
+
+
+my_vcr = vcr.VCR(
+    serializer="yaml",
+    record_mode="all",
+    cassette_library_dir="local/cassettes",
+    before_record_request=before_record_cb,
+    # match_on=["uri", "method"],
+)
 
 log = logging.getLogger(__name__)
 
@@ -71,17 +87,35 @@ def _make_pywikibot_site(pywikibot, settings: WikiSettings):
     already know that an explicit API URL is an AutoFamily, so construct it
     directly and keep site creation local to these settings.
     """
+    from pywikibot.site import APISite
+
+    class ConfiguredSite(APISite):
+        # A distinct interface class keeps pywikibot's global Site cache from
+        # sharing mutable sites between clients with different settings.
+        # ClientRegistry handles reuse of clients with identical settings.
+        def shared_image_repository(self) -> tuple[str | None, str | None]:
+            return settings.shared_image_repository
+
     if settings.api_url:
         from pywikibot.family import AutoFamily
 
         family = AutoFamily(settings.family, settings.api_url)
-        return pywikibot.Site(code=family.code, fam=family)
-    return pywikibot.Site(code=settings.code, fam=settings.family)
+        return pywikibot.Site(code=family.code, fam=family, interface=ConfiguredSite)
+    return pywikibot.Site(
+        code=settings.code, fam=settings.family, interface=ConfiguredSite
+    )
 
 
 @runtime_checkable
 class WikiClient(Protocol):
     def get_page(self, title: str) -> RemotePage: ...
+
+    def get_pages(self, titles: list[str]) -> list[PageFetchResult]:
+        """One outcome per requested title, in input order, including duplicates.
+
+        Per-title failures are returned; a failed bulk transport may raise.
+        """
+        ...
 
     def get_history(self, title: str, *, limit: int) -> list[RemotePage]:
         """Up to ``limit`` revisions of a page, newest first, with content.
@@ -335,6 +369,58 @@ class PywikibotClient:
     def get_page(self, title: str) -> RemotePage:
         return self._with_session_retry(lambda: self._get_page(title))
 
+    def get_pages(self, titles: list[str]) -> list[PageFetchResult]:
+        """Load current revisions in groups of 50, through this site's session.
+
+        Keep the actual preloaded Page objects: constructing them again would
+        discard their revision caches and cause one request per title again.
+        Missing/invalid titles are individual outcomes; transport errors escape
+        so the worker can stop a rate-limited batch without serial retries.
+        """
+        return self._with_session_retry(lambda: self._get_pages(titles))
+
+    def _get_pages(self, titles: list[str]) -> list[PageFetchResult]:
+        pages = {}
+        requested_pages = {}
+        results: dict[str, RemotePage | Exception] = {}
+        for title in dict.fromkeys(titles):
+            try:
+                page = self._pwb.Page(self.site, title)
+                canonical = page.title(with_section=False)
+                requested_pages[title] = pages.setdefault(canonical, page)
+            except Exception as exc:
+                if (
+                    is_login_session_timeout(exc)
+                    or classify(exc).kind is FailureKind.rate_limited
+                ):
+                    raise
+                results[title] = exc
+        loaded = (
+            {
+                id(page)
+                for page in self.site.preloadpages(list(pages.values()), groupsize=50)
+            }
+            if pages
+            else set()
+        )
+        for title in dict.fromkeys(titles):
+            if title in results:
+                continue
+            try:
+                page = requested_pages[title]
+                if id(page) not in loaded:
+                    raise RuntimeError(f"bulk response omitted {title!r}")
+                results[title] = self._remote_page(page, title, preloaded=True)
+            except Exception as exc:
+                if (
+                    is_login_session_timeout(exc)
+                    or classify(exc).kind is FailureKind.rate_limited
+                ):
+                    raise
+                results[title] = exc
+        return [PageFetchResult(title, results[title]) for title in titles]
+
+    @my_vcr.use_cassette()
     def _get_page(self, title: str) -> RemotePage:
         """One page, in one upstream request.
 
@@ -352,13 +438,31 @@ class PywikibotClient:
         another fetch, and a redirect is returned as its own wikitext rather
         than raising -- which is what the previous ``page.text`` did too.
         """
-        page = self._pwb.Page(self.site, title)
+        return self._remote_page(self._pwb.Page(self.site, title), title)
+
+    def _remote_page(self, page, title: str, *, preloaded: bool = False) -> RemotePage:
         try:
+            if preloaded and not page.exists():
+                raise self._pwb.exceptions.NoPageError(page)
             rev = page.latest_revision
-        except (
-            self._pwb.exceptions.NoPageError,
-            self._pwb.exceptions.InvalidPageError,
-        ) as exc:
+        except self._pwb.exceptions.NoPageError as exc:
+            if page.namespace().id != 6:
+                raise PageNotFound(title) from exc
+            shared_page = self._resolve_file_page(page.title())
+            try:
+                shared_rev = shared_page.latest_revision
+            except self._pwb.exceptions.NoPageError as shared_exc:
+                raise PageNotFound(title) from shared_exc
+            # This is a shared description, not a revision in this wiki's
+            # database. Never store Commons page/revision ids as local ids.
+            return RemotePage(
+                title=page.title(),
+                namespace_key=6,
+                namespace_canonical="File",
+                content_model=shared_page.content_model,
+                text=shared_rev.text or "",
+            )
+        except self._pwb.exceptions.InvalidPageError as exc:
             raise PageNotFound(title) from exc
         ns = page.namespace()
 
@@ -407,6 +511,7 @@ class PywikibotClient:
             )
         ]
 
+    @my_vcr.use_cassette()
     def _resolve_file_page(self, title: str):
         """Resolve a File: title to a FilePage, following the shared repo (e.g.
         Commons) when the file isn't uploaded locally — the common case for
@@ -657,6 +762,10 @@ class PywikibotClient:
     def get_history(self, title: str, *, limit: int) -> list[RemotePage]:
         page = self._pwb.Page(self.site, title)
         if not page.exists():
+            if page.namespace().id == 6:
+                self._resolve_file_page(page.title())
+                # Shared files have no description revisions on this wiki.
+                return []
             raise PageNotFound(title)
 
         out: list[RemotePage] = []
@@ -819,6 +928,16 @@ class FakeWikiClient:
         self._oldest_change = oldest_change
         #: title -> revisions newest first, as get_history returns them.
         self._history = dict(history or {})
+
+    def get_pages(self, titles: list[str]) -> list[PageFetchResult]:
+        results = []
+        for title in titles:
+            try:
+                result = self.get_page(title)
+            except Exception as exc:
+                result = exc
+            results.append(PageFetchResult(title, result))
+        return results
 
     def get_page(self, title: str) -> RemotePage:
         try:

@@ -370,7 +370,7 @@ landed":
 
 ## 7. The fetch worker (pywikibot side)
 
-The worker (`wtbot/fetch/worker.py`) drives surface B:
+The worker (`wtbot/fetch/fetch_worker.py`) drives surface B:
 
 ```
 1. claim a pending FetchRequest (highest priority first) -> in_progress

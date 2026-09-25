@@ -12,7 +12,7 @@ from wtbot.api.commit import (
     run_commit_for_page,
 )
 from wtbot.commit_worker import run_pending_commits
-from wtbot.fetch.worker import run_pending
+from wtbot.fetch.fetch_worker import run_pending
 from wtbot.model import Commit, CommitStatus, EditJournal, FetchRequest, Page, Site
 from wtbot.model.fetch.fetch_request import FetchKind, FetchStatus
 from wtbot.vfs.store import PageStore

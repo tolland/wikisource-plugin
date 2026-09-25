@@ -46,6 +46,7 @@ class ClientKey:
     bot_name: str | None
     secret_digest: str  # never the password itself, only a change detector
     rate_limits: RateLimitPolicy
+    shared_image_repository: tuple[str | None, str | None]
 
     @classmethod
     def of(cls, site: Site, settings: WikiSettings) -> "ClientKey":
@@ -58,6 +59,7 @@ class ClientKey:
             bot_name=settings.bot_name,
             secret_digest=_digest(settings.password),
             rate_limits=settings.rate_limits,
+            shared_image_repository=settings.shared_image_repository,
         )
 
 

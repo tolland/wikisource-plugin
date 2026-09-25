@@ -1,7 +1,7 @@
 """Commit worker: drains uncommitted EditJournal rows, pushes each page's
 latest local save to the wiki via pywikibot, and records the outcome.
 
-Mirrors worker.py's shape (plain functions over a Session + ClientFactory) so
+Mirrors fetch_worker.py's shape (plain functions over a Session + ClientFactory) so
 it's testable with FakeWikiClient the same way the fetch worker is.
 
 Push granularity is per-page, not per-journal-row: only the most recent
@@ -25,7 +25,7 @@ from threading import Lock
 from sqlmodel import Session, select
 
 from wtbot.db_session import detached_site, read_snapshot, write_batch
-from wtbot.fetch.worker import ClientFactory
+from wtbot.fetch.fetch_worker import ClientFactory
 from wtbot.log.failure_log import FailureContext, record_failure, site_label
 from wtbot.model import (
     Commit,

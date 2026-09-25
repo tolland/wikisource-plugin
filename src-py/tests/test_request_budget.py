@@ -308,7 +308,8 @@ def test_a_page_fetched_on_its_own_still_gets_its_image(engine, tmp_path):
 
         drain_queue(session, lambda _site: wiki, blob_root=tmp_path / "blobs")
 
-    assert wiki.single_calls == [title]
+    assert wiki.single_calls == []
+    assert wiki.bulk_calls == [[title]]
 
 
 # -- the guard -------------------------------------------------------------
