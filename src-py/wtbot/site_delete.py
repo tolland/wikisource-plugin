@@ -9,7 +9,6 @@ from wtbot.model import (
     EditJournal,
     FetchRequest,
     FileBlob,
-    FileMeta,
     IndexMeta,
     Namespace,
     Page,
@@ -22,7 +21,6 @@ from wtbot.model import (
     Slot,
     TextTargetAnchor,
     Title,
-    Transclusion,
 )
 
 """Deleting a site, and everything that only exists because of it.
@@ -45,10 +43,6 @@ Two rows survive on purpose:
 - ``OcrBackendConfig`` rows. Their ``scope`` string is not a foreign key
   precisely so a config outlives the Site it was named after (see the model's
   docstring).
-
-``FileMeta.source_page_pk`` may point at this site's pages from a *surviving*
-row (in principle, a crop whose provenance crosses sites); those links are
-cleared rather than taking the row with them.
 """
 
 
@@ -115,20 +109,12 @@ def _predicates(site_pk: int) -> list[tuple[type, object]]:
         (Revision, Revision.page_pk.in_(pages)),
         (ProofreadPageMeta, ProofreadPageMeta.title_pk.in_(pages)),
         (IndexMeta, or_(IndexMeta.site_pk == site_pk, IndexMeta.page_pk.in_(pages))),
-        (FileMeta, FileMeta.page_pk.in_(pages)),
         (FileBlob, FileBlob.page_pk.in_(pages)),
         (ScanAnnotation, ScanAnnotation.title_pk.in_(pages)),
         (BoxRangeLink, BoxRangeLink.title_pk.in_(pages)),
         (TextTargetAnchor, TextTargetAnchor.title_pk.in_(pages)),
         (EditJournal, EditJournal.title_pk.in_(pages)),
         (Commit, Commit.title_pk.in_(pages)),
-        (
-            Transclusion,
-            or_(
-                Transclusion.site_pk == site_pk,
-                Transclusion.source_page_pk.in_(pages),
-            ),
-        ),
         (FetchRequest, FetchRequest.site_pk == site_pk),
         (Page, Page.site_pk == site_pk),
         # After Page: every page is a title, sharing its pk. By site rather
@@ -167,21 +153,14 @@ def execute_site_delete(session: Session, site: Site) -> SiteDeletePlan:
     """
     assert site.pk is not None
     plan = plan_site_delete(session, site)
-    pages = _page_pks(site.pk)
 
     # The orphan predicate is self-referential through `slot`, so the pks must
     # be pinned down before the slot rows it consults are gone.
     orphaned_contents = list(session.exec(_orphaned_content_pks(site.pk)).all())
 
-    # Surviving FileMeta rows may cite this site's pages as crop provenance;
-    # FetchRequest children cite their parent within the doomed set. Both
-    # references must be cleared before the rows behind them go, or the
-    # foreign keys (rightly) refuse.
-    session.execute(
-        update(FileMeta)
-        .where(FileMeta.source_page_pk.in_(pages), FileMeta.page_pk.not_in(pages))
-        .values(source_page_pk=None)
-    )
+    # FetchRequest children cite their parent within the doomed set; that
+    # reference must be cleared before the rows behind it go, or the foreign
+    # key (rightly) refuses.
     session.execute(
         update(FetchRequest)
         .where(FetchRequest.site_pk == site.pk)

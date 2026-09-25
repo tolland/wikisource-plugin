@@ -9,7 +9,6 @@ from wtbot.model import (
     CommitStatus,
     EditJournal,
     FileBlob,
-    FileMeta,
     IndexMeta,
     Page,
     Site,
@@ -262,13 +261,6 @@ class PageStore:
         thumb/source URL (or the raster cache filled a local path)."""
         meta = self.proofread_page_meta(page)
         return meta_has_image(meta)
-
-    def file_meta(self, page: Page) -> FileMeta | None:
-        return self.session.exec(
-            select(FileMeta).where(FileMeta.page_pk == page.pk)
-        ).first()
-
-    # -- edit journal -----------------------------------------------------------
 
     def effective_state(self, page: Page) -> "EffectiveState":
         """What read()/stat() should report for [page]: body and revid together.

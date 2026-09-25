@@ -26,7 +26,6 @@ NATURAL_KEYS: dict[str, tuple[str, ...]] = {
     "boxrangelink": ("title_pk", "box_annotation_id"),
     "content": ("content_sha1", "content_model"),
     "fileblob": ("page_pk", "file_sha1", "upload_timestamp"),
-    "filemeta": ("page_pk",),
     "indexlink": ("pk",),  # shared with the pairing it tracks
     "indexmeta": ("page_pk",),
     "namespace": ("site_pk", "key"),
@@ -42,13 +41,6 @@ NATURAL_KEYS: dict[str, tuple[str, ...]] = {
     "slot": ("revision_pk", "role"),
     "texttargetanchor": ("title_pk", "annotation_id"),
     "title": ("site_pk", "title"),
-    "transclusion": (
-        "site_pk",
-        "source_page_pk",
-        "index_title",
-        "from_page",
-        "to_page",
-    ),
 }
 OMITTED_TABLES = (
     "editjournal",

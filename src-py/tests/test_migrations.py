@@ -781,3 +781,29 @@ def test_the_annotation_step_downgrades_cleanly(baseline_engine: Engine) -> None
             assert connection.exec_driver_sql(f"SELECT page_pk FROM {table}").all() == [
                 (7,)
             ]
+
+
+# -- step 2: Transclusion and FileMeta dropped, to be redesigned -------------
+
+TABLES_DROPPED = "f8c0a6e2d493"
+
+
+def test_transclusion_and_filemeta_are_dropped_and_come_back_empty(
+    baseline_engine: Engine,
+) -> None:
+    # Seeded in the shape _seed_annotations writes: a site and a page to cite.
+    _run(baseline_engine, command.upgrade, WORK_SHARES_KEY)
+    _seed_annotations(baseline_engine)
+    _run(baseline_engine, command.upgrade, ANNOTATIONS_TO_TITLE)
+    with baseline_engine.begin() as connection:
+        connection.exec_driver_sql(
+            "INSERT INTO filemeta (page_pk, origin) VALUES (7, 'paste')"
+        )
+
+    _run(baseline_engine, command.upgrade, TABLES_DROPPED)
+    assert not {"transclusion", "filemeta"} & _tables(baseline_engine)
+
+    _run(baseline_engine, command.downgrade, ANNOTATIONS_TO_TITLE)
+    assert {"transclusion", "filemeta"} <= _tables(baseline_engine)
+    with baseline_engine.connect() as connection:
+        assert connection.exec_driver_sql("SELECT count(*) FROM filemeta").scalar() == 0

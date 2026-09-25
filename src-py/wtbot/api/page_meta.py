@@ -5,13 +5,10 @@ from sqlmodel import Session
 from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.deps import get_session
 from wtbot.model import (
-    FileMeta,
-    FileOrigin,
     IndexMeta,
     Page,
     ProofreadPageMeta,
 )
-from wtbot.model.wiki.namespace import FILE_NAMESPACE_KEY
 from wtbot.model.wikisource.proofread_page_meta import SHORT_NAME_RE
 from wtbot.vfs.nodes import (
     FileBlobLeaf,
@@ -25,7 +22,7 @@ from wtbot.vfs.nodes import (
 )
 from wtbot.vfs.store import PROOFREAD_INDEX_CONTENT_MODEL, PageStore
 
-"""Per-role Page metadata extensions (IndexMeta / ProofreadPageMeta / FileMeta).
+"""Per-role Page metadata extensions (IndexMeta / ProofreadPageMeta).
 
 GET returns 404 while no row exists; PUT upserts with partial-update
 semantics (only fields present in the request body are applied).
@@ -103,16 +100,6 @@ class ProofreadPageMetaUpdate(BaseModel):
     thumb_height: int | None = None
     raster_path: str | None = None
     thumb_path: str | None = None
-
-
-class FileMetaUpdate(BaseModel):
-    origin: FileOrigin | None = None
-    source_page_pk: int | None = None
-    source_page_number: int | None = None
-    crop_x: int | None = None
-    crop_y: int | None = None
-    crop_w: int | None = None
-    crop_h: int | None = None
 
 
 # -- IndexMeta ---------------------------------------------------------------
@@ -224,38 +211,6 @@ def put_page_meta(
         assert index_title_pk is not None  # guarded above; narrows the model input
         meta = ProofreadPageMeta(title_pk=page.pk, index_title_pk=index_title_pk)
     for field, value in values.items():
-        setattr(meta, field, value)
-    session.add(meta)
-    session.commit()
-    session.refresh(meta)
-    return meta
-
-
-# -- FileMeta ------------------------------------------------------------------
-
-
-@router.get("/{page_pk}/file-meta", response_model=FileMeta)
-def get_file_meta(page_pk: int, session: Session = Depends(get_session)) -> FileMeta:
-    page = _get_page(session, page_pk)
-    meta = PageStore(session).file_meta(page)
-    if meta is None:
-        raise HTTPException(status_code=404, detail="no file meta yet")
-    return meta
-
-
-@router.put("/{page_pk}/file-meta", response_model=FileMeta)
-def put_file_meta(
-    page_pk: int,
-    update: FileMetaUpdate,
-    session: Session = Depends(get_session),
-) -> FileMeta:
-    page = _get_page(session, page_pk)
-    if page.namespace_key != FILE_NAMESPACE_KEY:
-        raise HTTPException(
-            status_code=400, detail=f"not a File:-namespace page: {page.title}"
-        )
-    meta = PageStore(session).file_meta(page) or FileMeta(page_pk=page.pk)
-    for field, value in update.model_dump(exclude_unset=True).items():
         setattr(meta, field, value)
     session.add(meta)
     session.commit()

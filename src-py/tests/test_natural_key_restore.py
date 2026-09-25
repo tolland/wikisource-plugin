@@ -22,7 +22,7 @@ def test_restore_roundtrip_with_new_ids_and_named_constraints(tmp_path: Path) ->
     )
     after = read_dump(rebuilt)
     assert result.rows == sum(len(table.rows) for table in before.tables)
-    assert result.tables == 20
+    assert result.tables == 18
     for table in before.tables:
         for row in table.rows:
             row.fields.pop("legacy_note", None)
@@ -99,7 +99,9 @@ def test_restore_rejects_invalid_archives(tmp_path: Path, damage: str) -> None:
     elif damage == "duplicate":
         tables["site"].rows.append(tables["site"].rows[0])
     else:
-        dump.tables.pop()
+        # By name, and one no legacy upgrade can supply: a dump missing
+        # `title` is an old dump, and the restore rightly completes it.
+        dump.tables[:] = [table for table in dump.tables if table.name != "revision"]
     archive.write_text(dump.model_dump_json())
     with pytest.raises(ValueError):
         restore_dump(archive, rebuilt, ignore_columns=frozenset({"site.legacy_note"}))
@@ -244,3 +246,30 @@ def test_a_dump_taken_before_meta_was_keyed_to_titles_restores(
             JOIN title t ON t.pk = a.title_pk
             """).fetchall() == [("Page:Book/1", "box-1")]
         assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
+
+
+def test_a_dump_with_since_dropped_tables_restores_without_them(tmp_path: Path) -> None:
+    """Transclusion and FileMeta were dropped for redesign. A dump that still
+    carries them is not refused as having unexpected tables; they are left out."""
+    original, archive, legacy, rebuilt = (
+        tmp_path / name
+        for name in ("source.db", "dump.json", "legacy.json", "rebuilt.db")
+    )
+    make_database(original)
+    write_dump(original, archive)
+    raw = json.loads(archive.read_text())
+    raw["tables"] += [
+        {"name": "transclusion", "key_fields": [], "rows": []},
+        {"name": "filemeta", "key_fields": ["page_pk"], "rows": []},
+    ]
+    legacy.write_text(json.dumps(raw))
+
+    restore_dump(legacy, rebuilt, ignore_columns=frozenset({"site.legacy_note"}))
+    with sqlite3.connect(rebuilt) as connection:
+        tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            )
+        }
+    assert not {"transclusion", "filemeta"} & tables

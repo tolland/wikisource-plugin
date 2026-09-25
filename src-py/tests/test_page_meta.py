@@ -198,32 +198,6 @@ def test_page_meta_rejected_for_non_page(client, seeded):
     assert r.status_code == 400
 
 
-def test_file_meta_records_provenance(client, seeded):
-    pk = seeded["file_pk"]
-    r = client.put(
-        f"/pages/{pk}/file-meta",
-        json={
-            "origin": "paste",
-            "source_page_pk": seeded["page_pk"],
-            "source_page_number": 159,
-            "crop_x": 120,
-            "crop_y": 340,
-            "crop_w": 800,
-            "crop_h": 600,
-        },
-    )
-    assert r.status_code == 200
-    body = client.get(f"/pages/{pk}/file-meta").json()
-    assert body["origin"] == "paste"
-    assert body["source_page_number"] == 159
-    assert body["crop_w"] == 800
-
-
-def test_file_meta_rejected_for_non_file(client, seeded):
-    r = client.put(f"/pages/{seeded['index_pk']}/file-meta", json={"origin": "paste"})
-    assert r.status_code == 400
-
-
 def test_meta_404_for_missing_page(client, seeded):
     assert client.get("/pages/99999/index-meta").status_code == 404
     assert client.put("/pages/99999/page-meta", json={}).status_code == 404

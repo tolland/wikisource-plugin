@@ -194,9 +194,22 @@ def _drop_legacy_references(dump: DatabaseDump) -> DatabaseDump:
     return dump.model_copy(update={"tables": tables})
 
 
+# Tables later steps removed. Transclusion was never populated; FileMeta is to
+# be redesigned (docs/design/pages-and-existence.md records both). A dump that
+# still carries them restores without them rather than being refused.
+_DROPPED_TABLES: frozenset[str] = frozenset({"transclusion", "filemeta"})
+
+
+def _drop_legacy_tables(dump: DatabaseDump) -> DatabaseDump:
+    return dump.model_copy(
+        update={"tables": [t for t in dump.tables if t.name not in _DROPPED_TABLES]}
+    )
+
+
 # Applied in order: each brings a dump from one schema step to the next, and
 # does nothing to a dump that is already past it.
 _LEGACY_UPGRADES = (
+    _drop_legacy_tables,
     _add_titles_to_legacy_dump,
     _rename_legacy_references,
     _drop_legacy_references,
