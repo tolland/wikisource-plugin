@@ -108,7 +108,7 @@ def _predicates(site_pk: int) -> list[tuple[type, object]]:
         (Content, Content.pk.in_(_orphaned_content_pks(site_pk))),
         (Revision, Revision.page_pk.in_(pages)),
         (ProofreadPageMeta, ProofreadPageMeta.title_pk.in_(pages)),
-        (IndexMeta, or_(IndexMeta.site_pk == site_pk, IndexMeta.page_pk.in_(pages))),
+        (IndexMeta, or_(IndexMeta.site_pk == site_pk, IndexMeta.title_pk.in_(pages))),
         (FileBlob, FileBlob.page_pk.in_(pages)),
         (ScanAnnotation, ScanAnnotation.title_pk.in_(pages)),
         (BoxRangeLink, BoxRangeLink.title_pk.in_(pages)),

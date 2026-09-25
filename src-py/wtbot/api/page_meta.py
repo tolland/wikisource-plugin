@@ -154,7 +154,7 @@ def put_index_meta(
         )
     if meta is None:
         meta = IndexMeta(
-            page_pk=page.pk, site_pk=page.site_pk, short_name=update.short_name
+            title_pk=page.pk, site_pk=page.site_pk, short_name=update.short_name
         )
     else:
         meta.short_name = update.short_name

@@ -49,7 +49,7 @@ def link_indexes(
     for page in (local_index, remote_index):
         meta = session.exec(
             select(IndexMeta).where(
-                IndexMeta.page_pk == page.pk,
+                IndexMeta.title_pk == page.pk,
                 IndexMeta.site_pk == page.site_pk,
             )
         ).first()

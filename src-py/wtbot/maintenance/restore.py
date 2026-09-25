@@ -110,6 +110,8 @@ _RENAMED_REFERENCES: dict[tuple[str, str], tuple[str, str]] = {
     ("scanannotation", "page_pk"): ("title_pk", "title"),
     ("boxrangelink", "page_pk"): ("title_pk", "title"),
     ("texttargetanchor", "page_pk"): ("title_pk", "title"),
+    # IndexMeta's surrogate pk is gone; its page reference became its key.
+    ("indexmeta", "page_pk"): ("title_pk", "title"),
 }
 
 # References that later steps dropped because they were derivable. A work's
@@ -206,6 +208,63 @@ def _drop_legacy_tables(dump: DatabaseDump) -> DatabaseDump:
     )
 
 
+def _page_references_to_titles(dump: DatabaseDump) -> DatabaseDump:
+    """Retarget page references wherever the current schema expects a title.
+
+    Columns that kept their names but now reference ``title`` (PageLink's two
+    sides) cannot be listed as renames -- and their old target is repeated
+    *inside other tables' keys*: an IndexLink or RevisionLink names its pairing
+    by the pairing's key, which names two pages. So this walks every reference,
+    nested ones included, and wherever the current model says a field points at
+    ``title`` but the dump says ``page``, retargets it. Sound because a Page
+    and its Title share a natural key (site, title): only the table name moves.
+    """
+
+    def conform(value: Scalar | Reference, target: str | None):
+        if not isinstance(value, Reference):
+            return value
+        if target == "title" and value.table == "page":
+            value = value.model_copy(update={"table": "title"})
+        return with_conformed_key(value)
+
+    def with_conformed_key(ref: Reference) -> Reference:
+        if ref.table not in NATURAL_KEYS:
+            return ref
+        relationships = _relationships(ref.table)
+        key = tuple(
+            conform(value, relationships.get(field))
+            for field, value in zip(NATURAL_KEYS[ref.table], ref.key, strict=True)
+        )
+        return ref.model_copy(update={"key": key})
+
+    tables = []
+    for table in dump.tables:
+        if table.name not in NATURAL_KEYS:
+            tables.append(table)
+            continue
+        relationships = _relationships(table.name)
+        rows = [
+            row.model_copy(
+                update={
+                    "key": with_conformed_key(
+                        Reference(table=table.name, key=row.key)
+                    ).key,
+                    "references": {
+                        column: (
+                            None
+                            if ref is None
+                            else conform(ref, relationships.get(column))
+                        )
+                        for column, ref in row.references.items()
+                    },
+                }
+            )
+            for row in table.rows
+        ]
+        tables.append(table.model_copy(update={"rows": rows}))
+    return dump.model_copy(update={"tables": tables})
+
+
 # Applied in order: each brings a dump from one schema step to the next, and
 # does nothing to a dump that is already past it.
 _LEGACY_UPGRADES = (
@@ -213,6 +272,7 @@ _LEGACY_UPGRADES = (
     _add_titles_to_legacy_dump,
     _rename_legacy_references,
     _drop_legacy_references,
+    _page_references_to_titles,
 )
 
 

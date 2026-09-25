@@ -42,11 +42,25 @@ change of constraint, never of data.
      `pagelink` foreign-key cycle.
    - **Done** (`e5f2a8d1c349`): `ScanAnnotation`, `BoxRangeLink`,
      `TextTargetAnchor` keyed to `title_pk`: the scan exists before the page.
+   - **Done** (`f8c0a6e2d493`): `Transclusion` and `FileMeta` dropped for
+     redesign rather than moved; their shapes are in §12.
+   - **Done** (`a9d4b7e1f026`): `IndexMeta` shares its Index's title key (so
+     an Index assembled from the client carries its metadata before any wiki
+     holds it), and `PageLink.local_page_pk`/`remote_page_pk` reference
+     `title` -- a pairing is the intention to keep two addresses in step,
+     whichever exists yet. The column names stay until the directed-links
+     rework.
+   - **Decided, staying on `page`:** `Revision` (a revision is of a page the
+     wiki holds; deleted-and-recreated pages are out of scope), `FileBlob`
+     (a blob is bytes the wiki holds; what a prospective blob would be is
+     undefined), and `PromotionBatch.source_page_pk` (by design).
    - **Deferred, to be revisited:** directed, mirrored `PageLink` and
      `RevisionLink` on titles -- one row per direction, the mirror enforced
      by a deferred composite foreign key, removing the two expression
      indexes and the either-way lookups. It also fixes `sync.py`'s anchor
-     report, which reads a rung's `local` as the sync's source.
+     report, which reads a rung's `local` as the sync's source. **Decided:
+     a tracked work is per direction** -- an `IndexLink` will share the key
+     of one directed pairing.
    - **Next:** the columns that belong to the address (`namespace_key`,
      `dirty`, `fetch_status`, `history_complete_from_revid`).
 

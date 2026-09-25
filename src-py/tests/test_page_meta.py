@@ -81,7 +81,7 @@ def test_ensure_index_meta_creates_default_and_is_idempotent(session):
 
     meta = store.ensure_index_meta(index)
     assert meta.short_name == "Wittgenstein-Tractatus_Logico-Philosophicus_1922"
-    assert store.ensure_index_meta(index).pk == meta.pk
+    assert store.ensure_index_meta(index).title_pk == meta.title_pk == index.pk
 
 
 def test_ensure_index_meta_deconflicts_same_site_defaults(session):

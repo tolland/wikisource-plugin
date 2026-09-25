@@ -153,7 +153,7 @@ def test_fanout_creates_stubs_and_fetches_only_existing(engine, tmp_path):
         # recorded on the Index's IndexMeta row.
         index_row = s.exec(select(Page).where(Page.title == INDEX)).one()
         index_meta = s.exec(
-            select(IndexMeta).where(IndexMeta.page_pk == index_row.pk)
+            select(IndexMeta).where(IndexMeta.title_pk == index_row.pk)
         ).one()
         assert index_meta.page_count == 5
 

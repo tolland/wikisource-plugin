@@ -79,5 +79,5 @@ def _page_counts(session: Session, page_pks: list[int]) -> dict[int, int | None]
     """Index page_count now lives on IndexMeta; look it up per Index page_pk."""
     if not page_pks:
         return {}
-    rows = session.exec(select(IndexMeta).where(IndexMeta.page_pk.in_(page_pks))).all()
-    return {row.page_pk: row.page_count for row in rows}
+    rows = session.exec(select(IndexMeta).where(IndexMeta.title_pk.in_(page_pks))).all()
+    return {row.title_pk: row.page_count for row in rows}

@@ -483,7 +483,7 @@ def list_candidates(
 
     pages = session.exec(
         select(Page, IndexMeta)
-        .join(IndexMeta, IndexMeta.page_pk == Page.pk)
+        .join(IndexMeta, IndexMeta.title_pk == Page.pk)
         .where(Page.site_pk == site.pk, IndexMeta.site_pk == site.pk)
         .order_by(Page.title)
     ).all()

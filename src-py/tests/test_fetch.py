@@ -303,7 +303,7 @@ def test_index_fanout_creates_pages_and_children(app_with_index_fanout, engine):
         # page_count (from <pagelist> wikitext) is recorded on IndexMeta.
         index_row = next(p for p in pages if p.title == _INDEX_TITLE)
         index_meta = s.exec(
-            select(IndexMeta).where(IndexMeta.page_pk == index_row.pk)
+            select(IndexMeta).where(IndexMeta.title_pk == index_row.pk)
         ).one()
         assert index_meta.page_count == 3
 
@@ -320,7 +320,7 @@ def test_index_fanout_creates_pages_and_children(app_with_index_fanout, engine):
     with Session(engine) as s:
         index_page = s.exec(select(Page).where(Page.title == _INDEX_TITLE)).first()
         meta = s.exec(
-            select(IndexMeta).where(IndexMeta.page_pk == index_page.pk)
+            select(IndexMeta).where(IndexMeta.title_pk == index_page.pk)
         ).first()
         assert meta is not None
         assert meta.site_pk == index_page.site_pk

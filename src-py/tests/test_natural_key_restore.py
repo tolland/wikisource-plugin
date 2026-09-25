@@ -162,6 +162,19 @@ def _as_before_works_shared_their_pairings_key(raw: dict) -> None:
                 row["references"]["index_link_pk"] = None
 
 
+def _every_reference_names_a_page(value):
+    """Before titles existed, every reference that now names a title named a
+    page -- including those nested inside other tables' keys (a work's key is
+    its pairing's, which is two pages)."""
+    if isinstance(value, dict):
+        if value.get("table") == "title":
+            value = {**value, "table": "page"}
+        return {k: _every_reference_names_a_page(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_every_reference_names_a_page(v) for v in value]
+    return value
+
+
 def test_a_dump_taken_before_titles_existed_restores_with_them(tmp_path: Path) -> None:
     """The backup taken before a schema change is older than the code restoring
     it. A pre-Title dump has no title table, no page->title reference, and the
@@ -187,14 +200,27 @@ def test_a_dump_taken_before_titles_existed_restores_with_them(tmp_path: Path) -
                 )
     _as_before_meta_was_keyed_to_titles(raw)
     _as_before_works_shared_their_pairings_key(raw)
+    for table in raw["tables"]:
+        if table["name"] == "indexmeta":
+            table["key_fields"] = ["page_pk"]
+            for row in table["rows"]:
+                row["references"]["page_pk"] = row["references"].pop("title_pk")
+    raw["tables"] = _every_reference_names_a_page(raw["tables"])
     legacy.write_text(json.dumps(raw))
 
     restore_dump(legacy, rebuilt, ignore_columns=frozenset({"site.legacy_note"}))
     with sqlite3.connect(rebuilt) as connection:
-        # The work came back sharing its pairing's key.
+        # The work came back sharing its pairing's key, the pairing's sides
+        # are titles, and the index metadata is keyed to the index's title.
         assert connection.execute(
             "SELECT count(*) FROM indexlink w JOIN pagelink p ON p.pk = w.pk"
+            " JOIN title a ON a.pk = p.local_page_pk"
+            " JOIN title b ON b.pk = p.remote_page_pk"
         ).fetchone() == (1,)
+        assert connection.execute(
+            "SELECT t.title, m.short_name, m.page_count FROM indexmeta m"
+            " JOIN title t ON t.pk = m.title_pk"
+        ).fetchall() == [("Index:Book", "Book", 9)]
         titles = connection.execute("""
             SELECT s.family, t.title, t.expected_content_model, t.pk = p.pk
             FROM title t JOIN page p ON p.pk = t.pk JOIN site s ON s.pk = t.site_pk
