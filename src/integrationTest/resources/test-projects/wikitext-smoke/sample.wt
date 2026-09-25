@@ -1,0 +1,11 @@
+== UI smoke heading ==
+
+Some '''bold''' and ''italic'' text with a [[Main Page|link]].
+
+{{Template name|param=value}}
+
+{| class="wikitable"
+! Header
+|-
+| Cell
+|}

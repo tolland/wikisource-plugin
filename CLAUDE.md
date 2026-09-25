@@ -41,6 +41,14 @@ GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew generateLexer generateParser  # 
 GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew check           # build + tests + spotless, run by the pre-commit hook
 ```
 
+UI integration tests (Starter + Driver, `src/integrationTest/`) launch the real IDE against a docker wtbot backend on the test ports — see `docs/reference/ui-tests.md`:
+
+```bash
+GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew integrationTest                 # compose up → drive IDE → compose down
+GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew integrationTest -PuiTestWtbotBaseUrl=http://127.0.0.1:18574   # reuse a running backend, no docker
+GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew runIdeUiTestBackend             # same backend, interactive sandbox IDE
+```
+
 The sandbox's wtbot sidecar can be chosen per launch, so a session can be pointed at the docker harness instead of the workstation sidecar without editing settings by hand:
 
 ```bash

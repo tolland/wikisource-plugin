@@ -27,6 +27,25 @@ val intellijPlatformVersion = providers.gradleProperty("intellijPlatformVersion"
 val wtbotBaseUrl = providers.gradleProperty("wtbotBaseUrl")
 val wtbotTimeoutSeconds = providers.gradleProperty("wtbotTimeoutSeconds")
 
+// UI integration tests (`./gradlew integrationTest`) run against their own
+// docker compose project on the test-port convention (AGENTS.md: 1858x), so
+// they never touch the dev stack (1857x) or the workstation sidecar. Passing
+// -PuiTestWtbotBaseUrl=... skips docker entirely and points the IDE at a
+// backend you already have running; -PuiTestKeepBackend leaves the compose
+// project up afterwards for poking at with the viewer or curl.
+val uiTestComposeProject = providers.gradleProperty("uiTestComposeProject").orElse("wtbot-ui-test")
+val uiTestWikiPort = providers.gradleProperty("uiTestWikiPort").orElse("18581")
+val uiTestLocalWikiPort = providers.gradleProperty("uiTestLocalWikiPort").orElse("18582")
+val uiTestViewerPort = providers.gradleProperty("uiTestViewerPort").orElse("18583")
+val uiTestWtbotPort = providers.gradleProperty("uiTestWtbotPort").orElse("18584")
+val uiTestExternalBackend = providers.gradleProperty("uiTestWtbotBaseUrl")
+val uiTestWtbotBaseUrl = uiTestExternalBackend.orElse(uiTestWtbotPort.map { "http://127.0.0.1:$it" })
+val uiTestKeepBackend = providers.gradleProperty("uiTestKeepBackend").isPresent
+// Extra compose overlays on top of seeded + wtbot, e.g. -PuiTestComposeOverlays=compose.principles.yml
+val uiTestComposeOverlays = providers.gradleProperty("uiTestComposeOverlays")
+    .map { it.split(',').map(String::trim).filter(String::isNotEmpty) }
+    .orElse(emptyList())
+
 plugins {
     idea
     id("org.jetbrains.kotlin.jvm")
@@ -40,6 +59,17 @@ plugins {
 idea {
     module {
     }
+}
+
+sourceSets {
+    create("integrationTest") {
+        compileClasspath += sourceSets.main.get().output
+        runtimeClasspath += sourceSets.main.get().output
+    }
+}
+
+configurations.named("integrationTestImplementation") {
+    extendsFrom(configurations.testImplementation.get())
 }
 
 allprojects {
@@ -72,10 +102,15 @@ dependencies {
         pluginModule(implementation(project(":wikitext-vfs")))
         pluginModule(implementation(project(":wikitext-ui")))
         testFramework(TestFrameworkType.Platform)
+        testFramework(TestFrameworkType.Starter, configurationName = "integrationTestImplementation")
         bundledModule("intellij.platform.structureView")
         bundledModule("intellij.platform.ui.jcef")
         bundledModule("intellij.libraries.jcef")
     }
+    "integrationTestImplementation"("org.junit.jupiter:junit-jupiter:5.13.4")
+    "integrationTestRuntimeOnly"("org.junit.platform:junit-platform-launcher:1.13.4")
+    "integrationTestImplementation"("org.kodein.di:kodein-di-jvm:7.26.1")
+    "integrationTestImplementation"("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.10.2")
 }
 
 intellijPlatform {
@@ -196,5 +231,82 @@ intellijPlatformTesting {
                 )
             }
         }
+
+        // The integrationTest backend, by hand: brings the compose project up
+        // and opens a sandbox IDE on it, for writing XPath queries against
+        // the Driver devtools or reproducing a failed UI test.
+        register("runIdeUiTestBackend") {
+            task {
+                dependsOn("uiTestBackendUp")
+                systemProperty("wtbot.baseUrl", uiTestWtbotBaseUrl.get())
+            }
+        }
+    }
+}
+
+// -- UI integration tests ---------------------------------------------------
+//
+// The docker backend for them: the seeded wiki pair plus the wtbot API, in its
+// own compose project so its volumes (and MW_SERVER, baked in at install time
+// for one port) are never shared with the dev stack. `up --wait` blocks on the
+// healthchecks, which only go green after seeding.
+fun uiTestComposeCommand(vararg args: String): List<String> = buildList {
+    addAll(listOf("docker", "compose", "-f", "compose.seeded.yml", "-f", "compose.wtbot.yml"))
+    uiTestComposeOverlays.get().forEach { addAll(listOf("-f", it)) }
+    addAll(listOf("--profile", "pair", "--profile", "api"))
+    addAll(args)
+}
+
+fun Exec.uiTestComposeEnvironment() {
+    workingDir = rootProject.projectDir
+    environment("COMPOSE_PROJECT_NAME", uiTestComposeProject.get())
+    environment("WIKISOURCE_PORT", uiTestWikiPort.get())
+    environment("WIKISOURCE_LOCAL_PORT", uiTestLocalWikiPort.get())
+    environment("WTBOT_PORT", uiTestWtbotPort.get())
+    environment("WTBOT_VIEWER_PORT", uiTestViewerPort.get())
+    // Every run starts from an empty sidecar database; the tests register
+    // what they need. The wikis keep their (slow to build) volumes.
+    environment("WTBOT_RESET_DB", "1")
+}
+
+val uiTestBackendUp = tasks.register<Exec>("uiTestBackendUp") {
+    group = "verification"
+    description = "Starts the docker compose backend (wiki pair + wtbot) for integrationTest."
+    onlyIf("-PuiTestWtbotBaseUrl not set") { !uiTestExternalBackend.isPresent }
+    uiTestComposeEnvironment()
+    commandLine(uiTestComposeCommand("up", "-d", "--build", "--wait"))
+}
+
+val uiTestBackendDown = tasks.register<Exec>("uiTestBackendDown") {
+    group = "verification"
+    description = "Stops the integrationTest docker compose backend (volumes are kept)."
+    onlyIf("-PuiTestWtbotBaseUrl not set") { !uiTestExternalBackend.isPresent }
+    uiTestComposeEnvironment()
+    commandLine(uiTestComposeCommand("down", "--remove-orphans"))
+}
+
+intellijPlatformTesting.testIdeUi.register("integrationTest") {
+    task {
+        group = "verification"
+        description = "Launches the IDE with the plugin via Starter/Driver and drives its UI."
+        val integrationTestSourceSet = sourceSets.getByName("integrationTest")
+        testClassesDirs = integrationTestSourceSet.output.classesDirs
+        classpath = integrationTestSourceSet.runtimeClasspath
+        useJUnitPlatform()
+
+        dependsOn(uiTestBackendUp)
+        if (!uiTestKeepBackend) finalizedBy(uiTestBackendDown)
+
+        val pluginZip = tasks.buildPlugin.flatMap { it.archiveFile }
+        inputs.file(pluginZip).withPropertyName("pluginZip")
+        systemProperty("path.to.build.plugin", pluginZip.get().asFile.absolutePath)
+        // Reuse the IDE Gradle already resolved rather than letting Starter
+        // download (and cache) a second copy of it.
+        systemProperty("path.to.platform", intellijPlatform.platformPath.toString())
+        systemProperty("wtbot.baseUrl", uiTestWtbotBaseUrl.get())
+        systemProperty("uitest.wikiApiUrl", "http://127.0.0.1:${uiTestWikiPort.get()}/api.php")
+        systemProperty("uitest.output", layout.buildDirectory.dir("ui-test").get().asFile.absolutePath)
+        // UI runs are slow and stateful; never serve them from the build cache.
+        outputs.upToDateWhen { false }
     }
 }

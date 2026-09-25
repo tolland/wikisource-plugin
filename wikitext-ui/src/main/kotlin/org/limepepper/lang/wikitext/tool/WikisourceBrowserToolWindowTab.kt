@@ -59,6 +59,8 @@ internal class WikisourceBrowserToolWindowTab(
         val structureModel = StructureTreeModel(structure, toolWindow.disposable)
         val tree = Tree(AsyncTreeModel(structureModel, toolWindow.disposable))
         tree.isRootVisible = true
+        // Screen readers, and the UI tests' XPath lookup (src/integrationTest).
+        tree.accessibleContext.accessibleName = TREE_ACCESSIBLE_NAME
         tree.cellRenderer = object : ColoredTreeCellRenderer() {
             override fun customizeCellRenderer(
                 tree: JTree,
@@ -248,7 +250,9 @@ internal class WikisourceBrowserToolWindowTab(
         }
     }
 
-    private companion object {
+    internal companion object {
+        const val TREE_ACCESSIBLE_NAME: String = "Wikisource VFS"
+
         /** Structure element behind a rendered tree node, if any. */
         private fun elementOf(node: Any?): Any? {
             val userObject = TreeUtil.getUserObject(node)
