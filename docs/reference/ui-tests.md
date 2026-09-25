@@ -35,7 +35,12 @@ The pytest harness (`wiki_harness`, project `wtbot-sync-pair`) also binds
 | tool window | the VFS tree (`MyToolWindow`) lists a site registered on the backend — i.e. the IDE really is talking to the docker wtbot |
 
 Every level is also a crash check: `WtIdeTestContext` rebinds Starter's
-`CIServer` so any exception in the IDE log fails the test.
+`ErrorReporter` so an exception in the IDE log attributed to this plugin
+(`[Plugin: org.limepepper.lang.wikitext]` or a frame in our package) fails the
+test. Platform noise (e.g. a bundled plugin's missing class, theme warnings) is
+printed to the test output instead.
+
+Under a headless X server: `xvfb-run -a ./gradlew integrationTest …`.
 
 Backend state a test needs is created through wtbot's own HTTP API
 (`WtbotTestBackend`, e.g. `POST /sites/`) in `@BeforeAll`, not baked into the

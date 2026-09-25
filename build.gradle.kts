@@ -109,6 +109,12 @@ dependencies {
     }
     "integrationTestImplementation"("org.junit.jupiter:junit-jupiter:5.13.4")
     "integrationTestRuntimeOnly"("org.junit.platform:junit-platform-launcher:1.13.4")
+    // Starter pulls kotlin-reflect 2.4, which needs a matching stdlib at runtime;
+    // with kotlin.stdlib.default.dependency=false nothing else raises it.
+    "integrationTestRuntimeOnly"("org.jetbrains.kotlin:kotlin-stdlib:2.4.0")
+    // Starter reports test metadata as TeamCity service messages even off CI;
+    // test-framework-team-city declares this but it isn't resolved transitively.
+    "integrationTestRuntimeOnly"("org.jetbrains.teamcity:serviceMessages:2024.07")
     "integrationTestImplementation"("org.kodein.di:kodein-di-jvm:7.26.1")
     "integrationTestImplementation"("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.10.2")
 }
@@ -130,9 +136,14 @@ intellijPlatform {
 tasks {
 
     withType<PrepareSandboxTask> {
-        sandboxDirectory =
-            rootProject.layout.projectDirectory.dir(".intellijPlatform/custom-sandbox")
-        sandboxSuffix = ""
+        // The shared dev sandbox is for the runIde variants only. The UI
+        // tests' sandbox must stay separate: buildPlugin reads the main
+        // sandbox's plugin dir, and Starter runs the IDE from its own copy.
+        if (!name.endsWith("_integrationTest")) {
+            sandboxDirectory =
+                rootProject.layout.projectDirectory.dir(".intellijPlatform/custom-sandbox")
+            sandboxSuffix = ""
+        }
 
         preserve {
             sandboxPluginDirectories.forEach {
@@ -272,7 +283,8 @@ fun Exec.uiTestComposeEnvironment() {
 val uiTestBackendUp = tasks.register<Exec>("uiTestBackendUp") {
     group = "verification"
     description = "Starts the docker compose backend (wiki pair + wtbot) for integrationTest."
-    onlyIf("-PuiTestWtbotBaseUrl not set") { !uiTestExternalBackend.isPresent }
+    val externalBackend = uiTestExternalBackend.isPresent
+    onlyIf("-PuiTestWtbotBaseUrl not set") { !externalBackend }
     uiTestComposeEnvironment()
     commandLine(uiTestComposeCommand("up", "-d", "--build", "--wait"))
 }
@@ -280,7 +292,8 @@ val uiTestBackendUp = tasks.register<Exec>("uiTestBackendUp") {
 val uiTestBackendDown = tasks.register<Exec>("uiTestBackendDown") {
     group = "verification"
     description = "Stops the integrationTest docker compose backend (volumes are kept)."
-    onlyIf("-PuiTestWtbotBaseUrl not set") { !uiTestExternalBackend.isPresent }
+    val externalBackend = uiTestExternalBackend.isPresent
+    onlyIf("-PuiTestWtbotBaseUrl not set") { !externalBackend }
     uiTestComposeEnvironment()
     commandLine(uiTestComposeCommand("down", "--remove-orphans"))
 }
@@ -292,7 +305,8 @@ intellijPlatformTesting.testIdeUi.register("integrationTest") {
         val integrationTestSourceSet = sourceSets.getByName("integrationTest")
         testClassesDirs = integrationTestSourceSet.output.classesDirs
         classpath = integrationTestSourceSet.runtimeClasspath
-        useJUnitPlatform()
+        // The inherited platform test framework drags junit-vintage in; these are JUnit 5 only.
+        useJUnitPlatform { excludeEngines("junit-vintage") }
 
         dependsOn(uiTestBackendUp)
         if (!uiTestKeepBackend) finalizedBy(uiTestBackendDown)

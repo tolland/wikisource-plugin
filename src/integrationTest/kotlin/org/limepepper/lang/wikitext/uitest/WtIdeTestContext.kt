@@ -1,7 +1,5 @@
 package org.limepepper.lang.wikitext.uitest
 
-import com.intellij.ide.starter.ci.CIServer
-import com.intellij.ide.starter.ci.NoCIServer
 import com.intellij.ide.starter.di.di
 import com.intellij.ide.starter.ide.IDETestContext
 import com.intellij.ide.starter.ide.installer.ExistingIdeInstaller
@@ -9,6 +7,9 @@ import com.intellij.ide.starter.models.IdeInfo
 import com.intellij.ide.starter.models.TestCase
 import com.intellij.ide.starter.plugins.PluginConfigurator
 import com.intellij.ide.starter.project.LocalProjectInfo
+import com.intellij.ide.starter.report.ErrorReporter
+import com.intellij.ide.starter.report.ErrorReporterToCI
+import com.intellij.ide.starter.runner.IDERunContext
 import com.intellij.ide.starter.runner.Starter
 import com.intellij.tools.ide.starter.product.idea.ultimate.IdeaUltimate
 import org.junit.jupiter.api.fail
@@ -29,25 +30,37 @@ import kotlin.io.path.deleteRecursively
  */
 object WtIdeTestContext {
     init {
-        // Starter reports exceptions it finds in the IDE log through the CI
-        // server; NoCIServer only prints them. Failing instead is what makes
-        // "the plugin didn't throw" something these tests actually check.
+        // After the IDE exits, Starter collects the exceptions it logged and
+        // hands them to the ErrorReporter; the default only reports them to a
+        // CI server. Failing on ours is what makes "the plugin didn't throw"
+        // something these tests check. The platform's own noise (a bundled
+        // plugin missing a class, theme warnings) is printed, not failed on:
+        // it isn't ours to fix and would make every test red.
         di = DI {
             extend(di)
-            bindSingleton<CIServer>(overrides = true) {
-                object : CIServer by NoCIServer {
-                    override fun reportTestFailure(
-                        testName: String,
-                        message: String,
-                        details: String,
-                        linkToLogs: String?,
-                    ) {
-                        fail { "$testName: IDE reported an error: $message\n$details" }
+            bindSingleton<ErrorReporter>(overrides = true) {
+                object : ErrorReporter {
+                    override fun reportErrorsAsFailedTests(runContext: IDERunContext) {
+                        val (ours, others) = ErrorReporterToCI.collectErrors(runContext.logsDir)
+                            .partition { isFromThisPlugin("${it.messageText}\n${it.stackTraceContent}") }
+                        others.forEach { println("IDE error (not this plugin's): ${it.messageText.lineSequence().first()}") }
+                        if (ours.isEmpty()) return
+                        fail {
+                            ours.joinToString("\n\n", "IDE logged ${ours.size} error(s) from this plugin:\n") {
+                                "${it.messageText}\n${it.stackTraceContent}"
+                            }
+                        }
                     }
                 }
             }
         }
     }
+
+    private const val PLUGIN_ID = "org.limepepper.lang.wikitext"
+
+    /** Thrown from, or attributed by the platform (`[Plugin: …]`) to, this plugin. */
+    internal fun isFromThisPlugin(error: String): Boolean =
+        "[Plugin: $PLUGIN_ID]" in error || Regex("""\bat $PLUGIN_ID\.""").containsMatchIn(error)
 
     private fun property(name: String): String =
         requireNotNull(System.getProperty(name)) { "system property $name not set; run via ./gradlew integrationTest" }

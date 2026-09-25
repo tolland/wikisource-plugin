@@ -15,6 +15,8 @@ import java.time.Duration
  */
 class WtbotTestBackend(val baseUrl: String) {
     private val http: HttpClient = HttpClient.newBuilder()
+        // uvicorn answers the default h2c upgrade on a POST with 400.
+        .version(HttpClient.Version.HTTP_1_1)
         .connectTimeout(Duration.ofSeconds(5))
         .build()
 
