@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from wtbot.api.debug_logging_route import DebugLoggingRoute
+from wtbot.api.schemas import PageRow
 from wtbot.deps import get_session
-from wtbot.model import Content, Page, Revision, Site, Slot
+from wtbot.model import Content, Page, Revision, Site, Slot, Title
 
 router = APIRouter(prefix="/pages", tags=["pages"], route_class=DebugLoggingRoute)
 
@@ -21,12 +22,12 @@ class PageQueryRevision(BaseModel):
 
 
 class PageQueryResult(BaseModel):
-    page: Page
+    page: PageRow
     site_label: str | None
     revisions: list[PageQueryRevision]
 
 
-@router.get("/", response_model=list[Page])
+@router.get("/", response_model=list[PageRow])
 def list_pages(
     session: Session = Depends(get_session),
     site_pk: int | None = None,
@@ -36,19 +37,25 @@ def list_pages(
     title_contains: str | None = None,
     offset: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-) -> list[Page]:
-    statement = select(Page).order_by(Page.title).offset(offset).limit(limit)
+) -> list[PageRow]:
+    statement = (
+        select(Page)
+        .join(Title, col(Title.pk) == col(Page.pk))
+        .order_by(Page.title)
+        .offset(offset)
+        .limit(limit)
+    )
     if site_pk is not None:
         statement = statement.where(Page.site_pk == site_pk)
     if namespace_key is not None:
-        statement = statement.where(Page.namespace_key == namespace_key)
+        statement = statement.where(Title.namespace_key == namespace_key)
     if content_model is not None:
         statement = statement.where(Page.content_model == content_model)
     if title is not None:
         statement = statement.where(Page.title == title)
     if title_contains:
         statement = statement.where(Page.title.contains(title_contains))
-    return list(session.exec(statement).all())
+    return [PageRow.of(page) for page in session.exec(statement).all()]
 
 
 @router.get("/query", response_model=list[PageQueryResult])
@@ -74,6 +81,7 @@ def query_pages(
     statement = (
         select(Page, Site.label)
         .join(Site, Site.pk == Page.site_pk)
+        .join(Title, col(Title.pk) == col(Page.pk))
         .order_by(Site.label, Page.title, Page.pk)
         .limit(limit)
     )
@@ -83,7 +91,7 @@ def query_pages(
         (pageid, Page.pageid),
         (revid, Page.revid),
         (site_label, Site.label),
-        (namespace_key, Page.namespace_key),
+        (namespace_key, Title.namespace_key),
         (content_model, Page.content_model),
     )
     for value, column in filters:
@@ -128,7 +136,7 @@ def query_pages(
 
     return [
         PageQueryResult(
-            page=page,
+            page=PageRow.of(page),
             site_label=label,
             revisions=revisions_by_page[page.pk],
         )
@@ -137,9 +145,9 @@ def query_pages(
     ]
 
 
-@router.get("/{page_pk}", response_model=Page)
-def get_page(page_pk: int, session: Session = Depends(get_session)) -> Page:
+@router.get("/{page_pk}", response_model=PageRow)
+def get_page(page_pk: int, session: Session = Depends(get_session)) -> PageRow:
     page = session.get(Page, page_pk)
     if page is None:
         raise HTTPException(status_code=404, detail="page not found")
-    return page
+    return PageRow.of(page)

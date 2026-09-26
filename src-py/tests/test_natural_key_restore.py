@@ -189,10 +189,23 @@ def test_a_dump_taken_before_titles_existed_restores_with_them(tmp_path: Path) -
 
     models = {"Index:Book": "proofread-index", "Page:Book/1": "proofread-page"}
     raw = json.loads(archive.read_text())
+    # Before titles, the address's own columns were the page's, and so was
+    # fetch_error (never written, since dropped).
+    address = {
+        json.dumps(row["key"]): {
+            field: row["fields"].pop(field)
+            for field in ("namespace_key", "fetch_status", "dirty")
+        }
+        for table in raw["tables"]
+        if table["name"] == "title"
+        for row in table["rows"]
+    }
     raw["tables"] = [t for t in raw["tables"] if t["name"] != "title"]
     for table in raw["tables"]:
         if table["name"] == "page":
             for row in table["rows"]:
+                row["fields"] |= address[json.dumps(row["key"])]
+                row["fields"]["fetch_error"] = None
                 row["references"].pop("pk")
                 on_source = row["key"][0]["key"] == ["source", "en"]
                 row["fields"]["content_model"] = (
@@ -221,6 +234,10 @@ def test_a_dump_taken_before_titles_existed_restores_with_them(tmp_path: Path) -
             "SELECT t.title, m.short_name, m.page_count FROM indexmeta m"
             " JOIN title t ON t.pk = m.title_pk"
         ).fetchall() == [("Index:Book", "Book", 9)]
+        assert connection.execute(
+            "SELECT title, namespace_key, fetch_status, dirty FROM title"
+            " WHERE namespace_key IS NOT NULL"
+        ).fetchall() == [("Page:Book/1", 250, "done", 1)]
         titles = connection.execute("""
             SELECT s.family, t.title, t.expected_content_model, t.pk = p.pk
             FROM title t JOIN page p ON p.pk = t.pk JOIN site s ON s.pk = t.site_pk

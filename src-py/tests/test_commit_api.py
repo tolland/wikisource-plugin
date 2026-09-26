@@ -106,7 +106,7 @@ def test_commit_endpoint_pushes_pending_edits(engine):
         updated = s.get(Page, page.pk)
         assert updated.revid == 101
         assert updated.text == "edited"  # snapshot trued up by the refetch
-        assert updated.dirty is False
+        assert updated.address.dirty is False
 
         journal = s.exec(
             select(EditJournal).where(EditJournal.title_pk == page.pk)
@@ -226,7 +226,7 @@ def test_cancel_pending_commit_discards_local_edits(engine):
             == []
         )
         updated = s.get(Page, page.pk)
-        assert updated.dirty is False
+        assert updated.address.dirty is False
         assert updated.text == "original"
 
 

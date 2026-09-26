@@ -707,7 +707,7 @@ def _is_placeholder(session: Session, page: Page) -> bool:
     """A row for a page that is known not to exist on the wiki.
 
     The fan-out writes these for slots ProofreadPage paginates but nobody has
-    transcribed. Having no revision *and* ``fetch_status=done`` is the
+    transcribed. Having no revision *and* its title's ``fetch_status=done`` is the
     distinction that matters: we asked, and the answer was "absent" -- as
     against a row we have simply not got to, where the answer is unknown.
 
@@ -717,7 +717,10 @@ def _is_placeholder(session: Session, page: Page) -> bool:
     trusting them here would make this answer "create" for a page that has
     revisions, on any path that filled one and not the other.
     """
-    return head_revision(session, page) is None and page.fetch_status == FetchState.done
+    return (
+        head_revision(session, page) is None
+        and page.address.fetch_status == FetchState.done
+    )
 
 
 def _index_page(session: Session, site: Site, title: str) -> Page | None:

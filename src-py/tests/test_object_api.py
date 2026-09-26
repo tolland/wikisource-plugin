@@ -74,10 +74,11 @@ def test_file_blob_model_available_for_object_routes(session: Session):
     session.add(site)
     session.commit()
     session.refresh(site)
-    page = Page(site_pk=site.pk, title="File:Example.pdf", namespace_key=6)
+    page = Page(site_pk=site.pk, title="File:Example.pdf")
     session.add(page)
     session.commit()
     session.refresh(page)
+    page.address.namespace_key = 6
 
     blob = FileBlob(page_pk=page.pk, mime="application/pdf", size=123)
     session.add(blob)

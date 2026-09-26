@@ -95,7 +95,7 @@ def test_push_single_save_succeeds(engine):
         updated = s.get(Page, page.pk)
         assert updated.text == "original"
         assert updated.revid == 100
-        assert updated.dirty is False
+        assert updated.address.dirty is False
 
         # Until the refetch lands, reads bridge on the pushed body.
         assert PageStore(s).effective_body(updated) == "edited"
@@ -162,7 +162,7 @@ def test_local_save_during_remote_push_remains_pending(engine):
     with Session(engine) as s:
         s.add(EditJournal(title_pk=page.pk, base_revid=100, body="first edit"))
         db_page = s.get(Page, page.pk)
-        db_page.dirty = True
+        db_page.address.dirty = True
         s.add(db_page)
         s.commit()
 
@@ -170,7 +170,7 @@ def test_local_save_during_remote_push_remains_pending(engine):
         with Session(engine) as s:
             db_page = s.get(Page, page.pk)
             db_page.text = "second edit"
-            db_page.dirty = True
+            db_page.address.dirty = True
             s.add(db_page)
             s.add(EditJournal(title_pk=page.pk, base_revid=100, body="second edit"))
             s.commit()
@@ -200,7 +200,7 @@ def test_local_save_during_remote_push_remains_pending(engine):
         updated = s.get(Page, page.pk)
         assert updated.text == "second edit"
         assert updated.revid == 100  # snapshot untouched; Commit logs 101
-        assert updated.dirty is True
+        assert updated.address.dirty is True
 
         journal = s.exec(
             select(EditJournal)
@@ -398,7 +398,7 @@ def test_pending_commit_api_can_force_overwrite_conflict(engine):
 
         assert updated_snapshot_revid(s, page.pk) == 100  # refetch still queued
         assert PageStore(s).effective_revid(s.get(Page, page.pk)) == 201
-        assert s.get(Page, page.pk).dirty is False
+        assert s.get(Page, page.pk).address.dirty is False
         assert list_pending_commits(session=s) == []
 
         # Committing enqueues the refetch; draining it trues the snapshot up.
@@ -412,7 +412,7 @@ def test_pending_commit_api_can_cancel_local_edits(engine):
     site, page = _setup(engine)
     with Session(engine) as s:
         db_page = s.get(Page, page.pk)
-        db_page.dirty = True
+        db_page.address.dirty = True
         s.add(db_page)
         s.add(EditJournal(title_pk=page.pk, base_revid=100, body="draft"))
         s.commit()
@@ -423,7 +423,7 @@ def test_pending_commit_api_can_cancel_local_edits(engine):
         assert list_pending_commits(session=s) == []
 
         updated = s.get(Page, page.pk)
-        assert updated.dirty is False
+        assert updated.address.dirty is False
         assert updated.text == "original"
         assert (
             s.exec(select(EditJournal).where(EditJournal.title_pk == page.pk)).all()

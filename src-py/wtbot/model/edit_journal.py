@@ -7,7 +7,7 @@ from wtbot.timeutil import utcnow
 
 class EditJournal(SQLModel, table=True):
     """Local transaction log of IDE saves, kept distinct from the cached remote
-    body. Every VFS write appends a row (and flips Page.dirty); a commit reads
+    body. Every VFS write appends a row (and flips Title.dirty); a commit reads
     the uncommitted rows, pushes via pywikibot, and marks them committed. This
     is what keeps "save in the IDE" cheap/offline and separate from "push to the
     wiki"."""

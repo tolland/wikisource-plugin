@@ -561,9 +561,9 @@ def _ensure_placeholder_page(
         site_pk=site_pk,
         title=title,
         content_model="proofread-page",
-        # We *know* the remote state: absent. The fetch is complete.
-        fetch_status=FetchState.done,
     )
+    # We *know* the remote state: absent. The fetch is complete.
+    title_row.fetch_status = FetchState.done
     session.add(page)
     session.flush()
     index_page = ensure_index_page(session, site_pk, index_title)

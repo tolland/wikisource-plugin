@@ -291,7 +291,7 @@ aggregate `progress_done / progress_total`.
 identifies a namespace; `canonical_name` and `local_name` identify its names.
 `subpages`, `content`, and `case` describe namespace capabilities.
 
-`Page.namespace_key` resolves within its own site, never across sites. Extension
+`Title.namespace_key` resolves within its own site, never across sites. Extension
 namespace IDs can differ between installations. Use namespace metadata when
 filtering namespaces or determining whether slashes denote subpages.
 

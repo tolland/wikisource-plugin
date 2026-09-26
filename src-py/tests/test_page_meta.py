@@ -39,10 +39,10 @@ def _add_page(
         site_pk=site.pk,
         title=title,
         content_model=cm,
-        namespace_key=namespace_key,
     )
     session.add(page)
     session.flush()
+    page.address.namespace_key = namespace_key
     if index_title is not None:
         add_proofread_meta(session, page_pk=page.pk, index_title=index_title)
     session.commit()

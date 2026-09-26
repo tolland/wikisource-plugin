@@ -408,7 +408,6 @@ def _upsert_page(
         # splices two unrelated histories together under this Page row.
         validate_remote_identity(session, page, remote)
 
-        page.namespace_key = remote.namespace_key
         page.content_model = remote.content_model
         page.text = remote.text
         page.pageid = remote.pageid
@@ -419,9 +418,10 @@ def _upsert_page(
 
         processor.enrich(page, remote)
 
-        page.dirty = False
-        page.fetch_status = FetchState.done
-        page.fetch_error = None
+        title_row.namespace_key = remote.namespace_key
+        title_row.dirty = False
+        title_row.fetch_status = FetchState.done
+        session.add(title_row)
 
         session.add(page)
         session.flush()

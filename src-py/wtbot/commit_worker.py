@@ -317,7 +317,7 @@ def _record_commit_outcome(
                 # dirty is local bookkeeping; the remote-snapshot columns
                 # (text/revid/...) are deliberately left untouched — the
                 # enqueued refetch is the only writer of those.
-                page.dirty = _has_uncaptured_pending_edits(session, pending)
+                page.address.dirty = _has_uncaptured_pending_edits(session, pending)
                 session.add(page)
                 session.add(
                     FetchRequest(

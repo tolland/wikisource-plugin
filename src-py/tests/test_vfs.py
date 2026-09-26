@@ -87,7 +87,6 @@ def vfs_client(engine, tmp_path) -> TestClient:
         file_page = Page(
             site_pk=site.pk,
             title=FILE,
-            namespace_key=6,
             content_model="wikitext",
             text=_FILE_BODY,
             pageid=1002,
@@ -96,6 +95,7 @@ def vfs_client(engine, tmp_path) -> TestClient:
         s.add(file_page)
         s.commit()
         s.refresh(file_page)
+        file_page.address.namespace_key = 6
 
         blob = FileBlob(
             page_pk=file_page.pk,
@@ -590,7 +590,7 @@ def test_write_page_ok(vfs_client, engine):
         # Page.text is the cached *remote* body -- a local save must never
         # touch it, or a later refresh loses the diff base.
         assert page.text == _PAGE_1_BODY
-        assert page.dirty is True
+        assert page.address.dirty is True
 
         journal = s.exec(
             select(EditJournal).where(EditJournal.title_pk == page.pk)
@@ -673,7 +673,7 @@ def test_write_index_namespace_asset(engine):
 
     assert result.status == "ok"
     assert page.text == ".pagetext {}"  # unchanged -- still the cached remote body
-    assert page.dirty is True
+    assert page.address.dirty is True
     assert journal.body == new_body
     assert journal.base_revid == 5005
 
