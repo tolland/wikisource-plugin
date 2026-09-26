@@ -9,6 +9,7 @@ from wtbot.model import (
     Commit,
     EditJournal,
     FetchRequest,
+    FetchState,
     Page,
     ProofreadPageMeta,
     ScanAnnotation,
@@ -16,7 +17,7 @@ from wtbot.model import (
     TextTargetAnchor,
     Title,
 )
-from wtbot.page_processors import _ensure_placeholder_page, ensure_index_page
+from wtbot.page_processors import _ensure_untranscribed_title, ensure_index_title
 from wtbot.title_store import ensure_title, record_fetched_content_model
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import RemotePage
@@ -143,7 +144,7 @@ def test_a_fetch_that_contradicts_the_guess_warns_and_corrects_it(
 def test_the_fan_out_records_its_own_guesses(session, site):
     """The fan-out knows more than the hook's fallback: its children are
     proofread pages and their owner is an index, before either is fetched."""
-    _ensure_placeholder_page(
+    _ensure_untranscribed_title(
         session,
         site_pk=site.pk,
         index_title="Index:Book.djvu",
@@ -156,8 +157,13 @@ def test_the_fan_out_records_its_own_guesses(session, site):
     index_title = _title_at(session, site, "Index:Book.djvu")
     assert page_title.expected_content_model == "proofread-page"
     assert index_title.expected_content_model == "proofread-index"
-    assert session.get(Page, page_title.pk) is not None
-    assert ensure_index_page(session, site.pk, "Index:Book.djvu").pk == index_title.pk
+    # Step 3: the wiki does not hold either, so neither has a Page row; the
+    # untranscribed page is fetched ("absent"), its index merely named.
+    assert session.get(Page, page_title.pk) is None
+    assert session.get(Page, index_title.pk) is None
+    assert page_title.fetch_status == FetchState.done
+    assert index_title.fetch_status == FetchState.unfetched
+    assert ensure_index_title(session, site.pk, "Index:Book.djvu").pk == index_title.pk
 
 
 def _css_subpage() -> RemotePage:

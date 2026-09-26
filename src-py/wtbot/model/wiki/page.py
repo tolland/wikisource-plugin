@@ -38,8 +38,8 @@ class Page(SQLModel, table=True):
     # Full title incl. namespace prefix, e.g. 'Page:Foo.djvu/171'. Mirrors
     # Title.title during the transition; written once, when both rows are made.
     title: str
-    # namespace_key, dirty and fetch_status belong to the address and live on
-    # Title (see wtbot.model.wiki.title).
+    # namespace_key, dirty, fetch_status and local_modified_at belong to the
+    # address and live on Title (see wtbot.model.wiki.title).
     content_model: str | None = None  # remote contentmodel ('proofread-index', ...)
 
     # Remote identity / revision state -- this IS the conflict token. revid +
@@ -61,8 +61,6 @@ class Page(SQLModel, table=True):
     # (page.text in pywikibot). Consumers that need a content-model-specific
     # view should parse this field with the page's content_model.
     text: str | None = None
-    local_modified_at: datetime | None = None  # when THIS row last changed locally;
-    # deliberately distinct from remote_timestamp -- conflating them is a known bug class.
 
     # --- revision store (see wtbot.model.revision) -------------------------
     # The columns above stay as the head denormalisation -- mirroring

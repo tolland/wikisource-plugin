@@ -106,9 +106,10 @@ def validate_remote_identity(session: Session, page: Page, remote: RemotePage) -
         )
 
 
-def head_revision(session: Session, page: Page) -> Revision | None:
-    """The page's current revision, or None for a placeholder."""
-    if page.latest_revision_pk is None:
+def head_revision(session: Session, page: Page | None) -> Revision | None:
+    """The page's current revision; None when there is no page (the wiki does
+    not hold the title) or no revision recorded behind it."""
+    if page is None or page.latest_revision_pk is None:
         return None
     return session.get(Revision, page.latest_revision_pk)
 

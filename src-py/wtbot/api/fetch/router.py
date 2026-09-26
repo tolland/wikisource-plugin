@@ -74,7 +74,7 @@ def create_fetch(payload: FetchCreate, session: Session = Depends(get_session)) 
     page = session.exec(
         select(Page).where(Page.site_pk == site.pk, Page.title == payload.title)
     ).first()
-    return {"request": req, "page": None if page is None else PageRow.of(page)}
+    return {"request": req, "page": None if page is None else PageRow.of_page(page)}
 
 
 @router.post("/drain", response_model=DrainResponse)

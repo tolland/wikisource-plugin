@@ -14,7 +14,9 @@ from wtbot.model import (
     RevisionLink,
     Site,
     SiteCredential,
+    Title,
 )
+from wtbot.title_store import ensure_title
 from wtbot.wiki.wiki_types import RemotePage
 
 """``sync --from Index:X [--to Index:Y]``: the report before any push.
@@ -103,28 +105,32 @@ def build_page(
     revid: int | None = None,
     title: str | None = None,
     fetched: bool = True,
-) -> Page:
-    """One Page: of a work.
+) -> Title:
+    """One Page: of a work, returned as its title.
 
-    ``text=None`` builds a **placeholder** -- the stub an index fan-out writes
-    for a paginated slot nobody has transcribed. ``fetched=False`` makes it the
-    other kind of revision-less row: one we have simply not got to.
+    ``text=None`` builds a **placeholder** -- a title the index paginates and
+    the wiki does not hold: no page row. ``fetched=False`` makes it the other
+    kind of page-less member: one we have simply not got to.
     """
     title = title or f"Page:Varieties.djvu/{number}"
-    page = Page(
-        site_pk=site.pk,
-        title=title,
-        content_model="proofread-page",
+    address = ensure_title(
+        session, site_pk=site.pk, title=title, expected_content_model="proofread-page"
     )
-    session.add(page)
-    session.commit()
-    session.refresh(page)
-    page.address.fetch_status = FetchState.done if fetched else FetchState.unfetched
+    address.fetch_status = FetchState.done if fetched else FetchState.unfetched
     add_proofread_meta(
-        session, page_pk=page.pk, index_title=index_title, page_number=number
+        session, page_pk=address.pk, index_title=index_title, page_number=number
     )
     session.commit()
     if text is not None:
+        page = Page(
+            pk=address.pk,
+            site_pk=site.pk,
+            title=title,
+            content_model="proofread-page",
+            revid=revid,
+        )
+        session.add(page)
+        session.commit()
         record_head_revision(
             session,
             page,
@@ -139,7 +145,8 @@ def build_page(
             ),
         )
         session.commit()
-    return page
+    session.refresh(address)
+    return address
 
 
 def seed_source_only(engine, *, pages: int = 3) -> None:

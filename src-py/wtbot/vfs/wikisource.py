@@ -1,5 +1,3 @@
-from dataclasses import replace
-
 from sqlmodel import Session
 
 from wtbot.api.schemas import (
@@ -12,7 +10,7 @@ from wtbot.api.schemas import (
     WriteResult,
     WriteStatus,
 )
-from wtbot.model import FileBlob, Page, Site
+from wtbot.model import FileBlob, Site
 from wtbot.vfs.errors import BlobsNotImplemented, NotADirectory, NotAFile, NotFound
 from wtbot.vfs.mediawiki import MediaWikiVfs, ts_millis
 from wtbot.vfs.nodes import (
@@ -34,8 +32,9 @@ from wtbot.vfs.nodes import (
 from wtbot.vfs.paths import WikiPath
 from wtbot.vfs.store import (
     PROOFREAD_INDEX_CONTENT_MODEL,
-    EffectiveState,
+    Entry,
     PageStore,
+    proofread_page_scaffold,
 )
 
 """wikisource:// overlay — the ProofreadPage-aware VFS service.
@@ -81,16 +80,7 @@ def _index_to_file_title(index_title: str) -> str:
     return f"File:{rest}"
 
 
-def proofread_page_scaffold() -> str:
-    """Conventional skeleton for a not-yet-created proofread page, matching
-    what ProofreadPage's own editor prepopulates: quality "not proofread",
-    empty header/body/footer sections. Served as the *opening* body of a
-    placeholder (never persisted) so the first save is well-formed."""
-    return (
-        '<noinclude><pagequality level="1" user="" /></noinclude>'
-        "\n\n"
-        "<noinclude></noinclude>"
-    )
+__all__ = ["WikisourceVfs", "proofread_page_scaffold"]
 
 
 class WikisourceVfs:
@@ -125,13 +115,11 @@ class WikisourceVfs:
                 return Stat(
                     path=path.raw,
                     exists=True,
-                    name=index.title,
+                    name=index.name,
                     kind=NodeKind.directory,
                     stable_id=index.pageid,
                     revid=index.revid,
-                    timestamp=ts_millis(
-                        index.local_modified_at or index.remote_timestamp
-                    ),
+                    timestamp=ts_millis(index.timestamp),
                     content_model=index.content_model,
                 )
             case IndexWikitext(path, _, index):
@@ -141,13 +129,7 @@ class WikisourceVfs:
                     path=path.raw, exists=True, name="Pages", kind=NodeKind.directory
                 )
             case PageLeaf(path, _, page):
-                meta = self.store.proofread_page_meta(page)
-                state = self._state_with_placeholder_default(
-                    page, self.store.effective_state(page), meta
-                )
-                return self.mw.stat_page(
-                    path.raw, page, name=page.title, state=state, meta=meta
-                )
+                return self.mw.stat_page(path.raw, page, name=page.name)
             case StubDir(path, name):
                 return Stat(
                     path=path.raw, exists=True, name=name, kind=NodeKind.directory
@@ -156,7 +138,7 @@ class WikisourceVfs:
                 return Stat(
                     path=path.raw,
                     exists=True,
-                    name=file_page.title,
+                    name=file_page.name,
                     kind=NodeKind.directory,
                     stable_id=file_page.pageid,
                 )
@@ -199,7 +181,7 @@ class WikisourceVfs:
         for (family, code, index_title), entries in page_groups.items():
             site = self.store.site(family, code)
             index_exists = (
-                site is not None and self.store.page(site, index_title) is not None
+                site is not None and self.store.entry(site, index_title) is not None
             )
             if not index_exists:
                 for i, raw, _ in entries:
@@ -207,8 +189,8 @@ class WikisourceVfs:
                 continue
             titles = [page_title for _, _, page_title in entries]
             pages = self.store.proofread_pages_by_titles(site, titles, index_title)
-            pages_by_title = {p.title: p for p in pages}
-            page_pks = [p.pk for p in pages if p.pk is not None]
+            pages_by_title = {p.name: p for p in pages}
+            page_pks = [p.pk for p in pages]
             uncommitted = self.store.latest_uncommitted_bodies(page_pks)
             metas = self.store.proofread_page_metas_by_pks(page_pks)
             # For every page, not just those without local edits: a page can
@@ -223,18 +205,15 @@ class WikisourceVfs:
                     continue
                 # Same rule as the single-page path, over rows already loaded
                 # in bulk -- restating it here is how the two drifted apart.
+                meta = metas.get(page.pk)
                 state = self.store.effective_state_from(
                     page,
                     uncommitted_body=uncommitted.get(page.pk),
                     commit=pushed.get(page.pk),
+                    proposed=self.store.proposed_body(page, meta),
                 )
-                meta = metas.get(page.pk)
                 results[i] = self.mw.stat_page(
-                    raw,
-                    page,
-                    name=page.title,
-                    state=self._state_with_placeholder_default(page, state, meta),
-                    meta=meta,
+                    raw, page, name=page.name, state=state, meta=meta
                 )
 
         return [results[i] for i in range(len(paths))]
@@ -270,13 +249,13 @@ class WikisourceVfs:
         return ListChildrenResponse(
             parent_path=path.normalized,
             children=[
-                _dir_node(f"{path.normalized}/{p.title}", p.title, stable_id=p.pageid)
+                _dir_node(f"{path.normalized}/{p.name}", p.name, stable_id=p.pageid)
                 for p in self.store.indexes(site)
             ],
         )
 
     def _index_children(
-        self, path: WikiPath, site: Site, index: Page
+        self, path: WikiPath, site: Site, index: Entry
     ) -> ListChildrenResponse:
         parent = path.normalized
         children: list[Node] = [
@@ -284,8 +263,8 @@ class WikisourceVfs:
             _dir_node(f"{parent}/Pages", "Pages"),
         ]
 
-        file_title = _index_to_file_title(index.title)
-        file_page = self.store.page(site, file_title)
+        file_title = _index_to_file_title(index.name)
+        file_page = self.store.entry(site, file_title)
         if file_page is not None:
             children.append(
                 _dir_node(
@@ -294,47 +273,40 @@ class WikisourceVfs:
             )
 
         for asset in self._index_assets(site, index):
-            name = asset.title.removeprefix(f"{index.title}/")
+            name = asset.name.removeprefix(f"{index.name}/")
             children.append(self.mw.page_node(f"{parent}/{name}", asset, name=name))
 
         children.extend(_dir_node(f"{parent}/{stub}", stub) for stub in STUB_CONTAINERS)
         return ListChildrenResponse(parent_path=parent, children=children)
 
-    def _index_assets(self, site: Site, index: Page) -> list[Page]:
+    def _index_assets(self, site: Site, index: Entry) -> list[Entry]:
         """Non-index-content title-wise subpages of the Index page."""
         assets = {
             p.pk: p
-            for p in self.mw.subpages(site, index.title)
+            for p in self.mw.subpages(site, index.name)
             if p.content_model != PROOFREAD_INDEX_CONTENT_MODEL
         }
-        return sorted(assets.values(), key=lambda p: p.title)
+        return sorted(assets.values(), key=lambda p: p.name)
 
     def _pages_children(
-        self, path: WikiPath, site: Site, index: Page
+        self, path: WikiPath, site: Site, index: Entry
     ) -> ListChildrenResponse:
         parent = path.normalized
-        pages = self.store.proofread_pages(site, index.title)
-        metas = self.store.proofread_page_metas_by_pks(
-            [p.pk for p in pages if p.pk is not None]
-        )
+        pages = self.store.proofread_pages(site, index.name)
+        metas = self.store.proofread_page_metas_by_pks([p.pk for p in pages])
 
-        def page_number(p: Page) -> int:
+        def page_number(p: Entry) -> int:
             meta = metas.get(p.pk)
             return meta.page_number or 0 if meta is not None else 0
 
-        children: list[Node] = []
-        for p in sorted(pages, key=page_number):
-            meta = metas.get(p.pk)
-            state = self._state_with_placeholder_default(
-                p, self.store.effective_state(p), meta
-            )
-            children.append(
-                self.mw.page_node(f"{parent}/{p.title}", p, meta=meta, state=state)
-            )
+        children: list[Node] = [
+            self.mw.page_node(f"{parent}/{p.name}", p, meta=metas.get(p.pk))
+            for p in sorted(pages, key=page_number)
+        ]
         return ListChildrenResponse(parent_path=parent, children=children)
 
     def _file_dir_children(
-        self, path: WikiPath, file_page: Page
+        self, path: WikiPath, file_page: Entry
     ) -> ListChildrenResponse:
         parent = path.normalized
         return ListChildrenResponse(
@@ -345,45 +317,10 @@ class WikisourceVfs:
             ],
         )
 
-    def _state_with_placeholder_default(
-        self, page: Page, state: EffectiveState, meta
-    ) -> EffectiveState:
-        """The same state, with the content-model scaffold standing in for an
-        empty body. A ProofreadPage stub with nothing in it should still report
-        the size of what the editor will open, not zero."""
-        if state.body:
-            return state
-        return replace(state, body=self._placeholder_default(page, meta))
-
-    def _placeholder_default(self, page: Page, meta) -> str:
-        """The opening body a placeholder serves when it has no body of its
-        own — the wiki's prepopulated OCR default (stored at Index fan-out)
-        or the content-model scaffold. Empty for real pages. Applied in
-        stat/list as well as read so length/timestamp always describe the
-        same content a read would return."""
-        if page.revid is not None:
-            return ""
-        return (
-            meta.default_body if meta is not None else None
-        ) or proofread_page_scaffold()
-
     # -- read / write ------------------------------------------------------------
 
     def read(self, raw_path: str) -> ReadContentResponse:
         match resolve(self.store, raw_path):
-            case PageLeaf(path, _, page) if page.revid is None:
-                # Placeholder stub: open with the wiki's prepopulated body
-                # (the scan's OCR text layer, stored at Index fan-out time)
-                # when we have it, else the content-model scaffold — either
-                # way a fresh transcription starts well-formed (local edits,
-                # once journalled, take precedence via effective_state).
-                return self.mw.read_page(
-                    path.raw,
-                    page,
-                    default_body=self._placeholder_default(
-                        page, self.store.proofread_page_meta(page)
-                    ),
-                )
             case (
                 PageLeaf(path, _, page)
                 | IndexWikitext(path, _, page)

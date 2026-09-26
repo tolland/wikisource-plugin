@@ -1,3 +1,4 @@
+from datetime import datetime
 from enum import Enum
 
 from sqlalchemy import UniqueConstraint
@@ -92,6 +93,10 @@ class Title(SQLModel, table=True):
     """Local edits not yet committed: a save appends to ``EditJournal`` and
     sets this; a commit (or a fetch) clears it. An address property because a
     title the wiki does not hold yet can be edited and saved."""
+
+    local_modified_at: datetime | None = None
+    """When a local save last touched this address. Deliberately distinct from
+    the page's ``remote_timestamp`` -- conflating them is a known bug class."""
 
     def __repr__(self) -> str:  # pragma: no cover - convenience only
         return f"Title(pk={self.pk}, title={self.title!r})"

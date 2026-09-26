@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from sqlalchemy import func
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from wtbot.content_model import Significance, parse_document
 from wtbot.fetch.revision_store import head_revision
@@ -17,7 +17,9 @@ from wtbot.model import (
     RevisionLink,
     Site,
     Slot,
+    Title,
 )
+from wtbot.title_store import Entry
 from wtbot.vfs.store import canonical_title
 
 """Proposing correspondences between two sites' copies of a work.
@@ -171,24 +173,50 @@ def propose_index_links(
     local_pages = index_children(session, local_site, local_index_title)
     remote_pages = index_children(session, remote_site, remote_index_title)
     remote_by_number = {
-        number: page for number, page in remote_pages if number is not None
+        number: entry for number, entry in remote_pages if number is not None
     }
-    remote_by_title = {canonical_title(page.title): page for _, page in remote_pages}
+    remote_by_title = {canonical_title(entry.name): entry for _, entry in remote_pages}
 
     proposals: list[LinkProposal] = []
-    for number, local_page in sorted(
+    for number, local in sorted(
         local_pages, key=lambda pair: (pair[0] is None, pair[0] or 0)
     ):
-        remote_page = remote_by_number.get(number) if number is not None else None
-        if remote_page is None:
+        remote = remote_by_number.get(number) if number is not None else None
+        if remote is None:
             # Fall back to the title only when the structural key is missing:
             # a page number that lines up is a stronger claim than a string
             # that happens to match.
-            remote_page = remote_by_title.get(canonical_title(local_page.title))
-        proposals.append(
-            compare_pages(session, local_page, remote_page, page_number=number)
-        )
+            remote = remote_by_title.get(canonical_title(local.name))
+        proposals.append(_compare_members(session, local, remote, number))
     return proposals
+
+
+def _compare_members(
+    session: Session, local: Entry, remote: Entry | None, number: int | None
+) -> LinkProposal:
+    """[compare_pages] for two members of a work, either of which may be a
+    title the wiki does not hold -- which has no revision to compare."""
+    if remote is not None and (local.page is None or remote.page is None):
+        missing = "local" if local.page is None else "remote"
+        return LinkProposal(
+            outcome=MatchOutcome.unfetched,
+            local_title=local.name,
+            remote_title=remote.name,
+            page_number=number,
+            detail=f"{missing} side is not held by its wiki: no revision to compare",
+        )
+    if local.page is None:
+        return LinkProposal(
+            outcome=MatchOutcome.no_counterpart,
+            local_title=local.name,
+            page_number=number,
+        )
+    return compare_pages(
+        session,
+        local.page,
+        remote.page if remote is not None else None,
+        page_number=number,
+    )
 
 
 def compare_pages(
@@ -382,14 +410,15 @@ def _no_match_outcome(
     return MatchOutcome.diverged, None
 
 
-def history_is_complete(session: Session, page: Page) -> bool:
-    """Whether we hold this page back to its first revision.
+def history_is_complete(session: Session, page: Page | None) -> bool:
+    """Whether we hold this page back to its first revision. Never, when the
+    wiki does not hold the page at all.
 
     ``history_complete_from_revid`` marks the oldest revid of a contiguous run
     from the head; the run reaches the beginning when that revision has no
     parent.
     """
-    marker = page.history_complete_from_revid
+    marker = page.history_complete_from_revid if page is not None else None
     if marker is None:
         return False
     oldest = session.exec(
@@ -512,28 +541,31 @@ def confirm_proposals(
 
 def index_children(
     session: Session, site: Site, index_title: str
-) -> list[tuple[int | None, Page]]:
-    """A work's Page: rows with their page numbers.
+) -> list[tuple[int | None, Entry]]:
+    """A work's Page: titles with their page numbers, and the page behind
+    each one the wiki holds.
 
-    Membership comes from ``ProofreadPageMeta.index_title_pk``. The title is
-    used only to resolve the Index Page identity.
+    Membership comes from ``ProofreadPageMeta.index_title_pk``, so a page the
+    index paginates but nobody has transcribed is a member with no page. The
+    title is used only to resolve the Index's identity.
     """
-    index_page = session.exec(
-        select(Page).where(
-            Page.site_pk == site.pk,
-            Page.content_model == "proofread-index",
-            func.replace(Page.title, "_", " ") == canonical_title(index_title),
+    index = session.exec(
+        select(Title).where(
+            Title.site_pk == site.pk,
+            Title.expected_content_model == "proofread-index",
+            func.replace(Title.title, "_", " ") == canonical_title(index_title),
         )
     ).first()
-    if index_page is None:
+    if index is None:
         return []
     rows = session.exec(
-        select(ProofreadPageMeta.page_number, Page)
-        .join(Page, Page.pk == ProofreadPageMeta.title_pk)
+        select(ProofreadPageMeta.page_number, Title, Page)
+        .join(Title, col(Title.pk) == col(ProofreadPageMeta.title_pk))
+        .outerjoin(Page, col(Page.pk) == col(Title.pk))
         .where(
-            Page.site_pk == site.pk,
-            Page.content_model == "proofread-page",
-            ProofreadPageMeta.index_title_pk == index_page.pk,
+            Title.site_pk == site.pk,
+            Title.expected_content_model == "proofread-page",
+            ProofreadPageMeta.index_title_pk == index.pk,
         )
     ).all()
-    return [(number, page) for number, page in rows]
+    return [(number, Entry(title, page)) for number, title, page in rows]

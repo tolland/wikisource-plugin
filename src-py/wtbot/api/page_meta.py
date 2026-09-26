@@ -7,8 +7,8 @@ from wtbot.api.schemas import PageRow
 from wtbot.deps import get_session
 from wtbot.model import (
     IndexMeta,
-    Page,
     ProofreadPageMeta,
+    Title,
 )
 from wtbot.model.wikisource.proofread_page_meta import SHORT_NAME_RE
 from wtbot.vfs.nodes import (
@@ -21,7 +21,7 @@ from wtbot.vfs.nodes import (
     PageLeaf,
     resolve,
 )
-from wtbot.vfs.store import PROOFREAD_INDEX_CONTENT_MODEL, PageStore
+from wtbot.vfs.store import PROOFREAD_INDEX_CONTENT_MODEL, Entry, PageStore
 
 """Per-role Page metadata extensions (IndexMeta / ProofreadPageMeta).
 
@@ -49,7 +49,8 @@ def resolve_page(
     map either a wikisource:// VFS path (what the client's editors/tree hold)
     or a canonical (family, code, title) triple (what batch tooling holds) to
     the backing Page row — whose pk keys the per-role metadata endpoints."""
-    return PageRow.of(_resolve(PageStore(session), path, family, code, title))
+    entry = _resolve(PageStore(session), path, family, code, title)
+    return PageRow.of(entry.title, entry.page)
 
 
 def _resolve(
@@ -58,7 +59,7 @@ def _resolve(
     family: str | None,
     code: str | None,
     title: str | None,
-) -> Page:
+) -> Entry:
     if path is not None:
         match resolve(store, path):
             case PageLeaf(_, _, page) | IndexAssetLeaf(_, _, page, _):
@@ -77,19 +78,21 @@ def _resolve(
                 )
     if family is not None and code is not None and title is not None:
         site = store.site(family, code)
-        page = store.page(site, title) if site is not None else None
-        if page is None:
+        found = store.entry(site, title) if site is not None else None
+        if found is None:
             raise HTTPException(
                 status_code=404, detail=f"page not found: {family}/{code}/{title}"
             )
-        return page
+        return found
     raise HTTPException(
         status_code=400, detail="pass either ?path= or ?family=&code=&title="
     )
 
 
-def _get_page(session: Session, page_pk: int) -> Page:
-    page = session.get(Page, page_pk)
+def _get_page(session: Session, page_pk: int) -> Title:
+    """The title the metadata endpoints key on. Metadata belongs to the
+    address, so a title the wiki does not hold has it too."""
+    page = session.get(Title, page_pk)
     if page is None:
         raise HTTPException(status_code=404, detail="page not found")
     return page
@@ -115,9 +118,9 @@ class ProofreadPageMetaUpdate(BaseModel):
 # -- IndexMeta ---------------------------------------------------------------
 
 
-def _require_index_page(session: Session, page_pk: int) -> Page:
+def _require_index_page(session: Session, page_pk: int) -> Title:
     page = _get_page(session, page_pk)
-    if page.content_model != PROOFREAD_INDEX_CONTENT_MODEL:
+    if page.expected_content_model != PROOFREAD_INDEX_CONTENT_MODEL:
         raise HTTPException(
             status_code=400, detail=f"not a ProofreadPage index: {page.title}"
         )
@@ -181,8 +184,8 @@ def put_index_meta(
 def get_page_meta(
     page_pk: int, session: Session = Depends(get_session)
 ) -> ProofreadPageMeta:
-    page = _get_page(session, page_pk)
-    meta = PageStore(session).proofread_page_meta(page)
+    _get_page(session, page_pk)
+    meta = PageStore(session).proofread_page_meta(page_pk)
     if meta is None:
         raise HTTPException(status_code=404, detail="no page meta yet")
     return meta
@@ -195,11 +198,11 @@ def put_page_meta(
     session: Session = Depends(get_session),
 ) -> ProofreadPageMeta:
     page = _get_page(session, page_pk)
-    if page.content_model != "proofread-page":
+    if page.expected_content_model != "proofread-page":
         raise HTTPException(
             status_code=400, detail=f"not a proofread-page: {page.title}"
         )
-    meta = PageStore(session).proofread_page_meta(page)
+    meta = PageStore(session).proofread_page_meta(page_pk)
     values = update.model_dump(exclude_unset=True)
     index_title_pk = values.get("index_title_pk")
     if meta is None and index_title_pk is None:
@@ -211,7 +214,7 @@ def put_page_meta(
         index_page = _get_page(session, index_title_pk)
         if (
             index_page.site_pk != page.site_pk
-            or index_page.content_model != "proofread-index"
+            or index_page.expected_content_model != "proofread-index"
         ):
             raise HTTPException(
                 status_code=400,

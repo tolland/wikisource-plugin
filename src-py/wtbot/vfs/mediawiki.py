@@ -10,9 +10,9 @@ from wtbot.api.schemas import (
     WriteResult,
     WriteStatus,
 )
-from wtbot.model import Page, Site
+from wtbot.model import Site
 from wtbot.model.wikisource.proofread_page_meta import ProofreadPageMeta
-from wtbot.vfs.store import EffectiveState, PageStore, meta_has_image
+from wtbot.vfs.store import EffectiveState, Entry, PageStore, meta_has_image
 
 """mediawiki:// — the title-addressed layer.
 
@@ -72,47 +72,46 @@ class MediaWikiVfs:
             return True  # permissive until siteinfo populates the map
         return ns.subpages
 
-    def subpages(self, site: Site, title: str) -> list[Page]:
+    def subpages(self, site: Site, title: str) -> list[Entry]:
         """Direct and nested subpages of [title]; empty when the namespace
         does not support subpages (the slash is then part of the title)."""
         if not self.subpages_enabled(site, title):
             return []
-        return self.store.pages_with_title_prefix(site, f"{title}/")
+        return self.store.entries_with_title_prefix(site, f"{title}/")
 
-    # -- per-page content operations ------------------------------------------
+    # -- per-title content operations -----------------------------------------
 
     def _resolve_meta(
-        self, page: Page, meta: ProofreadPageMeta | None | object
+        self, entry: Entry, meta: ProofreadPageMeta | None | object
     ) -> ProofreadPageMeta | None:
         """`meta` may be precomputed by batched callers (one metadata query
         per listing); the _UNRESOLVED default means look it up here."""
         if meta is _UNRESOLVED:
-            return self.store.proofread_page_meta(page)
+            return self.store.proofread_page_meta(entry.pk)
         return meta if isinstance(meta, ProofreadPageMeta) else None
 
     def page_node(
         self,
         path: str,
-        page: Page,
+        entry: Entry,
         name: str | None = None,
         meta: ProofreadPageMeta | None | object = _UNRESOLVED,
         state: EffectiveState | None = None,
     ) -> Node:
-        state = state or self.store.effective_state(page)
-        body = state.body
-        resolved = self._resolve_meta(page, meta)
+        resolved = self._resolve_meta(entry, meta)
+        state = state or self._state(entry, resolved)
         return Node(
             path=path,
-            name=name if name is not None else page.title,
+            name=name if name is not None else entry.name,
             kind=NodeKind.file,
-            stable_id=page.pageid,
+            stable_id=entry.pageid,
             revid=state.revid,
-            timestamp=ts_millis(page.local_modified_at or page.remote_timestamp),
-            length=len(body.encode()),
+            timestamp=ts_millis(entry.timestamp),
+            length=len(state.body.encode()),
             writable=True,
-            content_model=page.content_model,
+            content_model=entry.content_model,
             quality_level=resolved.quality_level if resolved is not None else None,
-            dirty=page.address.dirty,
+            dirty=entry.title.dirty,
             has_reference_image=meta_has_image(resolved),
             # A page we pushed exists remotely even if its refetch is still
             # queued, so this follows the bridged revid, not the snapshot.
@@ -122,47 +121,51 @@ class MediaWikiVfs:
     def stat_page(
         self,
         raw_path: str,
-        page: Page,
+        entry: Entry,
         name: str,
         state: EffectiveState | None = None,
         meta: ProofreadPageMeta | None | object = _UNRESOLVED,
     ) -> Stat:
-        state = state or self.store.effective_state(page)
-        body = state.body
-        resolved = self._resolve_meta(page, meta)
+        resolved = self._resolve_meta(entry, meta)
+        state = state or self._state(entry, resolved)
         return Stat(
             path=raw_path,
             exists=True,
             name=name,
             kind=NodeKind.file,
-            stable_id=page.pageid,
+            stable_id=entry.pageid,
             revid=state.revid,
-            timestamp=ts_millis(page.local_modified_at or page.remote_timestamp),
-            length=len(body.encode()),
-            content_model=page.content_model,
+            timestamp=ts_millis(entry.timestamp),
+            length=len(state.body.encode()),
+            content_model=entry.content_model,
             quality_level=resolved.quality_level if resolved is not None else None,
-            dirty=page.address.dirty,
+            dirty=entry.title.dirty,
             has_reference_image=meta_has_image(resolved),
             # A page we pushed exists remotely even if its refetch is still
             # queued, so this follows the bridged revid, not the snapshot.
             placeholder=state.placeholder,
         )
 
-    def read_page(
-        self, raw_path: str, page: Page, default_body: str | None = None
-    ) -> ReadContentResponse:
-        """`default_body` is served when the page has no body at all (a
-        placeholder stub with no local edits) — the overlay passes the
-        content-model scaffold so a new transcription opens well-formed."""
-        state = self.store.effective_state(page)
-        body = state.body or (default_body or "")
+    def _state(self, entry: Entry, meta: ProofreadPageMeta | None) -> EffectiveState:
+        return self.store.effective_state_from(
+            entry,
+            uncommitted_body=self.store.latest_uncommitted_body(entry.pk),
+            commit=self.store.latest_successful_commits([entry.pk]).get(entry.pk),
+            proposed=self.store.proposed_body(entry, meta),
+        )
+
+    def read_page(self, raw_path: str, entry: Entry) -> ReadContentResponse:
+        """The effective body -- which for a title the wiki does not hold
+        falls back to the proposed body, so a new transcription opens
+        well-formed (see PageStore.effective_state)."""
+        state = self.store.effective_state(entry)
         return ReadContentResponse(
             path=raw_path,
             revid=state.revid,
-            content_base64=_b64(body),
+            content_base64=_b64(state.body),
         )
 
-    def write_page(self, req: WriteContentRequest, page: Page) -> WriteResult:
+    def write_page(self, req: WriteContentRequest, entry: Entry) -> WriteResult:
         """Local save via the edit journal (see PageStore.append_edit and
         effective_state for the Page.text discipline). A base_revid mismatch
         against the cached remote revid is an edit conflict, not an error.
@@ -171,7 +174,7 @@ class MediaWikiVfs:
         and read report. Against the raw snapshot it would reject a save based
         on a revision we ourselves pushed but have not refetched yet -- the
         client would be told it conflicts with our own edit."""
-        revid = self.store.effective_state(page).revid
+        revid = self.store.effective_state(entry).revid
         if req.base_revid is not None and revid is not None and req.base_revid != revid:
             return WriteResult(
                 path=req.path,
@@ -181,7 +184,7 @@ class MediaWikiVfs:
             )
 
         self.store.append_edit(
-            page,
+            entry,
             body=base64.b64decode(req.content_base64).decode(),
             base_revid=req.base_revid if req.base_revid is not None else revid,
             comment=req.comment,

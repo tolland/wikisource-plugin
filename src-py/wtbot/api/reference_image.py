@@ -12,13 +12,13 @@ from fastapi import (
     Request,
     Response,
 )
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.api.errors import ApiError
 from wtbot.api.targets import resolve_target
 from wtbot.deps import get_session
-from wtbot.model import Page
+from wtbot.model import Title
 from wtbot.model.wikisource.proofread_page_meta import ProofreadPageMeta
 from wtbot.settings import WikiSettings
 from wtbot.vfs.store import PageStore
@@ -109,14 +109,16 @@ def serve_reference_image(
     request: Request,
     background: BackgroundTasks,
     session: Session,
-    page: Page,
+    page: Title,
     width: int | None,
 ) -> Response | None:
     """Cached scan-rendition bytes for [page], or None while no scan URL is
     known — the caller decides what a miss means (the route below answers with
-    a placeholder SVG)."""
+    a placeholder SVG). A title, not a page: the scan exists before anyone
+    transcribes it."""
+    assert page.pk is not None
     store = PageStore(session)
-    meta = store.proofread_page_meta(page)
+    meta = store.proofread_page_meta(page.pk)
     url = _rendition_url(meta, width)
     if url is None:
         return None
@@ -162,17 +164,19 @@ def _warm_next_page(
     try:
         with Session(engine) as session:
             nxt = session.exec(
-                select(Page)
-                .join(ProofreadPageMeta, ProofreadPageMeta.title_pk == Page.pk)
+                select(Title)
+                .join(
+                    ProofreadPageMeta, col(ProofreadPageMeta.title_pk) == col(Title.pk)
+                )
                 .where(
-                    Page.site_pk == site_pk,
+                    Title.site_pk == site_pk,
                     ProofreadPageMeta.index_title_pk == index_page_pk,
                     ProofreadPageMeta.page_number == page_number + 1,
                 )
             ).first()
             if nxt is None or nxt.pk is None:
                 return
-            url = _rendition_url(PageStore(session).proofread_page_meta(nxt), width)
+            url = _rendition_url(PageStore(session).proofread_page_meta(nxt.pk), width)
             cache = _cache_path(blob_root, nxt.pk, width, url) if url else None
         if url is None or cache is None or cache.exists():
             return
@@ -223,15 +227,15 @@ def reference_image(
     empty one. Never 404s on a missing scan: the pane is part of the editor
     layout, and a broken image there is worse than a blank sheet.
     """
-    page: Page | None = None
+    page: Title | None = None
     if path:
         site, resolved_title, _ = resolve_target(session, path)
         page = session.exec(
-            select(Page).where(Page.site_pk == site.pk, Page.title == resolved_title)
+            select(Title).where(Title.site_pk == site.pk, Title.title == resolved_title)
         ).first()
     elif title:
         resolved_title = title
-        page = session.exec(select(Page).where(Page.title == title)).first()
+        page = session.exec(select(Title).where(Title.title == title)).first()
     else:
         raise ApiError(
             status_code=422, detail="need either path or title", code="missing-target"

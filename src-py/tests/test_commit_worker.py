@@ -15,7 +15,7 @@ from wtbot.commit_worker import run_pending_commits
 from wtbot.fetch.fetch_worker import run_pending
 from wtbot.model import Commit, CommitStatus, EditJournal, FetchRequest, Page, Site
 from wtbot.model.fetch.fetch_request import FetchKind, FetchStatus
-from wtbot.vfs.store import PageStore
+from wtbot.vfs.store import Entry, PageStore
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import RemotePage, SaveResult
 
@@ -98,7 +98,7 @@ def test_push_single_save_succeeds(engine):
         assert updated.address.dirty is False
 
         # Until the refetch lands, reads bridge on the pushed body.
-        assert PageStore(s).effective_body(updated) == "edited"
+        assert PageStore(s).effective_body(Entry(updated.address, updated)) == "edited"
 
         refetch = s.exec(select(FetchRequest).where(FetchRequest.title == TITLE)).one()
         assert refetch.kind == FetchKind.single
@@ -121,7 +121,7 @@ def test_push_single_save_succeeds(engine):
         updated = s.get(Page, page.pk)
         assert updated.revid == 101
         assert updated.text == "edited"
-        assert PageStore(s).effective_body(updated) == "edited"
+        assert PageStore(s).effective_body(Entry(updated.address, updated)) == "edited"
 
     assert fake._pages[TITLE].text == "edited"
 
@@ -397,7 +397,7 @@ def test_pending_commit_api_can_force_overwrite_conflict(engine):
         assert commit.result_revid == 201
 
         assert updated_snapshot_revid(s, page.pk) == 100  # refetch still queued
-        assert PageStore(s).effective_revid(s.get(Page, page.pk)) == 201
+        assert PageStore(s).effective_revid(PageStore(s).entry_by_pk(page.pk)) == 201
         assert s.get(Page, page.pk).address.dirty is False
         assert list_pending_commits(session=s) == []
 

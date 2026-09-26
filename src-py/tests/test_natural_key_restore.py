@@ -194,12 +194,33 @@ def test_a_dump_taken_before_titles_existed_restores_with_them(tmp_path: Path) -
     address = {
         json.dumps(row["key"]): {
             field: row["fields"].pop(field)
-            for field in ("namespace_key", "fetch_status", "dirty")
+            for field in ("namespace_key", "fetch_status", "dirty", "local_modified_at")
         }
         for table in raw["tables"]
         if table["name"] == "title"
         for row in table["rows"]
     }
+    # ...and every title had a page row: one the wiki did not hold was a
+    # placeholder, with no revid.
+    titles = next(t for t in raw["tables"] if t["name"] == "title")
+    pages = next(t for t in raw["tables"] if t["name"] == "page")
+    held = {json.dumps(row["key"]) for row in pages["rows"]}
+    columns = pages["rows"][0]["fields"].keys() - set(
+        address[json.dumps(pages["rows"][0]["key"])]
+    )
+    for row in titles["rows"]:
+        if json.dumps(row["key"]) not in held:
+            pages["rows"].append(
+                {
+                    "key": row["key"],
+                    "fields": {column: None for column in columns}
+                    | {"title": row["fields"]["title"]},
+                    "references": {
+                        "site_pk": row["references"]["site_pk"],
+                        "pk": {"table": "title", "key": row["key"]},
+                    },
+                }
+            )
     raw["tables"] = [t for t in raw["tables"] if t["name"] != "title"]
     for table in raw["tables"]:
         if table["name"] == "page":
@@ -243,6 +264,11 @@ def test_a_dump_taken_before_titles_existed_restores_with_them(tmp_path: Path) -
             FROM title t JOIN page p ON p.pk = t.pk JOIN site s ON s.pk = t.site_pk
             ORDER BY s.family, t.title
             """).fetchall()
+        placeholder = connection.execute("""
+            SELECT t.expected_content_model, p.pk FROM title t
+            JOIN site s ON s.pk = t.site_pk LEFT JOIN page p ON p.pk = t.pk
+            WHERE s.family = 'target'
+            """).fetchall()
         meta = connection.execute("""
             SELECT page.title, idx.title FROM proofreadpagemeta meta
             JOIN title page ON page.pk = meta.title_pk
@@ -252,9 +278,10 @@ def test_a_dump_taken_before_titles_existed_restores_with_them(tmp_path: Path) -
     assert titles == [
         ("source", "Index:Book", "proofread-index", 1),
         ("source", "Page:Book/1", "proofread-page", 1),
-        # No model on record: MediaWiki's own fallback, as in the migration.
-        ("target", "Index:Book", "wikitext", 1),
+        # The target's Index was a placeholder: its title stays, with
+        # MediaWiki's fallback model (none on record), and its page row went.
     ]
+    assert placeholder == [("wikitext", None)]
     assert meta == [("Page:Book/1", "Index:Book")]
 
 

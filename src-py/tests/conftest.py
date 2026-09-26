@@ -11,7 +11,7 @@ import pytest
 import requests
 from fastapi.testclient import TestClient
 from sqlalchemy.engine import Engine
-from sqlmodel import Session, func, select
+from sqlmodel import Session
 from wiki_harness import (
     CANADIAN_PATENT_INDEX,
     CANADIAN_PATENT_SCAN,
@@ -26,7 +26,7 @@ from wiki_harness import (
 
 from wtbot.db import create_db_engine, init_db
 from wtbot.main import create_app
-from wtbot.model import Page, ProofreadPageMeta
+from wtbot.model import ProofreadPageMeta, Title
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 COMPOSE_FILE = REPO_ROOT / "compose.seeded.yml"
@@ -44,25 +44,13 @@ def add_proofread_meta(
     page_number: int | None = None,
     **values,
 ) -> ProofreadPageMeta:
-    """Test fixture helper that models keyed Index identity faithfully."""
-    page = session.get(Page, page_pk)
-    assert page is not None
-    canonical = index_title.replace("_", " ")
-    index = session.exec(
-        select(Page).where(
-            Page.site_pk == page.site_pk,
-            Page.content_model == "proofread-index",
-            func.replace(Page.title, "_", " ") == canonical,
-        )
-    ).first()
-    if index is None:
-        index = Page(
-            site_pk=page.site_pk,
-            title=index_title,
-            content_model="proofread-index",
-        )
-        session.add(index)
-        session.flush()
+    """Test fixture helper that models keyed Index identity faithfully: the
+    owning Index is a title, found or created the way the fetch does it."""
+    from wtbot.page_processors import ensure_index_title
+
+    title = session.get(Title, page_pk)
+    assert title is not None
+    index = ensure_index_title(session, title.site_pk, index_title)
     meta = ProofreadPageMeta(
         title_pk=page_pk,
         index_title_pk=index.pk,

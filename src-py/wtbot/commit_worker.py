@@ -35,6 +35,7 @@ from wtbot.model import (
     FetchRequest,
     Page,
     Site,
+    Title,
 )
 from wtbot.wiki.wiki_types import EditConflict
 
@@ -205,9 +206,11 @@ def _load_pending_page_commit(
     than live ORM objects attached to an open transaction.
     """
     with read_snapshot(session):
-        page = session.get(Page, page_pk)
-        if page is None:
+        title = session.get(Title, page_pk)
+        if title is None:
             return _OrphanedPendingPage(page_pk)
+        # None when the wiki does not hold the page yet: the push is a creation.
+        page = session.get(Page, page_pk)
 
         pending = session.exec(
             select(EditJournal)
@@ -220,18 +223,22 @@ def _load_pending_page_commit(
         if not pending:
             return None
 
-        site = session.get(Site, page.site_pk)
+        site = session.get(Site, title.site_pk)
         if site is None:
-            raise RuntimeError(f"page {page_pk} references missing site {page.site_pk}")
+            raise RuntimeError(
+                f"page {page_pk} references missing site {title.site_pk}"
+            )
 
         journal_pks = tuple(row.pk for row in pending if row.pk is not None)
         if len(journal_pks) != len(pending):
             raise RuntimeError(f"page {page_pk} has unpersisted journal rows")
 
         latest = pending[-1]
-        # None stays None: a placeholder stub (never on the wiki) pushes as a
-        # page *creation*, not an edit based on a fabricated revid 0.
-        base_revid = latest.base_revid if latest.base_revid is not None else page.revid
+        # None stays None: a title the wiki does not hold pushes as a page
+        # *creation*, not an edit based on a fabricated revid 0.
+        base_revid = latest.base_revid
+        if base_revid is None and page is not None:
+            base_revid = page.revid
 
         # Saves made after our own successful push but before its refetch
         # landed were based on the pushed body (effective_state serves it),
@@ -252,7 +259,7 @@ def _load_pending_page_commit(
             base_revid = last_push.result_revid
         return _PendingPageCommit(
             page_pk=page_pk,
-            title=page.title,
+            title=title.title,
             site=detached_site(site),
             journal_pks=journal_pks,
             base_revid=base_revid,
@@ -312,17 +319,18 @@ def _record_commit_outcome(
     )
     with write_batch(session):
         if outcome.status == CommitStatus.success:
-            page = session.get(Page, pending.page_pk)
-            if page is not None:
+            title = session.get(Title, pending.page_pk)
+            if title is not None:
                 # dirty is local bookkeeping; the remote-snapshot columns
                 # (text/revid/...) are deliberately left untouched — the
-                # enqueued refetch is the only writer of those.
-                page.address.dirty = _has_uncaptured_pending_edits(session, pending)
-                session.add(page)
+                # enqueued refetch is the only writer of those, and for a
+                # creation it is what writes the Page row at all.
+                title.dirty = _has_uncaptured_pending_edits(session, pending)
+                session.add(title)
                 session.add(
                     FetchRequest(
-                        site_pk=page.site_pk,
-                        title=page.title,
+                        site_pk=title.site_pk,
+                        title=title.title,
                         kind=FetchKind.single,
                         depth=0,
                         priority=10,  # snapshot refresh jumps bulk fan-outs

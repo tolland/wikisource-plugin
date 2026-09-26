@@ -4,11 +4,10 @@ from sqlmodel import Session
 
 from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.deps import get_session
-from wtbot.model import Page
 from wtbot.model.wikisource.proofread_page_meta import ProofreadPageMeta
 from wtbot.vfs.nodes import PageLeaf, resolve
 from wtbot.vfs.paths import WikiPath
-from wtbot.vfs.store import PageStore
+from wtbot.vfs.store import Entry, PageStore
 
 """Page-navigation metadata for the split editor's toolbar.
 
@@ -59,16 +58,16 @@ def get_page_nav(
     siblings, metas = _ordered_siblings(store, node)
     pos = next(i for i, p in enumerate(siblings) if p.pk == node.page.pk)
 
-    def entry(p: Page) -> PageNavEntry:
+    def entry(p: Entry) -> PageNavEntry:
         meta = metas.get(p.pk)
         return PageNavEntry(
-            path=f"{pages_dir}/{p.title}",
-            title=p.title,
+            path=f"{pages_dir}/{p.name}",
+            title=p.name,
             page_number=meta.page_number if meta is not None else None,
         )
 
-    index_page = store.page(node.site, index_title)
-    index_meta = store.index_meta(index_page) if index_page is not None else None
+    index_page = store.entry(node.site, index_title)
+    index_meta = store.index_meta(index_page.title) if index_page is not None else None
     return PageNavInfo(
         current=entry(node.page),
         index_path=index_path,
@@ -83,14 +82,14 @@ def get_page_nav(
 
 def _ordered_siblings(
     store: PageStore, node: PageLeaf
-) -> tuple[list[Page], dict[int, ProofreadPageMeta]]:
+) -> tuple[list[Entry], dict[int, ProofreadPageMeta]]:
     """All Page: members of the leaf's index in Pages/-listing order —
     ascending page_number, missing numbers sorting first (as 0) — plus
     their ProofreadPageMeta rows keyed by page pk."""
     pages = store.proofread_pages(node.site, node.path.index_title)
-    metas = store.proofread_page_metas_by_pks([p.pk for p in pages if p.pk is not None])
+    metas = store.proofread_page_metas_by_pks([p.pk for p in pages])
 
-    def page_number(p: Page) -> int:
+    def page_number(p: Entry) -> int:
         meta = metas.get(p.pk)
         return meta.page_number or 0 if meta is not None else 0
 

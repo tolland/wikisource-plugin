@@ -1,13 +1,17 @@
 import logging
+from dataclasses import dataclass
+from datetime import datetime
 
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
-from wtbot.model import Title
+from wtbot.model import Page, Title
 
 """Reading and writing titles: addresses we know about, fetched or not.
 
-Two operations for now, matching the two things step 1 of the Title/WikiPage
-split needs:
+[Entry] is the unit most readers want: a title, and the page behind it if the
+wiki holds one (step 3 of the split: a Page row exists only then).
+
+Two operations:
 
 - [ensure_title] -- the Title at an address, created with the caller's guess
   at its content model if we have not seen the address before. Callers that
@@ -22,6 +26,58 @@ split needs:
 """
 
 log = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class Entry:
+    """What the cache holds at one title: the Title, and its Page if the wiki
+    holds one."""
+
+    title: Title
+    page: Page | None
+
+    @property
+    def pk(self) -> int:
+        assert self.title.pk is not None
+        return self.title.pk
+
+    @property
+    def name(self) -> str:
+        return self.title.title
+
+    @property
+    def content_model(self) -> str:
+        return self.title.expected_content_model
+
+    @property
+    def pageid(self) -> int | None:
+        return self.page.pageid if self.page is not None else None
+
+    @property
+    def revid(self) -> int | None:
+        return self.page.revid if self.page is not None else None
+
+    @property
+    def timestamp(self) -> datetime | None:
+        """Local save time over remote time: what the client's VirtualFile
+        stamps."""
+        remote = self.page.remote_timestamp if self.page is not None else None
+        return self.title.local_modified_at or remote
+
+
+def entry_at(session: Session, *, site_pk: int, title: str) -> Entry | None:
+    """The Entry at (site, title), if we know the address at all."""
+    row = session.exec(
+        select(Title, Page)
+        .outerjoin(Page, col(Page.pk) == col(Title.pk))
+        .where(Title.site_pk == site_pk, Title.title == title)
+    ).first()
+    return None if row is None else Entry(*row)
+
+
+def entry_by_pk(session: Session, pk: int) -> Entry | None:
+    title = session.get(Title, pk)
+    return None if title is None else Entry(title, session.get(Page, pk))
 
 
 def ensure_title(

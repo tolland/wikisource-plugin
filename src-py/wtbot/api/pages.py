@@ -55,7 +55,7 @@ def list_pages(
         statement = statement.where(Page.title == title)
     if title_contains:
         statement = statement.where(Page.title.contains(title_contains))
-    return [PageRow.of(page) for page in session.exec(statement).all()]
+    return [PageRow.of_page(page) for page in session.exec(statement).all()]
 
 
 @router.get("/query", response_model=list[PageQueryResult])
@@ -136,7 +136,7 @@ def query_pages(
 
     return [
         PageQueryResult(
-            page=PageRow.of(page),
+            page=PageRow.of_page(page),
             site_label=label,
             revisions=revisions_by_page[page.pk],
         )
@@ -150,4 +150,4 @@ def get_page(page_pk: int, session: Session = Depends(get_session)) -> PageRow:
     page = session.get(Page, page_pk)
     if page is None:
         raise HTTPException(status_code=404, detail="page not found")
-    return PageRow.of(page)
+    return PageRow.of_page(page)

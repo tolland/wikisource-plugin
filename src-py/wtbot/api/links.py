@@ -42,6 +42,7 @@ from wtbot.model import (
     RevisionLink,
     Site,
     Slot,
+    Title,
 )
 from wtbot.site_store import resolve_pair
 from wtbot.timeutil import utcnow
@@ -177,13 +178,26 @@ class LadderOut(BaseModel):
     checked_at: datetime | None = None
 
 
-def _page(session: Session, site: Site, title: str) -> Page:
-    page = session.exec(
-        select(Page).where(Page.site_pk == site.pk, Page.title == title)
+def _title(session: Session, site: Site, title: str) -> Title:
+    """An address we know on this site. Pairing is between addresses, so the
+    wiki need not hold either page yet."""
+    row = session.exec(
+        select(Title).where(Title.site_pk == site.pk, Title.title == title)
     ).first()
-    if page is None:
+    if row is None:
         raise HTTPException(
             404, f"{title} is not cached for site {site.label or site.family}"
+        )
+    return row
+
+
+def _page(session: Session, site: Site, title: str) -> Page:
+    """A page the wiki holds and we have fetched: what a revision comparison
+    needs."""
+    page = session.get(Page, _title(session, site, title).pk)
+    if page is None:
+        raise HTTPException(
+            404, f"{title} is not held by site {site.label or site.family}"
         )
     return page
 
@@ -296,15 +310,15 @@ def get_ladder(
     reachable by pasting a URL.
     """
     local_site, remote_site = resolve_pair(session, local_label, remote_label)
-    local_page = _page(session, local_site, local_title)
-    remote_page = _page(session, remote_site, remote_title or local_title)
+    local_page = _title(session, local_site, local_title)
+    remote_page = _title(session, remote_site, remote_title or local_title)
 
     rungs = ladder(session, page_pk=local_page.pk, other_page_pk=remote_page.pk)
     anchor = current_anchor(
         session, page_pk=local_page.pk, other_page_pk=remote_page.pk
     )
-    local_head = head_revision(session, local_page)
-    remote_head = head_revision(session, remote_page)
+    local_head = head_revision(session, session.get(Page, local_page.pk))
+    remote_head = head_revision(session, session.get(Page, remote_page.pk))
 
     anchor_is_current = bool(
         anchor
@@ -378,14 +392,14 @@ def _site_name(site: Site) -> str:
 
 
 def _pair_out(session: Session, link: PageLink) -> PairOut:
-    local_page = session.get(Page, link.local_page_pk)
-    remote_page = session.get(Page, link.remote_page_pk)
+    local_page = session.get(Title, link.local_page_pk)
+    remote_page = session.get(Title, link.remote_page_pk)
     rungs = ladder(
         session, page_pk=link.local_page_pk, other_page_pk=link.remote_page_pk
     )
     anchor = rungs[-1] if rungs else None
-    local_head = head_revision(session, local_page)
-    remote_head = head_revision(session, remote_page)
+    local_head = head_revision(session, session.get(Page, link.local_page_pk))
+    remote_head = head_revision(session, session.get(Page, link.remote_page_pk))
 
     meta = session.exec(
         select(ProofreadPageMeta).where(
@@ -452,8 +466,8 @@ def create_pair(
     local_site, remote_site = resolve_pair(
         session, payload.local_label, payload.remote_label
     )
-    local_page = _page(session, local_site, payload.local_title)
-    remote_page = _page(
+    local_page = _title(session, local_site, payload.local_title)
+    remote_page = _title(
         session, remote_site, payload.remote_title or payload.local_title
     )
     try:
@@ -631,12 +645,12 @@ class AssertRungRequest(BaseModel):
 
 
 def _revision_rows(
-    session: Session, page: Page
+    session: Session, page_pk: int
 ) -> tuple[list[Revision], dict[int, Content | None]]:
     revisions = list(
         session.exec(
             select(Revision)
-            .where(Revision.page_pk == page.pk)
+            .where(Revision.page_pk == page_pk)
             .order_by(Revision.revid.desc())
         ).all()
     )
@@ -697,13 +711,13 @@ def pair_revisions(
     if pairing is None:
         raise HTTPException(404, f"no pairing {pair_pk}")
 
-    local_page = session.get(Page, pairing.local_page_pk)
-    remote_page = session.get(Page, pairing.remote_page_pk)
-    local_revisions, local_content = _revision_rows(session, local_page)
-    remote_revisions, remote_content = _revision_rows(session, remote_page)
+    local_page = session.get(Title, pairing.local_page_pk)
+    remote_page = session.get(Title, pairing.remote_page_pk)
+    local_revisions, local_content = _revision_rows(session, pairing.local_page_pk)
+    remote_revisions, remote_content = _revision_rows(session, pairing.remote_page_pk)
 
-    local_head = head_revision(session, local_page)
-    remote_head = head_revision(session, remote_page)
+    local_head = head_revision(session, session.get(Page, pairing.local_page_pk))
+    remote_head = head_revision(session, session.get(Page, pairing.remote_page_pk))
 
     rungs = ladder(session, page_pk=local_page.pk, other_page_pk=remote_page.pk)
     linked_pairs: dict[tuple[int, int], RevisionLink] = {}
@@ -773,8 +787,12 @@ def pair_revisions(
         ],
         matches=matches,
         rungs=[LinkOut(**rung.model_dump()) for rung in rungs],
-        local_history_complete=history_is_complete(session, local_page),
-        remote_history_complete=history_is_complete(session, remote_page),
+        local_history_complete=history_is_complete(
+            session, session.get(Page, pairing.local_page_pk)
+        ),
+        remote_history_complete=history_is_complete(
+            session, session.get(Page, pairing.remote_page_pk)
+        ),
     )
 
 
@@ -939,8 +957,8 @@ def pair_index(
     for proposal in proposals:
         if proposal.outcome is MatchOutcome.no_counterpart:
             continue
-        local_page = _page(session, local_site, proposal.local_title)
-        remote_page = _page(session, remote_site, proposal.remote_title)
+        local_page = _title(session, local_site, proposal.local_title)
+        remote_page = _title(session, remote_site, proposal.remote_title)
         before = find_pair(session, local_page.pk, remote_page.pk)
         pair_pages(session, local_page, remote_page, origin=LinkOrigin.title_match)
         if before is None:

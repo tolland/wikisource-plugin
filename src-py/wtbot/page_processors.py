@@ -3,10 +3,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from sqlalchemy import func
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from wtbot.log.fetch_log import activity, fetch_stage
-from wtbot.model import FetchState, FileBlob, Page, Site
+from wtbot.model import FetchState, FileBlob, Page, Site, Title
 from wtbot.model.fetch.fetch_request import FetchKind, FetchRequest, FetchStatus
 from wtbot.model.wiki.namespace import FILE_NAMESPACE_KEY
 from wtbot.model.wikisource.proofread_page_meta import ProofreadPageMeta
@@ -232,7 +232,7 @@ def _record_index_page_count(
         return
     session = ctx.session
     try:
-        db_index_page = session.get(Page, cached.pk)
+        db_index_page = session.get(Title, cached.pk)
         if db_index_page is None:
             return
         store = PageStore(session)
@@ -344,7 +344,7 @@ def _fan_out_index(
 
     store = PageStore(session)
 
-    db_index_page = session.get(Page, index_page.pk)
+    db_index_page = session.get(Title, index_page.pk)
 
     index_meta = (
         store.ensure_index_meta(db_index_page) if db_index_page is not None else None
@@ -395,7 +395,7 @@ def _fan_out_index(
             store.set_index_page_count(index_meta, page_count)
 
         for title, page_number in stub_specs:
-            _ensure_placeholder_page(
+            _ensure_untranscribed_title(
                 session,
                 req.site_pk,
                 req.title,
@@ -462,13 +462,13 @@ def _gather_placeholder_enrichment(
         return {}
     try:
         rows = session.exec(
-            select(Page, ProofreadPageMeta)
+            select(Title, ProofreadPageMeta)
             .join(
                 ProofreadPageMeta,
-                ProofreadPageMeta.title_pk == Page.pk,
+                col(ProofreadPageMeta.title_pk) == col(Title.pk),
                 isouter=True,
             )
-            .where(Page.site_pk == site_pk, Page.title.in_(titles))
+            .where(Title.site_pk == site_pk, col(Title.title).in_(titles))
         ).all()
     finally:
         session.rollback()
@@ -513,7 +513,7 @@ def _apply_placeholder_enrichment(
         meta.default_body = enrichment.default_body
 
 
-def _ensure_placeholder_page(
+def _ensure_untranscribed_title(
     session: Session,
     site_pk: int,
     index_title: str,
@@ -521,33 +521,15 @@ def _ensure_placeholder_page(
     page_number: int,
     enrichment: PlaceholderEnrichment | None = None,
 ) -> None:
-    """Create the local stub row for a proofread page that does not exist on
-    the wiki yet — the same provisional-Page shape as a pasted upload:
-    pageid/revid None means "exists locally only". Everything downstream
-    (listing, stat, editing, commit-as-create) then works with no special
-    cases. Never clobbers an existing row: the user may already have edits
-    journalled against a stub from an earlier fan-out — an existing stub only
-    gains enrichment fields it is still missing."""
-    existing = session.exec(
-        select(Page).where(Page.site_pk == site_pk, Page.title == title)
-    ).first()
-    if existing is not None:
-        meta = session.exec(
-            select(ProofreadPageMeta).where(ProofreadPageMeta.title_pk == existing.pk)
-        ).first()
-        if meta is None:
-            index_page = ensure_index_page(session, site_pk, index_title)
-            meta = ProofreadPageMeta(
-                title_pk=existing.pk,
-                index_title_pk=index_page.pk,
-                page_number=page_number,
-            )
-        else:
-            meta.page_number = page_number
-        if existing.revid is None and enrichment is not None:
-            _apply_placeholder_enrichment(meta, enrichment)
-        session.add(meta)
-        return
+    """Record a proofread page the index paginates but the wiki does not hold:
+    its Title, marked fetched (we asked; the answer is "absent"), and its
+    ProofreadPageMeta. No Page row -- a Page is only what the wiki holds.
+
+    Never clobbers: the user may already have saves journalled against this
+    title from an earlier fan-out, so an existing title only gains the
+    enrichment fields its meta is still missing, and a title the wiki does
+    hold (a Page exists) is left to its own fetch.
+    """
     # The fan-out knows its children are proofread pages before any of them is
     # fetched; that guess is the title's to hold (see Title.expected_content_model).
     title_row = ensure_title(
@@ -556,57 +538,53 @@ def _ensure_placeholder_page(
         title=title,
         expected_content_model="proofread-page",
     )
-    page = Page(
-        pk=title_row.pk,
-        site_pk=site_pk,
-        title=title,
-        content_model="proofread-page",
-    )
-    # We *know* the remote state: absent. The fetch is complete.
-    title_row.fetch_status = FetchState.done
-    session.add(page)
-    session.flush()
-    index_page = ensure_index_page(session, site_pk, index_title)
-    meta = ProofreadPageMeta(
-        title_pk=page.pk,
-        index_title_pk=index_page.pk,
-        page_number=page_number,
-    )
-    if enrichment is not None:
+    held = session.get(Page, title_row.pk) is not None
+    if not held:
+        title_row.fetch_status = FetchState.done
+        session.add(title_row)
+    index = ensure_index_title(session, site_pk, index_title)
+    meta = session.get(ProofreadPageMeta, title_row.pk)
+    if meta is None:
+        meta = ProofreadPageMeta(
+            title_pk=title_row.pk,
+            index_title_pk=index.pk,
+            page_number=page_number,
+        )
+    else:
+        meta.page_number = page_number
+    if not held and enrichment is not None:
         _apply_placeholder_enrichment(meta, enrichment)
     session.add(meta)
 
 
-def ensure_index_page(session: Session, site_pk: int, title: str) -> Page:
-    """Return the keyed Index identity, creating an unfetched placeholder."""
+def ensure_index_title(session: Session, site_pk: int, title: str) -> Title:
+    """The Title of the Index that owns a proofread page, created if missing.
+
+    Resolved with MediaWiki's underscore/space equivalence. An existing title
+    must be an Index: by the wiki's word if it holds the page, else by the
+    expectation on record.
+    """
     canonical = title.replace("_", " ")
     index = session.exec(
-        select(Page).where(
-            Page.site_pk == site_pk,
-            func.replace(Page.title, "_", " ") == canonical,
+        select(Title).where(
+            Title.site_pk == site_pk,
+            func.replace(Title.title, "_", " ") == canonical,
         )
     ).first()
-    if index is not None:
-        if index.content_model != "proofread-index":
-            raise RuntimeError(
-                f"owning Index title {title!r} resolves to non-Index page {index.pk}"
-            )
-        return index
-    # Named as the owning Index of a proofread page, so expected to be one.
-    title_row = ensure_title(
-        session,
-        site_pk=site_pk,
-        title=title,
-        expected_content_model="proofread-index",
-    )
-    index = Page(
-        pk=title_row.pk,
-        site_pk=site_pk,
-        title=title,
-        content_model="proofread-index",
-    )
-    session.add(index)
-    session.flush()
+    if index is None:
+        # Named as the owning Index of a proofread page, so expected to be one.
+        return ensure_title(
+            session,
+            site_pk=site_pk,
+            title=title,
+            expected_content_model="proofread-index",
+        )
+    page = session.get(Page, index.pk)
+    model = page.content_model if page is not None else index.expected_content_model
+    if model != "proofread-index":
+        raise RuntimeError(
+            f"owning Index title {title!r} resolves to non-Index title {index.pk}"
+        )
     return index
 
 
