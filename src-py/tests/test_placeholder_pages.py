@@ -6,7 +6,16 @@ from sqlmodel import Session, select
 
 from wtbot.fetch.fetch_worker import run_pending
 from wtbot.main import create_app
-from wtbot.model import EditJournal, FetchRequest, FetchStatus, IndexMeta, Page, Site
+from wtbot.model import (
+    EditJournal,
+    FetchRequest,
+    FetchState,
+    FetchStatus,
+    IndexMeta,
+    Page,
+    Site,
+    Title,
+)
 from wtbot.model.wikisource.proofread_page_meta import ProofreadPageMeta
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import IndexPageEntry, RemotePage, RemotePageImages
@@ -113,24 +122,25 @@ def _unb64(s: str) -> str:
 def test_fanout_creates_stubs_and_fetches_only_existing(engine, tmp_path):
     _seed_and_fan_out(engine, tmp_path)
     with Session(engine) as s:
-        index = s.exec(select(Page).where(Page.title == INDEX)).one()
+        index = s.exec(select(Title).where(Title.title == INDEX)).one()
         rows = s.exec(
-            select(Page, ProofreadPageMeta)
-            .join(ProofreadPageMeta, ProofreadPageMeta.title_pk == Page.pk)
+            select(Title, ProofreadPageMeta)
+            .join(ProofreadPageMeta, ProofreadPageMeta.title_pk == Title.pk)
             .where(ProofreadPageMeta.index_title_pk == index.pk)
             .order_by(ProofreadPageMeta.page_number)
         ).all()
         assert [meta.page_number for _, meta in rows] == [1, 2, 3, 4, 5]
-        stubs = [(page, meta) for page, meta in rows if page.revid is None]
+        # The pages the wiki does not hold are titles with no page: fetched
+        # (we asked; "absent"), expected to be proofread pages, clean.
+        stubs = [(title, meta) for title, meta in rows if s.get(Page, title.pk) is None]
         assert [meta.page_number for _, meta in stubs] == [1, 2, 3, 4]
         for stub, _ in stubs:
-            assert stub.pageid is None
-            assert stub.text is None
-            assert stub.content_model == "proofread-page"
-            assert stub.address.dirty is False
+            assert stub.fetch_status == FetchState.done
+            assert stub.expected_content_model == "proofread-page"
+            assert stub.dirty is False
 
         # Page 5 was fetched for real.
-        page5 = next(page for page, meta in rows if meta.page_number == 5)
+        page5 = s.get(Page, next(t.pk for t, meta in rows if meta.page_number == 5))
         assert page5.revid == 105
         assert page5.text == _PAGE_5_BODY
 
@@ -151,7 +161,7 @@ def test_fanout_creates_stubs_and_fetches_only_existing(engine, tmp_path):
         assert parent.progress_total == 3
         # page_count derived from the pagination when <pagelist> is bare,
         # recorded on the Index's IndexMeta row.
-        index_row = s.exec(select(Page).where(Page.title == INDEX)).one()
+        index_row = s.exec(select(Title).where(Title.title == INDEX)).one()
         index_meta = s.exec(
             select(IndexMeta).where(IndexMeta.title_pk == index_row.pk)
         ).one()
@@ -161,15 +171,15 @@ def test_fanout_creates_stubs_and_fetches_only_existing(engine, tmp_path):
 def test_fanout_enriches_placeholders_with_scan_and_ocr(engine, tmp_path):
     _seed_and_fan_out(engine, tmp_path)
     with Session(engine) as s:
-        index = s.exec(select(Page).where(Page.title == INDEX)).one()
+        index = s.exec(select(Title).where(Title.title == INDEX)).one()
         metas = {
             meta.page_number: meta
             for meta in s.exec(
                 select(ProofreadPageMeta)
-                .join(Page, Page.pk == ProofreadPageMeta.title_pk)
+                .outerjoin(Page, Page.pk == ProofreadPageMeta.title_pk)
                 .where(
                     ProofreadPageMeta.index_title_pk == index.pk,
-                    Page.revid.is_(None),
+                    Page.pk.is_(None),
                 )
             ).all()
         }
@@ -227,9 +237,9 @@ def test_refanout_skips_already_enriched_stubs(engine, tmp_path):
 def test_refanout_does_not_clobber_edited_stub(engine, tmp_path):
     wiki = _seed_and_fan_out(engine, tmp_path)
     with Session(engine) as s:
-        stub = s.exec(select(Page).where(Page.title == "Page:Sparse.pdf/2")).one()
+        stub = s.exec(select(Title).where(Title.title == "Page:Sparse.pdf/2")).one()
         s.add(EditJournal(title_pk=stub.pk, base_revid=None, body="typed text"))
-        stub.address.dirty = True
+        stub.dirty = True
         s.add(stub)
         s.commit()
         stub_pk = stub.pk
@@ -238,9 +248,10 @@ def test_refanout_does_not_clobber_edited_stub(engine, tmp_path):
         s.commit()
         run_pending(s, lambda _: wiki, blob_root=tmp_path / "blobs")
 
-        again = s.exec(select(Page).where(Page.title == "Page:Sparse.pdf/2")).one()
+        again = s.exec(select(Title).where(Title.title == "Page:Sparse.pdf/2")).one()
         assert again.pk == stub_pk
-        assert again.address.dirty is True
+        assert again.dirty is True
+        assert s.get(Page, stub_pk) is None
         journal = s.exec(
             select(EditJournal).where(EditJournal.title_pk == stub_pk)
         ).one()

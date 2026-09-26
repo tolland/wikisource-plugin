@@ -72,9 +72,23 @@ change of constraint, never of data.
      `Page.address`, the page's `Title`, loaded with it; the HTTP surfaces
      that served a `Page` (`/pages`, `/pages/resolve`, `POST /fetch`) serve a
      `PageRow` with the same fields as before.
-   - **Next:** step 3 -- a `Page` row only where the wiki holds the page.
-     Placeholder rows go (their state is now all on the title), the head
-     columns become NOT NULL, `page.title` and the `before_flush` hook go.
+   - **Done** (`c6a1e8d4f207`, step 3a): a `Page` row exists only where the
+     wiki holds the page. The fan-out records an untranscribed `Page:` as a
+     title (`fetch_status=done`) plus its `ProofreadPageMeta`; an Index named
+     before it is fetched is a title only (`ensure_index_title`). The
+     migration deletes rows with no `revid`, and refuses -- naming them -- any
+     still referred to by a `revision`, `fileblob` or promotion source.
+     `local_modified_at` moved to `title` with them (a save sets it).
+     Readers work from an `Entry` (`wtbot.title_store`): a title and its page
+     if held. The VFS, page navigation, reference image, annotations, OCR,
+     locator index, metadata endpoints, commit worker, sync report, matcher,
+     works and pairings all resolve titles and treat the page as optional;
+     `EffectiveState` folds the proposed body in as its last fallback (§5).
+     Content models are read off `Title.expected_content_model`, which the
+     fetch keeps equal to the wiki's. `SyncVerdict` is unchanged: the §5/§6
+     reshape of sync is its own step.
+   - **Next:** step 3b -- the head columns NOT NULL; then 3c -- `page.title`
+     and the `before_flush` hook go.
 
    Two things learned doing the first batch, and a third since. Tables whose
    constraints are not conventionally named, or which carry an expression

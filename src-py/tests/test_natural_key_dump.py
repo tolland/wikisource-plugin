@@ -43,10 +43,19 @@ def make_database(path: Path, offset: int = 0) -> None:
                 pk=offset + 3,
                 site_pk=offset + 1,
                 title="Index:Book",
+                revid=123,
                 latest_revision_pk=offset + 5,
             )
         )
-        session.add(Page(pk=offset + 4, site_pk=offset + 2, title="Index:Book"))
+        # The target's Index is a title the wiki does not hold: no page row.
+        session.add(
+            Title(
+                pk=offset + 4,
+                site_pk=offset + 2,
+                title="Index:Book",
+                expected_content_model="proofread-index",
+            )
+        )
         session.add(Revision(pk=offset + 5, page_pk=offset + 3, revid=123))
         session.add(
             Content(
@@ -84,7 +93,9 @@ def make_database(path: Path, offset: int = 0) -> None:
             )
         )
         session.flush()
-        session.add(Page(pk=offset + 9, site_pk=offset + 1, title="Page:Book/1"))
+        session.add(
+            Page(pk=offset + 9, site_pk=offset + 1, title="Page:Book/1", revid=124)
+        )
         session.add(
             ProofreadPageMeta(
                 title_pk=offset + 9, index_title_pk=offset + 3, page_number=1

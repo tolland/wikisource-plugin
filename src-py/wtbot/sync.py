@@ -12,7 +12,8 @@ from wtbot.matching import (
     compare_pages,
     index_children,
 )
-from wtbot.model import FetchState, FileBlob, Page, PageLink, Revision, Site
+from wtbot.model import FetchState, FileBlob, Page, PageLink, Revision, Site, Title
+from wtbot.title_store import Entry, entry_at
 from wtbot.vfs.store import canonical_title
 
 """``sync --from Index:X [--to Index:Y]``: what it would take to make the target
@@ -36,12 +37,13 @@ absent side as work to do rather than as an error.
 Three kinds of absence, and they are not the same:
 
 - the target ``Index:`` does not exist -- the whole work is a create;
-- a target ``Page:`` has no row -- that page is a create;
-- a target ``Page:`` has a row with no revision. This is a **placeholder**, the
-  stub an index fan-out writes for a page ProofreadPage paginates but nobody has
-  transcribed (``pageid``/``revid`` None, ``fetch_status=done`` meaning "we
-  know: absent"). It is still a create, and distinguishing it from "not fetched
-  yet" is the difference between work to do and a gap in what we know.
+- a target ``Page:`` is not a member of the target work at all -- that page is
+  a create;
+- a target ``Page:`` is a member with no page behind it: a **placeholder**, a
+  title the index paginates but the wiki does not hold (its ``fetch_status`` is
+  ``done``: "we asked; absent"). It is still a create, and distinguishing it
+  from a title not fetched yet is the difference between work to do and a gap
+  in what we know.
 
 **The scan check runs first** (discussion §6). If the two sides' backing scans
 are different uploads then local page 101 is not target page 101, and every
@@ -379,8 +381,8 @@ def _asset_reports(
     *,
     source_site: Site,
     target_site: Site,
-    source_index: Page,
-    target_index: Page | None,
+    source_index: Title,
+    target_index: Title | None,
     target_index_title: str,
     scan: ScanCheck,
 ) -> list[SyncAsset]:
@@ -517,8 +519,8 @@ def _page_reports(
     *,
     source_site: Site,
     target_site: Site,
-    source_children: list[tuple[int | None, Page]],
-    target_children: list[tuple[int | None, Page]],
+    source_children: list[tuple[int | None, Entry]],
+    target_children: list[tuple[int | None, Entry]],
 ) -> list[SyncPage]:
     """One row per page of the work, from either side.
 
@@ -528,7 +530,7 @@ def _page_reports(
     what has to correspond.
     """
     target_by_number = {n: page for n, page in target_children if n is not None}
-    target_by_title = {canonical_title(p.title): p for _, p in target_children}
+    target_by_title = {canonical_title(p.name): p for _, p in target_children}
 
     rows: list[SyncPage] = []
     seen_targets: set[int] = set()
@@ -536,7 +538,7 @@ def _page_reports(
     for number, source_page in source_children:
         target_page = target_by_number.get(number) if number is not None else None
         if target_page is None:
-            target_page = target_by_title.get(canonical_title(source_page.title))
+            target_page = target_by_title.get(canonical_title(source_page.name))
         if target_page is not None:
             seen_targets.add(target_page.pk)
         rows.append(_page_report(session, number, source_page, target_page))
@@ -551,7 +553,7 @@ def _page_reports(
                 verdict=SyncVerdict.source_missing,
                 page_number=number,
                 source_title=None,
-                target_title=target_page.title,
+                target_title=target_page.name,
                 target_revid=target_page.revid,
                 detail="only on the target side",
             )
@@ -564,16 +566,16 @@ def _page_reports(
 def _page_report(
     session: Session,
     number: int | None,
-    source_page: Page,
-    target_page: Page | None,
+    source: Entry,
+    target: Entry | None,
 ) -> SyncPage:
     base = {
         "page_number": number,
-        "source_title": source_page.title,
-        "source_revid": source_page.revid,
+        "source_title": source.name,
+        "source_revid": source.revid,
     }
 
-    if target_page is None:
+    if target is None:
         return SyncPage(
             verdict=SyncVerdict.create,
             target_title=None,
@@ -581,18 +583,16 @@ def _page_report(
             **base,
         )
 
-    base["target_title"] = target_page.title
-    base["target_revid"] = target_page.revid
+    base["target_title"] = target.name
+    base["target_revid"] = target.revid
 
-    pairing = find_pair(session, source_page.pk, target_page.pk)
+    pairing = find_pair(session, source.pk, target.pk)
     if pairing is not None:
         base["pair_pk"] = pairing.pk
-        base["rungs"] = len(
-            ladder(session, page_pk=source_page.pk, other_page_pk=target_page.pk)
-        )
+        base["rungs"] = len(ladder(session, page_pk=source.pk, other_page_pk=target.pk))
 
-    if head_revision(session, target_page) is None:
-        placeholder = _is_placeholder(session, target_page)
+    if target.page is None or head_revision(session, target.page) is None:
+        placeholder = _is_placeholder(target)
         return SyncPage(
             verdict=SyncVerdict.create if placeholder else SyncVerdict.unknown,
             target_is_placeholder=placeholder,
@@ -603,18 +603,18 @@ def _page_report(
             ),
             **base,
         )
-    if head_revision(session, source_page) is None:
+    if source.page is None or head_revision(session, source.page) is None:
         return SyncPage(
             verdict=SyncVerdict.unknown,
             detail=(
                 "source is a placeholder: nothing to write"
-                if _is_placeholder(session, source_page)
+                if _is_placeholder(source)
                 else "source has no cached revision"
             ),
             **base,
         )
 
-    return _compared(session, source_page, target_page, base)
+    return _compared(session, source.page, target.page, base)
 
 
 def _compared(
@@ -703,39 +703,24 @@ def _revid(session: Session, revision_pk: int) -> int | None:
     return revision.revid if revision else None
 
 
-def _is_placeholder(session: Session, page: Page) -> bool:
-    """A row for a page that is known not to exist on the wiki.
+def _is_placeholder(entry: Entry) -> bool:
+    """A title the wiki is known not to hold.
 
-    The fan-out writes these for slots ProofreadPage paginates but nobody has
-    transcribed. Having no revision *and* its title's ``fetch_status=done`` is the
-    distinction that matters: we asked, and the answer was "absent" -- as
-    against a row we have simply not got to, where the answer is unknown.
-
-    "Has no revision" is read through the revision store rather than off
-    ``Page.revid``. The head columns on ``Page`` are a denormalisation with
-    more than one writer (TODO: normalise them behind ``head_revision``), and
-    trusting them here would make this answer "create" for a page that has
-    revisions, on any path that filled one and not the other.
+    The fan-out records these for slots ProofreadPage paginates but nobody has
+    transcribed. No page *and* ``fetch_status=done`` is the distinction that
+    matters: we asked, and the answer was "absent" -- as against a title we
+    have simply not got to, where the answer is unknown.
     """
-    return (
-        head_revision(session, page) is None
-        and page.address.fetch_status == FetchState.done
-    )
+    return entry.page is None and entry.title.fetch_status == FetchState.done
 
 
-def _index_page(session: Session, site: Site, title: str) -> Page | None:
+def _index_page(session: Session, site: Site, title: str) -> Title | None:
     return session.exec(
-        select(Page).where(
-            Page.site_pk == site.pk,
-            Page.title == title,
-            Page.content_model == "proofread-index",
+        select(Title).where(
+            Title.site_pk == site.pk,
+            Title.title == title,
+            Title.expected_content_model == "proofread-index",
         )
-    ).first()
-
-
-def _page(session: Session, site: Site, title: str) -> Page | None:
-    return session.exec(
-        select(Page).where(Page.site_pk == site.pk, Page.title == title)
     ).first()
 
 
@@ -761,24 +746,24 @@ def build_page_report(
     """
     target_title = target_title or source_title
 
-    source_page = _page(session, source_site, source_title)
-    if source_page is None:
+    source = entry_at(session, site_pk=source_site.pk, title=source_title)
+    if source is None:
         raise SyncError(
             f"{source_title} is not cached for {_site_name(source_site)}. "
             "A sync reports on what we hold: fetch the source page first."
         )
-    target_page = _page(session, target_site, target_title)
-    return _page_report(session, None, source_page, target_page)
+    target = entry_at(session, site_pk=target_site.pk, title=target_title)
+    return _page_report(session, None, source, target)
 
 
 def _side(
     session: Session,
     site: Site,
     index_title: str,
-    index_page: Page | None,
-    children: list[tuple[int | None, Page]],
+    index_page: Title | None,
+    children: list[tuple[int | None, Entry]],
 ) -> SyncSide:
-    placeholders = sum(1 for _, page in children if _is_placeholder(session, page))
+    placeholders = sum(1 for _, entry in children if _is_placeholder(entry))
     return SyncSide(
         site=_site_name(site),
         site_pk=site.pk,
@@ -790,7 +775,7 @@ def _side(
 
 
 def _scan_check(
-    session: Session, source_index: Page, target_index: Page | None
+    session: Session, source_index: Title, target_index: Title | None
 ) -> ScanCheck:
     """Discussion §6: do the two sides transcribe the same upload?
 
@@ -853,7 +838,7 @@ def _scan_check(
     )
 
 
-def _file_of(session: Session, index_page: Page) -> tuple[str | None, FileBlob | None]:
+def _file_of(session: Session, index_page: Title) -> tuple[str | None, FileBlob | None]:
     """The ``File:`` backing an ``Index:``, and its downloaded blob record.
 
     By title -- ``Index:Foo.djvu`` -> ``File:Foo.djvu`` -- which is how the
@@ -876,7 +861,9 @@ def _site_name(site: Site) -> str:
     return site.label or f"{site.family}:{site.code}"
 
 
-def work_pk_for(session: Session, source_index: Page, target_index: Page) -> int | None:
+def work_pk_for(
+    session: Session, source_index: Title, target_index: Title
+) -> int | None:
     """The tracked work for two index pages, if they are tracked."""
     pairing: PageLink | None = find_pair(session, source_index.pk, target_index.pk)
     if pairing is None:

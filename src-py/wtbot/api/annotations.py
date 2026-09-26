@@ -12,7 +12,7 @@ from wtbot.annotation_store import (
 )
 from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.deps import get_session
-from wtbot.model import Page
+from wtbot.model import Title
 from wtbot.model.annotation.box_range_link import BoxRangeLink
 from wtbot.model.annotation.scan_annotation import AnnotationCategory, ScanAnnotation
 from wtbot.model.annotation.text_target_anchor import TextTargetAnchor
@@ -113,11 +113,13 @@ class BoxLinkList(BaseModel):
     links: list[BoxLinkOut]
 
 
-def _page_for(session: Session, path: str) -> Page:
+def _page_for(session: Session, path: str) -> Title:
+    """The title a Page: leaf addresses. Annotations are drawn on its scan,
+    which exists whether or not the wiki holds the page."""
     node = resolve(PageStore(session), path)
     if not isinstance(node, PageLeaf):
         raise HTTPException(status_code=404, detail=f"not a proofread page: {path}")
-    return node.page
+    return node.page.title
 
 
 def get_annotation_store(

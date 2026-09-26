@@ -13,7 +13,6 @@ from wtbot.model import (
     BatchStatus,
     FetchKind,
     FetchRequest,
-    Page,
     Promotion,
     PromotionBatch,
     PromotionIntent,
@@ -622,7 +621,7 @@ def sync_page_report(
 
 def _single_change(
     session: Session,
-    source_page: Page,
+    source_page: Title,
     target: Title | None,
     status: PromotionStatus,
 ) -> Promotion | None:
@@ -666,10 +665,12 @@ def next_change(
     except SyncError as exc:
         raise HTTPException(404, str(exc)) from exc
 
+    # The source's address: build_page_report found it. Whether the wiki holds
+    # it decides whether anything can be staged, which staging checks.
     source_page = session.exec(
-        select(Page).where(
-            Page.site_pk == source_site.pk,
-            Page.title == payload.source_title,
+        select(Title).where(
+            Title.site_pk == source_site.pk,
+            Title.title == payload.source_title,
         )
     ).one()
     target = session.exec(

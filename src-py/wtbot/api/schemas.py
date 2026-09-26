@@ -28,7 +28,7 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
-from wtbot.model import FetchState, Page
+from wtbot.model import FetchState, Page, Title
 
 
 # --------------------------------------------------------------------------
@@ -292,9 +292,9 @@ class ChangesSinceResponse(BaseModel):
 
 
 class PageRow(BaseModel):
-    """A Page as this router has always served it: the page's columns plus the
-    ones that moved to its Title (they belong to the address, but a reader of
-    a cached page still wants them alongside)."""
+    """A title as the /pages surfaces serve it: the address's columns, plus the
+    page's when the wiki holds one (all None when it does not). ``pk`` is the
+    title's, which is the page's too, and keys the metadata endpoints."""
 
     pk: int
     site_pk: int
@@ -314,11 +314,31 @@ class PageRow(BaseModel):
     history_complete_from_revid: int | None
 
     @classmethod
-    def of(cls, page: Page) -> "PageRow":
-        address = page.address
+    def of(cls, title: Title, page: Page | None = None) -> "PageRow":
+        assert title.pk is not None
         return cls(
-            **page.model_dump(),
-            namespace_key=address.namespace_key,
-            dirty=address.dirty,
-            fetch_status=address.fetch_status,
+            pk=title.pk,
+            site_pk=title.site_pk,
+            title=title.title,
+            namespace_key=title.namespace_key,
+            content_model=(
+                page.content_model if page is not None else title.expected_content_model
+            ),
+            pageid=page.pageid if page is not None else None,
+            revid=page.revid if page is not None else None,
+            remote_timestamp=page.remote_timestamp if page is not None else None,
+            contributor=page.contributor if page is not None else None,
+            comment=page.comment if page is not None else None,
+            text=page.text if page is not None else None,
+            local_modified_at=title.local_modified_at,
+            dirty=title.dirty,
+            fetch_status=title.fetch_status,
+            latest_revision_pk=page.latest_revision_pk if page is not None else None,
+            history_complete_from_revid=(
+                page.history_complete_from_revid if page is not None else None
+            ),
         )
+
+    @classmethod
+    def of_page(cls, page: Page) -> "PageRow":
+        return cls.of(page.address, page)

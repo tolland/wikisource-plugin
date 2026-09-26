@@ -8,7 +8,6 @@ from wtbot.model import (
     IndexLink,
     IndexMeta,
     LinkOrigin,
-    Page,
     PageLink,
     ProofreadPageMeta,
     Site,
@@ -35,8 +34,8 @@ pair belongs to its work whenever both exist, in whichever order they came.
 
 def link_indexes(
     session: Session,
-    local_index: Page,
-    remote_index: Page,
+    local_index: Title,
+    remote_index: Title,
     *,
     origin: LinkOrigin = LinkOrigin.manual,
 ) -> IndexLink:
@@ -156,8 +155,8 @@ def works_for_sites(
     assertion was made, not a hierarchy, and a viewer that swapped its two
     columns should see the same works.
     """
-    local_page = aliased(Page)
-    remote_page = aliased(Page)
+    local_page = aliased(Title)
+    remote_page = aliased(Title)
     statement = (
         select(IndexLink)
         .join(PageLink, PageLink.pk == IndexLink.pk)

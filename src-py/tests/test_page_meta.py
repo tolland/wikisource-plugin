@@ -79,9 +79,9 @@ def test_ensure_index_meta_creates_default_and_is_idempotent(session):
     index = _seed_index(session, site)
     store = PageStore(session)
 
-    meta = store.ensure_index_meta(index)
+    meta = store.ensure_index_meta(index.address)
     assert meta.short_name == "Wittgenstein-Tractatus_Logico-Philosophicus_1922"
-    assert store.ensure_index_meta(index).title_pk == meta.title_pk == index.pk
+    assert store.ensure_index_meta(index.address).title_pk == meta.title_pk == index.pk
 
 
 def test_ensure_index_meta_deconflicts_same_site_defaults(session):
@@ -90,8 +90,8 @@ def test_ensure_index_meta_deconflicts_same_site_defaults(session):
     b = _seed_index(session, site, "Index:Foo.pdf")  # same default 'Foo'
     store = PageStore(session)
 
-    assert store.ensure_index_meta(a).short_name == "Foo"
-    assert store.ensure_index_meta(b).short_name == "Foo_2"
+    assert store.ensure_index_meta(a.address).short_name == "Foo"
+    assert store.ensure_index_meta(b.address).short_name == "Foo_2"
 
 
 def test_ensure_index_meta_same_default_ok_across_sites(session):
@@ -101,8 +101,8 @@ def test_ensure_index_meta_same_default_ok_across_sites(session):
     b = _seed_index(session, site_b, "Index:Foo.djvu")
     store = PageStore(session)
 
-    assert store.ensure_index_meta(a).short_name == "Foo"
-    assert store.ensure_index_meta(b).short_name == "Foo"
+    assert store.ensure_index_meta(a.address).short_name == "Foo"
+    assert store.ensure_index_meta(b.address).short_name == "Foo"
 
 
 # -- HTTP endpoints --------------------------------------------------------------
@@ -279,19 +279,19 @@ def test_css_in_index_namespace_cannot_own_proofread_metadata(session):
     from fastapi import HTTPException
 
     from wtbot.api.page_meta import ProofreadPageMetaUpdate, put_page_meta
-    from wtbot.page_processors import ensure_index_page
+    from wtbot.page_processors import ensure_index_title
 
     site = _seed_site(session)
     css = _add_page(
         session, site, "Index:Book.djvu/styles.css", "sanitized-css", namespace_key=106
     )
     page = _add_page(session, site, "Page:Book.djvu/1", "proofread-page")
-    assert PageStore(session).index_page(site, css.title) is None
+    assert PageStore(session).index_entry(site, css.title) is None
     with pytest.raises(HTTPException) as exc:
         put_page_meta(page.pk, ProofreadPageMetaUpdate(index_title_pk=css.pk), session)
     assert exc.value.status_code == 400
     with pytest.raises(RuntimeError, match="non-Index"):
-        ensure_index_page(session, site.pk, css.title)
+        ensure_index_title(session, site.pk, css.title)
 
 
 def test_proofread_metadata_accepts_content_model_in_custom_namespace(session):
@@ -308,4 +308,6 @@ def test_proofread_metadata_accepts_content_model_in_custom_namespace(session):
         page.pk, ProofreadPageMetaUpdate(index_title_pk=index.pk), session
     )
     assert meta.index_title_pk == index.pk
-    assert PageStore(session).proofread_pages(site, index.title) == [page]
+    assert [e.page for e in PageStore(session).proofread_pages(site, index.title)] == [
+        page
+    ]

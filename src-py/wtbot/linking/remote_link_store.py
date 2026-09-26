@@ -136,7 +136,7 @@ def _pairing_for(session: Session, local_page: Page, remote_page: Page):
     """
     from wtbot.linking.page_link_store import pair_pages
 
-    return pair_pages(session, local_page, remote_page)
+    return pair_pages(session, local_page.address, remote_page.address)
 
 
 def find_link(

@@ -68,23 +68,26 @@ def list_pending_commits(
 
     pending_pages: list[PendingCommitPage] = []
     for page_pk, journals in list(grouped.items())[offset : offset + limit]:
-        page = session.get(Page, page_pk)
-        if page is None:
+        title = session.get(Title, page_pk)
+        if title is None:
             continue
+        # None when the wiki does not hold the page: the push is a creation.
+        page = session.get(Page, page_pk)
+        revid = page.revid if page is not None else None
 
         latest = journals[-1]
         base_revid = (
-            latest.base_revid if latest.base_revid is not None else (page.revid or 0)
+            latest.base_revid if latest.base_revid is not None else (revid or 0)
         )
         pending_pages.append(
             PendingCommitPage(
                 page_pk=page_pk,
-                site_pk=page.site_pk,
-                title=page.title,
-                current_revid=page.revid,
+                site_pk=title.site_pk,
+                title=title.title,
+                current_revid=revid,
                 base_revid=base_revid,
                 comment=latest.comment,
-                base_body=page.text,
+                base_body=page.text if page is not None else None,
                 submitted_body=latest.body,
                 pending_count=len(journals),
                 first_saved_at=journals[0].saved_at.isoformat(),

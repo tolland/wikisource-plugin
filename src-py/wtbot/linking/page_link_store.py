@@ -2,7 +2,7 @@ from sqlalchemy import func
 from sqlmodel import Session, select
 
 from wtbot.linking.remote_link_store import LinkError
-from wtbot.model import LinkOrigin, Page, PageLink, RevisionLink, Site
+from wtbot.model import LinkOrigin, PageLink, RevisionLink, Site, Title
 
 """Reading and writing page pairings.
 
@@ -31,8 +31,8 @@ reason this is stored rather than recomputed.
 
 def pair_pages(
     session: Session,
-    local_page: Page,
-    remote_page: Page,
+    local_page: Title,
+    remote_page: Title,
     *,
     origin: LinkOrigin = LinkOrigin.title_match,
 ) -> PageLink:
@@ -94,10 +94,10 @@ def pair_for_page(
     )
     return session.exec(
         select(PageLink)
-        .join(Page, Page.pk == other)
+        .join(Title, Title.pk == other)
         .where(
             (PageLink.local_page_pk == page_pk) | (PageLink.remote_page_pk == page_pk),
-            Page.site_pk == other_site_pk,
+            Title.site_pk == other_site_pk,
         )
     ).first()
 
@@ -112,7 +112,9 @@ def pairs_for_index(
     """
     from wtbot.matching import index_children
 
-    page_pks = {page.pk for _, page in index_children(session, local_site, index_title)}
+    page_pks = {
+        entry.pk for _, entry in index_children(session, local_site, index_title)
+    }
     if not page_pks:
         return []
     return list(

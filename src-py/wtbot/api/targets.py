@@ -4,7 +4,7 @@ from fastapi import Request
 from sqlmodel import Session, select
 
 from wtbot.api.errors import ApiError
-from wtbot.model import Page, Site
+from wtbot.model import Site, Title
 from wtbot.wiki.client import WikiClient
 
 """Resolving a VFS path to the wiki thing it names.
@@ -60,10 +60,12 @@ def resolve_target(session: Session, path: str) -> tuple[Site, str, str | None]:
     else:
         title = f"{index_title}/{'/'.join(rest)}"  # index subpage, e.g. styles.css
 
-    page = session.exec(
-        select(Page).where(Page.site_pk == site.pk, Page.title == title)
+    # The title's expectation, which a fetch keeps equal to the wiki's own
+    # answer: a page the wiki does not hold yet still renders as what it is.
+    known = session.exec(
+        select(Title).where(Title.site_pk == site.pk, Title.title == title)
     ).first()
-    return site, title, page.content_model if page else None
+    return site, title, known.expected_content_model if known else None
 
 
 _lock = threading.Lock()

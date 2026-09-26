@@ -266,14 +266,20 @@ def _page_references_to_titles(dump: DatabaseDump) -> DatabaseDump:
 
 
 # Page columns that moved to the page's Title, and the one dropped on the way.
-_ADDRESS_FIELDS: tuple[str, ...] = ("namespace_key", "fetch_status", "dirty")
+_ADDRESS_FIELDS: tuple[str, ...] = (
+    "namespace_key",
+    "fetch_status",
+    "dirty",
+    "local_modified_at",
+)
 _DROPPED_PAGE_FIELDS: frozenset[str] = frozenset({"fetch_error"})
 
 
 def _move_address_fields_to_titles(dump: DatabaseDump) -> DatabaseDump:
     """Carry a page's address fields onto its title.
 
-    ``namespace_key``, ``fetch_status`` and ``dirty`` moved from Page to Title;
+    ``namespace_key``, ``fetch_status``, ``dirty`` and ``local_modified_at``
+    moved from Page to Title;
     ``fetch_error``, never written, was dropped. A page and its title share a
     natural key, so the title to receive them is the one with the page's key.
     A title with no page keeps the model's defaults.
@@ -325,12 +331,56 @@ def _move_address_fields_to_titles(dump: DatabaseDump) -> DatabaseDump:
     return dump.model_copy(update={"tables": tables})
 
 
+# Tables whose rows say "the wiki holds this page" of the page they reference.
+_HELD_PAGE_REFERENCES: tuple[tuple[str, str], ...] = (
+    ("revision", "page_pk"),
+    ("fileblob", "page_pk"),
+    ("promotionbatch", "source_page_pk"),
+)
+
+
+def _drop_placeholder_pages(dump: DatabaseDump) -> DatabaseDump:
+    """Drop page rows the wiki does not hold, as the migration does.
+
+    A placeholder -- a page row with no ``revid`` -- stood for a title the wiki
+    does not hold. Its title keeps everything it said (the step before moved
+    the address fields across), so the row goes. One that another row still
+    treats as held is a contradiction, refused rather than guessed at.
+    """
+    pages = next((table for table in dump.tables if table.name == "page"), None)
+    if pages is None:
+        return dump
+    placeholders = {
+        _identity("page", row) for row in pages.rows if row.fields.get("revid") is None
+    }
+    if not placeholders:
+        return dump
+    for table in dump.tables:
+        for name, column in _HELD_PAGE_REFERENCES:
+            if table.name != name:
+                continue
+            for row in table.rows:
+                ref = row.references.get(column)
+                if ref is not None and ref.model_dump_json() in placeholders:
+                    raise ValueError(
+                        f"{name}.{column} refers to a page with no revid: "
+                        f"{ref.model_dump_json()}"
+                    )
+    rows = [row for row in pages.rows if _identity("page", row) not in placeholders]
+    tables = [
+        table.model_copy(update={"rows": rows}) if table.name == "page" else table
+        for table in dump.tables
+    ]
+    return dump.model_copy(update={"tables": tables})
+
+
 # Applied in order: each brings a dump from one schema step to the next, and
 # does nothing to a dump that is already past it.
 _LEGACY_UPGRADES = (
     _drop_legacy_tables,
     _add_titles_to_legacy_dump,
     _move_address_fields_to_titles,
+    _drop_placeholder_pages,
     _rename_legacy_references,
     _drop_legacy_references,
     _page_references_to_titles,

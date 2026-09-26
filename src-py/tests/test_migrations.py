@@ -972,3 +972,102 @@ def test_the_address_columns_step_downgrades_cleanly(baseline_engine: Engine) ->
             "SELECT pk, namespace_key, fetch_status, dirty, fetch_error FROM page"
             " ORDER BY pk"
         ).all() == [(10, 252, "done", 0, None), (11, None, "done", 1, None)]
+
+
+# -- step 3a: a page row only where the wiki holds one ------------------------
+
+PAGE_ONLY_WHERE_HELD = "c6a1e8d4f207"
+
+
+def _seed_held_and_placeholder(engine: Engine) -> None:
+    """A held page (10), a placeholder with a local save (11), and an Index
+    named before it was fetched (12) -- the last two with no revid."""
+    with engine.begin() as connection:
+        run = connection.exec_driver_sql
+        run(
+            "INSERT INTO site (pk, family, code, articlepath, created_at)"
+            f" VALUES (1, 'up', 'en', '/wiki/$1', {_T})"
+        )
+        for pk, title, model, status in (
+            (10, "Page:B.djvu/1", "proofread-page", "done"),
+            (11, "Page:B.djvu/2", "proofread-page", "done"),
+            (12, "Index:B.djvu", "proofread-index", "unfetched"),
+        ):
+            run(
+                "INSERT INTO title (pk, site_pk, title, expected_content_model,"
+                f" fetch_status) VALUES ({pk}, 1, '{title}', '{model}', '{status}')"
+            )
+        run(
+            "INSERT INTO page (pk, site_pk, title, content_model, revid,"
+            " local_modified_at) VALUES"
+            " (10, 1, 'Page:B.djvu/1', 'proofread-page', 7, NULL),"
+            " (11, 1, 'Page:B.djvu/2', 'proofread-page', NULL,"
+            "  '2026-02-01 00:00:00'),"
+            " (12, 1, 'Index:B.djvu', 'proofread-index', NULL, NULL)"
+        )
+        run(
+            "INSERT INTO proofreadpagemeta (title_pk, index_title_pk, page_number)"
+            " VALUES (10, 12, 1), (11, 12, 2)"
+        )
+
+
+def test_placeholder_pages_go_and_their_saves_stay_on_the_title(
+    baseline_engine: Engine,
+) -> None:
+    _run(baseline_engine, command.upgrade, ADDRESS_COLUMNS_ON_TITLE)
+    _seed_held_and_placeholder(baseline_engine)
+
+    _run(baseline_engine, command.upgrade, PAGE_ONLY_WHERE_HELD)
+
+    assert "local_modified_at" not in _columns(baseline_engine, "page")
+    with baseline_engine.connect() as connection:
+        run = connection.exec_driver_sql
+        assert run("SELECT pk FROM page").scalars().all() == [10]
+        assert run(
+            "SELECT pk, fetch_status, local_modified_at FROM title ORDER BY pk"
+        ).all() == [
+            (10, "done", None),
+            (11, "done", "2026-02-01 00:00:00"),
+            (12, "unfetched", None),
+        ]
+        # The pagination is the title's, and survives its page row.
+        assert run("SELECT count(*) FROM proofreadpagemeta").scalar() == 2
+        assert run("PRAGMA foreign_key_check").all() == []
+
+
+def test_a_placeholder_with_revisions_stops_the_migration(
+    baseline_engine: Engine,
+) -> None:
+    _run(baseline_engine, command.upgrade, ADDRESS_COLUMNS_ON_TITLE)
+    _seed_held_and_placeholder(baseline_engine)
+    with baseline_engine.begin() as connection:
+        connection.exec_driver_sql(
+            "INSERT INTO revision (pk, page_pk, revid, minor, observed_at)"
+            f" VALUES (1, 11, 99, 0, {_T})"
+        )
+
+    with pytest.raises(RuntimeError, match="Page:B.djvu/2"):
+        _run(baseline_engine, command.upgrade, PAGE_ONLY_WHERE_HELD)
+    with baseline_engine.connect() as connection:
+        # Nothing was deleted: the migration ran in one transaction.
+        assert connection.exec_driver_sql("SELECT count(*) FROM page").scalar() == 3
+
+
+def test_the_page_only_where_held_step_downgrades_cleanly(
+    baseline_engine: Engine,
+) -> None:
+    _run(baseline_engine, command.upgrade, ADDRESS_COLUMNS_ON_TITLE)
+    _seed_held_and_placeholder(baseline_engine)
+    _run(baseline_engine, command.upgrade, PAGE_ONLY_WHERE_HELD)
+
+    _run(baseline_engine, command.downgrade, ADDRESS_COLUMNS_ON_TITLE)
+
+    with baseline_engine.connect() as connection:
+        assert connection.exec_driver_sql(
+            "SELECT pk, content_model, revid, local_modified_at FROM page"
+            " ORDER BY pk"
+        ).all() == [
+            (10, "proofread-page", 7, None),
+            (11, "proofread-page", None, "2026-02-01 00:00:00"),
+            (12, "proofread-index", None, None),
+        ]

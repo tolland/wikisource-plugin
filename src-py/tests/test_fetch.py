@@ -21,6 +21,7 @@ from wtbot.model import (
     Page,
     ProofreadPageMeta,
     Site,
+    Title,
 )
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.sha1 import normalize_sha1
@@ -441,7 +442,7 @@ def test_proofread_page_metadata_uses_content_model(session):
     meta = session.exec(
         select(ProofreadPageMeta).where(ProofreadPageMeta.title_pk == page.pk)
     ).one()
-    assert session.get(Page, meta.index_title_pk).title == "Index:Tractatus.djvu"
+    assert session.get(Title, meta.index_title_pk).title == "Index:Tractatus.djvu"
     assert meta.page_number == 7
 
 
@@ -518,7 +519,7 @@ def test_proofread_page_fetch_without_images_leaves_image_fields_empty(session):
     meta = session.exec(
         select(ProofreadPageMeta).where(ProofreadPageMeta.title_pk == page.pk)
     ).one()
-    assert session.get(Page, meta.index_title_pk).title == "Index:Tractatus.djvu"
+    assert session.get(Title, meta.index_title_pk).title == "Index:Tractatus.djvu"
     assert meta.page_number == 46
     assert meta.quality_level is None
     assert meta.thumb_url is None

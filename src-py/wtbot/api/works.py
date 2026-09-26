@@ -34,6 +34,7 @@ from wtbot.model import (
     ProofreadPageMeta,
     RevisionLink,
     Site,
+    Title,
 )
 from wtbot.site_store import require_credentialed_site, resolve_pair
 
@@ -301,9 +302,9 @@ def _site_name(site: Site) -> str:
     return site.label or f"{site.family}:{site.code}"
 
 
-def _index_page(session: Session, site: Site, title: str) -> Page:
+def _index_page(session: Session, site: Site, title: str) -> Title:
     page = session.exec(
-        select(Page).where(Page.site_pk == site.pk, Page.title == title)
+        select(Title).where(Title.site_pk == site.pk, Title.title == title)
     ).first()
     if page is None:
         raise HTTPException(
@@ -316,8 +317,8 @@ def _index_page(session: Session, site: Site, title: str) -> Page:
 
 def _summary(session: Session, work: IndexLink) -> WorkSummary:
     pairing = session.get(PageLink, work.pk)
-    local_page = session.get(Page, pairing.local_page_pk)
-    remote_page = session.get(Page, pairing.remote_page_pk)
+    local_page = session.get(Title, pairing.local_page_pk)
+    remote_page = session.get(Title, pairing.remote_page_pk)
 
     child_pks = [child.pk for child in children_of(session, work)]
     pairs = len(child_pks)
@@ -385,14 +386,14 @@ def _pair_out(
     rungs = 0
     anchor_is_current = False
     local = session.exec(
-        select(Page).where(
-            Page.site_pk == local_site.pk, Page.title == proposal.local_title
+        select(Title).where(
+            Title.site_pk == local_site.pk, Title.title == proposal.local_title
         )
     ).first()
     remote = (
         session.exec(
-            select(Page).where(
-                Page.site_pk == remote_site.pk, Page.title == proposal.remote_title
+            select(Title).where(
+                Title.site_pk == remote_site.pk, Title.title == proposal.remote_title
             )
         ).first()
         if proposal.remote_title
@@ -406,8 +407,8 @@ def _pair_out(
             rungs = len(ladder_rows)
             if ladder_rows:
                 anchor = ladder_rows[-1]
-                local_head = head_revision(session, local)
-                remote_head = head_revision(session, remote)
+                local_head = head_revision(session, session.get(Page, local.pk))
+                remote_head = head_revision(session, session.get(Page, remote.pk))
                 anchor_is_current = bool(
                     local_head
                     and remote_head
@@ -482,17 +483,20 @@ def list_candidates(
         raise HTTPException(404, f"no site {site_pk if site_pk is not None else label}")
 
     pages = session.exec(
-        select(Page, IndexMeta)
-        .join(IndexMeta, IndexMeta.title_pk == Page.pk)
-        .where(Page.site_pk == site.pk, IndexMeta.site_pk == site.pk)
-        .order_by(Page.title)
+        select(Title, IndexMeta)
+        .join(IndexMeta, col(IndexMeta.title_pk) == col(Title.pk))
+        .where(Title.site_pk == site.pk, IndexMeta.site_pk == site.pk)
+        .order_by(Title.title)
     ).all()
 
     counts = dict(
         session.exec(
             select(ProofreadPageMeta.index_title_pk, func.count())
-            .join(Page, Page.pk == ProofreadPageMeta.title_pk)
-            .where(Page.site_pk == site.pk, Page.content_model == "proofread-page")
+            .join(Title, col(Title.pk) == col(ProofreadPageMeta.title_pk))
+            .where(
+                Title.site_pk == site.pk,
+                Title.expected_content_model == "proofread-page",
+            )
             .group_by(ProofreadPageMeta.index_title_pk)
         ).all()
     )
@@ -508,7 +512,7 @@ def list_candidates(
                 if pairing.local_page_pk == page.pk
                 else pairing.local_page_pk
             )
-            other = session.get(Page, other_pk)
+            other = session.get(Title, other_pk)
             paired_with = other.title if other else None
         out.append(
             IndexCandidate(
@@ -595,11 +599,11 @@ def create_work(
     )
 
 
-def _page_by_title(session: Session, site: Site, title: str | None) -> Page | None:
+def _page_by_title(session: Session, site: Site, title: str | None) -> Title | None:
     if title is None:
         return None
     return session.exec(
-        select(Page).where(Page.site_pk == site.pk, Page.title == title)
+        select(Title).where(Title.site_pk == site.pk, Title.title == title)
     ).first()
 
 

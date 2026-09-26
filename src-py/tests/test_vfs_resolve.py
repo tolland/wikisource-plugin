@@ -104,18 +104,18 @@ def test_resolve_classifies(store, path, expected):
 def test_resolve_carries_underlying_pages(store):
     page_leaf = resolve(store, f"{_INDEX_PATH}/Pages/{PAGE_1}")
     assert isinstance(page_leaf, PageLeaf)
-    assert page_leaf.page.title == PAGE_1
+    assert page_leaf.page.name == PAGE_1
 
     # Dual role: the synthetic wikitext leaf is backed by the Index page itself.
     wikitext = resolve(store, f"{_INDEX_PATH}/wikitext")
     assert isinstance(wikitext, IndexWikitext)
-    assert wikitext.index.title == INDEX
+    assert wikitext.index.name == INDEX
 
     file_wikitext = resolve(store, f"{_INDEX_PATH}/{FILE}/wikitext")
     assert isinstance(file_wikitext, FileWikitext)
-    assert file_wikitext.file_page.title == FILE
+    assert file_wikitext.file_page.name == FILE
 
     asset = resolve(store, f"{_INDEX_PATH}/styles.css")
     assert isinstance(asset, IndexAssetLeaf)
     assert asset.name == "styles.css"
-    assert asset.page.title == f"{INDEX}/styles.css"
+    assert asset.page.name == f"{INDEX}/styles.css"

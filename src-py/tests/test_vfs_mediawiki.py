@@ -76,7 +76,7 @@ def test_subpages_permissive_without_namespace_map(session, site):
     and subpages cannot be ruled out."""
     mw = MediaWikiVfs(PageStore(session))
     assert mw.subpages_enabled(site, INDEX) is True
-    titles = [p.title for p in mw.subpages(site, INDEX)]
+    titles = [p.name for p in mw.subpages(site, INDEX)]
     assert titles == [UNLINKED_SUBPAGE, LINKED_SUBPAGE]
 
 
@@ -90,7 +90,7 @@ def test_subpages_respect_namespace_flag(session, site):
 def test_subpages_enabled_namespace_lists_them(session, site):
     _add_index_namespace(session, site, subpages=True)
     mw = MediaWikiVfs(PageStore(session))
-    titles = [p.title for p in mw.subpages(site, INDEX)]
+    titles = [p.name for p in mw.subpages(site, INDEX)]
     assert titles == [UNLINKED_SUBPAGE, LINKED_SUBPAGE]
 
 
@@ -142,5 +142,5 @@ def test_proofread_pages_match_across_underscore_space(session):
     store = PageStore(session)
     # Querying by either spelling returns both members.
     for query_title in (spaced, underscored):
-        titles = {p.title for p in store.proofread_pages(site, query_title)}
+        titles = {p.name for p in store.proofread_pages(site, query_title)}
         assert titles == {real.title, stub.title}, query_title

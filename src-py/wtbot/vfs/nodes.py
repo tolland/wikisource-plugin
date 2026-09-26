@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from wtbot.model import Page, Site
+from wtbot.model import Site
 from wtbot.vfs.paths import WikiPath
-from wtbot.vfs.store import PROOFREAD_INDEX_CONTENT_MODEL, PageStore
+from wtbot.vfs.store import PROOFREAD_INDEX_CONTENT_MODEL, Entry, PageStore
 
 """Typed resolution of wikisource:// paths.
 
@@ -50,7 +50,7 @@ class IndexDir:
 
     path: WikiPath
     site: Site
-    index: Page
+    index: Entry
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,7 +59,7 @@ class IndexWikitext:
 
     path: WikiPath
     site: Site
-    index: Page
+    index: Entry
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,35 +69,35 @@ class PagesDir:
 
     path: WikiPath
     site: Site
-    index: Page
+    index: Entry
 
 
 @dataclass(frozen=True, slots=True)
 class PageLeaf:
     path: WikiPath
     site: Site
-    page: Page
+    page: Entry
 
 
 @dataclass(frozen=True, slots=True)
 class FileDir:
     path: WikiPath
     site: Site
-    file_page: Page
+    file_page: Entry
 
 
 @dataclass(frozen=True, slots=True)
 class FileWikitext:
     path: WikiPath
     site: Site
-    file_page: Page
+    file_page: Entry
 
 
 @dataclass(frozen=True, slots=True)
 class FileBlobLeaf:
     path: WikiPath
     site: Site
-    file_page: Page
+    file_page: Entry
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,7 +108,7 @@ class IndexAssetLeaf:
 
     path: WikiPath
     site: Site
-    page: Page
+    page: Entry
     name: str
 
 
@@ -157,7 +157,7 @@ def resolve(store: PageStore, raw_path: str) -> WsNode:
     index_title = path.index_title
     rest = path.rest
 
-    index_page = store.page(site, index_title)
+    index_page = store.entry(site, index_title)
     if index_page is None:
         return Missing(path)
 
@@ -181,7 +181,7 @@ def resolve(store: PageStore, raw_path: str) -> WsNode:
 
     # File: leaf (wikitext/blob) beneath the File: dir
     if rest[-1] in ("wikitext", "blob") and "/".join(rest[:-1]).startswith("File:"):
-        file_page = store.page(site, "/".join(rest[:-1]))
+        file_page = store.entry(site, "/".join(rest[:-1]))
         if file_page is None:
             return Missing(path)
         if rest[-1] == "wikitext":
@@ -190,13 +190,13 @@ def resolve(store: PageStore, raw_path: str) -> WsNode:
 
     joined = "/".join(rest)
     if joined.startswith("File:"):
-        file_page = store.page(site, joined)
+        file_page = store.entry(site, joined)
         return (
             FileDir(path, site, file_page) if file_page is not None else Missing(path)
         )
 
     # Index-namespace subpage asset
-    asset = store.page(site, f"{index_title}/{joined}")
+    asset = store.entry(site, f"{index_title}/{joined}")
     if asset is None or asset.content_model == PROOFREAD_INDEX_CONTENT_MODEL:
         return Missing(path)
     return IndexAssetLeaf(path, site, asset, joined)

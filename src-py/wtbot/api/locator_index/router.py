@@ -18,9 +18,9 @@ from wtbot.locator_index import (
     parse_pagelist_assignments,
     scan_section_occurrences,
 )
-from wtbot.model import Page, Site
+from wtbot.model import Site
 from wtbot.vfs.paths import WikiPath
-from wtbot.vfs.store import PageStore
+from wtbot.vfs.store import Entry, PageStore
 
 """GET /locator-index/{sections,page-numbers,dump} — resolves a back-of-book
 locator (a printed page number, or a section/paragraph id) to the `Page:`
@@ -68,7 +68,7 @@ def _resolve_index(path: str, session: Session) -> tuple[PageStore, Site, str]:
             status_code=404, detail=f"no such site: {wiki_path.family}/{wiki_path.code}"
         )
     index_title = wiki_path.index_title
-    if store.page(site, index_title) is None:
+    if store.entry(site, index_title) is None:
         raise HTTPException(status_code=404, detail=f"no such Index: {index_title}")
     return store, site, index_title
 
@@ -78,12 +78,12 @@ def _pages_dir(path: str) -> str:
     return "/" + "/".join(wiki_path.segments[:3]) + "/Pages"
 
 
-def _page_ref(store: PageStore, page: Page, pages_dir: str) -> PageRef | None:
-    meta = store.proofread_page_meta(page)
+def _page_ref(store: PageStore, page: Entry, pages_dir: str) -> PageRef | None:
+    meta = store.proofread_page_meta(page.pk)
     if meta is None or meta.page_number is None:
         return None
     return PageRef(
-        path=f"{pages_dir}/{page.title}", title=page.title, scan_page=meta.page_number
+        path=f"{pages_dir}/{page.name}", title=page.name, scan_page=meta.page_number
     )
 
 
@@ -94,7 +94,7 @@ def _matches(candidate: str, query: str) -> bool:
 
 
 def _page_refs_by_scan(
-    store: PageStore, pages: list[Page], pages_dir: str
+    store: PageStore, pages: list[Entry], pages_dir: str
 ) -> dict[int, PageRef]:
     refs: dict[int, PageRef] = {}
     for page in pages:
@@ -121,7 +121,7 @@ def lookup_page_numbers(
     session: Session = Depends(get_session),
 ) -> list[PageNumberMatch]:
     store, site, index_title = _resolve_index(path, session)
-    index_page = store.page(site, index_title)
+    index_page = store.entry(site, index_title)
     assert index_page is not None  # checked in _resolve_index
     pages = store.proofread_pages(site, index_title)
     pages_dir = _pages_dir(path)
@@ -202,7 +202,7 @@ def dump_locator_index(
     targeted endpoints instead.
     """
     store, site, index_title = _resolve_index(path, session)
-    index_page = store.page(site, index_title)
+    index_page = store.entry(site, index_title)
     assert index_page is not None  # checked in _resolve_index
     pages = store.proofread_pages(site, index_title)
     pages_dir = _pages_dir(path)

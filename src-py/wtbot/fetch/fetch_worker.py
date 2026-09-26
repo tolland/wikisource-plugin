@@ -29,7 +29,7 @@ from wtbot.page_processors import (
     ClaimedFetchRequest,
     PageProcessor,
     ProcessContext,
-    ensure_index_page,
+    ensure_index_title,
     processor_for,
     proofread_index_identity,
 )
@@ -435,7 +435,7 @@ def _upsert_page(
         identity = proofread_index_identity(remote.title)
         if remote.content_model == "proofread-page" and identity is not None:
             index_title, page_number = identity
-            index_page = ensure_index_page(session, site.pk, index_title)
+            index_page = ensure_index_title(session, site.pk, index_title)
             meta = session.get(ProofreadPageMeta, page.pk)
             target = meta or ProofreadPageMeta(
                 title_pk=page.pk,
