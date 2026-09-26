@@ -36,7 +36,7 @@ def _seed(engine) -> int:
         s.flush()
         s.add(
             IndexMeta(
-                page_pk=index.pk, site_pk=site.pk, short_name="Hertz", page_count=1
+                title_pk=index.pk, site_pk=site.pk, short_name="Hertz", page_count=1
             )
         )
         page = Page(

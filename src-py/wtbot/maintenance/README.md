@@ -11,7 +11,7 @@ The source is opened read-only inside a SQLite read transaction. An existing
 output is never overwritten. The JSON file is created with mode 0600 because
 site credentials and OCR API tokens are included. `backups/` is ignored by Git.
 
-The export includes the 20 tables in `NATURAL_KEYS`, excluding `editjournal`,
+The export includes the 18 tables in `NATURAL_KEYS`, excluding `editjournal`,
 `fetchrequest`, `commit`, `promotion`, and `promotionbatch`. It does not export
 schema DDL, Alembic temporary tables, or migration bookkeeping as application
 data. The original Alembic revision is recorded for provenance only.
@@ -23,7 +23,7 @@ a Title key is the same pair, and a Page's `pk` is a reference to the Title at
 its address, because the two share a primary key (every Page is a Title);
 a Revision key combines a Page reference with its wiki-local revid. Page and
 revision link keys retain local/remote orientation. FileBlob uses page, SHA-1,
-and upload timestamp. Transclusion uses site, source page, index title, and range.
+and upload timestamp.
 The exporter rejects duplicate keys, including nullable-key collisions, rather
 than merging or dropping records.
 

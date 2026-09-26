@@ -22,7 +22,7 @@ def test_restore_roundtrip_with_new_ids_and_named_constraints(tmp_path: Path) ->
     )
     after = read_dump(rebuilt)
     assert result.rows == sum(len(table.rows) for table in before.tables)
-    assert result.tables == 20
+    assert result.tables == 18
     for table in before.tables:
         for row in table.rows:
             row.fields.pop("legacy_note", None)
@@ -99,7 +99,9 @@ def test_restore_rejects_invalid_archives(tmp_path: Path, damage: str) -> None:
     elif damage == "duplicate":
         tables["site"].rows.append(tables["site"].rows[0])
     else:
-        dump.tables.pop()
+        # By name, and one no legacy upgrade can supply: a dump missing
+        # `title` is an old dump, and the restore rightly completes it.
+        dump.tables[:] = [table for table in dump.tables if table.name != "revision"]
     archive.write_text(dump.model_dump_json())
     with pytest.raises(ValueError):
         restore_dump(archive, rebuilt, ignore_columns=frozenset({"site.legacy_note"}))
@@ -160,6 +162,19 @@ def _as_before_works_shared_their_pairings_key(raw: dict) -> None:
                 row["references"]["index_link_pk"] = None
 
 
+def _every_reference_names_a_page(value):
+    """Before titles existed, every reference that now names a title named a
+    page -- including those nested inside other tables' keys (a work's key is
+    its pairing's, which is two pages)."""
+    if isinstance(value, dict):
+        if value.get("table") == "title":
+            value = {**value, "table": "page"}
+        return {k: _every_reference_names_a_page(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_every_reference_names_a_page(v) for v in value]
+    return value
+
+
 def test_a_dump_taken_before_titles_existed_restores_with_them(tmp_path: Path) -> None:
     """The backup taken before a schema change is older than the code restoring
     it. A pre-Title dump has no title table, no page->title reference, and the
@@ -185,14 +200,27 @@ def test_a_dump_taken_before_titles_existed_restores_with_them(tmp_path: Path) -
                 )
     _as_before_meta_was_keyed_to_titles(raw)
     _as_before_works_shared_their_pairings_key(raw)
+    for table in raw["tables"]:
+        if table["name"] == "indexmeta":
+            table["key_fields"] = ["page_pk"]
+            for row in table["rows"]:
+                row["references"]["page_pk"] = row["references"].pop("title_pk")
+    raw["tables"] = _every_reference_names_a_page(raw["tables"])
     legacy.write_text(json.dumps(raw))
 
     restore_dump(legacy, rebuilt, ignore_columns=frozenset({"site.legacy_note"}))
     with sqlite3.connect(rebuilt) as connection:
-        # The work came back sharing its pairing's key.
+        # The work came back sharing its pairing's key, the pairing's sides
+        # are titles, and the index metadata is keyed to the index's title.
         assert connection.execute(
             "SELECT count(*) FROM indexlink w JOIN pagelink p ON p.pk = w.pk"
+            " JOIN title a ON a.pk = p.local_page_pk"
+            " JOIN title b ON b.pk = p.remote_page_pk"
         ).fetchone() == (1,)
+        assert connection.execute(
+            "SELECT t.title, m.short_name, m.page_count FROM indexmeta m"
+            " JOIN title t ON t.pk = m.title_pk"
+        ).fetchall() == [("Index:Book", "Book", 9)]
         titles = connection.execute("""
             SELECT s.family, t.title, t.expected_content_model, t.pk = p.pk
             FROM title t JOIN page p ON p.pk = t.pk JOIN site s ON s.pk = t.site_pk
@@ -244,3 +272,30 @@ def test_a_dump_taken_before_meta_was_keyed_to_titles_restores(
             JOIN title t ON t.pk = a.title_pk
             """).fetchall() == [("Page:Book/1", "box-1")]
         assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
+
+
+def test_a_dump_with_since_dropped_tables_restores_without_them(tmp_path: Path) -> None:
+    """Transclusion and FileMeta were dropped for redesign. A dump that still
+    carries them is not refused as having unexpected tables; they are left out."""
+    original, archive, legacy, rebuilt = (
+        tmp_path / name
+        for name in ("source.db", "dump.json", "legacy.json", "rebuilt.db")
+    )
+    make_database(original)
+    write_dump(original, archive)
+    raw = json.loads(archive.read_text())
+    raw["tables"] += [
+        {"name": "transclusion", "key_fields": [], "rows": []},
+        {"name": "filemeta", "key_fields": ["page_pk"], "rows": []},
+    ]
+    legacy.write_text(json.dumps(raw))
+
+    restore_dump(legacy, rebuilt, ignore_columns=frozenset({"site.legacy_note"}))
+    with sqlite3.connect(rebuilt) as connection:
+        tables = {
+            row[0]
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            )
+        }
+    assert not {"transclusion", "filemeta"} & tables

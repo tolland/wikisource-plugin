@@ -33,7 +33,7 @@ def _seed(engine, page_numbers: list[int]) -> None:
         s.flush()
         s.add(
             IndexMeta(
-                page_pk=index.pk,
+                title_pk=index.pk,
                 site_pk=site.pk,
                 short_name="Tractatus",
                 page_count=len(page_numbers),

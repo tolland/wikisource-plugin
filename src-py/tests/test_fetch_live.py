@@ -116,7 +116,7 @@ def test_fan_out_an_index_end_to_end(engine, tmp_path, wiki_client) -> None:
         pages = session.exec(select(Page)).all()
         index_row = next(p for p in pages if p.title == CANADIAN_PATENT_INDEX)
         meta = session.exec(
-            select(IndexMeta).where(IndexMeta.page_pk == index_row.pk)
+            select(IndexMeta).where(IndexMeta.title_pk == index_row.pk)
         ).one()
         assert meta.page_count is not None and meta.page_count > 0
         # The children the fan-out discovered mid-drain, not just the index.

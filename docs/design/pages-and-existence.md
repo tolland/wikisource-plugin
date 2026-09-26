@@ -42,11 +42,25 @@ change of constraint, never of data.
      `pagelink` foreign-key cycle.
    - **Done** (`e5f2a8d1c349`): `ScanAnnotation`, `BoxRangeLink`,
      `TextTargetAnchor` keyed to `title_pk`: the scan exists before the page.
+   - **Done** (`f8c0a6e2d493`): `Transclusion` and `FileMeta` dropped for
+     redesign rather than moved; their shapes are in §12.
+   - **Done** (`a9d4b7e1f026`): `IndexMeta` shares its Index's title key (so
+     an Index assembled from the client carries its metadata before any wiki
+     holds it), and `PageLink.local_page_pk`/`remote_page_pk` reference
+     `title` -- a pairing is the intention to keep two addresses in step,
+     whichever exists yet. The column names stay until the directed-links
+     rework.
+   - **Decided, staying on `page`:** `Revision` (a revision is of a page the
+     wiki holds; deleted-and-recreated pages are out of scope), `FileBlob`
+     (a blob is bytes the wiki holds; what a prospective blob would be is
+     undefined), and `PromotionBatch.source_page_pk` (by design).
    - **Deferred, to be revisited:** directed, mirrored `PageLink` and
      `RevisionLink` on titles -- one row per direction, the mirror enforced
      by a deferred composite foreign key, removing the two expression
      indexes and the either-way lookups. It also fixes `sync.py`'s anchor
-     report, which reads a rung's `local` as the sync's source.
+     report, which reads a rung's `local` as the sync's source. **Decided:
+     a tracked work is per direction** -- an `IndexLink` will share the key
+     of one directed pairing.
    - **Next:** the columns that belong to the address (`namespace_key`,
      `dirty`, `fetch_status`, `history_complete_from_revid`).
 
@@ -454,3 +468,58 @@ Honest costs, none of them blocking:
    schema property, and it is what decides whether the change was worth making.
 5. **Every API response composes two rows.** Broad rather than hard, and a good
    moment to stop serialising the raw ORM shape outward.
+
+## 12. Tables dropped rather than moved
+
+Two tables hung off `page` and were dropped in step 2 (`f8c0a6e2d493`) rather
+than repointed, because each needs rethinking before it has a right key. Their
+shapes are kept here so that rethinking starts from what existed.
+
+### Transclusion
+
+A mainspace page pulling in `Page:` content via
+`<pages index="..." from="N" to="M" />`. Meant to support fetching "the Index
+plus any work that transcludes it" (`FetchKind.transclusion`, still declared
+and still unimplemented) and invalidating a composed work's rendered view when
+one of its pages changes. **Nothing ever wrote a row.**
+
+| Column | Type | Notes |
+|---|---|---|
+| `pk` | int, PK | |
+| `site_pk` | int → `site.pk` | |
+| `source_page_pk` | int → `page.pk` | the mainspace page doing the transcluding |
+| `index_title` | str, indexed | target `Index:` title, as a string |
+| `from_page` | int | |
+| `to_page` | int | |
+
+Open questions for a redesign: the target should be the Index's *title* (pk),
+not a string; a `<pages>` tag can also use `fromsection`/`tosection` and
+`include`/`exclude`, which a `from`/`to` range does not capture; and the source
+is derived from fetched content, so it plausibly belongs to the wiki side of the
+split rather than to the address.
+
+### FileMeta
+
+Provenance for `File:` pages. For images cropped out of a scan page it held
+the crop geometry, in source-raster pixels -- which is also the input a
+templated-region OCR run iterates over.
+
+| Column | Type | Notes |
+|---|---|---|
+| `pk` | int, PK | |
+| `page_pk` | int → `page.pk`, unique | the `File:` page described |
+| `origin` | `remote` \| `paste` \| `ocr` | fetched; pasted as a screenshot; produced by region OCR |
+| `source_page_pk` | int → `page.pk`, nullable | the scan page it was cropped from |
+| `source_page_number` | int, nullable | |
+| `crop_x`, `crop_y`, `crop_w`, `crop_h` | int, nullable | pixel geometry on the source raster |
+
+It was exposed at `GET`/`PUT /pages/{pk}/file-meta`; no client used either.
+
+Open questions for a redesign, driven by creating a work *from the client*
+(an Index, its backing file and its pages, before any of them exists on a
+wiki): the `File:` side is then only a title, so file attributes that exist
+before an upload would key to `title`; crop geometry in raw pixels has the same
+problem annotations had before they were normalised to fractions of the image
+(`docs/design/scan-image-modeling.md`); and a *prospective* upload is not a
+`FileBlob` -- a blob describes bytes the wiki holds, which is why `FileBlob`
+stays on `page` for now.

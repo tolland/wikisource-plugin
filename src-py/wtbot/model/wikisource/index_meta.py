@@ -17,12 +17,17 @@ class IndexMeta(SQLModel, table=True):
 
     __table_args__ = (
         UniqueConstraint("site_pk", "short_name", name="uq_indexmeta_site_short"),
-        UniqueConstraint("page_pk", name="uq_indexmeta_page"),
     )
 
-    pk: int | None = Field(default=None, primary_key=True)
-    page_pk: int = Field(foreign_key="page.pk", index=True)
+    title_pk: int = Field(foreign_key="title.pk", primary_key=True)
+    """Shared with the ``Index:`` title it describes: one row per index, and
+    keyed to the address rather than the page, so an Index being put together
+    from the client -- before any wiki holds it -- can carry its metadata."""
+
     site_pk: int = Field(foreign_key="site.pk", index=True)
+    """The title's own site, repeated because the unique short name is scoped
+    per site and a constraint needs the column. The writers set it from the
+    title; nothing else may."""
 
     short_name: str
     page_count: int | None = None  # total pages per the Index (pagelist/IndexPage)

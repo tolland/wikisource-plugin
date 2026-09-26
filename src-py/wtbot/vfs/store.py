@@ -9,7 +9,6 @@ from wtbot.model import (
     CommitStatus,
     EditJournal,
     FileBlob,
-    FileMeta,
     IndexMeta,
     Page,
     Site,
@@ -198,7 +197,7 @@ class PageStore:
 
     def index_meta(self, page: Page) -> IndexMeta | None:
         return self.session.exec(
-            select(IndexMeta).where(IndexMeta.page_pk == page.pk)
+            select(IndexMeta).where(IndexMeta.title_pk == page.pk)
         ).first()
 
     def short_name_taken(self, site_pk: int, short_name: str) -> bool:
@@ -226,7 +225,7 @@ class PageStore:
         while self.short_name_taken(page.site_pk, short):
             short = f"{base}_{n}"
             n += 1
-        meta = IndexMeta(page_pk=page.pk, site_pk=page.site_pk, short_name=short)
+        meta = IndexMeta(title_pk=page.pk, site_pk=page.site_pk, short_name=short)
         self.session.add(meta)
         self.session.commit()
         self.session.refresh(meta)
@@ -262,13 +261,6 @@ class PageStore:
         thumb/source URL (or the raster cache filled a local path)."""
         meta = self.proofread_page_meta(page)
         return meta_has_image(meta)
-
-    def file_meta(self, page: Page) -> FileMeta | None:
-        return self.session.exec(
-            select(FileMeta).where(FileMeta.page_pk == page.pk)
-        ).first()
-
-    # -- edit journal -----------------------------------------------------------
 
     def effective_state(self, page: Page) -> "EffectiveState":
         """What read()/stat() should report for [page]: body and revid together.

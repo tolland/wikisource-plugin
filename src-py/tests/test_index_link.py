@@ -71,7 +71,7 @@ def build_index(session: Session, site: Site, title: str) -> Page:
     session.refresh(page)
     session.add(
         IndexMeta(
-            page_pk=page.pk,
+            title_pk=page.pk,
             site_pk=site.pk,
             short_name=f"index-{page.pk}",
         )

@@ -34,7 +34,7 @@ def _add_page(
     if content_model == "proofread-index":
         session.add(
             IndexMeta(
-                page_pk=page.pk,
+                title_pk=page.pk,
                 site_pk=site.pk,
                 short_name=title,
                 page_count=12,

@@ -52,8 +52,11 @@ class PageLink(SQLModel, table=True):
 
     pk: int | None = Field(default=None, primary_key=True)
 
-    local_page_pk: int = Field(foreign_key="page.pk", index=True)
-    remote_page_pk: int = Field(foreign_key="page.pk", index=True)
+    # Titles, not pages, despite the names: a pairing records the intention to
+    # keep two addresses in step, and either side may not exist on its wiki
+    # yet. Renaming the columns is left for the directed-links rework.
+    local_page_pk: int = Field(foreign_key="title.pk", index=True)
+    remote_page_pk: int = Field(foreign_key="title.pk", index=True)
 
     origin: LinkOrigin = LinkOrigin.title_match
     """How the pairing was arrived at. Weaker evidence than a revision link's

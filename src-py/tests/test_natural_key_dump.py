@@ -15,6 +15,7 @@ from wtbot.model import (
     Content,
     FileBlob,
     IndexLink,
+    IndexMeta,
     Page,
     PageLink,
     ProofreadPageMeta,
@@ -63,6 +64,11 @@ def make_database(path: Path, offset: int = 0) -> None:
             )
         )
         session.add(IndexLink(pk=offset + 7))  # a work shares its pairing's key
+        session.add(
+            IndexMeta(
+                title_pk=offset + 3, site_pk=offset + 1, short_name="Book", page_count=9
+            )
+        )
         session.add(Page(pk=offset + 9, site_pk=offset + 1, title="Page:Book/1"))
         session.add(
             ProofreadPageMeta(

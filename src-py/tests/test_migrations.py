@@ -781,3 +781,107 @@ def test_the_annotation_step_downgrades_cleanly(baseline_engine: Engine) -> None
             assert connection.exec_driver_sql(f"SELECT page_pk FROM {table}").all() == [
                 (7,)
             ]
+
+
+# -- step 2: Transclusion and FileMeta dropped, to be redesigned -------------
+
+TABLES_DROPPED = "f8c0a6e2d493"
+
+
+def test_transclusion_and_filemeta_are_dropped_and_come_back_empty(
+    baseline_engine: Engine,
+) -> None:
+    # Seeded in the shape _seed_annotations writes: a site and a page to cite.
+    _run(baseline_engine, command.upgrade, WORK_SHARES_KEY)
+    _seed_annotations(baseline_engine)
+    _run(baseline_engine, command.upgrade, ANNOTATIONS_TO_TITLE)
+    with baseline_engine.begin() as connection:
+        connection.exec_driver_sql(
+            "INSERT INTO filemeta (page_pk, origin) VALUES (7, 'paste')"
+        )
+
+    _run(baseline_engine, command.upgrade, TABLES_DROPPED)
+    assert not {"transclusion", "filemeta"} & _tables(baseline_engine)
+
+    _run(baseline_engine, command.downgrade, ANNOTATIONS_TO_TITLE)
+    assert {"transclusion", "filemeta"} <= _tables(baseline_engine)
+    with baseline_engine.connect() as connection:
+        assert connection.exec_driver_sql("SELECT count(*) FROM filemeta").scalar() == 0
+
+
+# -- step 2: IndexMeta keyed by its title; PageLink sides are titles ---------
+
+INDEX_META_AND_PAIRS_ON_TITLE = "a9d4b7e1f026"
+
+
+def _seed_index_meta_and_pairing(engine: Engine) -> None:
+    with engine.begin() as connection:
+        run = connection.exec_driver_sql
+        run(
+            "INSERT INTO site (pk, family, code, articlepath, created_at) VALUES"
+            f" (1, 'up', 'en', '/wiki/$1', {_T}), (2, 'down', 'en', '/wiki/$1', {_T})"
+        )
+        for pk, site in ((10, 1), (20, 2)):
+            run(
+                "INSERT INTO title (pk, site_pk, title, expected_content_model)"
+                f" VALUES ({pk}, {site}, 'Index:B.djvu', 'proofread-index')"
+            )
+            run(
+                "INSERT INTO page (pk, site_pk, title, content_model, dirty,"
+                f" fetch_status) VALUES ({pk}, {site}, 'Index:B.djvu',"
+                " 'proofread-index', 0, 'done')"
+            )
+        # A surrogate pk (5) unlike the page's (10), so re-keying shows.
+        run(
+            "INSERT INTO indexmeta (pk, page_pk, site_pk, short_name, page_count)"
+            " VALUES (5, 10, 1, 'B', 42)"
+        )
+        run(
+            "INSERT INTO pagelink (pk, local_page_pk, remote_page_pk, origin,"
+            f" created_at) VALUES (50, 10, 20, 'manual', {_T})"
+        )
+        run(f"INSERT INTO indexlink (pk, created_at) VALUES (50, {_T})")
+
+
+def test_index_meta_takes_its_titles_key_and_pairs_point_at_titles(
+    baseline_engine: Engine,
+) -> None:
+    _run(baseline_engine, command.upgrade, TABLES_DROPPED)
+    _seed_index_meta_and_pairing(baseline_engine)
+
+    _run(baseline_engine, command.upgrade, INDEX_META_AND_PAIRS_ON_TITLE)
+
+    assert _foreign_keys(baseline_engine, "indexmeta") == {
+        ("title_pk", "title"),
+        ("site_pk", "site"),
+    }
+    assert _foreign_keys(baseline_engine, "pagelink") == {
+        ("local_page_pk", "title"),
+        ("remote_page_pk", "title"),
+    }
+    with baseline_engine.begin() as connection:
+        run = connection.exec_driver_sql
+        assert run("SELECT * FROM indexmeta").all() == [(10, 1, "B", 42)]
+        assert run("PRAGMA foreign_key_check").all() == []
+        with pytest.raises(IntegrityError):  # uq_pagelink_pair survived
+            run(
+                "INSERT INTO pagelink (pk, local_page_pk, remote_page_pk, origin,"
+                f" created_at) VALUES (51, 20, 10, 'manual', {_T})"
+            )
+
+
+def test_index_meta_and_pairs_step_downgrades_cleanly(baseline_engine: Engine) -> None:
+    _run(baseline_engine, command.upgrade, TABLES_DROPPED)
+    _seed_index_meta_and_pairing(baseline_engine)
+    _run(baseline_engine, command.upgrade, INDEX_META_AND_PAIRS_ON_TITLE)
+
+    _run(baseline_engine, command.downgrade, TABLES_DROPPED)
+
+    assert _foreign_keys(baseline_engine, "pagelink") == {
+        ("local_page_pk", "page"),
+        ("remote_page_pk", "page"),
+    }
+    with baseline_engine.connect() as connection:
+        assert connection.exec_driver_sql(
+            "SELECT page_pk, site_pk, short_name, page_count FROM indexmeta"
+        ).all() == [(10, 1, "B", 42)]
