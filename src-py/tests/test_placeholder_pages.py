@@ -127,7 +127,7 @@ def test_fanout_creates_stubs_and_fetches_only_existing(engine, tmp_path):
             assert stub.pageid is None
             assert stub.text is None
             assert stub.content_model == "proofread-page"
-            assert stub.dirty is False
+            assert stub.address.dirty is False
 
         # Page 5 was fetched for real.
         page5 = next(page for page, meta in rows if meta.page_number == 5)
@@ -229,7 +229,7 @@ def test_refanout_does_not_clobber_edited_stub(engine, tmp_path):
     with Session(engine) as s:
         stub = s.exec(select(Page).where(Page.title == "Page:Sparse.pdf/2")).one()
         s.add(EditJournal(title_pk=stub.pk, base_revid=None, body="typed text"))
-        stub.dirty = True
+        stub.address.dirty = True
         s.add(stub)
         s.commit()
         stub_pk = stub.pk
@@ -240,7 +240,7 @@ def test_refanout_does_not_clobber_edited_stub(engine, tmp_path):
 
         again = s.exec(select(Page).where(Page.title == "Page:Sparse.pdf/2")).one()
         assert again.pk == stub_pk
-        assert again.dirty is True
+        assert again.address.dirty is True
         journal = s.exec(
             select(EditJournal).where(EditJournal.title_pk == stub_pk)
         ).one()

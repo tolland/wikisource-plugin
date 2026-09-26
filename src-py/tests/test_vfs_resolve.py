@@ -55,14 +55,8 @@ def store(engine):
             content_model="sanitized-css",
         )
         s.add(styles)
-        s.add(
-            Page(
-                site_pk=site.pk,
-                title=FILE,
-                namespace_key=6,
-                content_model="wikitext",
-            )
-        )
+        file_page = Page(site_pk=site.pk, title=FILE, content_model="wikitext")
+        s.add(file_page)
         page_1 = Page(
             site_pk=site.pk,
             title=PAGE_1,
@@ -71,6 +65,7 @@ def store(engine):
         s.add(page_1)
         s.flush()
         add_proofread_meta(s, page_pk=page_1.pk, index_title=INDEX, page_number=1)
+        file_page.address.namespace_key = 6
         s.commit()
         yield PageStore(s)
 

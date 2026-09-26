@@ -400,7 +400,7 @@ class PageStore:
                 comment=comment,
             )
         )
-        page.dirty = True
+        page.address.dirty = True
         page.local_modified_at = datetime.now(timezone.utc)
         self.session.add(page)
         self.session.commit()

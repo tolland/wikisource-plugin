@@ -89,12 +89,11 @@ def seed(
             )
             session.add(index)
             session.commit()
-            file_page = Page(
-                site_pk=site.pk, title="File:Varieties.djvu", namespace_key=6
-            )
+            file_page = Page(site_pk=site.pk, title="File:Varieties.djvu")
             session.add(file_page)
             session.commit()
             session.refresh(file_page)
+            file_page.address.namespace_key = 6
             session.add(FileBlob(page_pk=file_page.pk, file_sha1=SHA1, page_count=1))
             session.commit()
 

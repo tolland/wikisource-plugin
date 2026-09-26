@@ -52,7 +52,6 @@ def test_query_api_filters_pages_and_returns_joined_revision_records(
         title="Page:Book.djvu/1",
         pageid=101,
         revid=12,
-        namespace_key=250,
         content_model="proofread-page",
     )
     same_title_elsewhere = Page(
@@ -62,6 +61,8 @@ def test_query_api_filters_pages_and_returns_joined_revision_records(
         revid=24,
     )
     session.add_all((wanted, same_title_elsewhere))
+    session.commit()
+    wanted.address.namespace_key = 250
     session.commit()
 
     old = Revision(page_pk=wanted.pk, revid=11)

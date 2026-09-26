@@ -83,10 +83,11 @@ def build_index(session: Session, site: Site, title: str, *, sha1: str | None) -
     session.commit()
     if sha1 is not None:
         _, _, basename = title.partition(":")
-        file_page = Page(site_pk=site.pk, title=f"File:{basename}", namespace_key=6)
+        file_page = Page(site_pk=site.pk, title=f"File:{basename}")
         session.add(file_page)
         session.commit()
         session.refresh(file_page)
+        file_page.address.namespace_key = 6
         session.add(FileBlob(page_pk=file_page.pk, file_sha1=sha1, page_count=3))
         session.commit()
     return page
@@ -114,11 +115,11 @@ def build_page(
         site_pk=site.pk,
         title=title,
         content_model="proofread-page",
-        fetch_status=FetchState.done if fetched else FetchState.unfetched,
     )
     session.add(page)
     session.commit()
     session.refresh(page)
+    page.address.fetch_status = FetchState.done if fetched else FetchState.unfetched
     add_proofread_meta(
         session, page_pk=page.pk, index_title=index_title, page_number=number
     )

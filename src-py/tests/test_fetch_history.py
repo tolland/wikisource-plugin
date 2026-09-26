@@ -171,4 +171,4 @@ def test_a_history_that_cannot_be_recorded_does_not_fail_the_fetch(engine):
     with Session(engine) as session:
         page = session.exec(select(Page).where(Page.title == TITLE)).one()
     assert page.revid == 3
-    assert page.fetch_status == "done"
+    assert page.address.fetch_status == "done"

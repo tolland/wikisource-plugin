@@ -1,19 +1,10 @@
 from datetime import datetime
-from enum import Enum
 
 from sqlalchemy import UniqueConstraint, event, insert, select
 from sqlalchemy.orm import Session
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, Relationship, SQLModel
 
 from wtbot.model.wiki.title import Title
-
-
-class FetchState(str, Enum):
-    unfetched = "unfetched"
-    pending = "pending"
-    fetching = "fetching"
-    done = "done"
-    error = "error"
 
 
 class Page(SQLModel, table=True):
@@ -36,13 +27,19 @@ class Page(SQLModel, table=True):
     Title at the same (site, title), creating that Title if need be -- see
     ``_every_page_is_a_title`` below."""
 
+    address: Title = Relationship(sa_relationship_kwargs={"lazy": "selectin"})
+    """The Title this page is at -- the row holding what belongs to the address
+    (namespace, fetch status, dirty) rather than to the page the wiki holds.
+    Loaded with the page, so a listing of pages costs one extra query, not one
+    per page. Unset on a Page not yet flushed: the flush supplies ``pk``."""
+
     site_pk: int = Field(foreign_key="site.pk")
 
     # Full title incl. namespace prefix, e.g. 'Page:Foo.djvu/171'. Mirrors
     # Title.title during the transition; written once, when both rows are made.
     title: str
-    # Site-local numeric ID; resolves against Namespace for this site.
-    namespace_key: int | None = None
+    # namespace_key, dirty and fetch_status belong to the address and live on
+    # Title (see wtbot.model.wiki.title).
     content_model: str | None = None  # remote contentmodel ('proofread-index', ...)
 
     # Remote identity / revision state -- this IS the conflict token. revid +
@@ -66,10 +63,6 @@ class Page(SQLModel, table=True):
     text: str | None = None
     local_modified_at: datetime | None = None  # when THIS row last changed locally;
     # deliberately distinct from remote_timestamp -- conflating them is a known bug class.
-    dirty: bool = Field(default=False, index=True)
-
-    fetch_status: FetchState = FetchState.unfetched
-    fetch_error: str | None = None
 
     # --- revision store (see wtbot.model.revision) -------------------------
     # The columns above stay as the head denormalisation -- mirroring

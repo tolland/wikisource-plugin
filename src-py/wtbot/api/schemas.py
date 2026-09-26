@@ -23,9 +23,12 @@ continuity in SQLite that a raw path diff cannot, so it is the right place
 to classify this.
 """
 
+from datetime import datetime
 from enum import Enum
 
 from pydantic import BaseModel, Field
+
+from wtbot.model import FetchState, Page
 
 
 # --------------------------------------------------------------------------
@@ -286,3 +289,36 @@ class ChangesSinceResponse(BaseModel):
         ..., description="Opaque; pass back as `cursor` on the next poll."
     )
     has_more: bool = False
+
+
+class PageRow(BaseModel):
+    """A Page as this router has always served it: the page's columns plus the
+    ones that moved to its Title (they belong to the address, but a reader of
+    a cached page still wants them alongside)."""
+
+    pk: int
+    site_pk: int
+    title: str
+    namespace_key: int | None
+    content_model: str | None
+    pageid: int | None
+    revid: int | None
+    remote_timestamp: datetime | None
+    contributor: str | None
+    comment: str | None
+    text: str | None
+    local_modified_at: datetime | None
+    dirty: bool
+    fetch_status: FetchState
+    latest_revision_pk: int | None
+    history_complete_from_revid: int | None
+
+    @classmethod
+    def of(cls, page: Page) -> "PageRow":
+        address = page.address
+        return cls(
+            **page.model_dump(),
+            namespace_key=address.namespace_key,
+            dirty=address.dirty,
+            fetch_status=address.fetch_status,
+        )

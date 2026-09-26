@@ -61,8 +61,20 @@ change of constraint, never of data.
      report, which reads a rung's `local` as the sync's source. **Decided:
      a tracked work is per direction** -- an `IndexLink` will share the key
      of one directed pairing.
-   - **Next:** the columns that belong to the address (`namespace_key`,
-     `dirty`, `fetch_status`, `history_complete_from_revid`).
+   - **Done** (`b3e7c2f9a15d`): the address's own columns moved from `page`
+     to `title` -- `fetch_status` (so "fetched and absent" is `done` on a
+     title with no page, ready for step 3), `dirty` (a title with no page can
+     hold saves), and `namespace_key` (§4 sketched it on `WikiPage`; it is on
+     `Title`, nullable until a fetch says, and derivable from the prefix once
+     titles are created from the client). `Page.fetch_error` was dropped:
+     nothing ever wrote it. `history_complete_from_revid` stays on `page`
+     with the `Revision` rows it describes. Code reaches them through
+     `Page.address`, the page's `Title`, loaded with it; the HTTP surfaces
+     that served a `Page` (`/pages`, `/pages/resolve`, `POST /fetch`) serve a
+     `PageRow` with the same fields as before.
+   - **Next:** step 3 -- a `Page` row only where the wiki holds the page.
+     Placeholder rows go (their state is now all on the title), the head
+     columns become NOT NULL, `page.title` and the `before_flush` hook go.
 
    Two things learned doing the first batch, and a third since. Tables whose
    constraints are not conventionally named, or which carry an expression

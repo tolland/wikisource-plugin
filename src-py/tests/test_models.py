@@ -61,7 +61,7 @@ def test_index_fanout_and_journal(session):
     assert child.parent_pk == parent.pk
 
     # An IDE save: journal row + dirty flag, distinct from any remote state.
-    index.dirty = True
+    index.address.dirty = True
     session.add(EditJournal(title_pk=index.pk, body="== edited ==", base_revid=None))
     session.add(index)
     session.commit()

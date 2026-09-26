@@ -514,7 +514,7 @@ def test_proofread_page_fetch_without_images_leaves_image_fields_empty(session):
     assert run_pending(session, lambda _: wiki) == 1
 
     page = session.exec(select(Page).where(Page.title == title)).one()
-    assert page.fetch_status == "done"
+    assert page.address.fetch_status == "done"
     meta = session.exec(
         select(ProofreadPageMeta).where(ProofreadPageMeta.title_pk == page.pk)
     ).one()

@@ -1,3 +1,5 @@
+from enum import Enum
+
 from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, SQLModel
 
@@ -16,10 +18,20 @@ identifies a page also identifies its title. That is what lets the split
 happen progressively: an existing foreign key to ``page.pk`` is already a
 valid ``title.pk``, and repointing one is a change of constraint, not of data.
 
-The transition is recorded in docs/design/pages-and-existence.md. This first
-step introduces the table and the invariant; nothing reads from it yet except
-the fetch-time content-model check.
+The transition is recorded in docs/design/pages-and-existence.md. What
+belongs to the address lives here -- the expected content model, namespace,
+fetch status and dirty flag -- and everything keyed by address (journal,
+commits, proofread metadata, annotations, pairings) references this table.
+A Page reaches its Title as ``Page.address``.
 """
+
+
+class FetchState(str, Enum):
+    unfetched = "unfetched"
+    pending = "pending"
+    fetching = "fetching"
+    done = "done"
+    error = "error"
 
 
 class Title(SQLModel, table=True):
@@ -54,6 +66,32 @@ class Title(SQLModel, table=True):
     The fetch compares the two, warns when the guess was wrong, and corrects
     it (see ``wtbot.title_store.record_fetched_content_model``).
     """
+
+    namespace_key: int | None = None
+    """Site-local namespace id, resolving against ``Namespace`` for this site.
+
+    What the wiki said when the title was fetched; None until then. It could be
+    derived from the title's prefix and the site's namespace map, and may be
+    once titles are created from the client."""
+
+    fetch_status: FetchState = Field(
+        default=FetchState.unfetched,
+        sa_column_kwargs={"server_default": FetchState.unfetched.value},
+    )
+    """Whether we have asked the wiki about this address.
+
+    ``done`` with no ``Page`` behind it is the answer "absent" -- as against
+    ``unfetched``, where the answer is unknown. That distinction is the
+    title's to hold because the absent case has no page to hold it. (Only
+    ``unfetched`` and ``done`` are written; the queue's own progress is
+    ``FetchRequest.status``.)"""
+
+    dirty: bool = Field(
+        default=False, index=True, sa_column_kwargs={"server_default": "0"}
+    )
+    """Local edits not yet committed: a save appends to ``EditJournal`` and
+    sets this; a commit (or a fetch) clears it. An address property because a
+    title the wiki does not hold yet can be edited and saved."""
 
     def __repr__(self) -> str:  # pragma: no cover - convenience only
         return f"Title(pk={self.pk}, title={self.title!r})"

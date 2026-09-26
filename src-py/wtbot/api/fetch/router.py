@@ -11,6 +11,7 @@ from wtbot.api.fetch.model import (
     RefreshPlanOut,
     RefreshResult,
 )
+from wtbot.api.schemas import PageRow
 from wtbot.deps import get_session
 from wtbot.fetch.queue_runner import (
     drain_queue,
@@ -73,7 +74,7 @@ def create_fetch(payload: FetchCreate, session: Session = Depends(get_session)) 
     page = session.exec(
         select(Page).where(Page.site_pk == site.pk, Page.title == payload.title)
     ).first()
-    return {"request": req, "page": page}
+    return {"request": req, "page": None if page is None else PageRow.of(page)}
 
 
 @router.post("/drain", response_model=DrainResponse)

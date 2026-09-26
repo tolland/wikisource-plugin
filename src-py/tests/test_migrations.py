@@ -277,7 +277,7 @@ def test_namespace_classification_removal_preserves_pages_and_links(baseline_eng
             INSERT INTO proofreadpagemeta (page_pk, index_page_pk, page_number)
             VALUES (2, 1, 1)
             """))
-    _run(baseline_engine, command.upgrade, "head")
+    _run(baseline_engine, command.upgrade, INDEX_META_AND_PAIRS_ON_TITLE)
     with baseline_engine.connect() as c:
         assert "namespace_role" not in {
             row[1] for row in c.execute(text("PRAGMA table_info(page)"))
@@ -297,7 +297,7 @@ def test_namespace_classification_removal_preserves_pages_and_links(baseline_eng
             (6, 252, None, 0),
         ]
         assert c.execute(
-            # Renamed at head: the meta row is keyed to the Title (step 2).
+            # Renamed by then: the meta row is keyed to the Title (step 2).
             text("SELECT title_pk, index_title_pk FROM proofreadpagemeta")
         ).all() == [(2, 1)]
         assert c.execute(text("PRAGMA foreign_key_check")).all() == []
@@ -306,7 +306,7 @@ def test_namespace_classification_removal_preserves_pages_and_links(baseline_eng
         assert c.execute(
             text("SELECT namespace_role FROM page ORDER BY pk")
         ).scalars().all() == ["index", "page", "index", "page", "file", "index"]
-    _run(baseline_engine, command.upgrade, "head")
+    _run(baseline_engine, command.upgrade, INDEX_META_AND_PAIRS_ON_TITLE)
 
 
 # -- the migration runner ----------------------------------------------------
@@ -885,3 +885,90 @@ def test_index_meta_and_pairs_step_downgrades_cleanly(baseline_engine: Engine) -
         assert connection.exec_driver_sql(
             "SELECT page_pk, site_pk, short_name, page_count FROM indexmeta"
         ).all() == [(10, 1, "B", 42)]
+
+
+# -- step 2: the address's columns move from page to title --------------------
+
+ADDRESS_COLUMNS_ON_TITLE = "b3e7c2f9a15d"
+
+
+def _columns(engine: Engine, table: str) -> set[str]:
+    with engine.connect() as connection:
+        return {
+            row[1] for row in connection.exec_driver_sql(f"PRAGMA table_info({table})")
+        }
+
+
+def _seed_address_columns(engine: Engine) -> None:
+    """A fetched page (10), a fetched-and-absent placeholder with a local save
+    (11), and a bare title with no page behind it (12)."""
+    with engine.begin() as connection:
+        run = connection.exec_driver_sql
+        run(
+            "INSERT INTO site (pk, family, code, articlepath, created_at)"
+            f" VALUES (1, 'up', 'en', '/wiki/$1', {_T})"
+        )
+        for pk, title, model in (
+            (10, "Index:B.djvu", "proofread-index"),
+            (11, "Page:B.djvu/1", "proofread-page"),
+            (12, "Page:B.djvu/2", "proofread-page"),
+        ):
+            run(
+                "INSERT INTO title (pk, site_pk, title, expected_content_model)"
+                f" VALUES ({pk}, 1, '{title}', '{model}')"
+            )
+        run(
+            "INSERT INTO page (pk, site_pk, title, namespace_key, content_model,"
+            " dirty, fetch_status, fetch_error) VALUES"
+            " (10, 1, 'Index:B.djvu', 252, 'proofread-index', 0, 'done', NULL),"
+            " (11, 1, 'Page:B.djvu/1', NULL, 'proofread-page', 1, 'done', 'x')"
+        )
+
+
+def test_the_address_columns_move_to_title(baseline_engine: Engine) -> None:
+    _run(baseline_engine, command.upgrade, INDEX_META_AND_PAIRS_ON_TITLE)
+    _seed_address_columns(baseline_engine)
+
+    _run(baseline_engine, command.upgrade, ADDRESS_COLUMNS_ON_TITLE)
+
+    assert not {"namespace_key", "dirty", "fetch_status", "fetch_error"} & _columns(
+        baseline_engine, "page"
+    )
+    assert "history_complete_from_revid" in _columns(baseline_engine, "page")
+    with baseline_engine.begin() as connection:
+        run = connection.exec_driver_sql
+        assert run(
+            "SELECT pk, namespace_key, fetch_status, dirty FROM title ORDER BY pk"
+        ).all() == [
+            (10, 252, "done", 0),
+            (11, None, "done", 1),
+            (12, None, "unfetched", 0),
+        ]
+        assert run("PRAGMA foreign_key_check").all() == []
+        # A title inserted without them takes the defaults.
+        run(
+            "INSERT INTO title (pk, site_pk, title, expected_content_model)"
+            " VALUES (13, 1, 'Page:B.djvu/3', 'proofread-page')"
+        )
+        assert run("SELECT fetch_status, dirty FROM title WHERE pk = 13").one() == (
+            "unfetched",
+            0,
+        )
+
+
+def test_the_address_columns_step_downgrades_cleanly(baseline_engine: Engine) -> None:
+    _run(baseline_engine, command.upgrade, INDEX_META_AND_PAIRS_ON_TITLE)
+    _seed_address_columns(baseline_engine)
+    _run(baseline_engine, command.upgrade, ADDRESS_COLUMNS_ON_TITLE)
+
+    _run(baseline_engine, command.downgrade, INDEX_META_AND_PAIRS_ON_TITLE)
+
+    assert not {"namespace_key", "dirty", "fetch_status"} & _columns(
+        baseline_engine, "title"
+    )
+    with baseline_engine.connect() as connection:
+        # fetch_error was never written; it comes back empty.
+        assert connection.exec_driver_sql(
+            "SELECT pk, namespace_key, fetch_status, dirty, fetch_error FROM page"
+            " ORDER BY pk"
+        ).all() == [(10, 252, "done", 0, None), (11, None, "done", 1, None)]

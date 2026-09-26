@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from sqlmodel import Session
 
 from wtbot.api.debug_logging_route import DebugLoggingRoute
+from wtbot.api.schemas import PageRow
 from wtbot.deps import get_session
 from wtbot.model import (
     IndexMeta,
@@ -34,7 +35,7 @@ derive the default itself.
 router = APIRouter(prefix="/pages", tags=["page-meta"], route_class=DebugLoggingRoute)
 
 
-@router.get("/resolve", response_model=Page)
+@router.get("/resolve", response_model=PageRow)
 def resolve_page(
     path: str | None = Query(
         None, description="wikisource:// VFS path, resolved via the overlay"
@@ -43,12 +44,21 @@ def resolve_page(
     code: str | None = Query(None),
     title: str | None = Query(None, description="full title incl. namespace prefix"),
     session: Session = Depends(get_session),
-) -> Page:
+) -> PageRow:
     """Identity bridge between the two addressing schemes and the rich model:
     map either a wikisource:// VFS path (what the client's editors/tree hold)
     or a canonical (family, code, title) triple (what batch tooling holds) to
     the backing Page row — whose pk keys the per-role metadata endpoints."""
-    store = PageStore(session)
+    return PageRow.of(_resolve(PageStore(session), path, family, code, title))
+
+
+def _resolve(
+    store: PageStore,
+    path: str | None,
+    family: str | None,
+    code: str | None,
+    title: str | None,
+) -> Page:
     if path is not None:
         match resolve(store, path):
             case PageLeaf(_, _, page) | IndexAssetLeaf(_, _, page, _):

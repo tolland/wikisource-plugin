@@ -148,7 +148,6 @@ export interface CachedPage {
   local_modified_at?: string | null;
   dirty: boolean;
   fetch_status: string;
-  fetch_error?: string | null;
 }
 
 export interface FetchCreate {

@@ -265,11 +265,72 @@ def _page_references_to_titles(dump: DatabaseDump) -> DatabaseDump:
     return dump.model_copy(update={"tables": tables})
 
 
+# Page columns that moved to the page's Title, and the one dropped on the way.
+_ADDRESS_FIELDS: tuple[str, ...] = ("namespace_key", "fetch_status", "dirty")
+_DROPPED_PAGE_FIELDS: frozenset[str] = frozenset({"fetch_error"})
+
+
+def _move_address_fields_to_titles(dump: DatabaseDump) -> DatabaseDump:
+    """Carry a page's address fields onto its title.
+
+    ``namespace_key``, ``fetch_status`` and ``dirty`` moved from Page to Title;
+    ``fetch_error``, never written, was dropped. A page and its title share a
+    natural key, so the title to receive them is the one with the page's key.
+    A title with no page keeps the model's defaults.
+    """
+    pages = next((table for table in dump.tables if table.name == "page"), None)
+    if pages is None or not any(
+        field in row.fields
+        for row in pages.rows
+        for field in (*_ADDRESS_FIELDS, *_DROPPED_PAGE_FIELDS)
+    ):
+        return dump
+    moved: dict[str, dict[str, Scalar]] = {}
+    page_rows = []
+    for row in pages.rows:
+        moved[_identity("title", row)] = {
+            field: row.fields[field] for field in _ADDRESS_FIELDS if field in row.fields
+        }
+        page_rows.append(
+            row.model_copy(
+                update={
+                    "fields": {
+                        field: value
+                        for field, value in row.fields.items()
+                        if field not in _ADDRESS_FIELDS
+                        and field not in _DROPPED_PAGE_FIELDS
+                    }
+                }
+            )
+        )
+    tables = []
+    for table in dump.tables:
+        if table.name == "page":
+            tables.append(table.model_copy(update={"rows": page_rows}))
+        elif table.name == "title":
+            rows = [
+                row.model_copy(
+                    update={
+                        "fields": {
+                            **row.fields,
+                            **moved.get(_identity("title", row), {}),
+                        }
+                    }
+                )
+                for row in table.rows
+            ]
+            tables.append(table.model_copy(update={"rows": rows}))
+        else:
+            tables.append(table)
+    return dump.model_copy(update={"tables": tables})
+
+
 # Applied in order: each brings a dump from one schema step to the next, and
 # does nothing to a dump that is already past it.
 _LEGACY_UPGRADES = (
     _drop_legacy_tables,
     _add_titles_to_legacy_dump,
+    _move_address_fields_to_titles,
     _rename_legacy_references,
     _drop_legacy_references,
     _page_references_to_titles,

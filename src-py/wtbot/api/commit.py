@@ -12,7 +12,7 @@ from wtbot.api.schemas import (
 )
 from wtbot.commit_worker import run_pending_commit_for_page, run_pending_commits
 from wtbot.deps import get_session
-from wtbot.model import Commit, CommitStatus, EditJournal, Page
+from wtbot.model import Commit, CommitStatus, EditJournal, Page, Title
 
 router = APIRouter(prefix="/commits", tags=["commits"], route_class=DebugLoggingRoute)
 
@@ -179,10 +179,12 @@ def cancel_pending_commit_for_page(
         for row in rows:
             session.delete(row)
 
-        page = session.get(Page, page_pk)
-        if page is not None:
-            page.dirty = False
-            session.add(page)
+        # The journal is keyed to the title, and so is dirty: a title with no
+        # page behind it can hold saves too.
+        title = session.get(Title, page_pk)
+        if title is not None:
+            title.dirty = False
+            session.add(title)
 
         session.commit()
     except Exception:

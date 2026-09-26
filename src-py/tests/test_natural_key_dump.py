@@ -13,6 +13,7 @@ from wtbot.maintenance.dump import (
 )
 from wtbot.model import (
     Content,
+    FetchState,
     FileBlob,
     IndexLink,
     IndexMeta,
@@ -24,6 +25,7 @@ from wtbot.model import (
     Site,
     SiteCredential,
     Slot,
+    Title,
 )
 
 
@@ -69,6 +71,19 @@ def make_database(path: Path, offset: int = 0) -> None:
                 title_pk=offset + 3, site_pk=offset + 1, short_name="Book", page_count=9
             )
         )
+        # The address's own state, set so a restore has something to carry.
+        session.add(
+            Title(
+                pk=offset + 9,
+                site_pk=offset + 1,
+                title="Page:Book/1",
+                expected_content_model="proofread-page",
+                namespace_key=250,
+                fetch_status=FetchState.done,
+                dirty=True,
+            )
+        )
+        session.flush()
         session.add(Page(pk=offset + 9, site_pk=offset + 1, title="Page:Book/1"))
         session.add(
             ProofreadPageMeta(
