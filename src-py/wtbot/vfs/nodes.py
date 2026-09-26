@@ -181,7 +181,7 @@ def resolve(store: PageStore, raw_path: str) -> WsNode:
 
     # File: leaf (wikitext/blob) beneath the File: dir
     if rest[-1] in ("wikitext", "blob") and "/".join(rest[:-1]).startswith("File:"):
-        file_page = store.entry(site, "/".join(rest[:-1]))
+        file_page = _index_file(store, site, index_page, "/".join(rest[:-1]))
         if file_page is None:
             return Missing(path)
         if rest[-1] == "wikitext":
@@ -190,7 +190,7 @@ def resolve(store: PageStore, raw_path: str) -> WsNode:
 
     joined = "/".join(rest)
     if joined.startswith("File:"):
-        file_page = store.entry(site, joined)
+        file_page = _index_file(store, site, index_page, joined)
         return (
             FileDir(path, site, file_page) if file_page is not None else Missing(path)
         )
@@ -200,3 +200,13 @@ def resolve(store: PageStore, raw_path: str) -> WsNode:
     if asset is None or asset.content_model == PROOFREAD_INDEX_CONTENT_MODEL:
         return Missing(path)
     return IndexAssetLeaf(path, site, asset, joined)
+
+
+def _index_file(store: PageStore, site: Site, index: Entry, name: str) -> Entry | None:
+    """The ``File:`` directory under an index: the file its metadata names,
+    wherever that lives (a Commons scan is Commons's page), else a same-named
+    title on the index's own site."""
+    backing = store.index_file(index)
+    if backing is not None and backing.name == name:
+        return backing
+    return store.entry(site, name)

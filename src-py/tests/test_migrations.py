@@ -82,7 +82,12 @@ def test_an_existing_final_database_at_the_retained_revision_is_untouched(
     init_db(baseline_engine)
 
     with Session(baseline_engine) as session:
-        site = session.exec(text("SELECT family, code, read_throttle FROM site")).one()
+        site = session.exec(
+            text(
+                "SELECT family, code, read_throttle FROM site"
+                " WHERE family = 'wikisource'"
+            )
+        ).one()
         assert site == ("wikisource", "en", None)
 
 
@@ -1097,3 +1102,91 @@ def test_a_shared_repository_file_is_held_and_stays(baseline_engine: Engine) -> 
         assert connection.exec_driver_sql(
             "SELECT pk FROM page ORDER BY pk"
         ).scalars().all() == [10, 13]
+
+
+# -- indexes name their File:; shared-repository descriptions go -------------
+
+INDEX_FILE_TITLE = "d2f5b9c3e810"
+
+
+def _seed_index_files(engine: Engine) -> None:
+    """Three works on one wiki: A's scan is on Commons (a shared-description
+    row with a blob), B's is uploaded locally, C's file was never fetched."""
+    with engine.begin() as connection:
+        run = connection.exec_driver_sql
+        run(
+            "INSERT INTO site (pk, family, code, articlepath, created_at)"
+            f" VALUES (1, 'wikisource', 'en', '/wiki/$1', {_T})"
+        )
+        for pk, title, model in (
+            (10, "Index:A.djvu", "proofread-index"),
+            (11, "File:A.djvu", "wikitext"),
+            (12, "Index:B.djvu", "proofread-index"),
+            (13, "File:B.djvu", "wikitext"),
+            (14, "Index:C.djvu", "proofread-index"),
+        ):
+            run(
+                "INSERT INTO title (pk, site_pk, title, expected_content_model)"
+                f" VALUES ({pk}, 1, '{title}', '{model}')"
+            )
+        run(
+            "INSERT INTO page (pk, site_pk, title, content_model, text, revid) VALUES"
+            " (11, 1, 'File:A.djvu', 'wikitext', 'from Commons', NULL),"
+            " (13, 1, 'File:B.djvu', 'wikitext', 'local', 5)"
+        )
+        run("INSERT INTO fileblob (pk, page_pk) VALUES (1, 11), (2, 13)")
+        run(
+            "INSERT INTO indexmeta (title_pk, site_pk, short_name) VALUES"
+            " (10, 1, 'A'), (12, 1, 'B'), (14, 1, 'C')"
+        )
+
+
+def test_indexes_name_their_file_and_shared_descriptions_go(
+    baseline_engine: Engine,
+) -> None:
+    _run(baseline_engine, command.upgrade, PAGE_ONLY_WHERE_HELD)
+    _seed_index_files(baseline_engine)
+
+    _run(baseline_engine, command.upgrade, INDEX_FILE_TITLE)
+
+    assert _foreign_keys(baseline_engine, "indexmeta") == {
+        ("title_pk", "title"),
+        ("site_pk", "site"),
+        ("file_title_pk", "title"),
+    }
+    with baseline_engine.connect() as connection:
+        run = connection.exec_driver_sql
+        [commons] = run(
+            "SELECT pk FROM site WHERE family = 'commons' AND code = 'commons'"
+        ).scalars()
+        files = dict(
+            run(
+                "SELECT m.short_name, t.site_pk || ':' || t.title FROM indexmeta m"
+                " JOIN title t ON t.pk = m.file_title_pk"
+            ).all()
+        )
+        assert files == {
+            "A": f"{commons}:File:A.djvu",  # the scan is Commons's page
+            "B": "1:File:B.djvu",
+            "C": "1:File:C.djvu",  # named, to be resolved by a fetch
+        }
+        # The borrowed description and its blob are gone; the local title
+        # stays, fetched: the wiki holds no page there.
+        assert run("SELECT pk FROM page ORDER BY pk").scalars().all() == [13]
+        assert run("SELECT page_pk FROM fileblob").scalars().all() == [13]
+        assert run("SELECT fetch_status FROM title WHERE pk = 11").scalar() == "done"
+        assert run("PRAGMA foreign_key_check").all() == []
+
+
+def test_index_file_title_step_downgrades(baseline_engine: Engine) -> None:
+    _run(baseline_engine, command.upgrade, PAGE_ONLY_WHERE_HELD)
+    _seed_index_files(baseline_engine)
+    _run(baseline_engine, command.upgrade, INDEX_FILE_TITLE)
+
+    _run(baseline_engine, command.downgrade, PAGE_ONLY_WHERE_HELD)
+
+    assert "file_title_pk" not in _columns(baseline_engine, "indexmeta")
+    with baseline_engine.connect() as connection:
+        assert (
+            connection.exec_driver_sql("SELECT count(*) FROM indexmeta").scalar() == 3
+        )

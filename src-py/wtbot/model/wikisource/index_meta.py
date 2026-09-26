@@ -29,6 +29,17 @@ class IndexMeta(SQLModel, table=True):
     per site and a constraint needs the column. The writers set it from the
     title; nothing else may."""
 
+    file_title_pk: int = Field(foreign_key="title.pk", index=True)
+    """The ``File:`` title holding the scan, on whichever site holds it: this
+    index's own site for a local upload, the shared repository's (Commons) for
+    a Wikimedia scan. A title, not a page, and required: an index names its
+    file before either is fetched -- or even exists -- and following the link
+    is how the file gets fetched (or created).
+
+    MediaWiki resolves ``File:X`` at request time, local repository first, so
+    a later local upload can shadow the shared one; the fetch re-resolves it
+    and moves this reference when that happens."""
+
     short_name: str
     page_count: int | None = None  # total pages per the Index (pagelist/IndexPage)
     # Room to grow: image_name_pattern, OCR region templates, ...

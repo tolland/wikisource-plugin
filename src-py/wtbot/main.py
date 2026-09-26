@@ -38,6 +38,7 @@ from wtbot.log.logging_config import LOGGING_CONFIG, LoggingConfig, configure_lo
 from wtbot.log.logging_config import sqlalchemy_echo as configured_sqlalchemy_echo
 from wtbot.model import Site, SiteCredential
 from wtbot.settings import WikiSettings
+from wtbot.shared_repository import ensure_shared_repository_site
 from wtbot.site_store import AnonymousAccessRefused, anonymous_allowed
 from wtbot.wiki.client_registry import make_client_factory
 
@@ -106,6 +107,9 @@ def create_app(
         # Importing the module constructs the default app, including in pytest
         # before fixtures run. Only migrate when this app actually starts.
         init_db(engine)
+        # After the schema, before serving: Commons is a site like any other,
+        # registered here so a shared File: has somewhere to be fetched from.
+        ensure_shared_repository_site(engine)
         yield
 
     app = FastAPI(

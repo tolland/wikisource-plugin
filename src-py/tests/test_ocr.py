@@ -1,5 +1,5 @@
 import pytest
-from conftest import add_proofread_meta
+from conftest import add_proofread_meta, index_file_title_pk
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
@@ -36,7 +36,11 @@ def _seed(engine) -> int:
         s.flush()
         s.add(
             IndexMeta(
-                title_pk=index.pk, site_pk=site.pk, short_name="Hertz", page_count=1
+                title_pk=index.pk,
+                file_title_pk=index_file_title_pk(s, index),
+                site_pk=site.pk,
+                short_name="Hertz",
+                page_count=1,
             )
         )
         page = Page(

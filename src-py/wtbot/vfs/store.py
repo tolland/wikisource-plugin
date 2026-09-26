@@ -19,6 +19,7 @@ from wtbot.model.wikisource.proofread_page_meta import (
     ProofreadPageMeta,
     default_short_name,
 )
+from wtbot.shared_repository import local_file_title_pk
 from wtbot.title_store import Entry, entry_by_pk
 
 """PageStore — all SQL for the VFS layers.
@@ -200,6 +201,13 @@ class PageStore:
         )
         return [row for row in rows if row.name.startswith(prefix)]
 
+    def index_file(self, index: Entry) -> Entry | None:
+        """The ``File:`` backing [index], as its IndexMeta names it -- which
+        may be on another site (a Commons scan). None before the index has
+        metadata."""
+        meta = self.session.get(IndexMeta, index.pk)
+        return entry_by_pk(self.session, meta.file_title_pk) if meta else None
+
     def blob(self, file: Entry) -> FileBlob | None:
         if file.page is None:
             return None
@@ -238,7 +246,12 @@ class PageStore:
         while self.short_name_taken(index.site_pk, short):
             short = f"{base}_{n}"
             n += 1
-        meta = IndexMeta(title_pk=index.pk, site_pk=index.site_pk, short_name=short)
+        meta = IndexMeta(
+            title_pk=index.pk,
+            site_pk=index.site_pk,
+            short_name=short,
+            file_title_pk=local_file_title_pk(self.session, index),
+        )
         self.session.add(meta)
         self.session.commit()
         self.session.refresh(meta)

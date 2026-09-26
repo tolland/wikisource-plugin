@@ -1,11 +1,17 @@
-"""Shared file descriptions must not become local revision identities."""
-
 from unittest.mock import Mock, PropertyMock
 
 import pytest
 
 from wtbot.wiki.client import PywikibotClient
-from wtbot.wiki.wiki_types import PageNotFound
+from wtbot.wiki.wiki_types import FileIsShared, PageNotFound
+
+"""A File: served from the shared repository is not this wiki's page.
+
+The client reports it as shared -- on the local wiki's own word,
+``imagerepository`` -- rather than borrowing Commons's description under a
+local title with no ids. The fetch worker then fetches the page on the
+repository's registered site (see test_shared_repository).
+"""
 
 
 class MissingPage(Exception):
@@ -14,6 +20,10 @@ class MissingPage(Exception):
 
 class InvalidPage(Exception):
     pass
+
+
+def _imageinfo(repository: str) -> dict:
+    return {"query": {"pages": {"-1": {"imagerepository": repository}}}}
 
 
 @pytest.fixture
@@ -29,44 +39,33 @@ def shared_client():
     local.exists.return_value = False
     type(local).latest_revision = PropertyMock(side_effect=MissingPage)
     client._pwb.Page.return_value = local
-    shared = Mock()
-    shared.exists.return_value = True
-    shared.content_model = "wikitext"
-    shared.latest_revision.text = "Commons description"
-    shared.latest_revision.revid = 12345
-    shared.pageid = 6789
-    client._pwb.FilePage.side_effect = lambda site, title: (
-        local if site is client.site else shared
-    )
-    return client, local, shared
-
-
-def test_shared_description_is_fetched_without_local_revision_ids(shared_client):
-    client, _, _ = shared_client
-    remote = client.get_page("File:Shared_scan.pdf")
-    assert remote.title == "File:Shared scan.pdf"
-    assert remote.namespace_key == 6
-    assert remote.text == "Commons description"
-    assert remote.pageid is None
-    assert remote.revid is None
-    assert remote.parentid is None
-    assert client.get_history(remote.title, limit=14) == []
-
-
-def test_batch_fetch_also_follows_shared_repository(shared_client):
-    client, local, _ = shared_client
-    client.site.preloadpages.return_value = [local]
-    results = client.get_pages(["File:Shared_scan.pdf"])
-    assert results[0].title == "File:Shared_scan.pdf"
-    assert results[0].result.text == "Commons description"
-    assert results[0].result.pageid is None
-    assert results[0].result.revid is None
+    client._pwb.FilePage.return_value = local
+    client._api_query = Mock(return_value=_imageinfo("shared"))
+    return client, local
 
 
 @pytest.mark.parametrize("operation", ["page", "history"])
-def test_file_missing_on_both_sites_still_fails(shared_client, operation):
-    client, _, shared = shared_client
-    shared.exists.return_value = False
+def test_a_shared_file_is_reported_as_shared(shared_client, operation):
+    client, _ = shared_client
+    with pytest.raises(FileIsShared) as raised:
+        if operation == "page":
+            client.get_page("File:Shared_scan.pdf")
+        else:
+            client.get_history("File:Shared_scan.pdf", limit=14)
+    assert raised.value.title == "File:Shared scan.pdf"
+
+
+def test_batch_fetch_reports_it_too(shared_client):
+    client, local = shared_client
+    client.site.preloadpages.return_value = [local]
+    [result] = client.get_pages(["File:Shared_scan.pdf"])
+    assert isinstance(result.result, FileIsShared)
+
+
+@pytest.mark.parametrize("operation", ["page", "history"])
+def test_file_missing_everywhere_is_not_found(shared_client, operation):
+    client, _ = shared_client
+    client._api_query.return_value = _imageinfo("")
     with pytest.raises(PageNotFound):
         if operation == "page":
             client.get_page("File:Shared scan.pdf")
@@ -74,16 +73,16 @@ def test_file_missing_on_both_sites_still_fails(shared_client, operation):
             client.get_history("File:Shared scan.pdf", limit=14)
 
 
-def test_missing_non_file_does_not_fall_back_to_commons(shared_client):
-    client, local, _ = shared_client
+def test_a_missing_non_file_asks_nothing_about_repositories(shared_client):
+    client, local = shared_client
     local.namespace.return_value.id = 0
     with pytest.raises(PageNotFound):
         client.get_page("Missing article")
-    client._pwb.FilePage.assert_not_called()
+    client._api_query.assert_not_called()
 
 
 def test_local_file_description_keeps_its_revision(shared_client):
-    client, local, _ = shared_client
+    client, local = shared_client
     revision = Mock(
         text="Local description",
         revid=42,
@@ -102,4 +101,4 @@ def test_local_file_description_keeps_its_revision(shared_client):
     assert remote.text == "Local description"
     assert remote.pageid == 12
     assert remote.revid == 42
-    client._pwb.FilePage.assert_not_called()
+    client._api_query.assert_not_called()

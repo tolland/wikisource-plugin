@@ -5,6 +5,7 @@ from fastapi import HTTPException
 from sqlmodel import Session, select
 
 from wtbot.model import Site, SiteCredential
+from wtbot.shared_repository import is_shared_repository
 
 """Resolving a site by the name a person gave it, and insisting it can log in.
 
@@ -125,7 +126,12 @@ def resolve_pair(
             ),
         )
 
-    labels = {row.label: row for row in session.exec(select(Site)).all() if row.label}
+    # The shared repository is where files live, never a side of a sync.
+    labels = {
+        row.label: row
+        for row in session.exec(select(Site)).all()
+        if row.label and not is_shared_repository(row)
+    }
     for local, remote in PAIR_CONVENTIONS:
         if local in labels and remote in labels:
             return labels[local], labels[remote]

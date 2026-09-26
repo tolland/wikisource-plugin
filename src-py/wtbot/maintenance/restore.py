@@ -377,6 +377,91 @@ def _drop_placeholder_pages(dump: DatabaseDump) -> DatabaseDump:
     return dump.model_copy(update={"tables": tables})
 
 
+def _name_index_files(dump: DatabaseDump) -> DatabaseDump:
+    """Give each index of an older dump the ``File:`` title it now names, and
+    drop the borrowed shared-repository descriptions.
+
+    The migration can tell a Commons scan from a local one by the borrowed
+    description row; a dump restores into a database with no Commons site,
+    so every index names its own site's ``File:`` title (added if the dump
+    has none) and the next fetch of the file moves the reference to Commons
+    where that is where the scan lives. The borrowed rows -- ``File:`` pages
+    with text and no revid -- go with their blobs, as in the migration.
+    """
+    tables = {table.name: table for table in dump.tables}
+    metas, titles, pages = (
+        tables.get("indexmeta"),
+        tables.get("title"),
+        tables.get("page"),
+    )
+    if metas is None or titles is None or pages is None:
+        return dump
+    if all("file_title_pk" in row.references for row in metas.rows):
+        return dump
+
+    title_keys = {_identity("title", row) for row in titles.rows}
+    template = titles.rows[0].fields if titles.rows else {}
+    new_titles = list(titles.rows)
+    new_metas = []
+    for row in metas.rows:
+        index = row.references["title_pk"]
+        assert index is not None
+        site, index_title = index.key
+        assert isinstance(site, Reference)
+        file_name = "File:" + str(index_title).partition(":")[2]
+        file_key: tuple[Scalar | Reference, ...] = (site, file_name)
+        file_ref = Reference(table="title", key=file_key)
+        if file_ref.model_dump_json() not in title_keys:
+            title_keys.add(file_ref.model_dump_json())
+            fields: dict[str, Scalar] = {field: None for field in template}
+            fields |= {
+                "title": file_name,
+                "expected_content_model": "wikitext",
+                "fetch_status": "unfetched",
+                "dirty": 0,
+            }
+            new_titles.append(
+                Record(key=file_key, fields=fields, references={"site_pk": site})
+            )
+        new_metas.append(
+            row.model_copy(
+                update={"references": {**row.references, "file_title_pk": file_ref}}
+            )
+        )
+
+    borrowed = {
+        _identity("page", row)
+        for row in pages.rows
+        if row.fields.get("revid") is None
+        and row.fields.get("text") is not None
+        and str(row.fields.get("title", "")).startswith("File:")
+    }
+    replaced = {
+        "indexmeta": metas.model_copy(update={"rows": new_metas}),
+        "title": titles.model_copy(update={"rows": new_titles}),
+        "page": pages.model_copy(
+            update={
+                "rows": [r for r in pages.rows if _identity("page", r) not in borrowed]
+            }
+        ),
+    }
+    if "fileblob" in tables:
+        blobs = tables["fileblob"]
+        replaced["fileblob"] = blobs.model_copy(
+            update={
+                "rows": [
+                    r
+                    for r in blobs.rows
+                    if (ref := r.references.get("page_pk")) is None
+                    or ref.model_dump_json() not in borrowed
+                ]
+            }
+        )
+    return dump.model_copy(
+        update={"tables": [replaced.get(t.name, t) for t in dump.tables]}
+    )
+
+
 # Applied in order: each brings a dump from one schema step to the next, and
 # does nothing to a dump that is already past it.
 _LEGACY_UPGRADES = (
@@ -387,6 +472,7 @@ _LEGACY_UPGRADES = (
     _rename_legacy_references,
     _drop_legacy_references,
     _page_references_to_titles,
+    _name_index_files,
 )
 
 

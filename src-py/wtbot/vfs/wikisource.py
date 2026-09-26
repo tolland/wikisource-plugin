@@ -263,12 +263,15 @@ class WikisourceVfs:
             _dir_node(f"{parent}/Pages", "Pages"),
         ]
 
-        file_title = _index_to_file_title(index.name)
-        file_page = self.store.entry(site, file_title)
+        file_page = self.store.index_file(index) or self.store.entry(
+            site, _index_to_file_title(index.name)
+        )
         if file_page is not None:
             children.append(
                 _dir_node(
-                    f"{parent}/{file_title}", file_title, stable_id=file_page.pageid
+                    f"{parent}/{file_page.name}",
+                    file_page.name,
+                    stable_id=file_page.pageid,
                 )
             )
 

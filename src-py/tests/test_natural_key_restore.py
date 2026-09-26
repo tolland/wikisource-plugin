@@ -239,6 +239,8 @@ def test_a_dump_taken_before_titles_existed_restores_with_them(tmp_path: Path) -
             table["key_fields"] = ["page_pk"]
             for row in table["rows"]:
                 row["references"]["page_pk"] = row["references"].pop("title_pk")
+                # Before indexes named their file.
+                row["references"].pop("file_title_pk")
     raw["tables"] = _every_reference_names_a_page(raw["tables"])
     legacy.write_text(json.dumps(raw))
 
@@ -252,9 +254,10 @@ def test_a_dump_taken_before_titles_existed_restores_with_them(tmp_path: Path) -
             " JOIN title b ON b.pk = p.remote_page_pk"
         ).fetchone() == (1,)
         assert connection.execute(
-            "SELECT t.title, m.short_name, m.page_count FROM indexmeta m"
-            " JOIN title t ON t.pk = m.title_pk"
-        ).fetchall() == [("Index:Book", "Book", 9)]
+            "SELECT t.title, m.short_name, m.page_count, f.title FROM indexmeta m"
+            " JOIN title t ON t.pk = m.title_pk JOIN title f ON f.pk = m.file_title_pk"
+            " WHERE f.site_pk = t.site_pk"
+        ).fetchall() == [("Index:Book", "Book", 9, "File:Book")]
         assert connection.execute(
             "SELECT title, namespace_key, fetch_status, dirty FROM title"
             " WHERE namespace_key IS NOT NULL"

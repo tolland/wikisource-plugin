@@ -58,16 +58,21 @@ def test_fetching_an_unregistered_site_is_refused_and_says_what_exists(http, eng
     assert "local" in detail, "the error should list the labels that do exist"
     assert "wtbot site add" in detail
 
-    # ...and nothing was registered or queued as a side effect of asking.
+    # ...and nothing was registered or queued as a side effect of asking
+    # (beyond the shared repository, which startup registers).
     with Session(engine) as session:
-        assert len(session.exec(select(Site)).all()) == 1
+        assert [s.label for s in session.exec(select(Site)).all()] == [
+            "commons",
+            "local",
+        ]
         assert session.exec(select(FetchRequest)).all() == []
 
 
-def test_fetching_with_no_sites_at_all_says_so(http):
+def test_fetching_with_no_sites_of_your_own_says_what_there_is(http):
+    """Startup registers the shared repository, so it is always listed."""
     resp = http.post("/fetch/", json={"title": "Page:Book.djvu/1", "label": "local"})
     assert resp.status_code == 404
-    assert "None registered" in resp.json()["detail"]
+    assert "Registered: commons." in resp.json()["detail"]
 
 
 def test_refresh_also_refuses_an_unknown_label(http):
