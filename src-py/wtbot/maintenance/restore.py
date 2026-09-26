@@ -342,8 +342,9 @@ _HELD_PAGE_REFERENCES: tuple[tuple[str, str], ...] = (
 def _drop_placeholder_pages(dump: DatabaseDump) -> DatabaseDump:
     """Drop page rows the wiki does not hold, as the migration does.
 
-    A placeholder -- a page row with no ``revid`` -- stood for a title the wiki
-    does not hold. Its title keeps everything it said (the step before moved
+    A placeholder -- a page row with no ``revid`` and no ``text`` -- stood for
+    a title the wiki does not hold. (A shared-repository ``File:`` description
+    has text and, deliberately, no local revid; it is held, and stays.) Its title keeps everything it said (the step before moved
     the address fields across), so the row goes. One that another row still
     treats as held is a contradiction, refused rather than guessed at.
     """
@@ -351,7 +352,9 @@ def _drop_placeholder_pages(dump: DatabaseDump) -> DatabaseDump:
     if pages is None:
         return dump
     placeholders = {
-        _identity("page", row) for row in pages.rows if row.fields.get("revid") is None
+        _identity("page", row)
+        for row in pages.rows
+        if row.fields.get("revid") is None and row.fields.get("text") is None
     }
     if not placeholders:
         return dump

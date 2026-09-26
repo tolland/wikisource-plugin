@@ -1071,3 +1071,29 @@ def test_the_page_only_where_held_step_downgrades_cleanly(
             (11, "proofread-page", None, "2026-02-01 00:00:00"),
             (12, "proofread-index", None, None),
         ]
+
+
+def test_a_shared_repository_file_is_held_and_stays(baseline_engine: Engine) -> None:
+    """A File: whose file lives on Commons is fetched with the shared
+    description as its text and no local revid (those would be Commons ids).
+    The wiki serves that page; it is not a placeholder, and its blob keeps it."""
+    _run(baseline_engine, command.upgrade, ADDRESS_COLUMNS_ON_TITLE)
+    _seed_held_and_placeholder(baseline_engine)
+    with baseline_engine.begin() as connection:
+        run = connection.exec_driver_sql
+        run(
+            "INSERT INTO title (pk, site_pk, title, expected_content_model,"
+            " fetch_status) VALUES (13, 1, 'File:B.djvu', 'wikitext', 'done')"
+        )
+        run(
+            "INSERT INTO page (pk, site_pk, title, content_model, text, revid)"
+            " VALUES (13, 1, 'File:B.djvu', 'wikitext', '== Summary ==', NULL)"
+        )
+        run("INSERT INTO fileblob (page_pk, page_count) VALUES (13, 2)")
+
+    _run(baseline_engine, command.upgrade, PAGE_ONLY_WHERE_HELD)
+
+    with baseline_engine.connect() as connection:
+        assert connection.exec_driver_sql(
+            "SELECT pk FROM page ORDER BY pk"
+        ).scalars().all() == [10, 13]

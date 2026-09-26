@@ -5,12 +5,19 @@ Revises: b3e7c2f9a15d
 Create Date: 2026-09-26 14:00:00.000000+00:00
 
 Step 3 of the Title/WikiPage split. A **placeholder** -- a ``page`` row with no
-``revid`` -- stood for a title the wiki does not hold: an untranscribed
+``revid`` and no ``text`` -- stood for a title the wiki does not hold: an untranscribed
 ``Page:`` the index paginates, or an Index named by a page before it was
 fetched. Everything such a row said now lives elsewhere: the address on
 ``title`` (fetch status, dirty), the pagination in ``proofreadpagemeta``, the
 saves in ``editjournal``. So the rows go, and "the wiki holds this page" becomes
 row presence.
+
+No ``revid`` alone is not the test. A ``File:`` whose file lives in the
+wiki's shared repository (Commons, for Wikisource) is fetched with the shared
+description as its text and deliberately no local ``pageid``/``revid`` --
+those would be Commons ids -- and its blob hangs off that row. The wiki does
+serve that page; it stays. Every fetch writes text, and no placeholder ever
+had any, so ``text IS NULL`` is what separates them.
 
 ``local_modified_at`` moves to ``title`` first: it is set by a local save, and
 a title with no page can be saved.
@@ -34,10 +41,11 @@ down_revision: str | None = "b3e7c2f9a15d"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-_PLACEHOLDER = "page.revid IS NULL"
+_PLACEHOLDER = "page.revid IS NULL AND page.text IS NULL"
 
 _CONTRADICTIONS = """
-    SELECT page.pk, page.title FROM page WHERE page.revid IS NULL AND (
+    SELECT page.pk, page.title FROM page
+    WHERE page.revid IS NULL AND page.text IS NULL AND (
         EXISTS (SELECT 1 FROM revision WHERE revision.page_pk = page.pk)
         OR EXISTS (SELECT 1 FROM fileblob WHERE fileblob.page_pk = page.pk)
         OR EXISTS (

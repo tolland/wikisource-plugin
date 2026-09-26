@@ -76,8 +76,11 @@ change of constraint, never of data.
      wiki holds the page. The fan-out records an untranscribed `Page:` as a
      title (`fetch_status=done`) plus its `ProofreadPageMeta`; an Index named
      before it is fetched is a title only (`ensure_index_title`). The
-     migration deletes rows with no `revid`, and refuses -- naming them -- any
-     still referred to by a `revision`, `fileblob` or promotion source.
+     migration deletes rows with no `revid` *and no `text`*, and refuses --
+     naming them -- any still referred to by a `revision`, `fileblob` or
+     promotion source. (No `revid` alone is not the test: a `File:` served
+     from the shared repository -- Commons -- is fetched with its description
+     as text and deliberately no local ids, and is held.)
      `local_modified_at` moved to `title` with them (a save sets it).
      Readers work from an `Entry` (`wtbot.title_store`): a title and its page
      if held. The VFS, page navigation, reference image, annotations, OCR,
@@ -87,6 +90,9 @@ change of constraint, never of data.
      Content models are read off `Title.expected_content_model`, which the
      fetch keeps equal to the wiki's. `SyncVerdict` is unchanged: the §5/§6
      reshape of sync is its own step.
+   - **Open, blocks 3b:** how a shared-repository `File:` is modelled. It is
+     the one held page with no local `pageid`/`revid`/timestamp, so those
+     columns cannot be NOT NULL while it is a `Page` row as it stands.
    - **Next:** step 3b -- the head columns NOT NULL; then 3c -- `page.title`
      and the `before_flush` hook go.
 
