@@ -6,6 +6,9 @@ from sqlmodel import Field, SQLModel
 from wtbot.timeutil import utcnow
 
 
+# @TODO its not entirely clear that we are using this, if we
+# are considering the content_model for fan out decisions
+# review wthether this is still needed
 class FetchKind(str, Enum):
     single = "single"  # just this title, no expansion
     index = "index"  # Index + its File + all its Pages
