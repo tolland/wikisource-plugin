@@ -1,7 +1,7 @@
 import pytest
-from conftest import add_proofread_meta
+from conftest import add_proofread_meta, make_page
 
-from wtbot.model import Page, Site
+from wtbot.model import Site
 from wtbot.model.wiki.namespace import Namespace
 from wtbot.vfs.mediawiki import MediaWikiVfs, title_namespace_name
 from wtbot.vfs.store import PageStore
@@ -29,20 +29,20 @@ def site(session) -> Site:
     session.refresh(site)
 
     session.add(
-        Page(
+        make_page(
             site_pk=site.pk,
             title=INDEX,
             content_model="proofread-index",
         )
     )
-    linked = Page(
+    linked = make_page(
         site_pk=site.pk,
         title=LINKED_SUBPAGE,
         content_model="sanitized-css",
     )
     session.add(linked)
     session.add(
-        Page(
+        make_page(
             site_pk=site.pk,
             title=UNLINKED_SUBPAGE,
             content_model="sanitized-css",
@@ -121,12 +121,12 @@ def test_proofread_pages_match_across_underscore_space(session):
     spaced = "Index:Unreported RTT Pathway Removals at MSE FT.pdf"
     underscored = "Index:Unreported_RTT_Pathway_Removals_at_MSE_FT.pdf"
 
-    real = Page(
+    real = make_page(
         site_pk=site.pk,
         title="Page:Unreported RTT Pathway Removals at MSE FT.pdf/5",
         content_model="proofread-page",
     )
-    stub = Page(
+    stub = make_page(
         site_pk=site.pk,
         title="Page:Unreported_RTT_Pathway_Removals_at_MSE_FT.pdf/1",
         content_model="proofread-page",

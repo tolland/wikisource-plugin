@@ -11,6 +11,8 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 
+from conftest import FAKE_TIMESTAMP, fake_pageid
+
 from wtbot.model import Site
 from wtbot.settings import WikiSettings
 from wtbot.wiki.client import FakeWikiClient
@@ -205,6 +207,8 @@ def test_worker_run_builds_one_client_for_a_whole_fan_out(engine):
             content_model="proofread-page",
             text="body",
             revid=1,
+            pageid=fake_pageid(title),
+            timestamp=FAKE_TIMESTAMP,
         )
         for title in titles
     }

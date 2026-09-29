@@ -346,3 +346,41 @@ def test_a_dump_with_since_dropped_tables_restores_without_them(tmp_path: Path) 
             )
         }
     assert not {"transclusion", "filemeta"} & tables
+
+
+def _page_rows(raw: dict) -> list[dict]:
+    return next(t for t in raw["tables"] if t["name"] == "page")["rows"]
+
+
+def test_an_older_dump_gets_its_page_models_from_the_titles(tmp_path: Path) -> None:
+    original, archive, rebuilt = (
+        tmp_path / name for name in ("source.db", "dump.json", "rebuilt.db")
+    )
+    make_database(original)
+    write_dump(original, archive)
+    raw = json.loads(archive.read_text())
+    for row in _page_rows(raw):
+        row["fields"]["content_model"] = None
+    archive.write_text(json.dumps(raw))
+
+    restore_dump(archive, rebuilt, ignore_columns=frozenset({"site.legacy_note"}))
+    with sqlite3.connect(rebuilt) as connection:
+        assert connection.execute(
+            "SELECT count(*) FROM page p JOIN title t ON t.pk = p.pk"
+            " WHERE p.content_model = t.expected_content_model"
+        ).fetchone() == (2,)
+
+
+def test_a_page_row_without_ids_is_refused_by_name(tmp_path: Path) -> None:
+    original, archive, rebuilt = (
+        tmp_path / name for name in ("source.db", "dump.json", "rebuilt.db")
+    )
+    make_database(original)
+    write_dump(original, archive)
+    raw = json.loads(archive.read_text())
+    _page_rows(raw)[0]["fields"]["pageid"] = None
+    archive.write_text(json.dumps(raw))
+
+    with pytest.raises(ValueError, match="missing a head column.*Index:Book"):
+        restore_dump(archive, rebuilt, ignore_columns=frozenset({"site.legacy_note"}))
+    assert not rebuilt.exists()

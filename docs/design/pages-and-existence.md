@@ -115,8 +115,19 @@ change of constraint, never of data.
      editing scans: `FileRevision` mirroring the imageinfo history, blobs
      keyed by sha1 (dedup, and the refetch after this migration reuses the
      bytes on disk), and an upload journal as the `EditJournal` analogue.
-   - **Next:** step 3b -- the head columns NOT NULL; then 3c -- `page.title`
-     and the `before_flush` hook go.
+   - **Done** (`e7a3d1f6b529`, step 3b): `page.pageid`, `revid`,
+     `remote_timestamp`, `text` and `content_model` are NOT NULL, and
+     `RemotePage`'s `pageid`/`revid`/`timestamp` are required -- a snapshot
+     is of a page the wiki holds; anything else is `PageNotFound` or
+     `FileIsShared`. The fetch builds a Page complete, and the identity
+     checks lose their "partial snapshot" leniency, which existed only for
+     fixtures. The migration derives `content_model` (from the title) and
+     `remote_timestamp` (from the head revision) where an older fetch left
+     them empty, and stops, naming the rows, on anything else; restore does
+     the same. `contributor`/`comment` stay nullable (revision-deleted is a
+     real state), as do `latest_revision_pk` and
+     `history_complete_from_revid` (what our store holds).
+   - **Next:** step 3c -- `page.title` and the `before_flush` hook go.
 
    Two things learned doing the first batch, and a third since. Tables whose
    constraints are not conventionally named, or which carry an expression

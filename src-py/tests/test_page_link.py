@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 import pytest
-from conftest import add_proofread_meta
+from conftest import add_proofread_meta, fake_pageid, make_page
 from sqlmodel import Session, select
 
 from wtbot.fetch.revision_store import record_head_revision
@@ -45,7 +45,7 @@ def build_page(
     session: Session, site: Site, number: int, *, body: str | None, revid: int
 ) -> Page:
     title = f"Page:Canadian patent 29537.djvu/{number}"
-    page = Page(site_pk=site.pk, title=title, content_model="proofread-page")
+    page = make_page(site_pk=site.pk, title=title, content_model="proofread-page")
     session.add(page)
     session.commit()
     session.refresh(page)
@@ -63,6 +63,7 @@ def build_page(
                 text=body,
                 revid=revid,
                 timestamp=datetime(2026, 1, 1, tzinfo=timezone.utc),
+                pageid=fake_pageid(title),
             ),
         )
         session.commit()

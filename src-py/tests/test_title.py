@@ -1,6 +1,7 @@
 import logging
 
 import pytest
+from conftest import FAKE_TIMESTAMP, make_page
 from sqlmodel import Session, select
 
 from wtbot.fetch.fetch_worker import run_pending
@@ -44,7 +45,7 @@ def _title_at(session: Session, site: Site, title: str) -> Title:
 
 
 def test_a_page_created_without_a_pk_gets_its_title(session, site):
-    page = Page(site_pk=site.pk, title="Main Page", content_model="wikitext")
+    page = make_page(site_pk=site.pk, title="Main Page", content_model="wikitext")
     session.add(page)
     session.commit()
 
@@ -55,7 +56,7 @@ def test_a_page_created_without_a_pk_gets_its_title(session, site):
 
 def test_a_page_with_no_model_is_expected_to_be_wikitext(session, site):
     """MediaWiki's own fallback. A namespace does not decide it."""
-    session.add(Page(site_pk=site.pk, title="Index:Book.pdf/styles.css"))
+    session.add(make_page(site_pk=site.pk, title="Index:Book.pdf/styles.css"))
     session.commit()
 
     title = _title_at(session, site, "Index:Book.pdf/styles.css")
@@ -69,7 +70,7 @@ def test_a_page_reuses_a_title_already_at_its_address(session, site):
         title="Page:Book.djvu/1",
         expected_content_model="proofread-page",
     )
-    page = Page(site_pk=site.pk, title="Page:Book.djvu/1")
+    page = make_page(site_pk=site.pk, title="Page:Book.djvu/1")
     session.add(page)
     session.commit()
 
@@ -78,7 +79,7 @@ def test_a_page_reuses_a_title_already_at_its_address(session, site):
 
 
 def test_an_explicit_pk_names_the_title_too(session, site):
-    page = Page(pk=4242, site_pk=site.pk, title="Index:Book.djvu")
+    page = make_page(pk=4242, site_pk=site.pk, title="Index:Book.djvu")
     session.add(page)
     session.commit()
 
@@ -93,7 +94,9 @@ def test_an_explicit_pk_may_not_contradict_the_title_at_its_address(session, sit
         expected_content_model="proofread-index",
     )
     session.commit()
-    session.add(Page(pk=existing.pk + 100, site_pk=site.pk, title="Index:Book.djvu"))
+    session.add(
+        make_page(pk=existing.pk + 100, site_pk=site.pk, title="Index:Book.djvu")
+    )
 
     with pytest.raises(ValueError, match="already has pk"):
         session.flush()
@@ -175,6 +178,7 @@ def _css_subpage() -> RemotePage:
         text=".x { color: red }",
         pageid=501,
         revid=9001,
+        timestamp=FAKE_TIMESTAMP,
     )
 
 

@@ -1,6 +1,7 @@
 from collections import defaultdict
 
 import pytest
+from conftest import FAKE_TIMESTAMP, fake_pageid
 
 from wtbot.settings import WikiSettings
 from wtbot.wiki.client import FakeWikiClient, _save_with_exact_summary
@@ -18,6 +19,8 @@ def _page(title, content_model, ns_canonical, ns_key, text="x"):
         text=text,
         revid=1,
         sha1="deadbeef",
+        pageid=fake_pageid(title),
+        timestamp=FAKE_TIMESTAMP,
     )
 
 

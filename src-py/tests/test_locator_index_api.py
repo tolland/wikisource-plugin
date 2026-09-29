@@ -1,5 +1,5 @@
 import pytest
-from conftest import add_proofread_meta
+from conftest import add_proofread_meta, make_page
 from sqlmodel import Session, select
 
 from wtbot.model import EditJournal, Page, Site
@@ -33,7 +33,7 @@ def _seed(engine) -> None:
         site = Site(family=FAMILY, code=CODE)
         s.add(site)
         s.flush()
-        index = Page(
+        index = make_page(
             site_pk=site.pk,
             title=INDEX,
             content_model="proofread-index",
@@ -41,7 +41,7 @@ def _seed(engine) -> None:
         )
         s.add(index)
 
-        page_155 = Page(
+        page_155 = make_page(
             site_pk=site.pk,
             title="Page:Principles_of_mechanics.pdf/155",
             content_model="proofread-page",
@@ -51,7 +51,7 @@ def _seed(engine) -> None:
         s.flush()
         add_proofread_meta(s, page_pk=page_155.pk, index_title=INDEX, page_number=155)
 
-        page_163 = Page(
+        page_163 = make_page(
             site_pk=site.pk,
             title="Page:Principles_of_mechanics.pdf/163",
             content_model="proofread-page",
@@ -61,7 +61,7 @@ def _seed(engine) -> None:
         s.flush()
         add_proofread_meta(s, page_pk=page_163.pk, index_title=INDEX, page_number=163)
 
-        page_164 = Page(
+        page_164 = make_page(
             site_pk=site.pk,
             title="Page:Principles_of_mechanics.pdf/164",
             content_model="proofread-page",
@@ -89,7 +89,7 @@ def _seed_bare_pagelist(engine) -> None:
         site = Site(family=FAMILY, code=CODE)
         s.add(site)
         s.flush()
-        index = Page(
+        index = make_page(
             site_pk=site.pk,
             title=BARE_INDEX,
             content_model="proofread-index",
@@ -97,7 +97,7 @@ def _seed_bare_pagelist(engine) -> None:
         )
         s.add(index)
         for n in (1, 2, 50):
-            page = Page(
+            page = make_page(
                 site_pk=site.pk,
                 title=f"Page:NeglectedArgument.pdf/{n}",
                 content_model="proofread-page",

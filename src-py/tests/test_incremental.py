@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from conftest import credential_for, drain
+from conftest import credential_for, drain, fake_pageid, make_page
 from sqlmodel import Session, select
 
 from wtbot.incremental import RefreshBasis, plan_refresh
@@ -49,7 +49,7 @@ def _site(session: Session, **kwargs) -> Site:
 
 
 def _page(session: Session, site: Site, title: str) -> Page:
-    page = Page(site_pk=site.pk, title=title)
+    page = make_page(site_pk=site.pk, title=title)
     session.add(page)
     session.commit()
     return page
@@ -230,6 +230,7 @@ def test_refresh_endpoint_fetches_only_what_moved(client, engine) -> None:
         text="refreshed body",
         revid=99,
         timestamp=NOW,
+        pageid=fake_pageid(moved),
     )
     wiki = FakeWikiClient(pages={moved: remote}, changes=[_change(moved, minutes=5)])
     client.app.state.client_factory = lambda _site: wiki

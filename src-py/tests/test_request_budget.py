@@ -24,6 +24,7 @@ from collections import Counter
 from urllib.parse import urlsplit
 
 import pytest
+from conftest import FAKE_TIMESTAMP, fake_pageid
 from wiki_harness import PwbHarness, WikiApi
 
 from wtbot.model import Page
@@ -229,8 +230,10 @@ def test_a_fan_out_asks_for_its_pages_images_once_not_once_per_page(engine, tmp_
             namespace_canonical="Index",
             content_model="proofread-index",
             text='<pagelist 1to5="1" />',
-            revid=1,
+            revid=fake_pageid(index_title),
             page_count=5,
+            pageid=fake_pageid(index_title),
+            timestamp=FAKE_TIMESTAMP,
         )
     }
     pages.update(
@@ -241,7 +244,9 @@ def test_a_fan_out_asks_for_its_pages_images_once_not_once_per_page(engine, tmp_
                 namespace_canonical="Page",
                 content_model="proofread-page",
                 text="body",
-                revid=1,
+                revid=fake_pageid(title),
+                pageid=fake_pageid(title),
+                timestamp=FAKE_TIMESTAMP,
             )
             for title in page_titles
         }
@@ -292,7 +297,9 @@ def test_a_page_fetched_on_its_own_still_gets_its_image(engine, tmp_path):
                 namespace_canonical="Page",
                 content_model="proofread-page",
                 text="body",
-                revid=1,
+                revid=fake_pageid(title),
+                pageid=fake_pageid(title),
+                timestamp=FAKE_TIMESTAMP,
             )
         },
         page_images={title: RemotePageImages(thumbnail_url="https://wiki.test/1.jpg")},

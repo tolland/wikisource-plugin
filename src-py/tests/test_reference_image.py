@@ -8,12 +8,12 @@ ProofreadPage's own API calls it ``imageforpage``.
 """
 
 import pytest
-from conftest import add_proofread_meta
+from conftest import add_proofread_meta, make_page
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from wtbot.main import create_app
-from wtbot.model import Page, Site
+from wtbot.model import Site
 from wtbot.wiki.client import FakeWikiClient
 
 FAMILY = "wikisource"
@@ -30,7 +30,7 @@ def client(engine) -> TestClient:
         s.add(site)
         s.commit()
         s.refresh(site)
-        page = Page(
+        page = make_page(
             site_pk=site.pk,
             title=PAGE,
             content_model="proofread-page",

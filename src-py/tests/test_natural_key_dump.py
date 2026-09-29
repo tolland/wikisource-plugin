@@ -2,6 +2,7 @@ import sqlite3
 from pathlib import Path
 
 import pytest
+from conftest import make_page
 from sqlmodel import Session, SQLModel, create_engine
 
 from wtbot.maintenance.dump import (
@@ -17,7 +18,6 @@ from wtbot.model import (
     FileBlob,
     IndexLink,
     IndexMeta,
-    Page,
     PageLink,
     ProofreadPageMeta,
     Revision,
@@ -39,7 +39,7 @@ def make_database(path: Path, offset: int = 0) -> None:
             SiteCredential(site_pk=offset + 1, username="bot", password="secret")
         )
         session.add(
-            Page(
+            make_page(
                 pk=offset + 3,
                 site_pk=offset + 1,
                 title="Index:Book",
@@ -107,7 +107,7 @@ def make_database(path: Path, offset: int = 0) -> None:
         )
         session.flush()
         session.add(
-            Page(pk=offset + 9, site_pk=offset + 1, title="Page:Book/1", revid=124)
+            make_page(pk=offset + 9, site_pk=offset + 1, title="Page:Book/1", revid=124)
         )
         session.add(
             ProofreadPageMeta(

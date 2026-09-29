@@ -3,8 +3,10 @@ import os
 import shutil
 import subprocess
 import time
+import zlib
 from collections.abc import Iterator
 from dataclasses import dataclass, replace
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -26,7 +28,7 @@ from wiki_harness import (
 
 from wtbot.db import create_db_engine, init_db
 from wtbot.main import create_app
-from wtbot.model import ProofreadPageMeta, Title
+from wtbot.model import Page, ProofreadPageMeta, Title
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 COMPOSE_FILE = REPO_ROOT / "compose.seeded.yml"
@@ -501,3 +503,29 @@ def index_file_title_pk(session: Session, index) -> int:
     title = session.get(Title, index.pk)
     assert title is not None
     return local_file_title_pk(session, title)
+
+
+#: When a fixture's page or remote snapshot says nothing about time.
+FAKE_TIMESTAMP = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+
+def fake_pageid(title: str) -> int:
+    """A stable pageid for a fixture title: the same title always gets the
+    same id, so a cached row and the fake wiki's snapshot of it agree, and two
+    titles do not collide (identity checks refuse a pageid reused on a site)."""
+    return zlib.crc32(title.encode()) & 0x7FFFFFFF
+
+
+def make_page(**fields) -> Page:
+    """A Page fixture: a page the wiki holds, so its head is complete. Fields
+    a test does not care about get plausible values -- ids derived from the
+    title, empty text, wikitext -- and whatever it passes wins."""
+    title = fields["title"]
+    defaults = {
+        "pageid": fake_pageid(title),
+        "revid": fake_pageid(title),
+        "remote_timestamp": FAKE_TIMESTAMP,
+        "text": "",
+        "content_model": "wikitext",
+    }
+    return Page(**(defaults | fields))

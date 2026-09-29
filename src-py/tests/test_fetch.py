@@ -6,7 +6,7 @@ which is also the only way to test the state *between* them.
 """
 
 import pytest
-from conftest import fetch_and_drain, register_site
+from conftest import FAKE_TIMESTAMP, fake_pageid, fetch_and_drain, register_site
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -56,6 +56,7 @@ def _remote(title, content_model, ns_canonical, ns_key, text=None):
         comment="tweak",
         sha1="7ea25a6970ea3470958843030de6e38783beeeda",
         size=2601,
+        timestamp=FAKE_TIMESTAMP,
     )
 
 
@@ -72,6 +73,7 @@ def _page_remote(n: int) -> RemotePage:
         comment=f"page {n}",
         sha1=f"sha{n:040d}",
         size=200,
+        timestamp=FAKE_TIMESTAMP,
     )
 
 
@@ -88,6 +90,7 @@ def _index_subpage_remote(title: str) -> RemotePage:
         comment="styles",
         sha1="c" * 40,
         size=50,
+        timestamp=FAKE_TIMESTAMP,
     )
 
 
@@ -133,6 +136,9 @@ def app_with_index_fanout(engine, tmp_path, index_remote_with_pagelist):
             namespace_canonical="File",
             content_model="wikitext",
             text="shared description",
+            pageid=fake_pageid(_FILE_TITLE),
+            revid=fake_pageid(_FILE_TITLE),
+            timestamp=FAKE_TIMESTAMP,
         ),
         asset_title: _index_subpage_remote(asset_title),
         **{f"Page:Tractatus.djvu/{n}": _page_remote(n) for n in range(1, 4)},
@@ -361,6 +367,9 @@ def test_worker_index_fanout_queues_index_subpages(
             namespace_canonical="File",
             content_model="wikitext",
             text="shared description",
+            pageid=fake_pageid(_FILE_TITLE),
+            revid=fake_pageid(_FILE_TITLE),
+            timestamp=FAKE_TIMESTAMP,
         ),
         asset_title: _index_subpage_remote(asset_title),
         **{f"Page:Tractatus.djvu/{n}": _page_remote(n) for n in range(1, 4)},
@@ -428,6 +437,7 @@ def test_proofread_page_metadata_uses_content_model(session):
         revid=1007,
         sha1="d" * 40,
         size=200,
+        timestamp=FAKE_TIMESTAMP,
     )
     wiki = FakeWikiClient(pages={remote.title: remote})
     site = Site(family="mywikisource", code="en")
@@ -458,6 +468,7 @@ def test_proofread_page_fetch_populates_page_meta(session):
         text="page content",
         pageid=145,
         revid=1045,
+        timestamp=FAKE_TIMESTAMP,
     )
     wiki = FakeWikiClient(
         pages={title: remote},
@@ -503,6 +514,7 @@ def test_proofread_page_fetch_without_images_leaves_image_fields_empty(session):
         text="page content",
         pageid=146,
         revid=1046,
+        timestamp=FAKE_TIMESTAMP,
     )
     wiki = FakeWikiClient(pages={title: remote})
     site = Site(family="mywikisource", code="en")
@@ -538,6 +550,7 @@ def test_refetch_updates_existing_page_meta(session):
         text="page content",
         pageid=147,
         revid=1047,
+        timestamp=FAKE_TIMESTAMP,
     )
 
     def images(quality: int) -> RemotePageImages:
@@ -586,6 +599,7 @@ def test_page_model_has_raw_text_not_proofread_sections(session):
         revid=1001,
         sha1="b" * 40,
         size=len(text),
+        timestamp=FAKE_TIMESTAMP,
     )
     wiki = FakeWikiClient(pages={remote.title: remote})
     site = Site(family="mywikisource", code="en")
@@ -724,6 +738,7 @@ def test_file_fetch_downloads_blob(engine, tmp_path):
         comment="upload",
         sha1="a" * 40,
         size=100,
+        timestamp=FAKE_TIMESTAMP,
     )
     wiki = FakeWikiClient(
         pages={_FILE_TITLE: file_remote}, files={_FILE_TITLE: _FAKE_FILE_BYTES}

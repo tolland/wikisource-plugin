@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from conftest import add_proofread_meta
+from conftest import add_proofread_meta, fake_pageid, make_page
 from sqlmodel import Session, select
 
 from wtbot.fetch.revision_store import record_head_revision, record_history
@@ -43,6 +43,7 @@ def remote_page(text: str, revid: int, parentid: int | None, days: int) -> Remot
         revid=revid,
         parentid=parentid,
         timestamp=WHEN + timedelta(days=days),
+        pageid=fake_pageid(TITLE),
     )
 
 
@@ -56,7 +57,7 @@ def build_site(session: Session, family: str) -> Site:
 
 def build_page(session: Session, site: Site, revisions: list[RemotePage]) -> Page:
     """A page with a real history: head first, older revisions behind it."""
-    page = Page(site_pk=site.pk, title=TITLE, content_model="proofread-page")
+    page = make_page(site_pk=site.pk, title=TITLE, content_model="proofread-page")
     session.add(page)
     session.commit()
     session.refresh(page)

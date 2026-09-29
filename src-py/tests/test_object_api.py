@@ -1,9 +1,10 @@
+from conftest import make_page
 from fastapi import HTTPException
 from sqlmodel import Session, select
 
 from wtbot.api.pages import get_page, list_pages
 from wtbot.main import create_app
-from wtbot.model import FileBlob, Page, Site
+from wtbot.model import FileBlob, Site
 
 
 def test_app_exposes_object_routes(engine):
@@ -23,7 +24,7 @@ def test_pages_route_returns_raw_text_and_content_model(session: Session):
     session.commit()
     session.refresh(site)
 
-    page = Page(
+    page = make_page(
         site_pk=site.pk,
         title="Template:TOC templates/style.css",
         content_model="sanitized-css",
@@ -74,7 +75,7 @@ def test_file_blob_model_available_for_object_routes(session: Session):
     session.add(site)
     session.commit()
     session.refresh(site)
-    page = Page(site_pk=site.pk, title="File:Example.pdf")
+    page = make_page(site_pk=site.pk, title="File:Example.pdf")
     session.add(page)
     session.commit()
     session.refresh(page)

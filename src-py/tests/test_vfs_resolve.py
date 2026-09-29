@@ -1,8 +1,8 @@
 import pytest
-from conftest import add_proofread_meta
+from conftest import add_proofread_meta, make_page
 from sqlmodel import Session
 
-from wtbot.model import Page, Site
+from wtbot.model import Site
 from wtbot.vfs.nodes import (
     FileBlobLeaf,
     FileDir,
@@ -43,21 +43,21 @@ def store(engine):
         s.commit()
         s.refresh(site)
         s.add(
-            Page(
+            make_page(
                 site_pk=site.pk,
                 title=INDEX,
                 content_model="proofread-index",
             )
         )
-        styles = Page(
+        styles = make_page(
             site_pk=site.pk,
             title=f"{INDEX}/styles.css",
             content_model="sanitized-css",
         )
         s.add(styles)
-        file_page = Page(site_pk=site.pk, title=FILE, content_model="wikitext")
+        file_page = make_page(site_pk=site.pk, title=FILE, content_model="wikitext")
         s.add(file_page)
-        page_1 = Page(
+        page_1 = make_page(
             site_pk=site.pk,
             title=PAGE_1,
             content_model="proofread-page",

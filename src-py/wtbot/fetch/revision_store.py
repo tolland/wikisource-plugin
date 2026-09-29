@@ -32,58 +32,46 @@ class RemoteIdentityError(ValueError):
 
 def validate_remote_identity(session: Session, page: Page, remote: RemotePage) -> None:
     """Refuse a remote snapshot that contradicts this Site's cached identity."""
-    if remote.pageid is not None:
-        if page.pageid is not None and page.pageid != remote.pageid:
-            raise RemoteIdentityError(
-                f"site {page.site_pk} title {page.title!r} changed pageid "
-                f"from {page.pageid} to {remote.pageid}; the MediaWiki database "
-                "may have been restored or replaced"
-            )
+    if page.pageid != remote.pageid:
+        raise RemoteIdentityError(
+            f"site {page.site_pk} title {page.title!r} changed pageid "
+            f"from {page.pageid} to {remote.pageid}; the MediaWiki database "
+            "may have been restored or replaced"
+        )
 
-        other_page = session.exec(
-            select(Page).where(
-                Page.site_pk == page.site_pk,
-                Page.pageid == remote.pageid,
-                Page.pk != page.pk,
-            )
-        ).first()
-        if other_page is not None:
-            raise RemoteIdentityError(
-                f"site {page.site_pk} pageid {remote.pageid} is already cached as "
-                f"{other_page.title!r}, not {page.title!r}; the MediaWiki database "
-                "may have been restored or a move needs reconciling"
-            )
+    other_page = session.exec(
+        select(Page).where(
+            Page.site_pk == page.site_pk,
+            Page.pageid == remote.pageid,
+            Page.pk != page.pk,
+        )
+    ).first()
+    if other_page is not None:
+        raise RemoteIdentityError(
+            f"site {page.site_pk} pageid {remote.pageid} is already cached as "
+            f"{other_page.title!r}, not {page.title!r}; the MediaWiki database "
+            "may have been restored or a move needs reconciling"
+        )
 
-    if remote.revid is None:
-        return
-
-    # Cross-page identity requires a complete page snapshot. Production fetches
-    # always carry pageid (see PywikibotClient.get_page/get_history), while
-    # small FakeWikiClient fixtures commonly omit it and use placeholder revids.
-    # Treating those partial snapshots as authoritative site-global identity
-    # records makes unrelated unit tests fail without improving the production
-    # guard. Same-page revision immutability below remains enforceable from a
-    # revid alone.
-    if remote.pageid is not None:
-        other_revision = session.exec(
-            select(Revision)
-            .join(Page, Page.pk == Revision.page_pk)
-            .where(
-                Page.site_pk == page.site_pk,
-                Revision.revid == remote.revid,
-                Revision.page_pk != page.pk,
-            )
-        ).first()
-        if other_revision is not None:
-            other_revision_page = session.get(Page, other_revision.page_pk)
-            other_title = (
-                other_revision_page.title if other_revision_page else "unknown"
-            )
-            raise RemoteIdentityError(
-                f"site {page.site_pk} revid {remote.revid} is already cached for "
-                f"{other_title!r}, not {page.title!r}; the MediaWiki database may "
-                "have been restored or replaced"
-            )
+    # Both ids are always present now (a RemotePage is a held page), so the
+    # cross-page check needs no "is this a complete snapshot" guard.
+    other_revision = session.exec(
+        select(Revision)
+        .join(Page, Page.pk == Revision.page_pk)
+        .where(
+            Page.site_pk == page.site_pk,
+            Revision.revid == remote.revid,
+            Revision.page_pk != page.pk,
+        )
+    ).first()
+    if other_revision is not None:
+        other_revision_page = session.get(Page, other_revision.page_pk)
+        other_title = other_revision_page.title if other_revision_page else "unknown"
+        raise RemoteIdentityError(
+            f"site {page.site_pk} revid {remote.revid} is already cached for "
+            f"{other_title!r}, not {page.title!r}; the MediaWiki database may "
+            "have been restored or replaced"
+        )
 
     existing = session.exec(
         select(Revision).where(
@@ -192,10 +180,9 @@ def record_head_revision(
     because nothing here establishes a contiguous range. A later history walk
     is what fills gaps in and sets that marker.
 
-    Returns None for a page with no remote revision (a placeholder), which must
-    not manufacture a revision row.
+    Returns None only for a page not yet flushed (no pk to hang it on).
     """
-    if remote.revid is None or page.pk is None:
+    if page.pk is None:
         return None
 
     validate_remote_identity(session, page, remote)
@@ -255,8 +242,6 @@ def record_history(
 
     stored: list[Revision] = []
     for remote in remotes:
-        if remote.revid is None:
-            continue
         validate_remote_identity(session, page, remote)
         content = upsert_content(
             session,

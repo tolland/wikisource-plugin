@@ -1,4 +1,5 @@
 import pytest
+from conftest import make_page
 from sqlmodel import Session, select
 
 from wtbot.model import (
@@ -45,8 +46,8 @@ def seeded(engine):
         s.add_all([doomed, survivor, shared, private])
         s.commit()
 
-        doomed_page = Page(site_pk=doomed.pk, title="Page:Book.djvu/1")
-        survivor_page = Page(site_pk=survivor.pk, title="Page:Book.djvu/1")
+        doomed_page = make_page(site_pk=doomed.pk, title="Page:Book.djvu/1")
+        survivor_page = make_page(site_pk=survivor.pk, title="Page:Book.djvu/1")
         s.add_all([doomed_page, survivor_page])
         s.commit()
 

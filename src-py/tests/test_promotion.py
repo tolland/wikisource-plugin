@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 import pytest
-from conftest import add_proofread_meta, drain
+from conftest import add_proofread_meta, drain, fake_pageid, make_page
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -81,7 +81,7 @@ def seed(
             )
             session.commit()
             sites[label] = site
-            index = Page(
+            index = make_page(
                 site_pk=site.pk,
                 title=INDEX,
                 content_model="proofread-index",
@@ -89,7 +89,7 @@ def seed(
             )
             session.add(index)
             session.commit()
-            file_page = Page(site_pk=site.pk, title="File:Varieties.djvu")
+            file_page = make_page(site_pk=site.pk, title="File:Varieties.djvu")
             session.add(file_page)
             session.commit()
             session.refresh(file_page)
@@ -99,7 +99,7 @@ def seed(
 
         def page(label: str, text: str, revid: int, parentid: int | None = None):
             title = "Page:Varieties.djvu/1"
-            row = Page(
+            row = make_page(
                 site_pk=sites[label].pk,
                 title=title,
                 content_model="proofread-page",
@@ -123,6 +123,7 @@ def seed(
                     revid=revid,
                     parentid=parentid,
                     timestamp=WHEN,
+                    pageid=fake_pageid(title),
                 ),
             )
             session.commit()
@@ -192,6 +193,7 @@ def add_source_revision(
                 timestamp=WHEN,
                 user="Editor",
                 comment=comment,
+                pageid=fake_pageid(page.title),
             ),
         )
         session.commit()
@@ -431,6 +433,7 @@ def test_each_source_revision_is_an_ordered_promotion(pushing_client, engine):
                 revid=4243,
                 parentid=4242,
                 timestamp=WHEN,
+                pageid=fake_pageid(target.title),
             ),
         )
         record_history(
@@ -446,6 +449,7 @@ def test_each_source_revision_is_an_ordered_promotion(pushing_client, engine):
                     revid=4242,
                     parentid=254,
                     timestamp=WHEN,
+                    pageid=fake_pageid(target.title),
                 )
             ],
         )
@@ -713,6 +717,7 @@ def test_a_target_that_already_holds_the_body_is_skipped(pushing_client, engine)
                 revid=255,
                 parentid=254,
                 timestamp=WHEN,
+                pageid=fake_pageid(target.title),
             ),
         )
         session.commit()
@@ -970,6 +975,7 @@ def test_next_change_exposes_only_the_oldest_source_revision(engine):
         text=body(3, "Us", "Words."),
         revid=254,
         timestamp=WHEN,
+        pageid=fake_pageid(PAGE_TITLE),
     )
     with TestClient(
         create_app(engine=engine, client_factory=lambda _site: wiki)
@@ -1014,6 +1020,7 @@ def test_granular_update_refuses_a_moved_cached_target_without_writing(engine):
                     revid=255,
                     parentid=254,
                     timestamp=WHEN,
+                    pageid=fake_pageid(PAGE_TITLE),
                 ),
             )
             session.commit()
@@ -1033,8 +1040,8 @@ def test_a_push_writes_to_the_targets_current_name(session):
     target_site = Site(family="down", code="en")
     session.add_all([source_site, target_site])
     session.commit()
-    source = Page(site_pk=source_site.pk, title="Page:Book.djvu/1")
-    target = Page(site_pk=target_site.pk, title="Page:Book.djvu/1")
+    source = make_page(site_pk=source_site.pk, title="Page:Book.djvu/1")
+    target = make_page(site_pk=target_site.pk, title="Page:Book.djvu/1")
     session.add_all([source, target])
     session.commit()
     batch = PromotionBatch(source_page_pk=source.pk, target_title_pk=target.pk)

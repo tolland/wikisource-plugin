@@ -1,5 +1,6 @@
 """Batch boundaries, site isolation, and individual queue outcomes."""
 
+from conftest import FAKE_TIMESTAMP, fake_pageid
 from sqlmodel import select
 
 from wtbot.fetch.fetch_worker import run_pending
@@ -16,6 +17,9 @@ def remote(title, text="body", model="wikitext"):
         namespace_canonical="",
         content_model=model,
         text=text,
+        pageid=fake_pageid(title),
+        revid=fake_pageid(title),
+        timestamp=FAKE_TIMESTAMP,
     )
 
 

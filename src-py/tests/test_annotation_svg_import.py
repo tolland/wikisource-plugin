@@ -1,11 +1,12 @@
 from pathlib import Path
 
 import pytest
+from conftest import make_page
 from sqlmodel import Session
 
 from wtbot.annotation_store import SqlAnnotationStore
 from wtbot.annotation_svg_import import import_svg_annotations, parse_svg_rects
-from wtbot.model import Page, ScanAnnotation, Site
+from wtbot.model import ScanAnnotation, Site
 
 """Tests for the one-shot import of legacy per-page SVG annotation
 documents into the ScanAnnotation table."""
@@ -46,7 +47,7 @@ def _seed_page(engine) -> int:
         site = Site(family="wikisource", code="en")
         s.add(site)
         s.flush()
-        page = Page(
+        page = make_page(
             site_pk=site.pk,
             title="Page:Tractatus.djvu/1",
             content_model="proofread-page",

@@ -2,12 +2,13 @@ from datetime import datetime, timezone
 
 import httpx
 import pytest
+from conftest import make_page
 from sqlmodel import Session
 from typer.testing import CliRunner
 
 from wtbot.api.pages import query_pages
 from wtbot.cli.run_cli import create_app
-from wtbot.model import Content, Page, Revision, Site, Slot
+from wtbot.model import Content, Revision, Site, Slot
 
 runner = CliRunner()
 
@@ -47,14 +48,14 @@ def test_query_api_filters_pages_and_returns_joined_revision_records(
     session.add_all((local, other))
     session.commit()
 
-    wanted = Page(
+    wanted = make_page(
         site_pk=local.pk,
         title="Page:Book.djvu/1",
         pageid=101,
         revid=12,
         content_model="proofread-page",
     )
-    same_title_elsewhere = Page(
+    same_title_elsewhere = make_page(
         site_pk=other.pk,
         title=wanted.title,
         pageid=202,

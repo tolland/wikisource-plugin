@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from conftest import add_proofread_meta
+from conftest import add_proofread_meta, make_page
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -36,13 +36,13 @@ def _add_index_asset_tree(session: Session) -> None:
     session.commit()
     session.refresh(site)
     session.add(
-        Page(
+        make_page(
             site_pk=site.pk,
             title=INDEX,
             content_model="proofread-index",
         )
     )
-    styles = Page(
+    styles = make_page(
         site_pk=site.pk,
         title=INDEX_STYLES,
         content_model="sanitized-css",
@@ -65,7 +65,7 @@ def vfs_client(engine, tmp_path) -> TestClient:
         s.commit()
         s.refresh(site)
 
-        index_page = Page(
+        index_page = make_page(
             site_pk=site.pk,
             title=INDEX,
             content_model="proofread-index",
@@ -75,7 +75,7 @@ def vfs_client(engine, tmp_path) -> TestClient:
         )
         s.add(index_page)
 
-        index_styles = Page(
+        index_styles = make_page(
             site_pk=site.pk,
             title=INDEX_STYLES,
             content_model="sanitized-css",
@@ -84,7 +84,7 @@ def vfs_client(engine, tmp_path) -> TestClient:
             revid=5005,
         )
         s.add(index_styles)
-        file_page = Page(
+        file_page = make_page(
             site_pk=site.pk,
             title=FILE,
             content_model="wikitext",
@@ -105,7 +105,7 @@ def vfs_client(engine, tmp_path) -> TestClient:
         )
         s.add(blob)
 
-        p1 = Page(
+        p1 = make_page(
             site_pk=site.pk,
             title=PAGE_1,
             content_model="proofread-page",
@@ -113,7 +113,7 @@ def vfs_client(engine, tmp_path) -> TestClient:
             pageid=1003,
             revid=5003,
         )
-        p2 = Page(
+        p2 = make_page(
             site_pk=site.pk,
             title=PAGE_2,
             content_model="proofread-page",
@@ -411,7 +411,7 @@ def test_list_index_includes_index_namespace_assets(engine):
             select(Site).where(Site.family == FAMILY, Site.code == CODE)
         ).one()
         s.add(
-            Page(
+            make_page(
                 site_pk=site.pk,
                 title=f"{INDEX}/legacy.css",
                 content_model="sanitized-css",

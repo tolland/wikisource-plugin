@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import base64
 
-from conftest import add_proofread_meta, drain
+from conftest import FAKE_TIMESTAMP, add_proofread_meta, drain, fake_pageid, make_page
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -34,13 +34,13 @@ def _setup(engine):
         # page's index_title link, so the fixture must model the cache state
         # the fetch worker actually produces: index row + linked page.
         s.add(
-            Page(
+            make_page(
                 site_pk=site.pk,
                 title=INDEX_TITLE,
                 content_model="proofread-index",
             )
         )
-        page = Page(
+        page = make_page(
             site_pk=site.pk,
             title=TITLE,
             content_model="proofread-page",
@@ -66,6 +66,8 @@ def test_commit_endpoint_pushes_pending_edits(engine):
                 content_model="proofread-page",
                 text="original",
                 revid=100,
+                pageid=fake_pageid(TITLE),
+                timestamp=FAKE_TIMESTAMP,
             )
         }
     )
@@ -146,6 +148,8 @@ def test_commit_endpoint_can_force_overwrite_conflict(engine):
                 content_model="proofread-page",
                 text="someone else's edit",
                 revid=200,
+                pageid=fake_pageid(TITLE),
+                timestamp=FAKE_TIMESTAMP,
             )
         }
     )
@@ -177,6 +181,8 @@ def test_commit_endpoint_accepts_edit_summary_override(engine):
                 content_model="proofread-page",
                 text="original",
                 revid=100,
+                pageid=fake_pageid(TITLE),
+                timestamp=FAKE_TIMESTAMP,
             )
         }
     )
@@ -259,6 +265,8 @@ def test_bulk_and_single_stat_agree_during_the_push_window(engine):
                 content_model="proofread-page",
                 text="original",
                 revid=100,
+                pageid=fake_pageid(TITLE),
+                timestamp=FAKE_TIMESTAMP,
             )
         }
     )

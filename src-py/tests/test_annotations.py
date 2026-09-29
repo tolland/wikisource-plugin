@@ -1,5 +1,5 @@
 import pytest
-from conftest import add_proofread_meta, index_file_title_pk
+from conftest import add_proofread_meta, index_file_title_pk, make_page
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -7,7 +7,6 @@ from wtbot.annotation_store import SqlAnnotationStore, SqlTextAnchorStore
 from wtbot.main import create_app
 from wtbot.model import (
     AnnotationCategory,
-    Page,
     ScanAnnotation,
     Site,
     TextTargetAnchor,
@@ -31,7 +30,7 @@ def _seed(engine) -> int:
         site = Site(family=FAMILY, code=CODE)
         s.add(site)
         s.flush()
-        index = Page(
+        index = make_page(
             site_pk=site.pk,
             title=INDEX,
             content_model="proofread-index",
@@ -47,7 +46,7 @@ def _seed(engine) -> int:
                 page_count=1,
             )
         )
-        page = Page(
+        page = make_page(
             site_pk=site.pk,
             title=PAGE_TITLE,
             content_model="proofread-page",

@@ -1,5 +1,5 @@
 import pytest
-from conftest import credential_for, drain
+from conftest import FAKE_TIMESTAMP, credential_for, drain, fake_pageid
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -37,6 +37,8 @@ def _page(
         content_model=model,
         text=f"body of {title}",
         revid=revid,
+        pageid=fake_pageid(title),
+        timestamp=FAKE_TIMESTAMP,
     )
 
 
@@ -50,6 +52,8 @@ def _index_remote(page_count: int) -> RemotePage:
         text=f"{{{{:MediaWiki:Proofreadpage_index_template}}}}{pagelist}",
         revid=1,
         page_count=page_count,
+        pageid=fake_pageid(_INDEX),
+        timestamp=FAKE_TIMESTAMP,
     )
 
 

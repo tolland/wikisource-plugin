@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from conftest import FAKE_TIMESTAMP
 from sqlalchemy.engine import Engine
 from sqlmodel import Session, select
 
@@ -47,6 +48,7 @@ def _file_on_commons() -> RemotePage:
         text="== Summary ==",
         pageid=46260330,
         revid=900,
+        timestamp=FAKE_TIMESTAMP,
     )
 
 
