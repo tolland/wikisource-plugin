@@ -20,8 +20,9 @@ from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.api.errors import ApiError
 from wtbot.api.targets import resolve_target
 from wtbot.deps import get_session
-from wtbot.model import Title
+from wtbot.model import Site, Title
 from wtbot.model.wikisource.proofread_page_meta import ProofreadPageMeta
+from wtbot.page_processors import store_page_images
 from wtbot.settings import WikiSettings
 from wtbot.vfs.store import PageStore
 
@@ -171,6 +172,77 @@ def _fill_cache(cache: Path, url: str) -> None:
     _validators_path(cache).write_text(json.dumps(asdict(fetched.validators)))
 
 
+def _is_gone(exc: Exception) -> bool:
+    """The wiki no longer has the URL we stored -- as opposed to being down."""
+    return (
+        isinstance(exc, requests.HTTPError)
+        and exc.response is not None
+        and exc.response.status_code in (404, 410)
+    )
+
+
+def _refresh_scan_url(
+    request: Request, session: Session, page: Title, width: int | None
+) -> str | None:
+    """Re-ask the wiki for [page]'s scan URLs and store them.
+
+    Replacing a scan's backing PDF changes the renditions that exist (the
+    stored URL carries a width token, e.g. ``page18-1683px``), so URLs cached
+    at fetch time can 404 while the page itself is unchanged. Nothing else
+    refreshes them for placeholder pages, which fetch never revisits."""
+    assert page.pk is not None
+    try:
+        site = session.get(Site, page.site_pk)
+        images = request.app.state.client_factory(site).get_page_images(page.title)
+    except Exception as exc:  # noqa: BLE001 - the original failure is the story
+        logger.warning("scan URL refresh failed for %s: %s", page.title, exc)
+        return None
+    if images is None:
+        return None
+    store_page_images(session, page.pk, images)
+    return _rendition_url(PageStore(session).proofread_page_meta(page.pk), width)
+
+
+def _ensure_cached(
+    request: Request, session: Session, page: Title, width: int | None, url: str
+) -> Path:
+    """Path of current cached bytes for [page]'s rendition.
+
+    Revalidates the cache; on a 404/410 refreshes the stored URL from the wiki
+    and retries once; if the wiki cannot help but bytes are held, serves them
+    (stale beats a broken pane)."""
+    assert page.pk is not None
+    blob_root = Path(request.app.state.blob_root)
+    cache = _cache_path(blob_root, page.pk, width, url)
+    try:
+        _fill_cache(cache, url)
+        return cache
+    except Exception as exc:  # noqa: BLE001 - classified below
+        failure = exc
+
+    if _is_gone(failure):
+        fresh = _refresh_scan_url(request, session, page, width)
+        if fresh is not None and fresh != url:
+            logger.info("scan URL for %s moved: %s -> %s", page.title, url, fresh)
+            cache = _cache_path(blob_root, page.pk, width, fresh)
+            # Validators describe the old URL's resource, not this one.
+            _validators_path(cache).unlink(missing_ok=True)
+            try:
+                _fill_cache(cache, fresh)
+                return cache
+            except Exception as exc:  # noqa: BLE001 - falls through
+                failure = exc
+
+    if cache.exists():
+        logger.warning("scan revalidation failed, serving cached %s: %s", url, failure)
+        return cache
+    raise ApiError(
+        status_code=502,
+        detail=f"scan image fetch failed: {failure}",
+        code="scan-image-fetch-failed",
+    ) from failure
+
+
 def serve_reference_image(
     request: Request,
     background: BackgroundTasks,
@@ -190,19 +262,7 @@ def serve_reference_image(
         return None
 
     blob_root = Path(request.app.state.blob_root)
-    cache = _cache_path(blob_root, page.pk, width, url)
-    had_cache = cache.exists()
-    try:
-        _fill_cache(cache, url)
-    except Exception as exc:  # noqa: BLE001 - surface as bad gateway
-        if not had_cache:
-            raise ApiError(
-                status_code=502,
-                detail=f"scan image fetch failed: {exc}",
-                code="scan-image-fetch-failed",
-            ) from exc
-        # Revalidation failed but we hold bytes: stale beats a broken pane.
-        logger.warning("scan revalidation failed, serving cached %s: %s", url, exc)
+    cache = _ensure_cached(request, session, page, width, url)
 
     background.add_task(
         _warm_next_page,
