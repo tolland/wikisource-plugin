@@ -11,6 +11,7 @@ from wtbot.model import (
     Title,
 )
 from wtbot.model.wikisource.proofread_page_meta import SHORT_NAME_RE
+from wtbot.shared_repository import local_file_title_pk
 from wtbot.vfs.nodes import (
     FileBlobLeaf,
     FileDir,
@@ -167,7 +168,10 @@ def put_index_meta(
         )
     if meta is None:
         meta = IndexMeta(
-            title_pk=page.pk, site_pk=page.site_pk, short_name=update.short_name
+            title_pk=page.pk,
+            site_pk=page.site_pk,
+            short_name=update.short_name,
+            file_title_pk=local_file_title_pk(session, page),
         )
     else:
         meta.short_name = update.short_name

@@ -78,7 +78,7 @@ def test_a_diverged_pair_can_still_be_paired(session: Session) -> None:
     local_page = build_page(session, local, 1, body="Ours.", revid=5)
     remote_page = build_page(session, remote, 1, body="Theirs.", revid=900)
 
-    link = pair_pages(session, local_page, remote_page)
+    link = pair_pages(session, local_page.address, remote_page.address)
     session.commit()
 
     assert link.pk is not None
@@ -93,7 +93,7 @@ def test_an_unfetched_side_can_still_be_paired(session: Session) -> None:
     local_page = build_page(session, local, 1, body="Ours.", revid=5)
     remote_page = build_page(session, remote, 1, body=None, revid=0)
 
-    assert pair_pages(session, local_page, remote_page).pk is not None
+    assert pair_pages(session, local_page.address, remote_page.address).pk is not None
 
 
 def test_pairing_is_idempotent_and_keeps_its_orientation(session: Session) -> None:
@@ -105,9 +105,13 @@ def test_pairing_is_idempotent_and_keeps_its_orientation(session: Session) -> No
     local_page = build_page(session, local, 1, body="Same.", revid=5)
     remote_page = build_page(session, remote, 1, body="Same.", revid=900)
 
-    first = pair_pages(session, local_page, remote_page, origin=LinkOrigin.copy)
+    first = pair_pages(
+        session, local_page.address, remote_page.address, origin=LinkOrigin.copy
+    )
     session.commit()
-    again = pair_pages(session, remote_page, local_page, origin=LinkOrigin.manual)
+    again = pair_pages(
+        session, remote_page.address, local_page.address, origin=LinkOrigin.manual
+    )
     session.commit()
 
     assert again.pk == first.pk
@@ -122,7 +126,7 @@ def test_two_pages_of_one_site_cannot_be_paired(session: Session) -> None:
     second = build_page(session, local, 2, body="B.", revid=2)
 
     with pytest.raises(LinkError, match="across sites"):
-        pair_pages(session, first, second)
+        pair_pages(session, first.address, second.address)
 
 
 def test_a_revision_link_materialises_its_pairing(session: Session) -> None:
@@ -173,7 +177,7 @@ def test_a_pairing_survives_a_rename(session: Session) -> None:
     )
     local_page = build_page(session, local, 1, body="Same.", revid=5)
     remote_page = build_page(session, remote, 1, body="Same.", revid=900)
-    pairing = pair_pages(session, local_page, remote_page)
+    pairing = pair_pages(session, local_page.address, remote_page.address)
     session.commit()
 
     remote_page.title = "Page:Renamed upstream.djvu/1"

@@ -1,5 +1,5 @@
 import pytest
-from conftest import add_proofread_meta
+from conftest import add_proofread_meta, index_file_title_pk
 from sqlmodel import Session
 
 from wtbot.model import Page, Site
@@ -34,6 +34,7 @@ def _seed(engine, page_numbers: list[int]) -> None:
         s.add(
             IndexMeta(
                 title_pk=index.pk,
+                file_title_pk=index_file_title_pk(s, index),
                 site_pk=site.pk,
                 short_name="Tractatus",
                 page_count=len(page_numbers),

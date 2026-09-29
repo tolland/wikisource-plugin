@@ -106,7 +106,7 @@ def seed_diverged_pair(engine) -> int:
 
         from wtbot.linking.page_link_store import pair_pages
 
-        pairing = pair_pages(session, local_page, remote_page_row)
+        pairing = pair_pages(session, local_page.address, remote_page_row.address)
         session.commit()
         return pairing.pk
 
@@ -254,7 +254,7 @@ def test_matches_are_ordered_by_how_little_would_replay(client, engine) -> None:
         )
         from wtbot.linking.page_link_store import pair_pages
 
-        pair_pk = pair_pages(session, local_page, remote_page_row).pk
+        pair_pk = pair_pages(session, local_page.address, remote_page_row.address).pk
         session.commit()
 
     matches = client.get(f"/links/pairs/{pair_pk}/revisions").json()["matches"]
@@ -281,7 +281,7 @@ def test_incomplete_history_is_reported_rather_than_implied(client, engine) -> N
         )
         from wtbot.linking.page_link_store import pair_pages
 
-        pair_pk = pair_pages(session, local_page, remote_page_row).pk
+        pair_pk = pair_pages(session, local_page.address, remote_page_row.address).pk
         session.commit()
 
     data = client.get(f"/links/pairs/{pair_pk}/revisions").json()

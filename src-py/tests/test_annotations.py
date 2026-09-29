@@ -1,5 +1,5 @@
 import pytest
-from conftest import add_proofread_meta
+from conftest import add_proofread_meta, index_file_title_pk
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -41,6 +41,7 @@ def _seed(engine) -> int:
         s.add(
             IndexMeta(
                 title_pk=index.pk,
+                file_title_pk=index_file_title_pk(s, index),
                 site_pk=site.pk,
                 short_name="Tractatus",
                 page_count=1,

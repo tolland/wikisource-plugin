@@ -32,6 +32,8 @@ def test_startup_initializes_only_the_supplied_engine(
     monkeypatch.setenv("WTBOT_DATABASE_URL", f"sqlite:///{default_path}")
     initialized: list[Engine] = []
     monkeypatch.setattr(main, "init_db", initialized.append)
+    # Registers Commons after the migrations; nothing to register into here.
+    monkeypatch.setattr(main, "ensure_shared_repository_site", lambda engine: None)
     engine = create_db_engine(f"sqlite:///{tmp_path / 'test.db'}")
     try:
         app = main.create_app(engine=engine)

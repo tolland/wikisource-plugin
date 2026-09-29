@@ -113,7 +113,7 @@ def test_the_plan_names_every_table_and_deletes_nothing(client, engine, seeded):
     }
 
     # ...and asking was not acting.
-    assert len(_rows(engine, Site)) == 2
+    assert len(_rows(engine, Site)) == 3  # the two, and the shared repository
     assert len(_rows(engine, Page)) == 2
     assert len(_rows(engine, Content)) == 2
     assert len(_rows(engine, FetchRequest)) == 2
@@ -129,7 +129,7 @@ def test_delete_removes_the_site_and_only_the_site(client, engine, seeded):
     assert counted["site"] == 1
     assert counted["fetchrequest"] == 2
 
-    assert [site.label for site in _rows(engine, Site)] == ["survivor"]
+    assert [site.label for site in _rows(engine, Site)] == ["commons", "survivor"]
     survivor_pk = seeded["survivor_pk"]
     assert [p.site_pk for p in _rows(engine, Page)] == [survivor_pk]
     assert len(_rows(engine, Revision)) == 1

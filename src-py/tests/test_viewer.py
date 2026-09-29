@@ -1,4 +1,5 @@
 import pytest
+from conftest import index_file_title_pk
 from fastapi import HTTPException
 from sqlmodel import Session, select
 
@@ -35,6 +36,7 @@ def _add_page(
         session.add(
             IndexMeta(
                 title_pk=page.pk,
+                file_title_pk=index_file_title_pk(session, page),
                 site_pk=site.pk,
                 short_name=title,
                 page_count=12,

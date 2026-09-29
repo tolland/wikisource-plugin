@@ -6,6 +6,21 @@ class PageNotFound(Exception):
     """Raised by a WikiClient when a title does not exist on the wiki."""
 
 
+class FileIsShared(Exception):
+    """Raised by a WikiClient for a ``File:`` this wiki does not hold but its
+    shared repository does (Commons, for a Wikimedia wiki).
+
+    MediaWiki reports such a title as ``missing`` and ``known``, with
+    ``imagerepository: shared``: the local page table has no row, and the
+    description is rendered from the foreign repository at request time. The
+    page -- with real ids -- exists only there, so it is fetched there.
+    """
+
+    def __init__(self, title: str) -> None:
+        super().__init__(title)
+        self.title = title
+
+
 class EditConflict(Exception):
     """Raised by WikiClient.save_page when the page changed remotely since
     base_revid -- the edit was not applied."""

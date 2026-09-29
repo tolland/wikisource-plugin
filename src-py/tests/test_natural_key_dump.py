@@ -76,8 +76,21 @@ def make_database(path: Path, offset: int = 0) -> None:
         )
         session.add(IndexLink(pk=offset + 7))  # a work shares its pairing's key
         session.add(
+            Title(
+                pk=offset + 10,
+                site_pk=offset + 1,
+                title="File:Book",
+                expected_content_model="wikitext",
+            )
+        )
+        session.flush()
+        session.add(
             IndexMeta(
-                title_pk=offset + 3, site_pk=offset + 1, short_name="Book", page_count=9
+                title_pk=offset + 3,
+                site_pk=offset + 1,
+                file_title_pk=offset + 10,
+                short_name="Book",
+                page_count=9,
             )
         )
         # The address's own state, set so a restore has something to carry.

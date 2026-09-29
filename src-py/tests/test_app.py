@@ -22,6 +22,7 @@ def test_create_and_list_site(client):
     assert created["family"] == "mywikisource"
 
     listed = client.get("/sites/").json()
+    listed = [site for site in listed if site["family"] != "commons"]
     assert len(listed) == 1
     assert listed[0]["code"] == "en"
 

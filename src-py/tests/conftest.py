@@ -489,3 +489,15 @@ def _wait_for_mediawiki(api_url: str, timeout_seconds: int = 180) -> None:
         time.sleep(3)
 
     raise TimeoutError(f"MediaWiki API did not become ready at {api_url}: {last_error}")
+
+
+def index_file_title_pk(session: Session, index) -> int:
+    """The ``File:`` title an index fixture names: on its own site, as the
+    fetch assumes until it finds the file shared. [index] is its Page or
+    Title; flushed, so it has a pk."""
+    from wtbot.shared_repository import local_file_title_pk
+
+    session.flush()
+    title = session.get(Title, index.pk)
+    assert title is not None
+    return local_file_title_pk(session, title)

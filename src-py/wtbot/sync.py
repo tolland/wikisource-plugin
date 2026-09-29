@@ -12,7 +12,17 @@ from wtbot.matching import (
     compare_pages,
     index_children,
 )
-from wtbot.model import FetchState, FileBlob, Page, PageLink, Revision, Site, Title
+from wtbot.model import (
+    FetchState,
+    FileBlob,
+    IndexMeta,
+    Page,
+    PageLink,
+    Revision,
+    Site,
+    Title,
+)
+from wtbot.shared_repository import index_file_title_name
 from wtbot.title_store import Entry, entry_at
 from wtbot.vfs.store import canonical_title
 
@@ -388,25 +398,16 @@ def _asset_reports(
 ) -> list[SyncAsset]:
     """The ``Index:`` and the ``File:``, as things a sync has to account for.
 
-    The file title is derived from the index title -- ``Index:Foo.pdf`` is
-    backed by ``File:Foo.pdf``, which is ProofreadPage's own structural rule,
-    not a template field to parse. It is also how the fetch fan-out finds it,
-    so the two agree by construction.
+    Each side's file is the one its ``IndexMeta`` names -- on its own site
+    for a local upload, on the shared repository's for a Commons scan. A
+    target index we do not hold yet names none, and the title is then
+    ProofreadPage's own rule: ``Index:Foo.pdf`` is backed by ``File:Foo.pdf``.
     """
     source_file_title, source_blob = _file_of(session, source_index)
-    target_file_title = f"File:{target_index_title.partition(':')[2]}"
-    target_file_page = session.exec(
-        select(Page).where(
-            Page.site_pk == target_site.pk, Page.title == target_file_title
-        )
-    ).first()
-    target_blob = (
-        session.exec(
-            select(FileBlob).where(FileBlob.page_pk == target_file_page.pk)
-        ).first()
-        if target_file_page is not None
-        else None
-    )
+    if target_index is not None:
+        target_file_title, target_blob = _file_of(session, target_index)
+    else:
+        target_file_title, target_blob = index_file_title_name(target_index_title), None
 
     index_asset = SyncAsset(
         kind="index",
@@ -453,7 +454,7 @@ def _asset_reports(
         index_asset,
         SyncAsset(
             kind="file",
-            source_title=source_file_title or "",
+            source_title=source_file_title,
             target_title=target_file_title,
             source_cached=source_blob is not None,
             target_cached=target_blob is not None,
@@ -746,6 +747,7 @@ def build_page_report(
     """
     target_title = target_title or source_title
 
+    assert source_site.pk is not None and target_site.pk is not None
     source = entry_at(session, site_pk=source_site.pk, title=source_title)
     if source is None:
         raise SyncError(
@@ -838,23 +840,22 @@ def _scan_check(
     )
 
 
-def _file_of(session: Session, index_page: Title) -> tuple[str | None, FileBlob | None]:
+def _file_of(session: Session, index: Title) -> tuple[str, FileBlob | None]:
     """The ``File:`` backing an ``Index:``, and its downloaded blob record.
 
-    By title -- ``Index:Foo.djvu`` -> ``File:Foo.djvu`` -- which is how the
-    fetch fan-out finds it too. The scan may live on the site itself or, for a
-    Wikimedia wiki, on Commons; both end up as a ``File:`` row on the site that
-    fetched it.
+    The one its ``IndexMeta`` names, which may be on another site: a Commons
+    scan is Commons's page, not the index's wiki's. Two indexes backed by the
+    same Commons upload therefore name the same file and the same blob. An
+    index with no metadata yet falls back to ProofreadPage's naming rule.
     """
-    _, _, basename = index_page.title.partition(":")
-    file_title = f"File:{basename}"
-    page = session.exec(
-        select(Page).where(Page.site_pk == index_page.site_pk, Page.title == file_title)
+    meta = session.get(IndexMeta, index.pk)
+    file_title = session.get(Title, meta.file_title_pk) if meta is not None else None
+    if file_title is None:
+        return index_file_title_name(index.title), None
+    blob = session.exec(
+        select(FileBlob).where(FileBlob.page_pk == file_title.pk)
     ).first()
-    if page is None:
-        return file_title, None
-    blob = session.exec(select(FileBlob).where(FileBlob.page_pk == page.pk)).first()
-    return file_title, blob
+    return file_title.title, blob
 
 
 def _site_name(site: Site) -> str:

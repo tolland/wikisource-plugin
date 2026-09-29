@@ -90,9 +90,31 @@ change of constraint, never of data.
      Content models are read off `Title.expected_content_model`, which the
      fetch keeps equal to the wiki's. `SyncVerdict` is unchanged: the §5/§6
      reshape of sync is its own step.
-   - **Open, blocks 3b:** how a shared-repository `File:` is modelled. It is
-     the one held page with no local `pageid`/`revid`/timestamp, so those
-     columns cannot be NOT NULL while it is a `Page` row as it stands.
+   - **Done** (`d2f5b9c3e810`): a scan served from the shared repository is
+     Commons's page, fetched on Commons. MediaWiki itself stores nothing for
+     it locally -- the title is `missing` and `known`,
+     `imagerepository: shared`, resolved through `$wgForeignFileRepos` at
+     request time -- so borrowing its description under a local title with
+     no ids was the anomaly. Commons is an ordinary registered site, created
+     at startup (after the migrations) without a credential; the operator
+     attaches one as for any site, which also authenticates the requests
+     that used to go to Commons anonymously. The client reports such a
+     title as `FileIsShared` (on the local wiki's own `imagerepository`
+     answer); the worker marks the local title fetched, repoints the
+     indexes that named it, and queues the fetch on Commons.
+     `IndexMeta.file_title_pk` (NOT NULL) names each index's scan wherever
+     it lives: required because an index names its file before either is
+     fetched, and following that title is how the file gets fetched or
+     created. A later local upload shadows the shared file, as MediaWiki's
+     local-first lookup does, and the fetch moves the reference back. The
+     migration dropped the borrowed rows and their blobs (refetch to fetch
+     them on Commons; the bytes stay on disk).
+   - **Next design, not scheduled:** a `File:` has two revision streams --
+     description revisions (`revision`) and file versions (MediaWiki's
+     `oldimage`, becoming `filerevision`), linked only by timestamp. For
+     editing scans: `FileRevision` mirroring the imageinfo history, blobs
+     keyed by sha1 (dedup, and the refetch after this migration reuses the
+     bytes on disk), and an upload journal as the `EditJournal` analogue.
    - **Next:** step 3b -- the head columns NOT NULL; then 3c -- `page.title`
      and the `before_flush` hook go.
 

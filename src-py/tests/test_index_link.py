@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from conftest import add_proofread_meta
+from conftest import add_proofread_meta, index_file_title_pk
 from sqlmodel import Session, select
 
 from wtbot.fetch.revision_store import record_head_revision
@@ -72,6 +72,7 @@ def build_index(session: Session, site: Site, title: str) -> Page:
     session.add(
         IndexMeta(
             title_pk=page.pk,
+            file_title_pk=index_file_title_pk(session, page),
             site_pk=site.pk,
             short_name=f"index-{page.pk}",
         )
@@ -188,7 +189,7 @@ def test_a_work_is_a_pairing_of_two_index_pages(session: Session) -> None:
     local_index = build_index(session, local, INDEX)
     remote_index = build_index(session, remote, REMOTE_INDEX)
 
-    work = link_indexes(session, local_index, remote_index)
+    work = link_indexes(session, local_index.address, remote_index.address)
     session.commit()
 
     pairing = session.get(PageLink, work.pk)  # a work shares its pairing's key
@@ -205,10 +206,10 @@ def test_linking_a_work_twice_returns_the_same_work(session: Session) -> None:
     local_index = build_index(session, local, INDEX)
     remote_index = build_index(session, remote, REMOTE_INDEX)
 
-    first = link_indexes(session, local_index, remote_index)
+    first = link_indexes(session, local_index.address, remote_index.address)
     # Reversed, because the pair is unordered and a second identity for one
     # work would double every count the viewer renders.
-    second = link_indexes(session, remote_index, local_index)
+    second = link_indexes(session, remote_index.address, local_index.address)
     session.commit()
 
     assert first.pk == second.pk
@@ -229,10 +230,10 @@ def test_a_work_includes_page_pairs_made_before_it(session: Session) -> None:
 
     from wtbot.linking.page_link_store import pair_pages
 
-    pairing = pair_pages(session, local_page, remote_page)
+    pairing = pair_pages(session, local_page.address, remote_page.address)
     session.commit()
 
-    work = link_indexes(session, local_index, remote_index)
+    work = link_indexes(session, local_index.address, remote_index.address)
     session.commit()
     assert [pair.pk for pair in children_of(session, work)] == [pairing.pk]
 
@@ -254,7 +255,7 @@ def test_only_pages_with_index_meta_can_be_a_work(session: Session) -> None:
     from wtbot.linking.remote_link_store import LinkError
 
     try:
-        link_indexes(session, local_page, remote_index)
+        link_indexes(session, local_page.address, remote_index.address)
     except LinkError as exc:
         assert "has no IndexMeta row" in str(exc)
     else:  # pragma: no cover - the assertion is the test
@@ -520,7 +521,7 @@ def test_a_page_pair_knows_its_work(session: Session) -> None:
     )
     local_index = build_index(session, local, INDEX)
     remote_index = build_index(session, remote, REMOTE_INDEX)
-    work = link_indexes(session, local_index, remote_index)
+    work = link_indexes(session, local_index.address, remote_index.address)
     session.commit()
 
     assert work_for_index_page(session, local_index.pk).pk == work.pk
@@ -612,8 +613,8 @@ def test_a_pair_belongs_even_when_the_other_page_has_no_meta(session: Session) -
 
     from wtbot.linking.page_link_store import pair_pages
 
-    pairing = pair_pages(session, local_page, bare)
-    work = link_indexes(session, local_index, remote_index)
+    pairing = pair_pages(session, local_page.address, bare.address)
+    work = link_indexes(session, local_index.address, remote_index.address)
     session.commit()
 
     assert [pair.pk for pair in children_of(session, work)] == [pairing.pk]
@@ -634,10 +635,10 @@ def test_one_index_tracked_against_two_wikis_is_two_works(session: Session) -> N
 
     from wtbot.linking.page_link_store import pair_pages
 
-    to_upstream = pair_pages(session, local_page, upstream_page)
-    to_mirror = pair_pages(session, local_page, mirror_page)
-    upstream_work = link_indexes(session, local_index, upstream_index)
-    mirror_work = link_indexes(session, local_index, mirror_index)
+    to_upstream = pair_pages(session, local_page.address, upstream_page.address)
+    to_mirror = pair_pages(session, local_page.address, mirror_page.address)
+    upstream_work = link_indexes(session, local_index.address, upstream_index.address)
+    mirror_work = link_indexes(session, local_index.address, mirror_index.address)
     session.commit()
 
     assert [p.pk for p in children_of(session, upstream_work)] == [to_upstream.pk]

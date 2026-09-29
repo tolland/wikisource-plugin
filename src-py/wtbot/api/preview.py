@@ -9,6 +9,7 @@ from wtbot.api.errors import ApiError
 from wtbot.api.targets import client_for, resolve_target
 from wtbot.deps import get_session
 from wtbot.model import Site
+from wtbot.shared_repository import is_shared_repository
 
 """Live-preview endpoint — renders an unsaved wikitext body to HTML.
 
@@ -60,7 +61,16 @@ def render_preview(
                 code="missing-target",
             )
         title = body.title
-        site = session.exec(select(Site)).first()
+        # The first site the operator registered -- not the shared
+        # repository, which startup registers on its own.
+        site = next(
+            (
+                row
+                for row in session.exec(select(Site))
+                if not is_shared_repository(row)
+            ),
+            None,
+        )
         if site is None:
             raise ApiError(
                 status_code=404, detail="no site configured", code="no-site-configured"

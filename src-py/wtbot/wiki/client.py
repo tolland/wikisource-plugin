@@ -11,6 +11,7 @@ from wtbot.settings import WikiSettings
 from wtbot.wiki.failures import FailureKind, classify, is_login_session_timeout
 from wtbot.wiki.wiki_types import (
     EditConflict,
+    FileIsShared,
     IndexPageEntry,
     PageFetchResult,
     PageNotFound,
@@ -446,22 +447,11 @@ class PywikibotClient:
                 raise self._pwb.exceptions.NoPageError(page)
             rev = page.latest_revision
         except self._pwb.exceptions.NoPageError as exc:
-            if page.namespace().id != 6:
-                raise PageNotFound(title) from exc
-            shared_page = self._resolve_file_page(page.title())
-            try:
-                shared_rev = shared_page.latest_revision
-            except self._pwb.exceptions.NoPageError as shared_exc:
-                raise PageNotFound(title) from shared_exc
-            # This is a shared description, not a revision in this wiki's
-            # database. Never store Commons page/revision ids as local ids.
-            return RemotePage(
-                title=page.title(),
-                namespace_key=6,
-                namespace_canonical="File",
-                content_model=shared_page.content_model,
-                text=shared_rev.text or "",
-            )
+            if page.namespace().id == 6 and self._file_is_shared(page.title()):
+                # The page lives in the shared repository, with its own ids;
+                # the caller fetches it there rather than borrowing its text.
+                raise FileIsShared(page.title()) from exc
+            raise PageNotFound(title) from exc
         except self._pwb.exceptions.InvalidPageError as exc:
             raise PageNotFound(title) from exc
         ns = page.namespace()
@@ -511,19 +501,25 @@ class PywikibotClient:
             )
         ]
 
+    def _file_is_shared(self, title: str) -> bool:
+        """Whether this wiki serves [title] from its shared repository: the
+        local wiki's own answer (``imagerepository``), one request to it."""
+        data = self._api_query(
+            action="query", prop="imageinfo", titles=title, iiprop="timestamp"
+        )
+        pages = ((data or {}).get("query") or {}).get("pages") or {}
+        return any(pdata.get("imagerepository") == "shared" for pdata in pages.values())
+
     @my_vcr.use_cassette()
     def _resolve_file_page(self, title: str):
-        """Resolve a File: title to a FilePage, following the shared repo (e.g.
-        Commons) when the file isn't uploaded locally — the common case for
-        Wikisource works whose scans live on Wikimedia Commons."""
+        """This wiki's own FilePage for [title]. A file served from the shared
+        repository is not this wiki's: it is fetched on the repository's own
+        registered site."""
         filepage = self._pwb.FilePage(self.site, title)
         if filepage.exists():
             return filepage
-        shared = self.site.image_repository()
-        if shared is not None:
-            shared_filepage = self._pwb.FilePage(shared, title)
-            if shared_filepage.exists():
-                return shared_filepage
+        if self._file_is_shared(title):
+            raise FileIsShared(title)
         raise PageNotFound(title)
 
     def get_file_info(self, title: str) -> RemoteFileInfo:
@@ -762,10 +758,8 @@ class PywikibotClient:
     def get_history(self, title: str, *, limit: int) -> list[RemotePage]:
         page = self._pwb.Page(self.site, title)
         if not page.exists():
-            if page.namespace().id == 6:
-                self._resolve_file_page(page.title())
-                # Shared files have no description revisions on this wiki.
-                return []
+            if page.namespace().id == 6 and self._file_is_shared(page.title()):
+                raise FileIsShared(page.title())
             raise PageNotFound(title)
 
         out: list[RemotePage] = []
@@ -913,8 +907,11 @@ class FakeWikiClient:
         changes: list[RemoteChange] | None = None,
         oldest_change: datetime | None = None,
         history: dict[str, list[RemotePage]] | None = None,
+        shared_files: set[str] | None = None,
     ):
         self._pages = dict(pages or {})
+        #: File: titles this fake wiki serves from its shared repository.
+        self._shared_files = set(shared_files or ())
         self._files = dict(files or {})
         self._page_images = dict(page_images or {})
         self._index_pages = dict(index_pages or {})
@@ -943,6 +940,8 @@ class FakeWikiClient:
         try:
             return self._pages[title]
         except KeyError:
+            if title in self._shared_files:
+                raise FileIsShared(title) from None
             raise PageNotFound(title) from None
 
     def list_index_subpage_titles(self, title: str) -> list[str]:

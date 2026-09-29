@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from conftest import add_proofread_meta
+from conftest import add_proofread_meta, index_file_title_pk
 from sqlmodel import Session, select
 
 from wtbot.fetch.revision_store import record_head_revision
@@ -78,6 +78,7 @@ def build_index(session: Session, site: Site, title: str, *, sha1: str | None) -
     session.add(
         IndexMeta(
             title_pk=page.pk,
+            file_title_pk=index_file_title_pk(session, page),
             site_pk=site.pk,
             short_name=f"index-{page.pk}",
         )

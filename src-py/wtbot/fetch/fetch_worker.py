@@ -16,6 +16,7 @@ from wtbot.fetch.utils import _claim_batch, _maybe_sync_namespaces
 from wtbot.log.failure_log import FailureContext, record_failure, site_label
 from wtbot.log.fetch_log import activity, fetch_context, fetch_stage
 from wtbot.model import (
+    FetchKind,
     FetchRequest,
     FetchState,
     FetchStatus,
@@ -23,6 +24,7 @@ from wtbot.model import (
     Site,
     Title,
 )
+from wtbot.model.wiki.namespace import FILE_NAMESPACE_KEY
 from wtbot.model.wikisource.proofread_page_meta import ProofreadPageMeta
 from wtbot.page_processors import (
     CachedPage,
@@ -34,11 +36,22 @@ from wtbot.page_processors import (
     proofread_index_identity,
 )
 from wtbot.promotion.promotion_store import materialize_promotion_links
+from wtbot.shared_repository import (
+    FILE_CONTENT_MODEL,
+    move_to_local,
+    move_to_shared_repository,
+    shared_repository_site,
+)
 from wtbot.timeutil import utcnow
 from wtbot.title_store import ensure_title, record_fetched_content_model
 from wtbot.wiki.client import WikiClient
 from wtbot.wiki.failures import FailureKind, WikiFailure
-from wtbot.wiki.wiki_types import PageNotFound, RemotePage, RemotePageImages
+from wtbot.wiki.wiki_types import (
+    FileIsShared,
+    PageNotFound,
+    RemotePage,
+    RemotePageImages,
+)
 
 """Fetch worker: drains the FetchRequest queue, calls the wiki, writes results
 back into the cache.
@@ -213,6 +226,10 @@ def _process(
         status = outcome.status
         progress_total = outcome.progress_total
         progress_done = outcome.progress_done
+    except FileIsShared as shared:
+        status, error_message = _fetch_from_shared_repository(
+            session, req, site, shared.title
+        )
     except PageNotFound:
         error_message = f"page not found: {req.title}"
     except Exception as exc:  # noqa: BLE001 - record any failure on the row
@@ -325,6 +342,42 @@ def _load_site_snapshot(session: Session, site_pk: int) -> Site:
         return detached_site(site)
 
 
+def _fetch_from_shared_repository(
+    session: Session, req: ClaimedFetchRequest, site: Site, title: str
+) -> tuple[FetchStatus, str | None]:
+    """[title] is a File: this site serves from its shared repository. Record
+    that, repoint the indexes that named the local title, and queue the fetch
+    of the real page on the repository's site. This request is then done: it
+    found out where the page is."""
+    with write_batch(session):
+        repository = shared_repository_site(session)
+        if repository is None or repository.pk is None:
+            return (
+                FetchStatus.error,
+                f"{title} is served from the shared repository, which is not "
+                "registered as a site",
+            )
+        assert site.pk is not None
+        local = ensure_title(
+            session,
+            site_pk=site.pk,
+            title=title,
+            expected_content_model=FILE_CONTENT_MODEL,
+        )
+        move_to_shared_repository(session, local, repository)
+        session.add(
+            FetchRequest(
+                site_pk=repository.pk,
+                title=title,
+                kind=FetchKind.single,
+                depth=0,
+                revisions=req.revisions,
+            )
+        )
+    activity("file served from shared repository; queued on site=%s", repository.pk)
+    return FetchStatus.done, None
+
+
 def _record_fetch_result(
     session: Session,
     req: ClaimedFetchRequest,
@@ -422,6 +475,10 @@ def _upsert_page(
         title_row.dirty = False
         title_row.fetch_status = FetchState.done
         session.add(title_row)
+        if remote.namespace_key == FILE_NAMESPACE_KEY:
+            # Held by this site: it shadows a same-named shared file for the
+            # site's own indexes, as MediaWiki's local-first lookup does.
+            move_to_local(session, title_row)
 
         session.add(page)
         session.flush()
