@@ -166,3 +166,64 @@ def test_a_failed_revalidation_serves_the_cached_scan(
 
     assert resp.status_code == 200
     assert resp.content == b"v1"
+
+
+def test_a_scan_url_that_404s_is_refreshed_from_the_wiki(
+    client, engine, tmp_path, monkeypatch
+):
+    """Replacing the backing PDF changes the rendition widths that exist, so
+    the URL stored at fetch time can 404 while the page is unchanged."""
+    import requests
+    from sqlmodel import select
+
+    from wtbot.api import reference_image as ri
+    from wtbot.model import Title
+    from wtbot.model.wikisource.proofread_page_meta import ProofreadPageMeta
+    from wtbot.wiki.client import RemotePageImages
+
+    old = "https://wiki.test/thumb/page18-1683px-Book.pdf.jpg"
+    new = "https://wiki.test/thumb/page18-1600px-Book.pdf.jpg"
+
+    def fake(url, validators):
+        if url == old:
+            resp = requests.Response()
+            resp.status_code = 404
+            raise requests.HTTPError("404", response=resp)
+        return ri.FetchedImage(b"new-scan", ri.Validators())
+
+    monkeypatch.setattr(ri, "fetch_image_if_changed", fake)
+    client.app.state.blob_root = tmp_path
+    client.app.state.client_factory = lambda site: FakeWikiClient(
+        page_images={PAGE: RemotePageImages(fullsize_url=new)}
+    )
+    _seed_scan(engine, old)
+
+    resp = client.get("/reference-image", params={"title": PAGE})
+
+    assert resp.status_code == 200
+    assert resp.content == b"new-scan"
+    with Session(engine) as s:
+        page = s.exec(select(Title).where(Title.title == PAGE)).one()
+        meta = s.exec(
+            select(ProofreadPageMeta).where(ProofreadPageMeta.title_pk == page.pk)
+        ).one()
+        assert meta.source_image_url == new
+
+
+def test_a_404_the_wiki_cannot_explain_is_a_502(client, engine, tmp_path, monkeypatch):
+    import requests
+
+    from wtbot.api import reference_image as ri
+
+    def fake(url, validators):
+        resp = requests.Response()
+        resp.status_code = 404
+        raise requests.HTTPError("404", response=resp)
+
+    monkeypatch.setattr(ri, "fetch_image_if_changed", fake)
+    client.app.state.blob_root = tmp_path
+    _seed_scan(engine, "https://wiki.test/thumb/page18-1683px-Book.pdf.jpg")
+
+    resp = client.get("/reference-image", params={"title": PAGE})
+
+    assert resp.status_code == 502

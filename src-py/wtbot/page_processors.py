@@ -113,7 +113,7 @@ class ProofreadPageProcessor(PageProcessor):
     ) -> ProcessOutcome:
         images = _page_images(ctx, cached.title)
         if images is not None:
-            _store_page_images(ctx.session, cached.pk, images)
+            store_page_images(ctx.session, cached.pk, images)
         return _DONE
 
 
@@ -245,9 +245,7 @@ def _record_index_page_count(
         session.rollback()
 
 
-def _store_page_images(
-    session: Session, page_pk: int, images: RemotePageImages
-) -> None:
+def store_page_images(session: Session, page_pk: int, images: RemotePageImages) -> None:
     """Upsert ProofreadPageMeta scan-image URLs and proofread quality."""
     try:
         meta = session.exec(
