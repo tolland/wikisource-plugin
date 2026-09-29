@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from conftest import add_proofread_meta, fake_pageid, index_file_title_pk, make_page
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from wtbot.fetch.revision_store import record_head_revision
 from wtbot.model import (
@@ -86,7 +86,7 @@ def build_index(session: Session, site: Site, title: str, *, sha1: str | None) -
     session.commit()
     if sha1 is not None:
         _, _, basename = title.partition(":")
-        file_page = make_page(site_pk=site.pk, title=f"File:{basename}")
+        file_page = make_page(session, site_pk=site.pk, title=f"File:{basename}")
         session.add(file_page)
         session.commit()
         session.refresh(file_page)
@@ -124,7 +124,7 @@ def build_page(
     session.commit()
     if text is not None:
         page = make_page(
-            pk=address.pk,
+            session,
             site_pk=site.pk,
             title=title,
             content_model="proofread-page",
@@ -370,15 +370,15 @@ def test_the_direction_decides_push_from_behind(client, engine):
         )
         # The upstream side then edits: it is one revision ahead of the anchor.
         upstream_page = session.exec(
-            select(Page).where(
-                Page.title == "Page:Varieties.djvu/1", Page.pk != page.pk
-            )
+            select(Page)
+            .join(Title, col(Title.pk) == col(Page.pk))
+            .where(Title.title == "Page:Varieties.djvu/1", Page.pk != page.pk)
         ).one()
         record_head_revision(
             session,
             upstream_page,
             RemotePage(
-                title=upstream_page.title,
+                title=upstream_page.address.title,
                 namespace_key=250,
                 namespace_canonical="Page",
                 content_model="proofread-page",
@@ -386,7 +386,7 @@ def test_the_direction_decides_push_from_behind(client, engine):
                 revid=999,
                 parentid=901,
                 timestamp=WHEN,
-                pageid=fake_pageid(upstream_page.title),
+                pageid=fake_pageid(upstream_page.address.title),
             ),
         )
         session.commit()
@@ -658,8 +658,10 @@ def _ahead(engine, *, link: bool) -> dict:
             session, local, SOURCE_INDEX, 1, text=body(3, "Us", "Page 1."), revid=254
         )
         upstream_page = session.exec(
-            select(Page).where(
-                Page.title == "Page:Varieties.djvu/1",
+            select(Page)
+            .join(Title, col(Title.pk) == col(Page.pk))
+            .where(
+                Title.title == "Page:Varieties.djvu/1",
                 Page.site_pk != local.pk,
             )
         ).one()
@@ -667,7 +669,7 @@ def _ahead(engine, *, link: bool) -> dict:
             session,
             upstream_page,
             RemotePage(
-                title=upstream_page.title,
+                title=upstream_page.address.title,
                 namespace_key=250,
                 namespace_canonical="Page",
                 content_model="proofread-page",
@@ -675,7 +677,7 @@ def _ahead(engine, *, link: bool) -> dict:
                 revid=887,
                 parentid=901,
                 timestamp=WHEN,
-                pageid=fake_pageid(upstream_page.title),
+                pageid=fake_pageid(upstream_page.address.title),
             ),
         )
         session.commit()

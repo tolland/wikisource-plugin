@@ -62,7 +62,7 @@ def _seed_reset_rows(engine) -> None:
             FetchRequest(
                 site_pk=source_site.pk,
                 parent_pk=parent.pk,
-                title=source_page.title,
+                title=source_page.address.title,
             )
         )
         session.commit()

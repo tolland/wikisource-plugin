@@ -34,7 +34,7 @@ backend data model and fetch/edit/commit contract live in `src-py/DESIGN.md`.
 | [`upstream-sync-discussion.md`](design/upstream-sync-discussion.md) | wtbot | living rationale for the sync feature | Read before touching anything in `todo/upstream-sync-TODO.md`; it is the *why* behind every item there. |
 | [`scan-image-modeling.md`](design/scan-image-modeling.md) | wtbot model + plugin | speculative; nothing implemented | Decide whether to normalise annotation coordinates to fractions — the one item worth doing on its own merits. |
 | [`templatedata-future.md`](design/templatedata-future.md) | plugin + wtbot | speculative; nothing implemented | Nothing to build. Keep the editing-feature seams (pure renderers, sidecar-mediated data) compatible. |
-| [`pages-and-existence.md`](design/pages-and-existence.md) | wtbot model | in progress — steps 1 and 2 landed: every address-keyed table (journal, commit, meta, annotations, pairings) and the address's own columns (namespace, fetch status, dirty) are on `title`; `PromotionBatch` reduced to two ends; `IndexLink`/`IndexMeta` share keys; `Transclusion`/`FileMeta` dropped for redesign (§12) | **Next:** step 3 — a `Page` row only where the wiki holds the page (placeholder rows go; head columns NOT NULL). Directed, mirrored links deferred; per-direction tracking decided (§0). |
+| [`pages-and-existence.md`](design/pages-and-existence.md) | wtbot model | split complete — titles are addresses; a `Page` exists iff the wiki holds it, head NOT NULL, no name of its own; Commons is a site and indexes name their scan | **Next:** sync's reshape (§5/§6); directed links (deferred, per-direction tracking decided); `FileRevision` for editing scans. |
 
 ## `reference/` — how it works now
 

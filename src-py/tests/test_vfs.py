@@ -5,11 +5,11 @@ from __future__ import annotations
 import pytest
 from conftest import add_proofread_meta, make_page
 from fastapi.testclient import TestClient
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from wtbot.api.schemas import WriteContentRequest
 from wtbot.api.vfs import list_children, read_content, write_content
-from wtbot.model import EditJournal, FileBlob, Page, Site
+from wtbot.model import EditJournal, FileBlob, Page, Site, Title
 from wtbot.vfs import WikisourceVfs
 
 FAMILY = "wikisource"
@@ -586,7 +586,11 @@ def test_write_page_ok(vfs_client, engine):
     assert body["status"] == "ok"
 
     with Session(engine) as s:
-        page = s.exec(select(Page).where(Page.title == PAGE_1)).first()
+        page = s.exec(
+            select(Page)
+            .join(Title, col(Title.pk) == col(Page.pk))
+            .where(Title.title == PAGE_1)
+        ).first()
         # Page.text is the cached *remote* body -- a local save must never
         # touch it, or a later refresh loses the diff base.
         assert page.text == _PAGE_1_BODY
@@ -666,7 +670,11 @@ def test_write_index_namespace_asset(engine):
             session=s,
         )
 
-        page = s.exec(select(Page).where(Page.title == INDEX_STYLES)).one()
+        page = s.exec(
+            select(Page)
+            .join(Title, col(Title.pk) == col(Page.pk))
+            .where(Title.title == INDEX_STYLES)
+        ).one()
         journal = s.exec(
             select(EditJournal).where(EditJournal.title_pk == page.pk)
         ).one()
@@ -721,7 +729,11 @@ def test_read_content_falls_back_to_page_text_once_journal_is_committed(
     assert r.json()["status"] == "ok"
 
     with Session(engine) as s:
-        page = s.exec(select(Page).where(Page.title == PAGE_1)).one()
+        page = s.exec(
+            select(Page)
+            .join(Title, col(Title.pk) == col(Page.pk))
+            .where(Title.title == PAGE_1)
+        ).one()
         journal = s.exec(
             select(EditJournal).where(EditJournal.title_pk == page.pk)
         ).one()

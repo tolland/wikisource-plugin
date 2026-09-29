@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from conftest import add_proofread_meta, fake_pageid, make_page
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from wtbot.content_model import Significance
 from wtbot.fetch.revision_store import record_head_revision, record_history
@@ -18,6 +18,7 @@ from wtbot.model import (
     Revision,
     RevisionLink,
     Site,
+    Title,
 )
 from wtbot.wiki.wiki_types import RemotePage
 
@@ -157,14 +158,14 @@ def test_a_run_of_identical_revisions_does_not_make_the_match_ambiguous(
             session,
             remote_page,
             RemotePage(
-                title=remote_page.title,
+                title=remote_page.address.title,
                 namespace_key=104,
                 namespace_canonical="Page",
                 content_model=PROOFREAD,
                 text=_body(3, "Hesperian"),
                 revid=revid,
                 timestamp=datetime(2026, 1, 1, tzinfo=timezone.utc),
-                pageid=fake_pageid(remote_page.title),
+                pageid=fake_pageid(remote_page.address.title),
             ),
         )
         session.commit()
@@ -356,22 +357,22 @@ def test_the_ladder_endpoint_reports_whether_the_anchor_is_current(
             select(Site).where(Site.family == "mywikisource")
         ).one()
         page = session.exec(
-            select(Page).where(
-                Page.site_pk == local_site.pk, Page.title == params["local_title"]
-            )
+            select(Page)
+            .join(Title, col(Title.pk) == col(Page.pk))
+            .where(Page.site_pk == local_site.pk, Title.title == params["local_title"])
         ).one()
         record_head_revision(
             session,
             page,
             RemotePage(
-                title=page.title,
+                title=page.address.title,
                 namespace_key=104,
                 namespace_canonical="Page",
                 content_model=PROOFREAD,
                 text=_body(3, "A", "Now different."),
                 revid=6,
                 timestamp=datetime(2026, 1, 2, tzinfo=timezone.utc),
-                pageid=fake_pageid(page.title),
+                pageid=fake_pageid(page.address.title),
             ),
         )
         session.commit()
@@ -440,7 +441,7 @@ def _older(
         page,
         [
             RemotePage(
-                title=page.title,
+                title=page.address.title,
                 namespace_key=104,
                 namespace_canonical="Page",
                 content_model=PROOFREAD,
@@ -448,7 +449,7 @@ def _older(
                 revid=revid,
                 parentid=parentid,
                 timestamp=datetime(2026, 1, 1, tzinfo=timezone.utc),
-                pageid=fake_pageid(page.title),
+                pageid=fake_pageid(page.address.title),
             )
         ],
     )

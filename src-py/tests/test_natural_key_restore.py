@@ -40,7 +40,7 @@ def test_restore_roundtrip_with_new_ids_and_named_constraints(tmp_path: Path) ->
         assert (
             connection.execute("""
             SELECT count(*) FROM page p JOIN title t
-              ON t.pk = p.pk AND t.site_pk = p.site_pk AND t.title = p.title
+              ON t.pk = p.pk AND t.site_pk = p.site_pk
             """).fetchone()
             == connection.execute("SELECT count(*) FROM page").fetchone()
         )
@@ -162,6 +162,31 @@ def _as_before_works_shared_their_pairings_key(raw: dict) -> None:
                 row["references"]["index_link_pk"] = None
 
 
+def _as_before_pages_lost_their_names(raw: dict) -> None:
+    """Rewrite a current dump's pages into their pre-3c shape: keyed by
+    ``(site_pk, title)`` with a ``title`` field, and every reference to a page
+    -- nested ones included -- keyed the same way."""
+
+    def named(value):
+        if isinstance(value, dict):
+            if value.get("table") == "page":
+                [title_ref] = value["key"]
+                return {**value, "key": named(title_ref["key"])}
+            return {k: named(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [named(v) for v in value]
+        return value
+
+    for table in raw["tables"]:
+        if table["name"] == "page":
+            table["key_fields"] = ["site_pk", "title"]
+            for row in table["rows"]:
+                [title_ref] = row["key"]
+                row["key"] = title_ref["key"]
+                row["fields"]["title"] = title_ref["key"][1]
+    raw["tables"] = named(raw["tables"])
+
+
 def _every_reference_names_a_page(value):
     """Before titles existed, every reference that now names a title named a
     page -- including those nested inside other tables' keys (a work's key is
@@ -189,6 +214,7 @@ def test_a_dump_taken_before_titles_existed_restores_with_them(tmp_path: Path) -
 
     models = {"Index:Book": "proofread-index", "Page:Book/1": "proofread-page"}
     raw = json.loads(archive.read_text())
+    _as_before_pages_lost_their_names(raw)
     # Before titles, the address's own columns were the page's, and so was
     # fetch_error (never written, since dropped).
     address = {

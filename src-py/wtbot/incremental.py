@@ -2,9 +2,9 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
-from wtbot.model import Namespace, Page, Site
+from wtbot.model import Namespace, Page, Site, Title
 from wtbot.timeutil import as_utc
 from wtbot.wiki.client import WikiClient
 from wtbot.wiki.wiki_types import RemoteChange
@@ -141,9 +141,14 @@ def _full(
 
 
 def _known_titles(session: Session, site: Site, title_prefix: str | None) -> set[str]:
-    statement = select(Page.title).where(Page.site_pk == site.pk)
+    # The titles of pages we hold: those are what a refresh re-reads.
+    statement = (
+        select(Title.title)
+        .join(Page, col(Page.pk) == col(Title.pk))
+        .where(Title.site_pk == site.pk)
+    )
     if title_prefix:
-        statement = statement.where(Page.title.startswith(title_prefix))
+        statement = statement.where(col(Title.title).startswith(title_prefix))
     return set(session.exec(statement).all())
 
 

@@ -269,7 +269,7 @@ def test_a_fan_out_asks_for_its_pages_images_once_not_once_per_page(engine, tmp_
 
         drain_queue(session, lambda _site: wiki, blob_root=tmp_path / "blobs", batch=1)
 
-        fetched = {p.title for p in session.exec(select(Page)).all()}
+        fetched = {p.address.title for p in session.exec(select(Page)).all()}
 
     assert set(page_titles) <= fetched, "the fan-out did not fetch its children"
     assert wiki.bulk_calls == [page_titles], "children should be asked for in one go"

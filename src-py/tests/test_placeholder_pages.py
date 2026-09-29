@@ -2,7 +2,7 @@ import base64
 
 from conftest import FAKE_TIMESTAMP, drain
 from fastapi.testclient import TestClient
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from wtbot.fetch.fetch_worker import run_pending
 from wtbot.main import create_app
@@ -378,7 +378,11 @@ def test_committing_placeholder_creates_remote_page(engine, tmp_path):
         drain(c)
 
     with Session(engine) as s:
-        page = s.exec(select(Page).where(Page.title == "Page:Sparse.pdf/4")).one()
+        page = s.exec(
+            select(Page)
+            .join(Title, col(Title.pk) == col(Page.pk))
+            .where(Title.title == "Page:Sparse.pdf/4")
+        ).one()
         assert page.revid is not None
         assert page.pageid is not None
         assert page.text == "fresh transcription"

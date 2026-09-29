@@ -1265,3 +1265,61 @@ def test_the_head_step_downgrades(baseline_engine: Engine) -> None:
             row[3] for row in run("PRAGMA table_info(page)").all() if row[1] == "pageid"
         )
         assert run("SELECT pageid FROM page").scalars().all() == [5]
+
+
+# -- step 3c: a page has no name of its own -----------------------------------
+
+PAGE_LOSES_TITLE = "f3c8a2e7d914"
+
+
+def _seed_a_held_page(engine: Engine) -> None:
+    with engine.begin() as connection:
+        run = connection.exec_driver_sql
+        run(
+            "INSERT INTO site (pk, family, code, articlepath, created_at)"
+            f" VALUES (1, 'wikisource', 'en', '/wiki/$1', {_T})"
+        )
+        run(
+            "INSERT INTO title (pk, site_pk, title, expected_content_model)"
+            " VALUES (10, 1, 'Page:B.djvu/1', 'proofread-page')"
+        )
+        run(
+            "INSERT INTO page (pk, site_pk, title, content_model, pageid, revid,"
+            " remote_timestamp, text) VALUES (10, 1, 'Page:B.djvu/1',"
+            f" 'proofread-page', 5, 7, {_T}, 'body')"
+        )
+
+
+def test_the_page_loses_its_title_and_keeps_everything_else(
+    baseline_engine: Engine,
+) -> None:
+    _run(baseline_engine, command.upgrade, HEAD_NOT_NULL)
+    _seed_a_held_page(baseline_engine)
+
+    _run(baseline_engine, command.upgrade, PAGE_LOSES_TITLE)
+
+    assert "title" not in _columns(baseline_engine, "page")
+    assert _foreign_keys(baseline_engine, "page") == {
+        ("site_pk", "site"),
+        ("pk", "title"),
+    }
+    with baseline_engine.connect() as connection:
+        run = connection.exec_driver_sql
+        assert run(
+            "SELECT t.title, p.pageid, p.revid, p.text FROM page p"
+            " JOIN title t ON t.pk = p.pk"
+        ).all() == [("Page:B.djvu/1", 5, 7, "body")]
+        assert run("PRAGMA foreign_key_check").all() == []
+
+
+def test_the_page_title_step_downgrades(baseline_engine: Engine) -> None:
+    _run(baseline_engine, command.upgrade, HEAD_NOT_NULL)
+    _seed_a_held_page(baseline_engine)
+    _run(baseline_engine, command.upgrade, PAGE_LOSES_TITLE)
+
+    _run(baseline_engine, command.downgrade, HEAD_NOT_NULL)
+
+    with baseline_engine.connect() as connection:
+        assert connection.exec_driver_sql(
+            "SELECT pk, title, revid FROM page"
+        ).all() == [(10, "Page:B.djvu/1", 7)]

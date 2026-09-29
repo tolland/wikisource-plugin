@@ -286,12 +286,12 @@ def test_css_in_index_namespace_cannot_own_proofread_metadata(session):
         session, site, "Index:Book.djvu/styles.css", "sanitized-css", namespace_key=106
     )
     page = _add_page(session, site, "Page:Book.djvu/1", "proofread-page")
-    assert PageStore(session).index_entry(site, css.title) is None
+    assert PageStore(session).index_entry(site, css.address.title) is None
     with pytest.raises(HTTPException) as exc:
         put_page_meta(page.pk, ProofreadPageMetaUpdate(index_title_pk=css.pk), session)
     assert exc.value.status_code == 400
     with pytest.raises(RuntimeError, match="non-Index"):
-        ensure_index_title(session, site.pk, css.title)
+        ensure_index_title(session, site.pk, css.address.title)
 
 
 def test_proofread_metadata_accepts_content_model_in_custom_namespace(session):
@@ -308,6 +308,6 @@ def test_proofread_metadata_accepts_content_model_in_custom_namespace(session):
         page.pk, ProofreadPageMetaUpdate(index_title_pk=index.pk), session
     )
     assert meta.index_title_pk == index.pk
-    assert [e.page for e in PageStore(session).proofread_pages(site, index.title)] == [
-        page
-    ]
+    assert [
+        e.page for e in PageStore(session).proofread_pages(site, index.address.title)
+    ] == [page]

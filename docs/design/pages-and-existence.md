@@ -127,7 +127,19 @@ change of constraint, never of data.
      the same. `contributor`/`comment` stay nullable (revision-deleted is a
      real state), as do `latest_revision_pk` and
      `history_complete_from_revid` (what our store holds).
-   - **Next:** step 3c -- `page.title` and the `before_flush` hook go.
+   - **Done** (`f3c8a2e7d914`, step 3c): `page.title` and the
+     `before_flush` hook are gone. A page's name is its title's
+     (`page.address.title`); queries by name join `Title` (`page_at`,
+     `entry_at` in `wtbot.title_store`); every Page is created at a Title
+     obtained first, taking its pk. A dump keys a page by its title
+     (`("pk",)`), and restore re-keys older dumps' pages and every reference
+     to them. `page.site_pk` still repeats `title.site_pk`; dropping it is a
+     possible follow-up.
+
+   **The split is complete:** a Title is an address, fetched or not; a Page
+   exists iff the wiki holds it, and its head is never empty. What remains in
+   this note is sync's reshape (§5/§6), the directed links (deferred above)
+   and, for files, `FileRevision`.
 
    Two things learned doing the first batch, and a third since. Tables whose
    constraints are not conventionally named, or which carry an expression

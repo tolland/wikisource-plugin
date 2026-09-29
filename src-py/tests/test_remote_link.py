@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import pytest
 from conftest import fake_pageid, make_page
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from wtbot.fetch.revision_store import record_head_revision
 from wtbot.linking.remote_link_store import (
@@ -15,7 +15,7 @@ from wtbot.linking.remote_link_store import (
     ladder,
     links_for_revision,
 )
-from wtbot.model import LinkOrigin, Page, Revision, RevisionLink, Site
+from wtbot.model import LinkOrigin, Page, Revision, RevisionLink, Site, Title
 from wtbot.wiki.wiki_types import RemotePage
 
 """Asserted correspondence between revisions on two sites.
@@ -49,7 +49,9 @@ def _revision(
     parent_revid: int | None = None,
 ) -> Revision:
     page = session.exec(
-        select(Page).where(Page.site_pk == site.pk, Page.title == title)
+        select(Page)
+        .join(Title, col(Title.pk) == col(Page.pk))
+        .where(Page.site_pk == site.pk, Title.title == title)
     ).first()
     if page is None:
         page = make_page(site_pk=site.pk, title=title)
@@ -375,14 +377,14 @@ def test_the_ladder_grows_and_the_last_rung_is_the_anchor(
     local_next = _revision(
         session,
         session.get(Site, local_site_pk),
-        local_page.title,
+        local_page.address.title,
         revid=9,
         body=_body(3, "LocalEditor"),
     )
     remote_next = _revision(
         session,
         session.get(Site, upstream_site_pk),
-        remote_page.title,
+        remote_page.address.title,
         revid=8900,
         body=_body(3, "Hesperian"),
     )

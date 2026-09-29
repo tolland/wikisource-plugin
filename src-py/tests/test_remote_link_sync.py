@@ -1,7 +1,7 @@
 from collections.abc import Iterator
 
 import pytest
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 from wiki_harness import (
     SCRATCH_PAGE,
     PwbHarness,
@@ -23,7 +23,7 @@ from wtbot.linking.remote_link_store import (
     find_link,
     ladder,
 )
-from wtbot.model import FetchRequest, LinkOrigin, Page, Revision, Site
+from wtbot.model import FetchRequest, LinkOrigin, Page, Revision, Site, Title
 
 """RemoteLink against two real wikis.
 
@@ -69,7 +69,9 @@ def _fetch(session: Session, site: Site, harness: PwbHarness, title: str) -> Pag
     assert handled >= 1, f"the worker did not fetch {title}"
 
     page = session.exec(
-        select(Page).where(Page.site_pk == site.pk, Page.title == title)
+        select(Page)
+        .join(Title, col(Title.pk) == col(Page.pk))
+        .where(Page.site_pk == site.pk, Title.title == title)
     ).one()
     assert page.latest_revision_pk is not None, f"{title} fetched without a revision"
     return page

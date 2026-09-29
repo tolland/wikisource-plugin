@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.deps import get_session
-from wtbot.model import IndexMeta, Page, Site
+from wtbot.model import IndexMeta, Page, Site, Title
 
 router = APIRouter(prefix="/viewer", tags=["viewer"], route_class=DebugLoggingRoute)
 
@@ -32,7 +32,7 @@ class IndexPageDetail(IndexPageSummary):
 def _summary(page: Page, site: Site, page_count: int | None) -> IndexPageSummary:
     return IndexPageSummary(
         pk=page.pk or 0,
-        title=page.title,
+        title=page.address.title,
         family=site.family,
         code=site.code,
         page_count=page_count,
@@ -46,8 +46,9 @@ def _summary(page: Page, site: Site, page_count: int | None) -> IndexPageSummary
 def list_index_pages(session: Session = Depends(get_session)) -> list[IndexPageSummary]:
     pages = session.exec(
         select(Page)
+        .join(Title, col(Title.pk) == col(Page.pk))
         .where(Page.content_model == PROOFREAD_INDEX_CONTENT_MODEL)
-        .order_by(Page.title)
+        .order_by(Title.title)
     ).all()
     counts = _page_counts(session, [p.pk for p in pages if p.pk is not None])
     sites = _sites_by_pk(session, [p.site_pk for p in pages])

@@ -30,7 +30,7 @@ NATURAL_KEYS: dict[str, tuple[str, ...]] = {
     "indexmeta": ("title_pk",),
     "namespace": ("site_pk", "key"),
     "ocrbackendconfig": ("scope", "name"),
-    "page": ("site_pk", "title"),
+    "page": ("pk",),  # shared with the title it is at
     "pagelink": ("local_page_pk", "remote_page_pk"),
     "proofreadpagemeta": ("title_pk",),
     "revision": ("page_pk", "revid"),

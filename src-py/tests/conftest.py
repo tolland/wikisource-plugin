@@ -8,6 +8,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import pytest
 import requests
@@ -516,16 +517,39 @@ def fake_pageid(title: str) -> int:
     return zlib.crc32(title.encode()) & 0x7FFFFFFF
 
 
-def make_page(**fields) -> Page:
-    """A Page fixture: a page the wiki holds, so its head is complete. Fields
-    a test does not care about get plausible values -- ids derived from the
-    title, empty text, wikitext -- and whatever it passes wins."""
-    title = fields["title"]
-    defaults = {
-        "pageid": fake_pageid(title),
-        "revid": fake_pageid(title),
+def make_page(session: Session | None = None, **fields: Any) -> Page:
+    """A Page fixture: a page the wiki holds. Fields a test does not care
+    about get plausible values -- ids derived from the title, empty text,
+    wikitext -- and whatever it passes wins.
+
+    ``title`` names the address. Without a ``session`` the Title is built
+    here and attached as ``address``, so the flush inserts it first and the
+    page takes its pk (a ``pk`` passed in pins both). With one, the Title
+    already at that address is reused -- for a title something else named
+    first (an index's ``File:``, a fan-out's pages)."""
+    name = fields.pop("title")
+    defaults: dict[str, Any] = {
+        "pageid": fake_pageid(name),
+        "revid": fake_pageid(name),
         "remote_timestamp": FAKE_TIMESTAMP,
         "text": "",
         "content_model": "wikitext",
     }
-    return Page(**(defaults | fields))
+    values = defaults | fields
+    if session is not None:
+        from wtbot.title_store import ensure_title
+
+        address = ensure_title(
+            session,
+            site_pk=values["site_pk"],
+            title=name,
+            expected_content_model=values["content_model"],
+        )
+        return Page(**(values | {"pk": address.pk}))
+    address = Title(
+        pk=values.get("pk"),
+        site_pk=values["site_pk"],
+        title=name,
+        expected_content_model=values["content_model"],
+    )
+    return Page(address=address, **values)

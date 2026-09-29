@@ -47,7 +47,9 @@ def test_index_fanout_and_journal(session):
     session.add(index)
     session.commit()
 
-    parent = FetchRequest(site_pk=site.pk, title=index.title, kind=FetchKind.index)
+    parent = FetchRequest(
+        site_pk=site.pk, title=index.address.title, kind=FetchKind.index
+    )
     session.add(parent)
     session.commit()
     child = FetchRequest(

@@ -107,7 +107,13 @@ def make_database(path: Path, offset: int = 0) -> None:
         )
         session.flush()
         session.add(
-            make_page(pk=offset + 9, site_pk=offset + 1, title="Page:Book/1", revid=124)
+            make_page(
+                session,
+                pk=offset + 9,
+                site_pk=offset + 1,
+                title="Page:Book/1",
+                revid=124,
+            )
         )
         session.add(
             ProofreadPageMeta(

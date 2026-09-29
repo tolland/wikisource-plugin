@@ -227,12 +227,12 @@ def compare_pages(
     page_number: int | None = None,
 ) -> LinkProposal:
     """Compare one page pair's head revisions."""
-    base = {"local_title": local_page.title, "page_number": page_number}
+    base = {"local_title": local_page.address.title, "page_number": page_number}
 
     if remote_page is None:
         return LinkProposal(outcome=MatchOutcome.no_counterpart, **base)
 
-    base["remote_title"] = remote_page.title
+    base["remote_title"] = remote_page.address.title
 
     local_revision = head_revision(session, local_page)
     remote_revision = head_revision(session, remote_page)

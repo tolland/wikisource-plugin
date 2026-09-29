@@ -13,13 +13,12 @@ separate answer. A paginated ``Page:`` nobody has transcribed has a title, a
 scan, a proposed body and a page number, and a user can open, edit and save
 it -- none of which needs the wiki to have a page there.
 
-**Every Page is a Title; not every Title is a Page yet.** ``page.pk`` is a
-foreign key to ``title.pk`` -- a shared primary key, so any value that
-identifies a page also identifies its title. That is what lets the split
-happen progressively: an existing foreign key to ``page.pk`` is already a
-valid ``title.pk``, and repointing one is a change of constraint, not of data.
+**Every Page is at a Title; a Title has a Page iff the wiki holds one.**
+``page.pk`` is a foreign key to ``title.pk`` -- a shared primary key, so any
+value that identifies a page also identifies its title -- and the page has no
+name of its own: ``page.address.title``.
 
-The transition is recorded in docs/design/pages-and-existence.md. What
+The split is recorded in docs/design/pages-and-existence.md. What
 belongs to the address lives here -- the expected content model, namespace,
 fetch status and dirty flag -- and everything keyed by address (journal,
 commits, proofread metadata, annotations, pairings) references this table.
@@ -46,8 +45,8 @@ class Title(SQLModel, table=True):
     title: str
     """Full title including the namespace prefix, e.g. ``Page:Foo.djvu/171``.
 
-    ``Page.title`` still exists during the transition and must agree with this.
-    It is written once, when both rows are created; nothing renames a page yet.
+    The page's name as well: a Page has none of its own, only this title.
+    Nothing renames a page yet.
     """
 
     expected_content_model: str

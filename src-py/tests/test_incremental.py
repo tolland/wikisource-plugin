@@ -1,10 +1,10 @@
 from datetime import datetime, timedelta, timezone
 
 from conftest import credential_for, drain, fake_pageid, make_page
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from wtbot.incremental import RefreshBasis, plan_refresh
-from wtbot.model import FetchRequest, Namespace, Page, Site
+from wtbot.model import FetchRequest, Namespace, Page, Site, Title
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import RemoteChange, RemotePage
 
@@ -252,14 +252,20 @@ def test_refresh_endpoint_fetches_only_what_moved(client, engine) -> None:
 
     # Enqueued, not fetched: the refresh planned the work, the drain does it.
     with Session(engine) as session:
-        assert session.exec(select(Page).where(Page.title == moved)).one().text != (
-            "refreshed body"
-        )
+        assert session.exec(
+            select(Page)
+            .join(Title, col(Title.pk) == col(Page.pk))
+            .where(Title.title == moved)
+        ).one().text != ("refreshed body")
 
     drain(client)
 
     with Session(engine) as session:
-        page = session.exec(select(Page).where(Page.title == moved)).one()
+        page = session.exec(
+            select(Page)
+            .join(Title, col(Title.pk) == col(Page.pk))
+            .where(Title.title == moved)
+        ).one()
         assert page.text == "refreshed body"
 
 
