@@ -275,7 +275,7 @@ class TestConfigInjection:
         assert pwbconfig.minthrottle == 0.35  # ~170 req/min
         assert 60 / pwbconfig.minthrottle < 200
         assert pwbconfig.put_throttle == 1.0
-        assert pwbconfig.maxlag == 5
+        assert pwbconfig.read_maxlag == 30
 
     def test_throttle_settings_from_env(self):
         env = {
