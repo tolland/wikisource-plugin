@@ -1,8 +1,8 @@
 import pytest
-from conftest import add_proofread_meta, index_file_title_pk
+from conftest import add_proofread_meta, index_file_title_pk, make_page
 from sqlmodel import Session
 
-from wtbot.model import Page, Site
+from wtbot.model import Site
 from wtbot.model.wikisource.index_meta import IndexMeta
 
 """Tests for GET /pages/nav — the split editor's page-navigation metadata:
@@ -24,7 +24,7 @@ def _seed(engine, page_numbers: list[int]) -> None:
         site = Site(family=FAMILY, code=CODE)
         s.add(site)
         s.flush()
-        index = Page(
+        index = make_page(
             site_pk=site.pk,
             title=INDEX,
             content_model="proofread-index",
@@ -41,7 +41,7 @@ def _seed(engine, page_numbers: list[int]) -> None:
             )
         )
         for n in page_numbers:
-            page = Page(
+            page = make_page(
                 site_pk=site.pk,
                 title=f"Page:Tractatus.djvu/{n}",
                 content_model="proofread-page",

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+from conftest import FAKE_TIMESTAMP, fake_pageid, make_page
 from sqlmodel import Session, select
 
 from wtbot.api.commit import (
@@ -29,7 +30,7 @@ def _setup(engine, *, remote_text="original", remote_revid=100):
         s.commit()
         s.refresh(site)
 
-        page = Page(
+        page = make_page(
             site_pk=site.pk,
             title=TITLE,
             content_model="proofread-page",
@@ -75,6 +76,8 @@ def test_push_single_save_succeeds(engine):
                 content_model="proofread-page",
                 text="original",
                 revid=100,
+                pageid=fake_pageid(TITLE),
+                timestamp=FAKE_TIMESTAMP,
             )
         }
     )
@@ -137,6 +140,8 @@ def test_multiple_saves_collapse_into_one_push(engine):
                 content_model="proofread-page",
                 text="original",
                 revid=100,
+                pageid=fake_pageid(TITLE),
+                timestamp=FAKE_TIMESTAMP,
             )
         }
     )
@@ -184,6 +189,8 @@ def test_local_save_during_remote_push_remains_pending(engine):
                 content_model="proofread-page",
                 text="original",
                 revid=100,
+                pageid=fake_pageid(TITLE),
+                timestamp=FAKE_TIMESTAMP,
             )
         },
         on_save=save_new_local_edit,
@@ -231,6 +238,8 @@ def test_second_edit_before_refetch_does_not_conflict_with_own_push(engine):
                 content_model="proofread-page",
                 text="original",
                 revid=100,
+                pageid=fake_pageid(TITLE),
+                timestamp=FAKE_TIMESTAMP,
             )
         }
     )
@@ -268,6 +277,8 @@ def test_remote_conflict_recorded_not_raised(engine):
                 content_model="proofread-page",
                 text="someone else's edit",
                 revid=200,
+                pageid=fake_pageid(TITLE),
+                timestamp=FAKE_TIMESTAMP,
             )
         }
     )
@@ -305,6 +316,8 @@ def test_remote_conflict_releases_db_lock(engine):
                 content_model="proofread-page",
                 text="someone else's edit",
                 revid=200,
+                pageid=fake_pageid(TITLE),
+                timestamp=FAKE_TIMESTAMP,
             )
         }
     )
@@ -335,6 +348,8 @@ def test_pending_commit_api_lists_and_pushes_one_page(engine):
                 content_model="proofread-page",
                 text="original",
                 revid=100,
+                pageid=fake_pageid(TITLE),
+                timestamp=FAKE_TIMESTAMP,
             )
         }
     )
@@ -379,6 +394,8 @@ def test_pending_commit_api_can_force_overwrite_conflict(engine):
                 content_model="proofread-page",
                 text="someone else's edit",
                 revid=200,
+                pageid=fake_pageid(TITLE),
+                timestamp=FAKE_TIMESTAMP,
             )
         }
     )

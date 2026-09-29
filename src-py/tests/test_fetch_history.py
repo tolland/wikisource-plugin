@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from conftest import fetch_and_drain, register_site
+from conftest import fake_pageid, fetch_and_drain, register_site
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -42,6 +42,7 @@ def revision(revid: int, parentid: int | None, text: str) -> RemotePage:
         revid=revid,
         parentid=parentid,
         timestamp=WHEN + timedelta(days=revid),
+        pageid=fake_pageid(TITLE),
     )
 
 

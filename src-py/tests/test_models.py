@@ -2,6 +2,7 @@
 FetchRequest tree, a journal entry and a commit. Mostly this proves the schema
 (FKs, self-reference, enums) builds and round-trips."""
 
+from conftest import make_page
 from sqlmodel import select
 
 from wtbot.model import (
@@ -10,7 +11,6 @@ from wtbot.model import (
     FetchKind,
     FetchRequest,
     Namespace,
-    Page,
     Site,
 )
 
@@ -39,7 +39,7 @@ def test_index_fanout_and_journal(session):
     session.add(site)
     session.commit()
 
-    index = Page(
+    index = make_page(
         site_pk=site.pk,
         title="Index:Tractatus.djvu",
         content_model="proofread-index",

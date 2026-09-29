@@ -462,6 +462,57 @@ def _name_index_files(dump: DatabaseDump) -> DatabaseDump:
     )
 
 
+_PAGE_HEAD: tuple[str, ...] = (
+    "pageid",
+    "revid",
+    "remote_timestamp",
+    "text",
+    "content_model",
+)
+
+
+def _complete_page_heads(dump: DatabaseDump) -> DatabaseDump:
+    """A page's head columns are NOT NULL. Fill ``content_model`` from the
+    title where an older fetch left it empty, as the migration does, and
+    refuse -- naming them -- rows missing what cannot be derived."""
+    tables = {table.name: table for table in dump.tables}
+    pages, titles = tables.get("page"), tables.get("title")
+    if pages is None:
+        return dump
+    expected = {
+        _identity("title", row): row.fields.get("expected_content_model")
+        for row in (titles.rows if titles is not None else [])
+    }
+    rows = []
+    for row in pages.rows:
+        if row.fields.get("content_model") is None:
+            model = expected.get(_identity("title", row))
+            row = row.model_copy(
+                update={"fields": {**row.fields, "content_model": model}}
+            )
+        rows.append(row)
+    incomplete = [
+        str(row.fields.get("title"))
+        for row in rows
+        if any(row.fields.get(column) is None for column in _PAGE_HEAD)
+    ]
+    if incomplete:
+        raise ValueError(
+            "page rows are missing a head column (pageid, revid, "
+            f"remote_timestamp, text or content_model): {', '.join(incomplete)}. "
+            "Refetch them in the source database and dump again, or drop them "
+            "from the dump."
+        )
+    return dump.model_copy(
+        update={
+            "tables": [
+                pages.model_copy(update={"rows": rows}) if t.name == "page" else t
+                for t in dump.tables
+            ]
+        }
+    )
+
+
 # Applied in order: each brings a dump from one schema step to the next, and
 # does nothing to a dump that is already past it.
 _LEGACY_UPGRADES = (
@@ -473,6 +524,7 @@ _LEGACY_UPGRADES = (
     _drop_legacy_references,
     _page_references_to_titles,
     _name_index_files,
+    _complete_page_heads,
 )
 
 

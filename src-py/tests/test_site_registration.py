@@ -8,7 +8,7 @@ meant.
 """
 
 import pytest
-from conftest import register_site
+from conftest import FAKE_TIMESTAMP, fake_pageid, register_site
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -29,6 +29,8 @@ def http(engine):
                 content_model="proofread-page",
                 text="body",
                 revid=1,
+                pageid=fake_pageid("Page:Book.djvu/1"),
+                timestamp=FAKE_TIMESTAMP,
             )
         }
     )

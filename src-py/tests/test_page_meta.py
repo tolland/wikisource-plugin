@@ -1,5 +1,5 @@
 import pytest
-from conftest import add_proofread_meta
+from conftest import add_proofread_meta, make_page
 from sqlmodel import Session
 
 from wtbot.model import Page, Site
@@ -35,7 +35,7 @@ def _add_page(
     index_title: str | None = None,
     namespace_key: int | None = None,
 ) -> Page:
-    page = Page(
+    page = make_page(
         site_pk=site.pk,
         title=title,
         content_model=cm,

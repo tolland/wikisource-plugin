@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from conftest import add_proofread_meta
+from conftest import add_proofread_meta, fake_pageid, make_page
 from sqlmodel import Session, select
 
 from wtbot.content_model import Significance
@@ -58,7 +58,7 @@ def _page(
     title: str | None = None,
 ) -> Page:
     title = title or f"Page:Canadian patent 29537.djvu/{number}"
-    page = Page(site_pk=site.pk, title=title, content_model="proofread-page")
+    page = make_page(site_pk=site.pk, title=title, content_model="proofread-page")
     session.add(page)
     session.commit()
     session.refresh(page)
@@ -80,6 +80,7 @@ def _page(
                 revid=revid,
                 parentid=parentid,
                 timestamp=datetime(2026, 1, 1, tzinfo=timezone.utc),
+                pageid=fake_pageid(title),
             ),
         )
         session.commit()
@@ -163,6 +164,7 @@ def test_a_run_of_identical_revisions_does_not_make_the_match_ambiguous(
                 text=_body(3, "Hesperian"),
                 revid=revid,
                 timestamp=datetime(2026, 1, 1, tzinfo=timezone.utc),
+                pageid=fake_pageid(remote_page.title),
             ),
         )
         session.commit()
@@ -369,6 +371,7 @@ def test_the_ladder_endpoint_reports_whether_the_anchor_is_current(
                 text=_body(3, "A", "Now different."),
                 revid=6,
                 timestamp=datetime(2026, 1, 2, tzinfo=timezone.utc),
+                pageid=fake_pageid(page.title),
             ),
         )
         session.commit()
@@ -445,6 +448,7 @@ def _older(
                 revid=revid,
                 parentid=parentid,
                 timestamp=datetime(2026, 1, 1, tzinfo=timezone.utc),
+                pageid=fake_pageid(page.title),
             )
         ],
     )

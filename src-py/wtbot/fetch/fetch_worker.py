@@ -449,7 +449,18 @@ def _upsert_page(
                 title=remote.title,
                 expected_content_model=remote.content_model,
             )
-            page = Page(pk=title_row.pk, site_pk=site.pk, title=remote.title)
+            # Complete from the start: a Page row is a page the wiki holds,
+            # and its head columns are never empty.
+            page = Page(
+                pk=title_row.pk,
+                site_pk=site.pk,
+                title=remote.title,
+                content_model=remote.content_model,
+                text=remote.text,
+                pageid=remote.pageid,
+                revid=remote.revid,
+                remote_timestamp=remote.timestamp,
+            )
         else:
             title_row = session.get(Title, page.pk)
 

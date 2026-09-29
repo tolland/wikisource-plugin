@@ -1190,3 +1190,78 @@ def test_index_file_title_step_downgrades(baseline_engine: Engine) -> None:
         assert (
             connection.exec_driver_sql("SELECT count(*) FROM indexmeta").scalar() == 3
         )
+
+
+# -- step 3b: a page's head columns are NOT NULL ------------------------------
+
+HEAD_NOT_NULL = "e7a3d1f6b529"
+
+
+def _seed_pages_with_gaps(engine: Engine, *, pageid: str = "5") -> None:
+    """A page an older fetch left without a model or a timestamp -- both
+    derivable -- and optionally without a pageid, which is not."""
+    with engine.begin() as connection:
+        run = connection.exec_driver_sql
+        run(
+            "INSERT INTO site (pk, family, code, articlepath, created_at)"
+            f" VALUES (1, 'wikisource', 'en', '/wiki/$1', {_T})"
+        )
+        run(
+            "INSERT INTO title (pk, site_pk, title, expected_content_model)"
+            " VALUES (10, 1, 'Page:B.djvu/1', 'proofread-page')"
+        )
+        run(
+            "INSERT INTO page (pk, site_pk, title, pageid, revid, text,"
+            f" latest_revision_pk) VALUES (10, 1, 'Page:B.djvu/1', {pageid}, 7, 'x', 1)"
+        )
+        run(
+            "INSERT INTO revision (pk, page_pk, revid, timestamp, minor, observed_at)"
+            f" VALUES (1, 10, 7, '2026-03-01 00:00:00', 0, {_T})"
+        )
+
+
+def test_head_columns_become_not_null_after_filling_what_derives(
+    baseline_engine: Engine,
+) -> None:
+    _run(baseline_engine, command.upgrade, INDEX_FILE_TITLE)
+    _seed_pages_with_gaps(baseline_engine)
+
+    _run(baseline_engine, command.upgrade, HEAD_NOT_NULL)
+
+    with baseline_engine.connect() as connection:
+        run = connection.exec_driver_sql
+        assert run(
+            "SELECT content_model, remote_timestamp FROM page WHERE pk = 10"
+        ).one() == ("proofread-page", "2026-03-01 00:00:00")
+        required = {
+            row[1]: bool(row[3]) for row in run("PRAGMA table_info(page)").all()
+        }
+        assert all(
+            required[c]
+            for c in ("pageid", "revid", "remote_timestamp", "text", "content_model")
+        )
+        assert not required["contributor"] and not required["latest_revision_pk"]
+        assert run("PRAGMA foreign_key_check").all() == []
+
+
+def test_a_page_missing_an_id_stops_the_head_migration(baseline_engine: Engine) -> None:
+    _run(baseline_engine, command.upgrade, INDEX_FILE_TITLE)
+    _seed_pages_with_gaps(baseline_engine, pageid="NULL")
+
+    with pytest.raises(RuntimeError, match="Page:B.djvu/1"):
+        _run(baseline_engine, command.upgrade, HEAD_NOT_NULL)
+
+
+def test_the_head_step_downgrades(baseline_engine: Engine) -> None:
+    _run(baseline_engine, command.upgrade, INDEX_FILE_TITLE)
+    _seed_pages_with_gaps(baseline_engine)
+    _run(baseline_engine, command.upgrade, HEAD_NOT_NULL)
+
+    _run(baseline_engine, command.downgrade, INDEX_FILE_TITLE)
+
+    with baseline_engine.connect() as connection:
+        run = connection.exec_driver_sql
+        assert not any(
+            row[3] for row in run("PRAGMA table_info(page)").all() if row[1] == "pageid"
+        )
+        assert run("SELECT pageid FROM page").scalars().all() == [5]

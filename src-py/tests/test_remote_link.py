@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 import pytest
+from conftest import fake_pageid, make_page
 from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
@@ -51,7 +52,7 @@ def _revision(
         select(Page).where(Page.site_pk == site.pk, Page.title == title)
     ).first()
     if page is None:
-        page = Page(site_pk=site.pk, title=title)
+        page = make_page(site_pk=site.pk, title=title)
         session.add(page)
         session.commit()
         session.refresh(page)
@@ -65,6 +66,7 @@ def _revision(
         revid=revid,
         parentid=parent_revid,
         timestamp=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        pageid=fake_pageid(title),
     )
     revision = record_head_revision(session, page, remote)
     session.commit()

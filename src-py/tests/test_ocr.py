@@ -1,11 +1,11 @@
 import pytest
-from conftest import add_proofread_meta, index_file_title_pk
+from conftest import add_proofread_meta, index_file_title_pk, make_page
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
 from wtbot.api.ocr import get_client_builder
 from wtbot.main import create_app
-from wtbot.model import Page, Site
+from wtbot.model import Site
 from wtbot.model.wikisource.index_meta import IndexMeta
 from wtbot.ocrapi.client import FakeOcrClient, OcrError
 
@@ -27,7 +27,7 @@ def _seed(engine) -> int:
         site = Site(family=FAMILY, code=CODE)
         s.add(site)
         s.flush()
-        index = Page(
+        index = make_page(
             site_pk=site.pk,
             title=INDEX,
             content_model="proofread-index",
@@ -43,7 +43,7 @@ def _seed(engine) -> int:
                 page_count=1,
             )
         )
-        page = Page(
+        page = make_page(
             site_pk=site.pk,
             title=PAGE_TITLE,
             content_model="proofread-page",

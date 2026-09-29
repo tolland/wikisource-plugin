@@ -1,6 +1,6 @@
 import base64
 
-from conftest import drain
+from conftest import FAKE_TIMESTAMP, drain
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -77,6 +77,7 @@ def _remote(
         text=text,
         pageid=revid + 1000,
         revid=revid,
+        timestamp=FAKE_TIMESTAMP,
     )
 
 

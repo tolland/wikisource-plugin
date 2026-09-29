@@ -1,3 +1,5 @@
+from conftest import FAKE_TIMESTAMP, fake_pageid
+
 from wtbot.page_processors import (
     DefaultProcessor,
     FilePageProcessor,
@@ -19,6 +21,9 @@ def _remote(content_model: str, ns_canonical: str | None) -> RemotePage:
         namespace_canonical=ns_canonical,
         content_model=content_model,
         text="",
+        pageid=fake_pageid("T"),
+        revid=fake_pageid("T"),
+        timestamp=FAKE_TIMESTAMP,
     )
 
 

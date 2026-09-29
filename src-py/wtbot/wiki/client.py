@@ -8,6 +8,7 @@ from typing import Protocol, runtime_checkable
 import vcr
 
 from wtbot.settings import WikiSettings
+from wtbot.timeutil import utcnow
 from wtbot.wiki.failures import FailureKind, classify, is_login_session_timeout
 from wtbot.wiki.wiki_types import (
     EditConflict,
@@ -476,7 +477,7 @@ class PywikibotClient:
             # carries prop=info), so neither costs a request of its own.
             content_model=page.content_model,
             text=rev.text,
-            pageid=getattr(page, "pageid", None),
+            pageid=page.pageid,
             revid=rev.revid,
             parentid=rev.parentid,
             timestamp=rev.timestamp,  # pywikibot Timestamp is a datetime subclass
@@ -1034,7 +1035,13 @@ class FakeWikiClient:
             raise EditConflict(title, base_revid, current_revid)
         new_revid = (current_revid or 0) + 1
         if existing is not None:
-            updated = replace(existing, text=text, revid=new_revid, comment=comment)
+            updated = replace(
+                existing,
+                text=text,
+                revid=new_revid,
+                comment=comment,
+                timestamp=utcnow(),
+            )
         else:
             # Mimic what a ProofreadPage wiki reports for a page created by
             # this push: namespace from the title prefix, content model from
@@ -1052,6 +1059,7 @@ class FakeWikiClient:
                 text=text,
                 pageid=new_revid + 1000,
                 revid=new_revid,
+                timestamp=utcnow(),
                 comment=comment,
             )
         self._pages[title] = updated

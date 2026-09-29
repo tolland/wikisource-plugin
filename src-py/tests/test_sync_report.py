@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from conftest import add_proofread_meta, index_file_title_pk
+from conftest import add_proofread_meta, fake_pageid, index_file_title_pk, make_page
 from sqlmodel import Session, select
 
 from wtbot.fetch.revision_store import record_head_revision
@@ -66,7 +66,7 @@ def build_site(session: Session, label: str) -> Site:
 
 
 def build_index(session: Session, site: Site, title: str, *, sha1: str | None) -> Page:
-    page = Page(
+    page = make_page(
         site_pk=site.pk,
         title=title,
         content_model="proofread-index",
@@ -86,7 +86,7 @@ def build_index(session: Session, site: Site, title: str, *, sha1: str | None) -
     session.commit()
     if sha1 is not None:
         _, _, basename = title.partition(":")
-        file_page = Page(site_pk=site.pk, title=f"File:{basename}")
+        file_page = make_page(site_pk=site.pk, title=f"File:{basename}")
         session.add(file_page)
         session.commit()
         session.refresh(file_page)
@@ -123,7 +123,7 @@ def build_page(
     )
     session.commit()
     if text is not None:
-        page = Page(
+        page = make_page(
             pk=address.pk,
             site_pk=site.pk,
             title=title,
@@ -143,6 +143,7 @@ def build_page(
                 text=text,
                 revid=revid,
                 timestamp=WHEN,
+                pageid=fake_pageid(title),
             ),
         )
         session.commit()
@@ -385,6 +386,7 @@ def test_the_direction_decides_push_from_behind(client, engine):
                 revid=999,
                 parentid=901,
                 timestamp=WHEN,
+                pageid=fake_pageid(upstream_page.title),
             ),
         )
         session.commit()
@@ -673,6 +675,7 @@ def _ahead(engine, *, link: bool) -> dict:
                 revid=887,
                 parentid=901,
                 timestamp=WHEN,
+                pageid=fake_pageid(upstream_page.title),
             ),
         )
         session.commit()

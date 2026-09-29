@@ -40,15 +40,17 @@ class Page(SQLModel, table=True):
     title: str
     # namespace_key, dirty, fetch_status and local_modified_at belong to the
     # address and live on Title (see wtbot.model.wiki.title).
-    content_model: str | None = None  # remote contentmodel ('proofread-index', ...)
+    content_model: str  # remote contentmodel ('proofread-index', ...)
 
     # Remote identity / revision state -- this IS the conflict token. revid +
     # remote_timestamp are sent back as basetimestamp on save; a mismatch on save
     # is a real edit conflict, not a bug. sha1 is MediaWiki's content hash and is
     # also the cross-wiki "same content" oracle (see RemoteLink, future).
-    pageid: int | None = None
-    revid: int | None = None
-    remote_timestamp: datetime | None = None
+    # Required: a Page row exists only where the wiki holds the page, and a held
+    # page has all three (step 3 of the Title/WikiPage split).
+    pageid: int
+    revid: int
+    remote_timestamp: datetime
     contributor: str | None = None
     comment: str | None = None
     # `sha1` used to live here. It was dropped rather than kept: nothing read
@@ -60,7 +62,7 @@ class Page(SQLModel, table=True):
     # `text` is the full raw content as returned by the MediaWiki API
     # (page.text in pywikibot). Consumers that need a content-model-specific
     # view should parse this field with the page's content_model.
-    text: str | None = None
+    text: str
 
     # --- revision store (see wtbot.model.revision) -------------------------
     # The columns above stay as the head denormalisation -- mirroring

@@ -1,5 +1,6 @@
 import httpx
 import pytest
+from conftest import make_page
 from sqlmodel import Session, select
 from typer.testing import CliRunner
 
@@ -30,8 +31,8 @@ def _seed_reset_rows(engine) -> None:
         session.add_all([source_site, target_site])
         session.flush()
 
-        source_page = Page(site_pk=source_site.pk, title="Page:Book/1")
-        target_page = Page(site_pk=target_site.pk, title="Page:Book/1")
+        source_page = make_page(site_pk=source_site.pk, title="Page:Book/1")
+        target_page = make_page(site_pk=target_site.pk, title="Page:Book/1")
         session.add_all([source_page, target_page])
         session.flush()
         revision = Revision(page_pk=source_page.pk, revid=10)

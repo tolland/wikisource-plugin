@@ -128,10 +128,15 @@ class RemoteChange:
     namespace_key: int | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class RemotePage:
     """A plain snapshot of a wiki page, decoupled from pywikibot's Page object so
     the rest of the backend (dispatch, worker, tests) never imports pywikibot.
+
+    A page the wiki holds, so its identity is never optional: ``pageid``,
+    ``revid`` and ``timestamp`` are what a held page has, and what the Page
+    row requires. A title the wiki does not hold is ``PageNotFound`` (or
+    ``FileIsShared``), never a RemotePage with the ids missing.
 
     ``content_model`` is what drives handling ('proofread-index',
     'proofread-page', 'wikitext', ...); ``namespace_canonical`` ('File', 'Index',
@@ -144,10 +149,10 @@ class RemotePage:
 
     text: str
 
-    pageid: int | None = None
-    revid: int | None = None
+    pageid: int
+    revid: int
+    timestamp: datetime
     parentid: int | None = None
-    timestamp: datetime | None = None
     user: str | None = None
     comment: str | None = None
     sha1: str | None = None

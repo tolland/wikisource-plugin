@@ -1,5 +1,5 @@
 import pytest
-from conftest import index_file_title_pk
+from conftest import index_file_title_pk, make_page
 from fastapi import HTTPException
 from sqlmodel import Session, select
 
@@ -23,7 +23,7 @@ def _add_page(
         session.commit()
         session.refresh(site)
 
-    page = Page(
+    page = make_page(
         site_pk=site.pk,
         title=title,
         content_model=content_model,

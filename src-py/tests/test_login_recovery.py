@@ -3,6 +3,7 @@
 from unittest.mock import Mock
 
 import pytest
+from conftest import FAKE_TIMESTAMP, fake_pageid
 from sqlmodel import Session, select
 
 from wtbot.fetch.queue_runner import drain_queue
@@ -103,6 +104,8 @@ def test_drain_records_terminal_status_after_login_recovery(engine, persistent):
         content_model="wikitext",
         text="body",
         revid=1,
+        pageid=fake_pageid("Title"),
+        timestamp=FAKE_TIMESTAMP,
     )
     client._get_pages = Mock(
         side_effect=[

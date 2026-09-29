@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from conftest import add_proofread_meta, index_file_title_pk
+from conftest import add_proofread_meta, fake_pageid, index_file_title_pk, make_page
 from sqlmodel import Session, select
 
 from wtbot.fetch.revision_store import record_head_revision
@@ -61,7 +61,7 @@ def build_site(session: Session, family: str) -> Site:
 
 
 def build_index(session: Session, site: Site, title: str) -> Page:
-    page = Page(
+    page = make_page(
         site_pk=site.pk,
         title=title,
         content_model="proofread-index",
@@ -99,7 +99,7 @@ def build_page(
     "we did not look far enough" from "they disagree".
     """
     title = title or f"Page:Canadian patent 29537.djvu/{number}"
-    page = Page(site_pk=site.pk, title=title, content_model="proofread-page")
+    page = make_page(site_pk=site.pk, title=title, content_model="proofread-page")
     session.add(page)
     session.commit()
     session.refresh(page)
@@ -119,6 +119,7 @@ def build_page(
             revid=revid,
             parentid=parentid,
             timestamp=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            pageid=fake_pageid(title),
         ),
     )
     session.commit()
@@ -242,7 +243,7 @@ def test_only_pages_with_index_meta_can_be_a_work(session: Session) -> None:
     local, remote = build_site(session, "mywikisource"), build_site(
         session, "wikisource"
     )
-    local_page = Page(
+    local_page = make_page(
         site_pk=local.pk,
         title=f"{INDEX}/styles.css",
         content_model="sanitized-css",
@@ -340,7 +341,7 @@ def test_candidates_exclude_index_namespace_pages_without_index_meta(engine) -> 
     with Session(engine) as session:
         site = session.exec(select(Site).where(Site.label == "mywikisource")).one()
         session.add(
-            Page(
+            make_page(
                 site_pk=site.pk,
                 title=f"{INDEX}/styles.css",
                 content_model="sanitized-css",
@@ -587,6 +588,7 @@ def test_a_linked_pair_that_has_moved_still_needs_attention(client, engine) -> N
                 revid=99,
                 parentid=5,
                 timestamp=datetime(2026, 2, 1, tzinfo=timezone.utc),
+                pageid=fake_pageid(page.title),
             ),
         )
         session.commit()
@@ -607,7 +609,7 @@ def test_a_pair_belongs_even_when_the_other_page_has_no_meta(session: Session) -
     local_index = build_index(session, local, INDEX)
     remote_index = build_index(session, remote, REMOTE_INDEX)
     local_page = build_page(session, local, INDEX, 1, text="a", revid=5)
-    bare = Page(site_pk=remote.pk, title="Page:Canadian patent 29537.djvu/1")
+    bare = make_page(site_pk=remote.pk, title="Page:Canadian patent 29537.djvu/1")
     session.add(bare)
     session.commit()
 
