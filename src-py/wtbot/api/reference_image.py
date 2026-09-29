@@ -1,6 +1,8 @@
+import json
 import logging
 import mimetypes
 import re
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -81,6 +83,51 @@ def fetch_image_bytes(url: str) -> bytes:
     return resp.content
 
 
+@dataclass(frozen=True)
+class Validators:
+    """HTTP validators from the fetch that filled a cache entry, replayed as a
+    conditional GET so a re-uploaded scan is noticed. The wiki's thumb URL does
+    not change when the file does, so the URL cannot be the cache key."""
+
+    etag: str | None = None
+    last_modified: str | None = None
+
+    def headers(self) -> dict[str, str]:
+        out: dict[str, str] = {}
+        if self.etag:
+            out["If-None-Match"] = self.etag
+        if self.last_modified:
+            out["If-Modified-Since"] = self.last_modified
+        return out
+
+
+@dataclass(frozen=True)
+class FetchedImage:
+    """``data`` is None when the upstream answered 304: the cache is current."""
+
+    data: bytes | None
+    validators: Validators
+
+
+def fetch_image_if_changed(url: str, validators: Validators) -> FetchedImage:
+    """Module-level so tests monkeypatch it. Same transport rules as
+    `fetch_image_bytes`, plus the conditional headers."""
+    verify: bool | str = WikiSettings.from_env().ca_bundle or True
+    resp = requests.get(
+        url,
+        timeout=(5, 30),
+        verify=verify,
+        headers={"User-Agent": "wtbot (wikisource-plugin)", **validators.headers()},
+    )
+    if resp.status_code == 304:
+        return FetchedImage(None, validators)
+    resp.raise_for_status()
+    return FetchedImage(
+        resp.content,
+        Validators(resp.headers.get("ETag"), resp.headers.get("Last-Modified")),
+    )
+
+
 def _rendition_url(meta: ProofreadPageMeta | None, width: int | None) -> str | None:
     if meta is None:
         return None
@@ -99,10 +146,29 @@ def _cache_path(blob_root: Path, page_pk: int, width: int | None, url: str) -> P
     return blob_root / "page_images" / f"{page_pk}-{label}{ext}"
 
 
+def _validators_path(cache: Path) -> Path:
+    return cache.with_name(cache.name + ".validators")
+
+
+def _read_validators(cache: Path) -> Validators:
+    try:
+        return Validators(**json.loads(_validators_path(cache).read_text()))
+    except (OSError, ValueError, TypeError):
+        return Validators()
+
+
 def _fill_cache(cache: Path, url: str) -> None:
-    data = fetch_image_bytes(url)
+    """Fetch [url] into [cache] unless the cached bytes are still current.
+
+    A miss fetches unconditionally; a hit revalidates, so an updated scan
+    replaces the stale bytes and an unchanged one costs a 304."""
+    known = _read_validators(cache) if cache.exists() else Validators()
+    fetched = fetch_image_if_changed(url, known)
+    if fetched.data is None:
+        return
     cache.parent.mkdir(parents=True, exist_ok=True)
-    cache.write_bytes(data)
+    cache.write_bytes(fetched.data)
+    _validators_path(cache).write_text(json.dumps(asdict(fetched.validators)))
 
 
 def serve_reference_image(
@@ -125,15 +191,18 @@ def serve_reference_image(
 
     blob_root = Path(request.app.state.blob_root)
     cache = _cache_path(blob_root, page.pk, width, url)
-    if not cache.exists():
-        try:
-            _fill_cache(cache, url)
-        except Exception as exc:  # noqa: BLE001 - surface as bad gateway
+    had_cache = cache.exists()
+    try:
+        _fill_cache(cache, url)
+    except Exception as exc:  # noqa: BLE001 - surface as bad gateway
+        if not had_cache:
             raise ApiError(
                 status_code=502,
                 detail=f"scan image fetch failed: {exc}",
                 code="scan-image-fetch-failed",
             ) from exc
+        # Revalidation failed but we hold bytes: stale beats a broken pane.
+        logger.warning("scan revalidation failed, serving cached %s: %s", url, exc)
 
     background.add_task(
         _warm_next_page,
@@ -146,7 +215,11 @@ def serve_reference_image(
     )
 
     media_type = mimetypes.guess_type(cache.name)[0] or "image/jpeg"
-    return Response(content=cache.read_bytes(), media_type=media_type)
+    return Response(
+        content=cache.read_bytes(),
+        media_type=media_type,
+        headers={"Cache-Control": "no-cache"},  # clients revalidate too
+    )
 
 
 def _warm_next_page(

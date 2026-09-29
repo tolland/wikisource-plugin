@@ -96,3 +96,73 @@ def test_preview_still_renders_markup(client):
 
     assert resp.status_code == 200
     assert "html_base64" in resp.json()
+
+
+def _seed_scan(engine, url: str) -> None:
+    from sqlmodel import select
+
+    from wtbot.model import Title
+    from wtbot.model.wikisource.proofread_page_meta import ProofreadPageMeta
+
+    with Session(engine) as s:
+        page = s.exec(select(Title).where(Title.title == PAGE)).one()
+        meta = s.exec(
+            select(ProofreadPageMeta).where(ProofreadPageMeta.title_pk == page.pk)
+        ).one()
+        meta.source_image_url = url
+        s.add(meta)
+        s.commit()
+
+
+def test_an_updated_scan_replaces_the_cached_bytes(
+    client, engine, tmp_path, monkeypatch
+):
+    """The wiki's thumb URL is stable across a re-upload, so the cache must
+    revalidate rather than trust its own existence."""
+    from wtbot.api import reference_image as ri
+
+    served = {"body": b"v1", "etag": '"1"'}
+    calls: list[str | None] = []
+
+    def fake(url, validators):
+        calls.append(validators.etag)
+        if validators.etag == served["etag"]:
+            return ri.FetchedImage(None, validators)
+        return ri.FetchedImage(served["body"], ri.Validators(etag=served["etag"]))
+
+    monkeypatch.setattr(ri, "fetch_image_if_changed", fake)
+    client.app.state.blob_root = tmp_path
+    _seed_scan(engine, "https://wiki.test/thumb/page1-800px-Book.pdf.jpg")
+    params = {"title": PAGE}
+    c = client
+    assert c.get("/reference-image", params=params).content == b"v1"
+    assert c.get("/reference-image", params=params).content == b"v1"  # 304
+
+    served.update(body=b"v2", etag='"2"')
+    assert c.get("/reference-image", params=params).content == b"v2"
+
+    assert calls == [None, '"1"', '"1"']
+
+
+def test_a_failed_revalidation_serves_the_cached_scan(
+    client, engine, tmp_path, monkeypatch
+):
+    from wtbot.api import reference_image as ri
+
+    state = {"up": True}
+
+    def fake(url, validators):
+        if not state["up"]:
+            raise OSError("wiki down")
+        return ri.FetchedImage(b"v1", ri.Validators())
+
+    monkeypatch.setattr(ri, "fetch_image_if_changed", fake)
+    client.app.state.blob_root = tmp_path
+    _seed_scan(engine, "https://wiki.test/thumb/page1-800px-Book.pdf.jpg")
+    c = client
+    assert c.get("/reference-image", params={"title": PAGE}).content == b"v1"
+    state["up"] = False
+    resp = c.get("/reference-image", params={"title": PAGE})
+
+    assert resp.status_code == 200
+    assert resp.content == b"v1"
