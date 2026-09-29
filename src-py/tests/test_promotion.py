@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import pytest
 from conftest import add_proofread_meta, drain, fake_pageid, make_page
 from fastapi.testclient import TestClient
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from wtbot.fetch.revision_store import record_head_revision, record_history
 from wtbot.linking.remote_link_store import ladder
@@ -175,15 +175,15 @@ def add_source_revision(
     with Session(engine) as session:
         upstream = session.exec(select(Site).where(Site.label == "upstream")).one()
         page = session.exec(
-            select(Page).where(
-                Page.site_pk == upstream.pk, Page.title == "Page:Varieties.djvu/1"
-            )
+            select(Page)
+            .join(Title, col(Title.pk) == col(Page.pk))
+            .where(Page.site_pk == upstream.pk, Title.title == "Page:Varieties.djvu/1")
         ).one()
         record_head_revision(
             session,
             page,
             RemotePage(
-                title=page.title,
+                title=page.address.title,
                 namespace_key=250,
                 namespace_canonical="Page",
                 content_model="proofread-page",
@@ -193,7 +193,7 @@ def add_source_revision(
                 timestamp=WHEN,
                 user="Editor",
                 comment=comment,
-                pageid=fake_pageid(page.title),
+                pageid=fake_pageid(page.address.title),
             ),
         )
         session.commit()
@@ -291,7 +291,7 @@ def test_a_work_report_stages_one_page_batch_with_ordered_revisions(engine):
             .order_by(Promotion.pk)
         ).all()
         ends = batch_ends(session, batch)
-        assert ends.source_page.title == "Page:Varieties.djvu/1"
+        assert ends.source_page.address.title == "Page:Varieties.djvu/1"
         assert ends.target_title.title == "Page:Varieties.djvu/1"
         assert page_number_of(session, batch) == 1  # from the source meta
         assert len(rows) == 2
@@ -419,13 +419,15 @@ def test_each_source_revision_is_an_ordered_promotion(pushing_client, engine):
 
         local = session.exec(select(Site).where(Site.label == "local")).one()
         target = session.exec(
-            select(Page).where(Page.site_pk == local.pk, Page.title == PAGE_TITLE)
+            select(Page)
+            .join(Title, col(Title.pk) == col(Page.pk))
+            .where(Page.site_pk == local.pk, Title.title == PAGE_TITLE)
         ).one()
         record_head_revision(
             session,
             target,
             RemotePage(
-                title=target.title,
+                title=target.address.title,
                 namespace_key=250,
                 namespace_canonical="Page",
                 content_model="proofread-page",
@@ -433,7 +435,7 @@ def test_each_source_revision_is_an_ordered_promotion(pushing_client, engine):
                 revid=4243,
                 parentid=4242,
                 timestamp=WHEN,
-                pageid=fake_pageid(target.title),
+                pageid=fake_pageid(target.address.title),
             ),
         )
         record_history(
@@ -441,7 +443,7 @@ def test_each_source_revision_is_an_ordered_promotion(pushing_client, engine):
             target,
             [
                 RemotePage(
-                    title=target.title,
+                    title=target.address.title,
                     namespace_key=250,
                     namespace_canonical="Page",
                     content_model="proofread-page",
@@ -449,7 +451,7 @@ def test_each_source_revision_is_an_ordered_promotion(pushing_client, engine):
                     revid=4242,
                     parentid=254,
                     timestamp=WHEN,
-                    pageid=fake_pageid(target.title),
+                    pageid=fake_pageid(target.address.title),
                 )
             ],
         )
@@ -458,7 +460,9 @@ def test_each_source_revision_is_an_ordered_promotion(pushing_client, engine):
 
         upstream = session.exec(select(Site).where(Site.label == "upstream")).one()
         source = session.exec(
-            select(Page).where(Page.site_pk == upstream.pk, Page.title == PAGE_TITLE)
+            select(Page)
+            .join(Title, col(Title.pk) == col(Page.pk))
+            .where(Page.site_pk == upstream.pk, Title.title == PAGE_TITLE)
         ).one()
         pairs = []
         for rung in ladder(session, page_pk=source.pk, other_page_pk=target.pk)[-2:]:
@@ -709,7 +713,7 @@ def test_a_target_that_already_holds_the_body_is_skipped(pushing_client, engine)
             session,
             target,
             RemotePage(
-                title=target.title,
+                title=target.address.title,
                 namespace_key=250,
                 namespace_canonical="Page",
                 content_model="proofread-page",
@@ -717,7 +721,7 @@ def test_a_target_that_already_holds_the_body_is_skipped(pushing_client, engine)
                 revid=255,
                 parentid=254,
                 timestamp=WHEN,
-                pageid=fake_pageid(target.title),
+                pageid=fake_pageid(target.address.title),
             ),
         )
         session.commit()
@@ -1006,7 +1010,9 @@ def test_granular_update_refuses_a_moved_cached_target_without_writing(engine):
         with Session(engine) as session:
             local = session.exec(select(Site).where(Site.label == "local")).one()
             target = session.exec(
-                select(Page).where(Page.site_pk == local.pk, Page.title == PAGE_TITLE)
+                select(Page)
+                .join(Title, col(Title.pk) == col(Page.pk))
+                .where(Page.site_pk == local.pk, Title.title == PAGE_TITLE)
             ).one()
             record_head_revision(
                 session,
@@ -1049,8 +1055,8 @@ def test_a_push_writes_to_the_targets_current_name(session):
     session.commit()
 
     moved = session.get(Title, target.pk)
-    moved.title = target.title = "Page:Book (1901).djvu/1"
-    session.add_all([moved, target])
+    moved.title = "Page:Book (1901).djvu/1"
+    session.add(moved)
     session.commit()
 
     ends = batch_ends(session, batch)

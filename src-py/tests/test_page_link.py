@@ -181,7 +181,7 @@ def test_a_pairing_survives_a_rename(session: Session) -> None:
     pairing = pair_pages(session, local_page.address, remote_page.address)
     session.commit()
 
-    remote_page.title = "Page:Renamed upstream.djvu/1"
+    remote_page.address.title = "Page:Renamed upstream.djvu/1"
     session.add(remote_page)
     session.commit()
 

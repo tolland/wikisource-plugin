@@ -523,7 +523,7 @@ def _change_review(session: Session, promotion: Promotion) -> ChangeReviewOut:
             target_body.splitlines(keepends=True),
             promotion.body.splitlines(keepends=True),
             fromfile=f"{target_title}@{promotion.base_revid or 'missing'}",
-            tofile=f"{source_page.title}@{source_revision.revid}",
+            tofile=f"{source_page.address.title}@{source_revision.revid}",
         )
     )
     blockers = _change_blockers(session, promotion)
@@ -534,7 +534,7 @@ def _change_review(session: Session, promotion: Promotion) -> ChangeReviewOut:
         intent=promotion.intent,
         source=ChangeSourceOut(
             site=_site_name(source_site),
-            title=source_page.title,
+            title=source_page.address.title,
             revid=source_revision.revid,
             revision_pk=source_revision.pk,
             contributor=source_revision.contributor,
@@ -876,7 +876,7 @@ def _batch_out(
         status=batch.status,
         source_site=_site_name(ends.source_site),
         target_site=_site_name(ends.target_site),
-        source_title=ends.source_page.title,
+        source_title=ends.source_page.address.title,
         target_title=ends.target_title.title,
         page_number=page_number_of(session, batch),
         work_pk=work.pk if work is not None else None,

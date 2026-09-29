@@ -3,10 +3,10 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from conftest import fake_pageid, fetch_and_drain, register_site
 from fastapi.testclient import TestClient
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from wtbot.main import create_app
-from wtbot.model import FetchStatus, Page, Revision
+from wtbot.model import FetchStatus, Page, Revision, Title
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import RemotePage
 
@@ -69,7 +69,11 @@ def test_a_deep_fetch_stores_the_revisions_behind_the_head(app_with_history, eng
     assert result["request"]["status"] == FetchStatus.done.value
 
     with Session(engine) as session:
-        page = session.exec(select(Page).where(Page.title == TITLE)).one()
+        page = session.exec(
+            select(Page)
+            .join(Title, col(Title.pk) == col(Page.pk))
+            .where(Title.title == TITLE)
+        ).one()
         revisions = session.exec(
             select(Revision).where(Revision.page_pk == page.pk).order_by(Revision.revid)
         ).all()
@@ -91,7 +95,11 @@ def test_a_shallow_fetch_walks_no_history(app_with_history, engine):
     fetch_and_drain(app_with_history, {"title": TITLE, "label": LABEL})
 
     with Session(engine) as session:
-        page = session.exec(select(Page).where(Page.title == TITLE)).one()
+        page = session.exec(
+            select(Page)
+            .join(Title, col(Title.pk) == col(Page.pk))
+            .where(Title.title == TITLE)
+        ).one()
         revisions = session.exec(
             select(Revision).where(Revision.page_pk == page.pk)
         ).all()
@@ -103,7 +111,11 @@ def test_the_walk_is_bounded_by_the_requested_depth(app_with_history, engine):
     fetch_and_drain(app_with_history, {"title": TITLE, "label": LABEL, "revisions": 2})
 
     with Session(engine) as session:
-        page = session.exec(select(Page).where(Page.title == TITLE)).one()
+        page = session.exec(
+            select(Page)
+            .join(Title, col(Title.pk) == col(Page.pk))
+            .where(Title.title == TITLE)
+        ).one()
         revisions = session.exec(
             select(Revision).where(Revision.page_pk == page.pk).order_by(Revision.revid)
         ).all()
@@ -170,6 +182,10 @@ def test_a_history_that_cannot_be_recorded_does_not_fail_the_fetch(engine):
 
     assert result["request"]["status"] == FetchStatus.done.value
     with Session(engine) as session:
-        page = session.exec(select(Page).where(Page.title == TITLE)).one()
+        page = session.exec(
+            select(Page)
+            .join(Title, col(Title.pk) == col(Page.pk))
+            .where(Title.title == TITLE)
+        ).one()
     assert page.revid == 3
     assert page.address.fetch_status == "done"

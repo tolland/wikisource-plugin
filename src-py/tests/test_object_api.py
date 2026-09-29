@@ -48,13 +48,13 @@ def test_pages_route_returns_raw_text_and_content_model(session: Session):
     assert listed.text == page.text
 
     fetched = get_page(page.pk, session)
-    assert fetched.title == page.title
+    assert fetched.title == page.address.title
     assert fetched.content_model == "sanitized-css"
 
     [exact] = list_pages(
         session,
         site_pk=site.pk,
-        title=page.title,
+        title=page.address.title,
         offset=0,
         limit=100,
     )

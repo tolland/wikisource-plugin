@@ -1,43 +1,38 @@
 from datetime import datetime
 
-from sqlalchemy import UniqueConstraint, event, insert, select
-from sqlalchemy.orm import Session
 from sqlmodel import Field, Relationship, SQLModel
 
 from wtbot.model.wiki.title import Title
 
 
 class Page(SQLModel, table=True):
-    """One (site, title) object -- mainspace, Index:, Page:, Book:, anything.
-    One table, not three: "search/replace across the whole work" is a core use
-    case and wants a single scan. The content model determines supported operations;
-    namespace identity and capabilities come from the per-site namespace map.
+    """A page the wiki holds, at a Title -- mainspace, Index:, Page:, Book:,
+    anything. A row exists iff the wiki holds the page (step 3 of the
+    Title/WikiPage split, docs/design/pages-and-existence.md); everything about
+    the address, including its name, is the Title's.
 
-    (site_pk, title) is the natural key. pageid/revid are wiki-local and not
-    comparable across independently-running instances -- which is exactly why
-    this can't be ``pageid INTEGER PRIMARY KEY``.
+    One table, not three: "search/replace across the whole work" is a core use
+    case and wants a single scan. The content model determines supported
+    operations; namespace identity and capabilities come from the per-site
+    namespace map. pageid/revid are wiki-local and not comparable across
+    independently-running instances -- which is exactly why this can't be
+    ``pageid INTEGER PRIMARY KEY``.
     """
 
-    __table_args__ = (UniqueConstraint("site_pk", "title", name="uq_page_site_title"),)
-
     pk: int | None = Field(default=None, primary_key=True, foreign_key="title.pk")
-    """Shared with ``Title``: every Page is a Title. See ``wtbot.model.wiki.title``.
-
-    Leave it None when constructing a Page and the flush supplies it from the
-    Title at the same (site, title), creating that Title if need be -- see
-    ``_every_page_is_a_title`` below."""
+    """Shared with ``Title``: a page is at exactly one title and takes its pk.
+    Set it from the Title when constructing a Page (or set ``address``, and the
+    flush copies the Title's pk across)."""
 
     address: Title = Relationship(sa_relationship_kwargs={"lazy": "selectin"})
-    """The Title this page is at -- the row holding what belongs to the address
+    """The Title this page is at -- its name, and what belongs to the address
     (namespace, fetch status, dirty) rather than to the page the wiki holds.
     Loaded with the page, so a listing of pages costs one extra query, not one
-    per page. Unset on a Page not yet flushed: the flush supplies ``pk``."""
+    per page."""
 
     site_pk: int = Field(foreign_key="site.pk")
+    """The title's site, repeated. Written once, from the Title."""
 
-    # Full title incl. namespace prefix, e.g. 'Page:Foo.djvu/171'. Mirrors
-    # Title.title during the transition; written once, when both rows are made.
-    title: str
     # namespace_key, dirty, fetch_status and local_modified_at belong to the
     # address and live on Title (see wtbot.model.wiki.title).
     content_model: str  # remote contentmodel ('proofread-index', ...)
@@ -90,69 +85,4 @@ class Page(SQLModel, table=True):
     level."""
 
     def __repr__(self) -> str:  # pragma: no cover - convenience only
-        return f"Page(pk={self.pk}, title={self.title!r})"
-
-
-_WIKITEXT = "wikitext"
-
-# @TODO this is patching Page to Title, creating the Title if missing
-# while the rest of the code base is migrated to the shared primary key
-# association model relationship. Needs to be removed.
-
-
-@event.listens_for(Session, "before_flush")
-def _every_page_is_a_title(session: Session, _flush_context, _instances) -> None:
-    """Give each new Page the pk of its Title, creating the Title if missing.
-
-    A transition rule, not a permanent one. While ``Page`` still stands for
-    "a page we know about", everything that creates one -- the fetch worker,
-    the index fan-out, and dozens of test fixtures -- must also create its
-    Title, and one hook here is a single place to hold that rule instead of
-    a copy of it at every call site. The places that know better than a
-    fallback (the fan-out knows its children are ``proofread-page``) create
-    the Title themselves first; this only fills in for the rest, and its
-    guess is the page's own content model or MediaWiki's ``wikitext``.
-
-    It goes when Page stops being created directly, i.e. when it becomes the
-    row a fetch writes for a title the wiki actually holds.
-
-    Uses the session's connection rather than ORM objects: a hook may not
-    flush, and the Title's pk has to exist before the Page row is inserted.
-    """
-    new_pages = [obj for obj in session.new if isinstance(obj, Page)]
-    if not new_pages:
-        return
-    connection = session.connection()
-    for page in new_pages:
-        at_address = connection.execute(
-            select(Title.pk).where(
-                Title.site_pk == page.site_pk, Title.title == page.title
-            )
-        ).scalar()
-        if page.pk is None:
-            page.pk = at_address or _insert_title(connection, page)
-            continue
-        # An explicit pk (fixtures pin them to prove pk-independence) names
-        # the Title as well; it must not contradict one already at the address.
-        if at_address is not None and at_address != page.pk:
-            raise ValueError(
-                f"Page {page.title!r} was given pk {page.pk}, but the Title at "
-                f"that address already has pk {at_address}"
-            )
-        if (
-            at_address is None
-            and connection.execute(select(Title.pk).where(Title.pk == page.pk)).scalar()
-            is None
-        ):
-            _insert_title(connection, page, pk=page.pk)
-
-
-def _insert_title(connection, page: Page, *, pk: int | None = None) -> int:
-    values = {
-        "site_pk": page.site_pk,
-        "title": page.title,
-        "expected_content_model": page.content_model or _WIKITEXT,
-    }
-    if pk is not None:
-        values["pk"] = pk
-    return connection.execute(insert(Title).values(**values)).inserted_primary_key[0]
+        return f"Page(pk={self.pk}, revid={self.revid})"

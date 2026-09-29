@@ -41,7 +41,7 @@ def list_pages(
     statement = (
         select(Page)
         .join(Title, col(Title.pk) == col(Page.pk))
-        .order_by(Page.title)
+        .order_by(Title.title)
         .offset(offset)
         .limit(limit)
     )
@@ -52,9 +52,9 @@ def list_pages(
     if content_model is not None:
         statement = statement.where(Page.content_model == content_model)
     if title is not None:
-        statement = statement.where(Page.title == title)
+        statement = statement.where(Title.title == title)
     if title_contains:
-        statement = statement.where(Page.title.contains(title_contains))
+        statement = statement.where(col(Title.title).contains(title_contains))
     return [PageRow.of_page(page) for page in session.exec(statement).all()]
 
 
@@ -82,12 +82,12 @@ def query_pages(
         select(Page, Site.label)
         .join(Site, Site.pk == Page.site_pk)
         .join(Title, col(Title.pk) == col(Page.pk))
-        .order_by(Site.label, Page.title, Page.pk)
+        .order_by(Site.label, Title.title, Page.pk)
         .limit(limit)
     )
     filters = (
         (pk, Page.pk),
-        (title, Page.title),
+        (title, Title.title),
         (pageid, Page.pageid),
         (revid, Page.revid),
         (site_label, Site.label),
@@ -98,7 +98,7 @@ def query_pages(
         if value is not None:
             statement = statement.where(column == value)
     if title_contains:
-        statement = statement.where(Page.title.contains(title_contains))
+        statement = statement.where(col(Title.title).contains(title_contains))
 
     page_rows = list(session.exec(statement).all())
     if not page_rows:

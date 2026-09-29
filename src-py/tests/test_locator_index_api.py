@@ -1,8 +1,8 @@
 import pytest
 from conftest import add_proofread_meta, make_page
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
-from wtbot.model import EditJournal, Page, Site
+from wtbot.model import EditJournal, Page, Site, Title
 
 """Tests for GET /locator-index/{page-numbers,sections} — resolving a
 back-of-book locator to the Page: that holds it. Mirrors test_page_nav.py's
@@ -300,7 +300,9 @@ def test_unsaved_local_edit_is_visible_to_section_lookup(client, engine, seeded)
     # before any commit -- effective_body() is what makes that true.
     with Session(engine) as s:
         page = s.exec(
-            select(Page).where(Page.title == "Page:Principles_of_mechanics.pdf/164")
+            select(Page)
+            .join(Title, col(Title.pk) == col(Page.pk))
+            .where(Title.title == "Page:Principles_of_mechanics.pdf/164")
         ).first()
         s.add(
             EditJournal(

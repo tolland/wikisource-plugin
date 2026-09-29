@@ -374,8 +374,8 @@ def _proposals(session: Session, work: IndexLink) -> list[LinkProposal]:
         session,
         local_site=local_site,
         remote_site=remote_site,
-        local_index_title=local_page.title,
-        remote_index_title=remote_page.title,
+        local_index_title=local_page.address.title,
+        remote_index_title=remote_page.address.title,
     )
 
 

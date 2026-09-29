@@ -114,14 +114,16 @@ def test_fan_out_an_index_end_to_end(engine, tmp_path, wiki_client) -> None:
 
     with Session(engine) as session:
         pages = session.exec(select(Page)).all()
-        index_row = next(p for p in pages if p.title == CANADIAN_PATENT_INDEX)
+        index_row = next(p for p in pages if p.address.title == CANADIAN_PATENT_INDEX)
         meta = session.exec(
             select(IndexMeta).where(IndexMeta.title_pk == index_row.pk)
         ).one()
         assert meta.page_count is not None and meta.page_count > 0
         # The children the fan-out discovered mid-drain, not just the index.
         assert len(pages) > 1
-        assert any(p.title.startswith(f"{CANADIAN_PATENT_INDEX}") for p in pages)
+        assert any(
+            p.address.title.startswith(f"{CANADIAN_PATENT_INDEX}") for p in pages
+        )
 
         blob = session.exec(
             select(FileBlob).where(FileBlob.page_pk == index_row.pk)

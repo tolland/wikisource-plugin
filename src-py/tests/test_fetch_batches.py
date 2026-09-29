@@ -1,11 +1,11 @@
 """Batch boundaries, site isolation, and individual queue outcomes."""
 
 from conftest import FAKE_TIMESTAMP, fake_pageid
-from sqlmodel import select
+from sqlmodel import col, select
 
 from wtbot.fetch.fetch_worker import run_pending
 from wtbot.fetch.utils import _claim_batch
-from wtbot.model import FetchRequest, FetchStatus, Page, Site
+from wtbot.model import FetchRequest, FetchStatus, Page, Site, Title
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import RemotePage, RemotePageImages
 
@@ -76,7 +76,11 @@ def test_same_titles_are_routed_to_their_own_site_and_image_cache(session):
             },
         )
     assert run_pending(session, lambda site: clients[site.pk], image_cache={}) == 2
-    rows = session.exec(select(Page).where(Page.title == title)).all()
+    rows = session.exec(
+        select(Page)
+        .join(Title, col(Title.pk) == col(Page.pk))
+        .where(Title.title == title)
+    ).all()
     assert {row.text for row in rows} == {"a", "b"}
     assert all(client.image_batches == [[title]] for client in clients.values())
 

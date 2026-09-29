@@ -143,4 +143,4 @@ def test_proofread_pages_match_across_underscore_space(session):
     # Querying by either spelling returns both members.
     for query_title in (spaced, underscored):
         titles = {p.name for p in store.proofread_pages(site, query_title)}
-        assert titles == {real.title, stub.title}, query_title
+        assert titles == {real.address.title, stub.address.title}, query_title

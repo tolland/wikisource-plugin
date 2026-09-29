@@ -11,13 +11,12 @@ from wtbot.model import Page, Title
 [Entry] is the unit most readers want: a title, and the page behind it if the
 wiki holds one (step 3 of the split: a Page row exists only then).
 
-Two operations:
+Two operations, and lookups by address ([entry_at], [page_at]):
 
 - [ensure_title] -- the Title at an address, created with the caller's guess
-  at its content model if we have not seen the address before. Callers that
-  know better than a fallback (the index fan-out, the fetch) use this before
-  creating a Page, so the guess on record is theirs rather than the transition
-  hook's.
+  at its content model if we have not seen the address before. Every Page is
+  created at a Title obtained this way: a page has no name of its own, and
+  takes its title's pk.
 - [record_fetched_content_model] -- the fetch's check of that guess. The wiki
   has now said what the page is; a guess that disagreed is logged, because
   anything attached on the strength of it (``ProofreadPageMeta`` on a title
@@ -116,3 +115,12 @@ def record_fetched_content_model(session: Session, row: Title, fetched: str) -> 
     )
     row.expected_content_model = fetched
     session.add(row)
+
+
+def page_at(session: Session, *, site_pk: int, title: str) -> Page | None:
+    """The page the wiki holds at (site, title), if we have fetched it."""
+    return session.exec(
+        select(Page)
+        .join(Title, col(Title.pk) == col(Page.pk))
+        .where(Title.site_pk == site_pk, Title.title == title)
+    ).first()

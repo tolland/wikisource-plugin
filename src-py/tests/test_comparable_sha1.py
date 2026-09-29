@@ -146,14 +146,14 @@ def test_two_sites_bodies_share_a_digest_but_not_a_row(session: Session) -> None
             session,
             page,
             RemotePage(
-                title=page.title,
+                title=page.address.title,
                 namespace_key=250,
                 namespace_canonical="Page",
                 content_model=MODEL,
                 text=body,
                 revid=7,
                 timestamp=datetime(2026, 1, 1, tzinfo=timezone.utc),
-                pageid=fake_pageid(page.title),
+                pageid=fake_pageid(page.address.title),
             ),
         )
         session.commit()

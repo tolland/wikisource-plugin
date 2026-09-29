@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from conftest import add_proofread_meta, fake_pageid, index_file_title_pk, make_page
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from wtbot.fetch.revision_store import record_head_revision
 from wtbot.linking.index_link_store import (
@@ -18,6 +18,7 @@ from wtbot.model import (
     RevisionLink,
     Site,
     SiteCredential,
+    Title,
 )
 from wtbot.wiki.wiki_types import RemotePage
 
@@ -571,16 +572,18 @@ def test_a_linked_pair_that_has_moved_still_needs_attention(client, engine) -> N
     with Session(engine) as session:
         local = session.exec(select(Site).where(Site.label == "mywikisource")).one()
         page = session.exec(
-            select(Page).where(
+            select(Page)
+            .join(Title, col(Title.pk) == col(Page.pk))
+            .where(
                 Page.site_pk == local.pk,
-                Page.title == "Page:Canadian patent 29537.djvu/1",
+                Title.title == "Page:Canadian patent 29537.djvu/1",
             )
         ).one()
         record_head_revision(
             session,
             page,
             RemotePage(
-                title=page.title,
+                title=page.address.title,
                 namespace_key=250,
                 namespace_canonical="Page",
                 content_model="proofread-page",
@@ -588,7 +591,7 @@ def test_a_linked_pair_that_has_moved_still_needs_attention(client, engine) -> N
                 revid=99,
                 parentid=5,
                 timestamp=datetime(2026, 2, 1, tzinfo=timezone.utc),
-                pageid=fake_pageid(page.title),
+                pageid=fake_pageid(page.address.title),
             ),
         )
         session.commit()

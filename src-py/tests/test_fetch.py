@@ -8,7 +8,7 @@ which is also the only way to test the state *between* them.
 import pytest
 from conftest import FAKE_TIMESTAMP, fake_pageid, fetch_and_drain, register_site
 from fastapi.testclient import TestClient
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from wtbot.fetch.fetch_worker import run_pending
 from wtbot.fetch.revision_store import head_content
@@ -203,7 +203,11 @@ def test_fetch_then_drain_persists(app_with_fake, engine):
     from sqlmodel import Session, select
 
     with Session(engine) as s:
-        rows = s.exec(select(Page).where(Page.title == index_remote.title)).all()
+        rows = s.exec(
+            select(Page)
+            .join(Title, col(Title.pk) == col(Page.pk))
+            .where(Title.title == index_remote.title)
+        ).all()
         assert len(rows) == 1
         # The wiki's hash lives on the slot's Content, normalised to base-36 --
         # Page.sha1 was dropped because it held the same value under a name
@@ -250,7 +254,11 @@ def test_refetch_updates_in_place(app_with_fake, engine):
     fetch_and_drain(client, payload)
 
     with Session(engine) as s:
-        rows = s.exec(select(Page).where(Page.title == index_remote.title)).all()
+        rows = s.exec(
+            select(Page)
+            .join(Title, col(Title.pk) == col(Page.pk))
+            .where(Title.title == index_remote.title)
+        ).all()
         assert len(rows) == 1
 
 
@@ -303,12 +311,12 @@ def test_index_fanout_creates_pages_and_children(app_with_index_fanout, engine):
     with Session(engine) as s:
         pages = s.exec(select(Page)).all()
         assert len(pages) == 6
-        titles = {p.title for p in pages}
+        titles = {p.address.title for p in pages}
         assert _INDEX_TITLE in titles
         assert f"{_INDEX_TITLE}/styles.css" in titles
 
         # page_count (from <pagelist> wikitext) is recorded on IndexMeta.
-        index_row = next(p for p in pages if p.title == _INDEX_TITLE)
+        index_row = next(p for p in pages if p.address.title == _INDEX_TITLE)
         index_meta = s.exec(
             select(IndexMeta).where(IndexMeta.title_pk == index_row.pk)
         ).one()
@@ -316,16 +324,22 @@ def test_index_fanout_creates_pages_and_children(app_with_index_fanout, engine):
 
         for n in range(1, 4):
             assert f"Page:Tractatus.djvu/{n}" in titles
-        page_one = next(p for p in pages if p.title == "Page:Tractatus.djvu/1")
+        page_one = next(p for p in pages if p.address.title == "Page:Tractatus.djvu/1")
         assert page_one.text == "page 1 content"
         assert page_one.content_model == "proofread-page"
-        styles = next(p for p in pages if p.title == f"{_INDEX_TITLE}/styles.css")
+        styles = next(
+            p for p in pages if p.address.title == f"{_INDEX_TITLE}/styles.css"
+        )
         assert styles.text == ".pagetext { font-variant-numeric: oldstyle-nums; }"
         assert styles.content_model == "sanitized-css"
 
     # IndexMeta was seeded with a filename-safe default short_name.
     with Session(engine) as s:
-        index_page = s.exec(select(Page).where(Page.title == _INDEX_TITLE)).first()
+        index_page = s.exec(
+            select(Page)
+            .join(Title, col(Title.pk) == col(Page.pk))
+            .where(Title.title == _INDEX_TITLE)
+        ).first()
         meta = s.exec(
             select(IndexMeta).where(IndexMeta.title_pk == index_page.pk)
         ).first()
@@ -335,7 +349,11 @@ def test_index_fanout_creates_pages_and_children(app_with_index_fanout, engine):
 
     # FileBlob belongs to the backing File:, as required by sync.
     with Session(engine) as s:
-        index_page = s.exec(select(Page).where(Page.title == _INDEX_TITLE)).one()
+        index_page = s.exec(
+            select(Page)
+            .join(Title, col(Title.pk) == col(Page.pk))
+            .where(Title.title == _INDEX_TITLE)
+        ).one()
         from wtbot.sync import _file_of
 
         file_title, blob = _file_of(s, index_page)
@@ -411,7 +429,7 @@ def test_worker_index_fanout_queues_index_subpages(
         "Page:Tractatus.djvu/3",
         asset_title,
     }
-    assert {p.title for p in session.exec(select(Page)).all()} == {
+    assert {p.address.title for p in session.exec(select(Page)).all()} == {
         _INDEX_TITLE,
         _FILE_TITLE,
         "Page:Tractatus.djvu/1",
@@ -419,7 +437,11 @@ def test_worker_index_fanout_queues_index_subpages(
         "Page:Tractatus.djvu/3",
         asset_title,
     }
-    styles = session.exec(select(Page).where(Page.title == asset_title)).one()
+    styles = session.exec(
+        select(Page)
+        .join(Title, col(Title.pk) == col(Page.pk))
+        .where(Title.title == asset_title)
+    ).one()
     styles_meta = session.exec(
         select(ProofreadPageMeta).where(ProofreadPageMeta.title_pk == styles.pk)
     ).first()
@@ -448,7 +470,11 @@ def test_proofread_page_metadata_uses_content_model(session):
     session.commit()
 
     assert run_pending(session, lambda _: wiki) == 1
-    page = session.exec(select(Page).where(Page.title == remote.title)).one()
+    page = session.exec(
+        select(Page)
+        .join(Title, col(Title.pk) == col(Page.pk))
+        .where(Title.title == remote.title)
+    ).one()
     meta = session.exec(
         select(ProofreadPageMeta).where(ProofreadPageMeta.title_pk == page.pk)
     ).one()
@@ -492,7 +518,11 @@ def test_proofread_page_fetch_populates_page_meta(session):
 
     assert run_pending(session, lambda _: wiki) == 1
 
-    page = session.exec(select(Page).where(Page.title == title)).one()
+    page = session.exec(
+        select(Page)
+        .join(Title, col(Title.pk) == col(Page.pk))
+        .where(Title.title == title)
+    ).one()
     meta = session.exec(
         select(ProofreadPageMeta).where(ProofreadPageMeta.title_pk == page.pk)
     ).one()
@@ -526,7 +556,11 @@ def test_proofread_page_fetch_without_images_leaves_image_fields_empty(session):
 
     assert run_pending(session, lambda _: wiki) == 1
 
-    page = session.exec(select(Page).where(Page.title == title)).one()
+    page = session.exec(
+        select(Page)
+        .join(Title, col(Title.pk) == col(Page.pk))
+        .where(Title.title == title)
+    ).one()
     assert page.address.fetch_status == "done"
     meta = session.exec(
         select(ProofreadPageMeta).where(ProofreadPageMeta.title_pk == page.pk)
@@ -573,7 +607,11 @@ def test_refetch_updates_existing_page_meta(session):
         session.commit()
         assert run_pending(session, lambda _: wiki) == 1
 
-    page = session.exec(select(Page).where(Page.title == title)).one()
+    page = session.exec(
+        select(Page)
+        .join(Title, col(Title.pk) == col(Page.pk))
+        .where(Title.title == title)
+    ).one()
     metas = session.exec(
         select(ProofreadPageMeta).where(ProofreadPageMeta.title_pk == page.pk)
     ).all()
@@ -610,7 +648,11 @@ def test_page_model_has_raw_text_not_proofread_sections(session):
     session.commit()
 
     assert run_pending(session, lambda _: wiki) == 1
-    page = session.exec(select(Page).where(Page.title == remote.title)).one()
+    page = session.exec(
+        select(Page)
+        .join(Title, col(Title.pk) == col(Page.pk))
+        .where(Title.title == remote.title)
+    ).one()
     dumped = page.model_dump()
     assert dumped["text"] == text
     assert dumped["content_model"] == "proofread-page"
@@ -654,7 +696,11 @@ def test_fetch_does_not_hold_db_lock_during_remote_get_page(engine):
             select(FetchRequest).where(FetchRequest.title == remote.title)
         ).one()
         assert req.status == FetchStatus.done
-        page = s.exec(select(Page).where(Page.title == remote.title)).one()
+        page = s.exec(
+            select(Page)
+            .join(Title, col(Title.pk) == col(Page.pk))
+            .where(Title.title == remote.title)
+        ).one()
         assert page.text == "page content"
 
 
@@ -718,7 +764,7 @@ def test_index_fanout_fetches_subpages_without_pagelist(engine, tmp_path):
             _FILE_TITLE,
             asset_title,
         }
-        assert {p.title for p in s.exec(select(Page)).all()} == {
+        assert {p.address.title for p in s.exec(select(Page)).all()} == {
             _INDEX_TITLE,
             asset_title,
         }
@@ -766,7 +812,11 @@ def test_file_fetch_downloads_blob(engine, tmp_path):
 
     # FileBlob carries the stat-like metadata.
     with Session(engine) as s:
-        file_page = s.exec(select(Page).where(Page.title == _FILE_TITLE)).one()
+        file_page = s.exec(
+            select(Page)
+            .join(Title, col(Title.pk) == col(Page.pk))
+            .where(Title.title == _FILE_TITLE)
+        ).one()
         fb = s.exec(select(FileBlob).where(FileBlob.page_pk == file_page.pk)).one()
         assert fb.mime == "image/vnd.djvu"
         assert fb.size == len(_FAKE_FILE_BYTES)

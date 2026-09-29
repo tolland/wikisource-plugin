@@ -23,10 +23,8 @@ from wtbot.title_store import ensure_title, record_fetched_content_model
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import RemotePage
 
-"""Step 1 of the Title/WikiPage split: every Page is a Title, sharing its pk.
-
-These pin the transition rules rather than any behaviour built on Title yet --
-nothing reads it except the fetch-time content-model check.
+"""Titles: every Page is at a Title and shares its pk; a Title need not have
+a Page. The expected content model is a guess until a fetch corrects it.
 """
 
 
@@ -44,62 +42,19 @@ def _title_at(session: Session, site: Site, title: str) -> Title:
     ).one()
 
 
-def test_a_page_created_without_a_pk_gets_its_title(session, site):
-    page = make_page(site_pk=site.pk, title="Main Page", content_model="wikitext")
-    session.add(page)
-    session.commit()
-
-    title = _title_at(session, site, "Main Page")
-    assert page.pk == title.pk
-    assert title.expected_content_model == "wikitext"
-
-
-def test_a_page_with_no_model_is_expected_to_be_wikitext(session, site):
-    """MediaWiki's own fallback. A namespace does not decide it."""
-    session.add(make_page(site_pk=site.pk, title="Index:Book.pdf/styles.css"))
-    session.commit()
-
-    title = _title_at(session, site, "Index:Book.pdf/styles.css")
-    assert title.expected_content_model == "wikitext"
-
-
-def test_a_page_reuses_a_title_already_at_its_address(session, site):
+def test_a_page_takes_its_pk_from_its_title(session, site):
+    """No hook supplies it: a page is built at a title, and the flush copies
+    the title's pk across (or the caller passes it)."""
     title = ensure_title(
-        session,
-        site_pk=site.pk,
-        title="Page:Book.djvu/1",
-        expected_content_model="proofread-page",
+        session, site_pk=site.pk, title="Main Page", expected_content_model="wikitext"
     )
-    page = make_page(site_pk=site.pk, title="Page:Book.djvu/1")
+    page = make_page(session, site_pk=site.pk, title="Main Page")
     session.add(page)
     session.commit()
 
     assert page.pk == title.pk
+    assert page.address is title
     assert len(session.exec(select(Title)).all()) == 1
-
-
-def test_an_explicit_pk_names_the_title_too(session, site):
-    page = make_page(pk=4242, site_pk=site.pk, title="Index:Book.djvu")
-    session.add(page)
-    session.commit()
-
-    assert _title_at(session, site, "Index:Book.djvu").pk == 4242
-
-
-def test_an_explicit_pk_may_not_contradict_the_title_at_its_address(session, site):
-    existing = ensure_title(
-        session,
-        site_pk=site.pk,
-        title="Index:Book.djvu",
-        expected_content_model="proofread-index",
-    )
-    session.commit()
-    session.add(
-        make_page(pk=existing.pk + 100, site_pk=site.pk, title="Index:Book.djvu")
-    )
-
-    with pytest.raises(ValueError, match="already has pk"):
-        session.flush()
 
 
 def test_the_first_guess_stands_until_a_fetch(session, site):
@@ -198,7 +153,7 @@ def test_a_first_fetch_records_the_wikis_answer_as_the_expectation(
 
     title = _title_at(session, site, remote.title)
     assert title.expected_content_model == "sanitized-css"
-    assert session.get(Page, title.pk).title == remote.title
+    assert session.get(Page, title.pk).address.title == remote.title
     assert caplog.records == []
 
 

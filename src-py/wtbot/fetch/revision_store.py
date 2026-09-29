@@ -34,7 +34,7 @@ def validate_remote_identity(session: Session, page: Page, remote: RemotePage) -
     """Refuse a remote snapshot that contradicts this Site's cached identity."""
     if page.pageid != remote.pageid:
         raise RemoteIdentityError(
-            f"site {page.site_pk} title {page.title!r} changed pageid "
+            f"site {page.site_pk} title {page.address.title!r} changed pageid "
             f"from {page.pageid} to {remote.pageid}; the MediaWiki database "
             "may have been restored or replaced"
         )
@@ -49,7 +49,7 @@ def validate_remote_identity(session: Session, page: Page, remote: RemotePage) -
     if other_page is not None:
         raise RemoteIdentityError(
             f"site {page.site_pk} pageid {remote.pageid} is already cached as "
-            f"{other_page.title!r}, not {page.title!r}; the MediaWiki database "
+            f"{other_page.address.title!r}, not {page.address.title!r}; the MediaWiki database "
             "may have been restored or a move needs reconciling"
         )
 
@@ -66,10 +66,12 @@ def validate_remote_identity(session: Session, page: Page, remote: RemotePage) -
     ).first()
     if other_revision is not None:
         other_revision_page = session.get(Page, other_revision.page_pk)
-        other_title = other_revision_page.title if other_revision_page else "unknown"
+        other_title = (
+            other_revision_page.address.title if other_revision_page else "unknown"
+        )
         raise RemoteIdentityError(
             f"site {page.site_pk} revid {remote.revid} is already cached for "
-            f"{other_title!r}, not {page.title!r}; the MediaWiki database may "
+            f"{other_title!r}, not {page.address.title!r}; the MediaWiki database may "
             "have been restored or replaced"
         )
 
@@ -88,7 +90,7 @@ def validate_remote_identity(session: Session, page: Page, remote: RemotePage) -
         content.content_sha1 != digest or content.content_model != remote.content_model
     ):
         raise RemoteIdentityError(
-            f"site {page.site_pk} revid {remote.revid} for {page.title!r} "
+            f"site {page.site_pk} revid {remote.revid} for {page.address.title!r} "
             "changed content; revision ids are immutable, so the MediaWiki "
             "database may have been restored or replaced"
         )

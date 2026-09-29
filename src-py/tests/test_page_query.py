@@ -57,7 +57,7 @@ def test_query_api_filters_pages_and_returns_joined_revision_records(
     )
     same_title_elsewhere = make_page(
         site_pk=other.pk,
-        title=wanted.title,
+        title=wanted.address.title,
         pageid=202,
         revid=24,
     )
@@ -90,7 +90,7 @@ def test_query_api_filters_pages_and_returns_joined_revision_records(
 
     results = query_pages(
         session=session,
-        title=wanted.title,
+        title=wanted.address.title,
         site_label="local",
         pageid=101,
         revid=12,

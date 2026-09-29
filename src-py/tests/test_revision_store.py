@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 import pytest
 from conftest import fake_pageid, make_page
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from wtbot.fetch.fetch_worker import run_pending
 from wtbot.fetch.revision_store import (
@@ -19,6 +19,7 @@ from wtbot.model import (
     Revision,
     Site,
     Slot,
+    Title,
 )
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.sha1 import content_sha1_base36, hex_to_base36
@@ -181,7 +182,7 @@ def test_sha1_agrees_when_stored_and_served_coincide(session: Session) -> None:
             revid=3,
             sha1=agreeing_hex,
             content_model="wikitext",
-            title=page.title,
+            title=page.address.title,
         ),
     )
     session.commit()
@@ -227,14 +228,16 @@ def test_a_revid_cannot_move_to_another_page_on_the_same_site(
     site = _site(session, family="wikisource")
     first = _page(session, site, "Page:Work.djvu/1")
     second = _page(session, site, "Page:Work.djvu/2")
-    record_head_revision(session, first, _remote("one", revid=42, title=first.title))
+    record_head_revision(
+        session, first, _remote("one", revid=42, title=first.address.title)
+    )
     session.commit()
 
     with pytest.raises(RemoteIdentityError, match="revid 42.*already cached"):
         record_head_revision(
             session,
             second,
-            _remote("two", revid=42, title=second.title),
+            _remote("two", revid=42, title=second.address.title),
         )
 
 
@@ -289,7 +292,7 @@ def test_a_pageid_cannot_name_two_titles_on_the_same_site(session: Session) -> N
         validate_remote_identity(
             session,
             second,
-            _remote("body", revid=42, pageid=10, title=second.title),
+            _remote("body", revid=42, pageid=10, title=second.address.title),
         )
 
 
@@ -308,7 +311,11 @@ def test_the_fetch_worker_populates_the_store(session: Session) -> None:
     session.commit()
     assert run_pending(session, lambda _: wiki) == 1
 
-    page = session.exec(select(Page).where(Page.title == remote.title)).one()
+    page = session.exec(
+        select(Page)
+        .join(Title, col(Title.pk) == col(Page.pk))
+        .where(Title.title == remote.title)
+    ).one()
     revision = session.exec(select(Revision).where(Revision.page_pk == page.pk)).one()
 
     assert page.latest_revision_pk == revision.pk

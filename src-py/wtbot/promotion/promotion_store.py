@@ -28,7 +28,7 @@ from wtbot.model import (
     Title,
 )
 from wtbot.sync import SyncPage, SyncReport, SyncVerdict
-from wtbot.title_store import ensure_title
+from wtbot.title_store import ensure_title, page_at
 
 """Staging a push run from a sync report, one source revision at a time.
 
@@ -183,11 +183,10 @@ def stage_page(
             "and cannot invent one"
         )
 
-    source_page = session.exec(
-        select(Page).where(
-            Page.site_pk == source_site.pk, Page.title == page.source_title
-        )
-    ).one()
+    assert source_site.pk is not None and page.source_title is not None
+    source_page = page_at(session, site_pk=source_site.pk, title=page.source_title)
+    if source_page is None:  # pragma: no cover - an actionable row names one
+        raise PromotionError(f"{page.source_title} is not held by the source")
     # The target is an address, whether or not the wiki holds a page there: a
     # create stages against a title as surely as an update does.
     target_name = page.target_title or page.source_title
@@ -318,7 +317,7 @@ def _revision_on_page(session: Session, link: RevisionLink, page: Page) -> Revis
         revision = session.get(Revision, revision_pk)
         if revision is not None and revision.page_pk == page.pk:
             return revision
-    raise PromotionError(f"anchor {link.pk} does not belong to {page.title}")
+    raise PromotionError(f"anchor {link.pk} does not belong to {page.address.title}")
 
 
 def _revisions_after_anchor(
@@ -340,7 +339,7 @@ def _revisions_after_anchor(
         if current.parent_revid in (None, 0):
             if anchor is not None:
                 raise PromotionError(
-                    f"cached history for {page.title} reaches its root before "
+                    f"cached history for {page.address.title} reaches its root before "
                     f"anchor revid {anchor.revid}"
                 )
             break
@@ -355,7 +354,7 @@ def _revisions_after_anchor(
                 f"anchor revid {anchor.revid}" if anchor is not None else "the root"
             )
             raise PromotionError(
-                f"cached history for {page.title} is missing parent revid "
+                f"cached history for {page.address.title} is missing parent revid "
                 f"{current.parent_revid}; fetch history through {destination} "
                 "before staging so revisions are not squashed"
             )

@@ -161,7 +161,7 @@ class WikisourceVfs:
 
         Page-under-Pages/ paths (the dominant case at real-library scale — one
         query per site+index_title rather than one per page) are batched via
-        `Page.title.in_(...)`; every other path shape falls back to `stat`,
+        `Title.title.in_(...)`; every other path shape falls back to `stat`,
         since sites/indexes/file-dirs are comparatively few per session.
         """
         results: dict[int, Stat] = {}

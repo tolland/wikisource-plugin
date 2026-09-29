@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlmodel import Session, select
+from sqlmodel import Session
 
 from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.api.fetch.model import (
@@ -18,8 +18,9 @@ from wtbot.fetch.queue_runner import (
     queue_stats,
 )
 from wtbot.incremental import RefreshPlan, plan_refresh
-from wtbot.model import FetchKind, FetchRequest, Page
+from wtbot.model import FetchKind, FetchRequest
 from wtbot.site_store import require_credentialed_site
+from wtbot.title_store import page_at
 
 """Cache-fill endpoint (surface B).
 
@@ -71,9 +72,8 @@ def create_fetch(payload: FetchCreate, session: Session = Depends(get_session)) 
     session.commit()
     session.refresh(req)
 
-    page = session.exec(
-        select(Page).where(Page.site_pk == site.pk, Page.title == payload.title)
-    ).first()
+    assert site.pk is not None
+    page = page_at(session, site_pk=site.pk, title=payload.title)
     return {"request": req, "page": None if page is None else PageRow.of_page(page)}
 
 

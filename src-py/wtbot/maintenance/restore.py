@@ -224,7 +224,11 @@ def _page_references_to_titles(dump: DatabaseDump) -> DatabaseDump:
         if not isinstance(value, Reference):
             return value
         if target == "title" and value.table == "page":
-            value = value.model_copy(update={"table": "title"})
+            [head, *rest] = value.key
+            if not rest and isinstance(head, Reference) and head.table == "title":
+                value = head  # a page keyed by its title: the title itself
+            else:
+                value = value.model_copy(update={"table": "title"})
         return with_conformed_key(value)
 
     def with_conformed_key(ref: Reference) -> Reference:
@@ -434,7 +438,7 @@ def _name_index_files(dump: DatabaseDump) -> DatabaseDump:
         for row in pages.rows
         if row.fields.get("revid") is None
         and row.fields.get("text") is not None
-        and str(row.fields.get("title", "")).startswith("File:")
+        and str(_page_title_key(row)[-1]).startswith("File:")
     }
     replaced = {
         "indexmeta": metas.model_copy(update={"rows": new_metas}),
@@ -471,6 +475,15 @@ _PAGE_HEAD: tuple[str, ...] = (
 )
 
 
+def _page_title_key(row: Record) -> tuple[Scalar | Reference, ...]:
+    """The title key of a page row, in either shape: ``(site, name)`` before
+    step 3c, or ``(Reference(title, (site, name)),)`` since."""
+    [head, *_] = row.key
+    if isinstance(head, Reference) and head.table == "title":
+        return head.key
+    return row.key
+
+
 def _complete_page_heads(dump: DatabaseDump) -> DatabaseDump:
     """A page's head columns are NOT NULL. Fill ``content_model`` from the
     title where an older fetch left it empty, as the migration does, and
@@ -486,13 +499,15 @@ def _complete_page_heads(dump: DatabaseDump) -> DatabaseDump:
     rows = []
     for row in pages.rows:
         if row.fields.get("content_model") is None:
-            model = expected.get(_identity("title", row))
+            model = expected.get(
+                Reference(table="title", key=_page_title_key(row)).model_dump_json()
+            )
             row = row.model_copy(
                 update={"fields": {**row.fields, "content_model": model}}
             )
         rows.append(row)
     incomplete = [
-        str(row.fields.get("title"))
+        str(_page_title_key(row)[-1])
         for row in rows
         if any(row.fields.get(column) is None for column in _PAGE_HEAD)
     ]
@@ -513,6 +528,55 @@ def _complete_page_heads(dump: DatabaseDump) -> DatabaseDump:
     )
 
 
+def _page_keyed_by_title(dump: DatabaseDump) -> DatabaseDump:
+    """Key pages by their title, as a page no longer has a name of its own.
+
+    Before step 3c a page's natural key was ``(site_pk, title)``; it is now its
+    ``pk``, a reference to the title with that same key. So each page key
+    ``(site, name)`` becomes ``(Reference(title, (site, name)),)``, the page's
+    ``title`` field goes, and every reference to a page -- nested ones inside
+    other keys included (a revision's key names its page) -- is re-keyed the
+    same way.
+    """
+    pages = next((table for table in dump.tables if table.name == "page"), None)
+    if pages is None or pages.key_fields != ("site_pk", "title"):
+        return dump
+
+    def title_key(
+        key: tuple[Scalar | Reference, ...],
+    ) -> tuple[Scalar | Reference, ...]:
+        return (Reference(table="title", key=key),)
+
+    def rekey(value):
+        if not isinstance(value, Reference):
+            return value
+        key = tuple(rekey(part) for part in value.key)
+        if value.table == "page" and len(key) == 2:
+            key = title_key(key)
+        return value.model_copy(update={"key": key})
+
+    tables = []
+    for table in dump.tables:
+        rows = []
+        for row in table.rows:
+            key = tuple(rekey(part) for part in row.key)
+            fields = row.fields
+            if table.name == "page":
+                key = title_key(key)
+                fields = {k: v for k, v in fields.items() if k != "title"}
+            references = {column: rekey(ref) for column, ref in row.references.items()}
+            rows.append(
+                row.model_copy(
+                    update={"key": key, "fields": fields, "references": references}
+                )
+            )
+        update: dict = {"rows": rows}
+        if table.name == "page":
+            update["key_fields"] = NATURAL_KEYS["page"]
+        tables.append(table.model_copy(update=update))
+    return dump.model_copy(update={"tables": tables})
+
+
 # Applied in order: each brings a dump from one schema step to the next, and
 # does nothing to a dump that is already past it.
 _LEGACY_UPGRADES = (
@@ -522,6 +586,7 @@ _LEGACY_UPGRADES = (
     _drop_placeholder_pages,
     _rename_legacy_references,
     _drop_legacy_references,
+    _page_keyed_by_title,
     _page_references_to_titles,
     _name_index_files,
     _complete_page_heads,

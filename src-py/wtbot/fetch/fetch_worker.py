@@ -2,7 +2,7 @@ import logging
 from collections.abc import Callable
 from pathlib import Path
 
-from sqlmodel import Session, select
+from sqlmodel import Session
 
 from wtbot.db_session import detached_site, read_snapshot, write_batch
 from wtbot.fetch.revision_store import (
@@ -43,7 +43,7 @@ from wtbot.shared_repository import (
     shared_repository_site,
 )
 from wtbot.timeutil import utcnow
-from wtbot.title_store import ensure_title, record_fetched_content_model
+from wtbot.title_store import ensure_title, page_at, record_fetched_content_model
 from wtbot.wiki.client import WikiClient
 from wtbot.wiki.failures import FailureKind, WikiFailure
 from wtbot.wiki.wiki_types import (
@@ -435,9 +435,8 @@ def _upsert_page(
     """Write the common Page fields from the remote snapshot, then let the
     type-specific processor enrich its own columns, in one transaction."""
     with write_batch(session):
-        page = session.exec(
-            select(Page).where(Page.site_pk == site.pk, Page.title == remote.title)
-        ).first()
+        assert site.pk is not None
+        page = page_at(session, site_pk=site.pk, title=remote.title)
         # The wiki has now said what this title is. A new title records that
         # as its expectation; an existing one gets its earlier guess checked.
         # An existing page reaches its title through the shared pk, not by
@@ -453,8 +452,8 @@ def _upsert_page(
             # and its head columns are never empty.
             page = Page(
                 pk=title_row.pk,
+                address=title_row,
                 site_pk=site.pk,
-                title=remote.title,
                 content_model=remote.content_model,
                 text=remote.text,
                 pageid=remote.pageid,
@@ -515,7 +514,7 @@ def _upsert_page(
 
         return CachedPage(
             pk=page.pk,
-            title=page.title,
+            title=page.address.title,
             content_model=page.content_model,
             text=page.text,
         )
