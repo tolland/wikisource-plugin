@@ -790,7 +790,7 @@ class PywikibotClient:
         *,
         since: datetime,
         namespace_keys: list[int] | None = None,
-        limit: int = 5000,
+        limit: int = 500,
     ) -> list[RemoteChange]:
         """Entries newer than ``since``, oldest first, following continuation.
 
