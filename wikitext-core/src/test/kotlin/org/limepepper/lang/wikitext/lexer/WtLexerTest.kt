@@ -37,6 +37,7 @@ class WtLexerTest : WtLexerTestCase() {
     fun testAuthorTemplate() = doTest()
     fun testProofreadpage_index_template() = doTest()
     fun testincludeInsideTemplate() = doTest()
+    fun testTocRowNestedTemplate() = doTest()
 
     // quote markup ('' italic, ''' bold, ''''' both)
     fun testQuoteBasics() = doTest()
@@ -50,4 +51,10 @@ class WtLexerTest : WtLexerTestCase() {
     // content model
     fun testProofread_page_1() = doTest()
 
+    // parser functions
+    fun testParserFunctions03() = doTest()
+    fun testParserFunctions04() = doTest()
+
+    // transclusions
+    fun testTransclusion01() = doTest()
 }

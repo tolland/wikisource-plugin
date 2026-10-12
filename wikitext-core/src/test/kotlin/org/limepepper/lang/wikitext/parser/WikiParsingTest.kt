@@ -26,6 +26,7 @@ class WikiParsingTest : WtParsingTextCase() {
     // templates
     fun testAuthorTemplate() = doTest()
     fun testProofreadpage_index_template() = doTest()
+    fun testTocRowNestedTemplate() = doTest()
 
     // content model
     fun testProofread_page_1() = doTest()
