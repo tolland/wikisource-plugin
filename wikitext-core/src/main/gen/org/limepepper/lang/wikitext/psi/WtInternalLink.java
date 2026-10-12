@@ -24,6 +24,9 @@ public interface WtInternalLink extends NavigatablePsiElement {
   List<WtListItem> getListItemList();
 
   @NotNull
+  List<WtReferenceTag> getReferenceTagList();
+
+  @NotNull
   List<WtTable> getTableList();
 
   @NotNull

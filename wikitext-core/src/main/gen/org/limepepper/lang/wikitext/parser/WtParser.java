@@ -54,9 +54,9 @@ public class WtParser implements PsiParser, LightPsiParser {
   private static boolean comment_1(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "comment_1")) return false;
     while (true) {
-      int c = current_position_(b);
+      int pos_ = current_position_(b);
       if (!comment_run(b, l + 1)) break;
-      if (!empty_element_parsed_guard_(b, "comment_1", c)) break;
+      if (!empty_element_parsed_guard_(b, "comment_1", pos_)) break;
     }
     return true;
   }
@@ -73,9 +73,9 @@ public class WtParser implements PsiParser, LightPsiParser {
     if (!recursion_guard_(b, l, "contained_element")) return false;
     Marker m = enter_section_(b, l, _NONE_, CONTAINED_ELEMENT, "<contained element>");
     while (true) {
-      int c = current_position_(b);
+      int pos_ = current_position_(b);
       if (!content_element(b, l + 1)) break;
-      if (!empty_element_parsed_guard_(b, "contained_element", c)) break;
+      if (!empty_element_parsed_guard_(b, "contained_element", pos_)) break;
     }
     exit_section_(b, l, m, true, false, null);
     return true;
@@ -86,6 +86,7 @@ public class WtParser implements PsiParser, LightPsiParser {
   //               | heading
   //               | list_item
   //               | table
+  //               | reference_tag
   //               | html_tag
   //               | verbatim_tag
   //               | comment
@@ -117,6 +118,7 @@ public class WtParser implements PsiParser, LightPsiParser {
     if (!r) r = heading(b, l + 1);
     if (!r) r = list_item(b, l + 1);
     if (!r) r = table(b, l + 1);
+    if (!r) r = reference_tag(b, l + 1);
     if (!r) r = html_tag(b, l + 1);
     if (!r) r = verbatim_tag(b, l + 1);
     if (!r) r = comment(b, l + 1);
@@ -180,9 +182,9 @@ public class WtParser implements PsiParser, LightPsiParser {
   static boolean html_tag_content(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "html_tag_content")) return false;
     while (true) {
-      int c = current_position_(b);
+      int pos_ = current_position_(b);
       if (!html_tag_content_0(b, l + 1)) break;
-      if (!empty_element_parsed_guard_(b, "html_tag_content", c)) break;
+      if (!empty_element_parsed_guard_(b, "html_tag_content", pos_)) break;
     }
     return true;
   }
@@ -235,9 +237,9 @@ public class WtParser implements PsiParser, LightPsiParser {
   static boolean link_display(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "link_display")) return false;
     while (true) {
-      int c = current_position_(b);
+      int pos_ = current_position_(b);
       if (!link_display_0(b, l + 1)) break;
-      if (!empty_element_parsed_guard_(b, "link_display", c)) break;
+      if (!empty_element_parsed_guard_(b, "link_display", pos_)) break;
     }
     return true;
   }
@@ -271,9 +273,9 @@ public class WtParser implements PsiParser, LightPsiParser {
     Marker m = enter_section_(b);
     r = list_item_0_0(b, l + 1);
     while (r) {
-      int c = current_position_(b);
+      int pos_ = current_position_(b);
       if (!list_item_0_0(b, l + 1)) break;
-      if (!empty_element_parsed_guard_(b, "list_item_0", c)) break;
+      if (!empty_element_parsed_guard_(b, "list_item_0", pos_)) break;
     }
     exit_section_(b, m, null, r);
     return r;
@@ -294,11 +296,105 @@ public class WtParser implements PsiParser, LightPsiParser {
   private static boolean list_item_1(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "list_item_1")) return false;
     while (true) {
-      int c = current_position_(b);
+      int pos_ = current_position_(b);
       if (!content_element(b, l + 1)) break;
-      if (!empty_element_parsed_guard_(b, "list_item_1", c)) break;
+      if (!empty_element_parsed_guard_(b, "list_item_1", pos_)) break;
     }
     return true;
+  }
+
+  /* ********************************************************** */
+  // (content_element | TEMPLATE_HEAD_TEXT | TEMPLATE_PARAM_TEXT)*
+  public static boolean reference_body(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "reference_body")) return false;
+    Marker m = enter_section_(b, l, _NONE_, REFERENCE_BODY, "<reference body>");
+    while (true) {
+      int pos_ = current_position_(b);
+      if (!reference_body_0(b, l + 1)) break;
+      if (!empty_element_parsed_guard_(b, "reference_body", pos_)) break;
+    }
+    exit_section_(b, l, m, true, false, null);
+    return true;
+  }
+
+  // content_element | TEMPLATE_HEAD_TEXT | TEMPLATE_PARAM_TEXT
+  private static boolean reference_body_0(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "reference_body_0")) return false;
+    boolean r;
+    r = content_element(b, l + 1);
+    if (!r) r = consumeToken(b, TEMPLATE_HEAD_TEXT);
+    if (!r) r = consumeToken(b, TEMPLATE_PARAM_TEXT);
+    return r;
+  }
+
+  /* ********************************************************** */
+  // reference_open reference_body HTML_TAG_CLOSE
+  static boolean reference_definition(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "reference_definition")) return false;
+    boolean r, p;
+    Marker m = enter_section_(b, l, _NONE_);
+    r = reference_open(b, l + 1);
+    p = r; // pin = 1
+    r = r && report_error_(b, reference_body(b, l + 1));
+    r = p && consumeToken(b, HTML_TAG_CLOSE) && r;
+    exit_section_(b, l, m, r, p, null);
+    return r || p;
+  }
+
+  /* ********************************************************** */
+  // &<<isReferenceTag>> HTML_TAG_OPEN
+  static boolean reference_open(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "reference_open")) return false;
+    boolean r;
+    Marker m = enter_section_(b);
+    r = reference_open_0(b, l + 1);
+    r = r && consumeToken(b, HTML_TAG_OPEN);
+    exit_section_(b, m, null, r);
+    return r;
+  }
+
+  // &<<isReferenceTag>>
+  private static boolean reference_open_0(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "reference_open_0")) return false;
+    boolean r;
+    Marker m = enter_section_(b, l, _AND_);
+    r = isReferenceTag(b, l + 1);
+    exit_section_(b, l, m, r, false, null);
+    return r;
+  }
+
+  /* ********************************************************** */
+  // &<<isReferenceTag>> HTML_TAG_SELFCLOSE
+  static boolean reference_self_close(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "reference_self_close")) return false;
+    boolean r;
+    Marker m = enter_section_(b);
+    r = reference_self_close_0(b, l + 1);
+    r = r && consumeToken(b, HTML_TAG_SELFCLOSE);
+    exit_section_(b, m, null, r);
+    return r;
+  }
+
+  // &<<isReferenceTag>>
+  private static boolean reference_self_close_0(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "reference_self_close_0")) return false;
+    boolean r;
+    Marker m = enter_section_(b, l, _AND_);
+    r = isReferenceTag(b, l + 1);
+    exit_section_(b, l, m, r, false, null);
+    return r;
+  }
+
+  /* ********************************************************** */
+  // reference_self_close | reference_definition
+  public static boolean reference_tag(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "reference_tag")) return false;
+    boolean r;
+    Marker m = enter_section_(b, l, _NONE_, REFERENCE_TAG, "<reference tag>");
+    r = reference_self_close(b, l + 1);
+    if (!r) r = reference_definition(b, l + 1);
+    exit_section_(b, l, m, r, false, null);
+    return r;
   }
 
   /* ********************************************************** */
@@ -328,9 +424,9 @@ public class WtParser implements PsiParser, LightPsiParser {
   private static boolean table_2(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "table_2")) return false;
     while (true) {
-      int c = current_position_(b);
+      int pos_ = current_position_(b);
       if (!table_cell(b, l + 1)) break;
-      if (!empty_element_parsed_guard_(b, "table_2", c)) break;
+      if (!empty_element_parsed_guard_(b, "table_2", pos_)) break;
     }
     return true;
   }
@@ -353,9 +449,9 @@ public class WtParser implements PsiParser, LightPsiParser {
   static boolean table_cell_content(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "table_cell_content")) return false;
     while (true) {
-      int c = current_position_(b);
+      int pos_ = current_position_(b);
       if (!table_cell_content_0(b, l + 1)) break;
-      if (!empty_element_parsed_guard_(b, "table_cell_content", c)) break;
+      if (!empty_element_parsed_guard_(b, "table_cell_content", pos_)) break;
     }
     return true;
   }
@@ -389,9 +485,9 @@ public class WtParser implements PsiParser, LightPsiParser {
   private static boolean template_2(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "template_2")) return false;
     while (true) {
-      int c = current_position_(b);
+      int pos_ = current_position_(b);
       if (!template_2_0(b, l + 1)) break;
-      if (!empty_element_parsed_guard_(b, "template_2", c)) break;
+      if (!empty_element_parsed_guard_(b, "template_2", pos_)) break;
     }
     return true;
   }
@@ -413,9 +509,9 @@ public class WtParser implements PsiParser, LightPsiParser {
     if (!recursion_guard_(b, l, "template_head")) return false;
     Marker m = enter_section_(b, l, _NONE_, TEMPLATE_HEAD, "<template head>");
     while (true) {
-      int c = current_position_(b);
+      int pos_ = current_position_(b);
       if (!template_head_0(b, l + 1)) break;
-      if (!empty_element_parsed_guard_(b, "template_head", c)) break;
+      if (!empty_element_parsed_guard_(b, "template_head", pos_)) break;
     }
     exit_section_(b, l, m, true, false, null);
     return true;
@@ -454,9 +550,9 @@ public class WtParser implements PsiParser, LightPsiParser {
   static boolean template_param_value(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "template_param_value")) return false;
     while (true) {
-      int c = current_position_(b);
+      int pos_ = current_position_(b);
       if (!template_param_value_0(b, l + 1)) break;
-      if (!empty_element_parsed_guard_(b, "template_param_value", c)) break;
+      if (!empty_element_parsed_guard_(b, "template_param_value", pos_)) break;
     }
     return true;
   }
@@ -509,9 +605,9 @@ public class WtParser implements PsiParser, LightPsiParser {
   static boolean wikitextFile(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "wikitextFile")) return false;
     while (true) {
-      int c = current_position_(b);
+      int pos_ = current_position_(b);
       if (!content_element(b, l + 1)) break;
-      if (!empty_element_parsed_guard_(b, "wikitextFile", c)) break;
+      if (!empty_element_parsed_guard_(b, "wikitextFile", pos_)) break;
     }
     return true;
   }

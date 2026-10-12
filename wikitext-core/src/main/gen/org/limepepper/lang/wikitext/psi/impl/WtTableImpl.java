@@ -60,6 +60,12 @@ public class WtTableImpl extends ASTWrapperPsiElement implements WtTable {
 
   @Override
   @NotNull
+  public List<WtReferenceTag> getReferenceTagList() {
+    return PsiTreeUtil.getChildrenOfTypeAsList(this, WtReferenceTag.class);
+  }
+
+  @Override
+  @NotNull
   public List<WtTable> getTableList() {
     return PsiTreeUtil.getChildrenOfTypeAsList(this, WtTable.class);
   }

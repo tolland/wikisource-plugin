@@ -34,6 +34,13 @@ class WtFileSentenceBandTest : ParsingTestCase("", "wt", true, WtParserDefinitio
         assertEquals(listOf("Before", "inside", "After"), bands("Before<u>inside</u>After"))
     }
 
+    fun testReferencesDoNotReceiveBodyBands() {
+        assertEquals(
+            listOf("Before", "between", "after."),
+            bands("Before<ref>Long note, with ''formatting''; and {{nested|text}}.</ref>between<ref name=\"note\"/>after."),
+        )
+    }
+
     fun testSeparateFilesDoNotShareTraversalState() {
         assertEquals(listOf("One,", "two."), bands("One, two."))
         assertEquals(listOf("New ''text''."), bands("New ''text''."))

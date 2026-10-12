@@ -1,9 +1,6 @@
 package org.limepepper.lang.wikitext.highlighting
 
-import com.intellij.openapi.editor.colors.EditorColorsManager
-import com.intellij.openapi.editor.markup.TextAttributes
 import java.awt.Color
-import java.awt.Font
 import kotlin.math.roundToInt
 
 private const val MINIMUM_TEXT_CONTRAST = 4.5
@@ -21,27 +18,11 @@ internal data class SentenceColorPair(
     val background: Color,
 )
 
-fun alternateSentenceAttributes(sentenceIndex: Int): TextAttributes {
-    val scheme = EditorColorsManager.getInstance().globalScheme
-    val colors = sentenceColors(
-        sentenceIndex = sentenceIndex,
-        defaultForeground = scheme.defaultForeground,
-        defaultBackground = scheme.defaultBackground,
-    )
-
-    return TextAttributes(
-        colors.foreground,
-        colors.background,
-        null,
-        null,
-        Font.PLAIN,
-    )
-}
-
 internal fun sentenceColors(
     sentenceIndex: Int,
     defaultForeground: Color,
     defaultBackground: Color,
+    backgroundStrength: Double? = null,
 ): SentenceColorPair {
     val hue = SENTENCE_HUES[Math.floorMod(sentenceIndex, SENTENCE_HUES.size)] / 360f
     val darkTheme = relativeLuminance(defaultBackground) < 0.35
@@ -59,7 +40,7 @@ internal fun sentenceColors(
         Color.getHSBColor(hue, 0.62f, 0.28f)
     }
 
-    val background = mix(defaultBackground, backgroundAnchor, if (darkTheme) 0.42 else 0.55)
+    val background = mix(defaultBackground, backgroundAnchor, backgroundStrength ?: if (darkTheme) 0.42 else 0.55)
     val tintedForeground = mix(defaultForeground, foregroundAnchor, if (darkTheme) 0.32 else 0.28)
     val foreground = ensureContrast(
         foreground = tintedForeground,

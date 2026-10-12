@@ -8,6 +8,12 @@
     </dependencies>
 
     <extensions defaultExtensionNs="com.intellij">
+        <applicationConfigurable
+            parentId="editor"
+            id="org.limepepper.wikitext.highlighting"
+            displayName="Wikitext Highlighting"
+            instance="org.limepepper.lang.wikitext.settings.WtHighlightingConfigurable"/>
+
         <lang.syntaxHighlighterFactory
             language="Wikitext"
             implementationClass="org.limepepper.lang.wikitext.highlighting.WtSyntaxHighlighterFactory"
@@ -21,6 +27,10 @@
         <annotator
             language="Wikitext"
             implementationClass="org.limepepper.lang.wikitext.annotator.WtSentenceBandAnnotator"/>
+
+        <annotator
+            language="Wikitext"
+            implementationClass="org.limepepper.lang.wikitext.annotator.WtReferenceAnnotator"/>
 
         <defaultLiveTemplates
             file="/liveTemplates/Wikitext.xml"
