@@ -1,0 +1,8 @@
+WtTokenType.HTML_TAG_OPEN ('<noinclude>')
+WtTokenType.PLAIN_TEXT ('some ')
+WtTokenType.{{ ('{{')
+WtTokenType.TEMPLATE_HEAD_TEXT ('a template')
+WtTokenType.}} ('}}')
+WtTokenType.PLAIN_TEXT (' text')
+WtTokenType.HTML_TAG_CLOSE ('</noinclude>')
+WtTokenType.NEWLINE ('\n')

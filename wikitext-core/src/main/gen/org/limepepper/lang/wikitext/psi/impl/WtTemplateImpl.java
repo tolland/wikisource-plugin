@@ -71,15 +71,15 @@ public class WtTemplateImpl extends ASTWrapperPsiElement implements WtTemplate {
   }
 
   @Override
-  @NotNull
-  public List<WtVerbatimTag> getVerbatimTagList() {
-    return PsiTreeUtil.getChildrenOfTypeAsList(this, WtVerbatimTag.class);
+  @Nullable
+  public WtTemplateHead getTemplateHead() {
+    return findChildByClass(WtTemplateHead.class);
   }
 
   @Override
-  @Nullable
-  public PsiElement getTemplateName() {
-    return findChildByType(TEMPLATE_NAME);
+  @NotNull
+  public List<WtVerbatimTag> getVerbatimTagList() {
+    return PsiTreeUtil.getChildrenOfTypeAsList(this, WtVerbatimTag.class);
   }
 
 }

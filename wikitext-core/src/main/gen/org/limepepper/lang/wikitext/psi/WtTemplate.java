@@ -29,10 +29,10 @@ public interface WtTemplate extends NavigatablePsiElement {
   @NotNull
   List<WtTemplate> getTemplateList();
 
+  @Nullable
+  WtTemplateHead getTemplateHead();
+
   @NotNull
   List<WtVerbatimTag> getVerbatimTagList();
-
-  @Nullable
-  PsiElement getTemplateName();
 
 }

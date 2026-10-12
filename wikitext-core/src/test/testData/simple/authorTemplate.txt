@@ -1,5 +1,5 @@
 WtTokenType.{{ ('{{')
-WtTokenType.TEMPLATE_NAME ('author\n ')
+WtTokenType.TEMPLATE_HEAD_TEXT ('author\n ')
 WtTokenType.TEMPLATE_PIPE ('|')
 WtTokenType.TEMPLATE_PARAM_TEXT (' firstname    ')
 WtTokenType.TEMPLATE_EQUALS[=] ('=')

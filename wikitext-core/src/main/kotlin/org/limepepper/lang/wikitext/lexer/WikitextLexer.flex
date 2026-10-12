@@ -282,7 +282,7 @@ APOS_RUN = "'"+
 // as their own token (rather than swallowed into PLAIN_TEXT_RUN) since a
 // PageReader/transclusion consumer downstream may need to know "this is
 // an entity reference, decode it" rather than treat it as five literal
-// characters -- same reasoning as giving TEMPLATE_NAME its own token
+// characters -- same reasoning as giving TEMPLATE_HEAD_TEXT its own token
 // instead of letting the parser reassemble it from PLAIN_TEXT runs.
 // Patterned directly on IntelliJ's bundled _HtmlLexer.flex (XML_CHAR_ENTITY_REF
 // / XML_ENTITY_REF_TOKEN rules) rather than re-deriving from scratch.
@@ -322,7 +322,7 @@ CLOSE_TAG          = "</" {TAG_NAME_CHARS} {WS}* ">"
 %state WIKI_TEXT
 %state COMMENT
 %state TEMPLATE
-%state TEMPLATE_NAME
+%state TEMPLATE_HEAD
 %state LINK
 %state LINK_TARGET
 %state TABLE
@@ -415,7 +415,7 @@ CLOSE_TAG          = "</" {TAG_NAME_CHARS} {WS}* ">"
 // =========================================================================
 
 <WIKI_TEXT> {
-  "{{"   { pushFrame(TEMPLATE_NAME, FrameKind.TEMPLATE); return WtTypes.TEMPLATE_OPEN; }
+  "{{"   { pushFrame(TEMPLATE_HEAD, FrameKind.TEMPLATE); return WtTypes.TEMPLATE_OPEN; }
   "[["   { pushFrame(LINK_TARGET, FrameKind.LINK);       return WtTypes.LINK_OPEN; }
 
   {COMMENT_START} { pushFrame(COMMENT, FrameKind.COMMENT); return WtTypes.COMMENT_START; }
@@ -475,20 +475,25 @@ CLOSE_TAG          = "</" {TAG_NAME_CHARS} {WS}* ">"
 // TEMPLATE Contexts
 // =========================================================================
 
-<TEMPLATE_NAME> {
-  // template name runs until first '|' or '}}', may itself contain a
-  // nested {{...}} (e.g. {{ {{PAGENAME}} }} is invalid wikitext usually,
-  // but {{ {{ns:Template}}:Foo | ... }}-style construction happens via
-  // subst/parser functions) -- adjust per your actual grammar decision.
-  "{{"        { pushFrame(TEMPLATE_NAME, FrameKind.TEMPLATE); return WtTypes.TEMPLATE_OPEN; }
+<TEMPLATE_HEAD> {
+  // Header text is interleaved with nested constructs until the first pipe.
+  // Function prefixes and namespace colons are interpreted after parsing.
+  "{{"        { pushFrame(TEMPLATE_HEAD, FrameKind.TEMPLATE); return WtTypes.TEMPLATE_OPEN; }
+  "[["        { pushFrame(LINK_TARGET, FrameKind.LINK); return WtTypes.LINK_OPEN; }
   "}}"        { popFrame(); return WtTypes.TEMPLATE_CLOSE; }
   "|"         { yybegin(TEMPLATE); return pipeTokenForContext(); }
-  [^{}|]+     { return WtTypes.TEMPLATE_NAME; }
-  {ANY}       { return WtTypes.PLAIN_TEXT; } // stray brace, error recovery
+  {COMMENT_START} { pushFrame(COMMENT, FrameKind.COMMENT); return WtTypes.COMMENT_START; }
+  {OPEN_TAG_SELFCLOSE} { return handleOpenTag(true); }
+  {OPEN_TAG_FULL} { return handleOpenTag(false); }
+  {CLOSE_TAG} { return handleCloseTag(); }
+  {CHAR_ENTITY_REF} { return WtTypes.CHAR_ENTITY_REF; }
+  {ENTITY_REF} { return WtTypes.ENTITY_REF; }
+  [^{}|\[<&]+ { return WtTypes.TEMPLATE_HEAD_TEXT; }
+  {ANY}       { return WtTypes.PLAIN_TEXT; } // stray delimiter, error recovery
 }
 
 <TEMPLATE> {
-  "{{"        { pushFrame(TEMPLATE_NAME, FrameKind.TEMPLATE); return WtTypes.TEMPLATE_OPEN; }
+  "{{"        { pushFrame(TEMPLATE_HEAD, FrameKind.TEMPLATE); return WtTypes.TEMPLATE_OPEN; }
   "[["        { pushFrame(LINK_TARGET, FrameKind.LINK);       return WtTypes.LINK_OPEN; }
   "}}"        { popFrame(); return WtTypes.TEMPLATE_CLOSE; }
   "|"         { return pipeTokenForContext(); } // next param at SAME depth
@@ -525,7 +530,7 @@ CLOSE_TAG          = "</" {TAG_NAME_CHARS} {WS}* ">"
 
 <LINK> {
   "[["        { pushFrame(LINK_TARGET, FrameKind.LINK);       return WtTypes.LINK_OPEN; }
-  "{{"        { pushFrame(TEMPLATE_NAME, FrameKind.TEMPLATE); return WtTypes.TEMPLATE_OPEN; }
+  "{{"        { pushFrame(TEMPLATE_HEAD, FrameKind.TEMPLATE); return WtTypes.TEMPLATE_OPEN; }
   "]]"        { popFrame(); return WtTypes.LINK_CLOSE; }
   "|"         { return pipeTokenForContext(); }
 
@@ -552,7 +557,7 @@ CLOSE_TAG          = "</" {TAG_NAME_CHARS} {WS}* ">"
 // =========================================================================
 
 <TABLE> {
-  "{{"        { pushFrame(TEMPLATE_NAME, FrameKind.TEMPLATE); return WtTypes.TEMPLATE_OPEN; }
+  "{{"        { pushFrame(TEMPLATE_HEAD, FrameKind.TEMPLATE); return WtTypes.TEMPLATE_OPEN; }
   "[["        { pushFrame(LINK_TARGET, FrameKind.LINK);       return WtTypes.LINK_OPEN; }
   "|}"        { popFrame(); return WtTypes.TABLE_CLOSE; }
   "|"         { return pipeTokenForContext(); }
@@ -599,7 +604,7 @@ CLOSE_TAG          = "</" {TAG_NAME_CHARS} {WS}* ">"
 // terminator we care about and emit everything before it as one content
 // token. Crucially: no recursive frame is pushed for what's INSIDE -- a
 // "{{" appearing inside <nowiki> is literally the three characters '{','{'
-// and must NOT trigger pushFrame(TEMPLATE_NAME, ...). The only thing that
+// and must NOT trigger pushFrame(TEMPLATE_HEAD, ...). The only thing that
 // can end this state is the closing tag matching the SAME name we opened
 // with (currentTagName()), checked dynamically since this one state serves
 // every verbatim tag rather than having a separate state per tag name.

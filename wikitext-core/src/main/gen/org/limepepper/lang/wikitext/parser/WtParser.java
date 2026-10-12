@@ -176,15 +176,25 @@ public class WtParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // content_element*
+  // (content_element | TEMPLATE_HEAD_TEXT | TEMPLATE_PARAM_TEXT)*
   static boolean html_tag_content(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "html_tag_content")) return false;
     while (true) {
       int c = current_position_(b);
-      if (!content_element(b, l + 1)) break;
+      if (!html_tag_content_0(b, l + 1)) break;
       if (!empty_element_parsed_guard_(b, "html_tag_content", c)) break;
     }
     return true;
+  }
+
+  // content_element | TEMPLATE_HEAD_TEXT | TEMPLATE_PARAM_TEXT
+  private static boolean html_tag_content_0(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "html_tag_content_0")) return false;
+    boolean r;
+    r = content_element(b, l + 1);
+    if (!r) r = consumeToken(b, TEMPLATE_HEAD_TEXT);
+    if (!r) r = consumeToken(b, TEMPLATE_PARAM_TEXT);
+    return r;
   }
 
   /* ********************************************************** */
@@ -360,15 +370,16 @@ public class WtParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // TEMPLATE_OPEN TEMPLATE_NAME (TEMPLATE_PIPE template_param)* TEMPLATE_CLOSE
+  // TEMPLATE_OPEN template_head (TEMPLATE_PIPE template_param)* TEMPLATE_CLOSE
   public static boolean template(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "template")) return false;
     if (!nextTokenIs(b, TEMPLATE_OPEN)) return false;
     boolean r, p;
     Marker m = enter_section_(b, l, _NONE_, TEMPLATE, null);
-    r = consumeTokens(b, 1, TEMPLATE_OPEN, TEMPLATE_NAME);
+    r = consumeToken(b, TEMPLATE_OPEN);
     p = r; // pin = 1
-    r = r && report_error_(b, template_2(b, l + 1));
+    r = r && report_error_(b, template_head(b, l + 1));
+    r = p && report_error_(b, template_2(b, l + 1)) && r;
     r = p && consumeToken(b, TEMPLATE_CLOSE) && r;
     exit_section_(b, l, m, r, p, null);
     return r || p;
@@ -393,6 +404,29 @@ public class WtParser implements PsiParser, LightPsiParser {
     r = consumeToken(b, TEMPLATE_PIPE);
     r = r && template_param(b, l + 1);
     exit_section_(b, m, null, r);
+    return r;
+  }
+
+  /* ********************************************************** */
+  // (content_element | TEMPLATE_HEAD_TEXT)*
+  public static boolean template_head(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "template_head")) return false;
+    Marker m = enter_section_(b, l, _NONE_, TEMPLATE_HEAD, "<template head>");
+    while (true) {
+      int c = current_position_(b);
+      if (!template_head_0(b, l + 1)) break;
+      if (!empty_element_parsed_guard_(b, "template_head", c)) break;
+    }
+    exit_section_(b, l, m, true, false, null);
+    return true;
+  }
+
+  // content_element | TEMPLATE_HEAD_TEXT
+  private static boolean template_head_0(PsiBuilder b, int l) {
+    if (!recursion_guard_(b, l, "template_head_0")) return false;
+    boolean r;
+    r = content_element(b, l + 1);
+    if (!r) r = consumeToken(b, TEMPLATE_HEAD_TEXT);
     return r;
   }
 

@@ -1,5 +1,5 @@
 WtTokenType.{{ ('{{')
-WtTokenType.TEMPLATE_NAME ('#ifeq:BARE_STRING')
+WtTokenType.TEMPLATE_HEAD_TEXT ('#ifeq:BARE_STRING')
 WtTokenType.TEMPLATE_PIPE ('|')
 WtTokenType.TEMPLATE_PARAM_TEXT ('Index')
 WtTokenType.TEMPLATE_PIPE ('|')

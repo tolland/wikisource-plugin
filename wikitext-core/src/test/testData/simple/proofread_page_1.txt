@@ -17,7 +17,7 @@ WtTokenType.PLAIN_TEXT ('Watson, Georgia, and Dr Elizabeth Fisher. 2025. “Why 
 WtTokenType.NEWLINE ('\n')
 WtTokenType.HTML_TAG_OPEN ('<noinclude>')
 WtTokenType.{{ ('{{')
-WtTokenType.TEMPLATE_NAME ('rh')
+WtTokenType.TEMPLATE_HEAD_TEXT ('rh')
 WtTokenType.TEMPLATE_PIPE ('|')
 WtTokenType.TEMPLATE_PIPE ('|')
 WtTokenType.TEMPLATE_PARAM_TEXT ('5')

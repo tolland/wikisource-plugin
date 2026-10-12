@@ -40,6 +40,10 @@ public class WtVisitor extends PsiElementVisitor {
     visitNavigatablePsiElement(o);
   }
 
+  public void visitTemplateHead(@NotNull WtTemplateHead o) {
+    visitNavigatablePsiElement(o);
+  }
+
   public void visitVerbatimBody(@NotNull WtVerbatimBody o) {
     visitPsiLanguageInjectionHost(o);
   }

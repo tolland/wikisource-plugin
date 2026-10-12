@@ -63,7 +63,7 @@ class RandomTest {
 
         assertTrue(tokens.none { it.type == TokenType.BAD_CHARACTER })
         assertEquals(WtTypes.TEMPLATE_OPEN, tokens[0].type)
-        assertEquals(WtTypes.TEMPLATE_NAME, tokens[1].type)
+        assertEquals(WtTypes.TEMPLATE_HEAD_TEXT, tokens[1].type)
         assertEquals(WtTypes.NEWLINE, tokens.get(tokens.size - 1).type)
     }
 }

@@ -47,6 +47,10 @@ class WtLexerTest : WtLexerTestCase() {
 
     // tags
     fun testPagelist_tag() = doTest()
+    fun testTemplateNestedTag01() = doTest()
+    fun testTemplateNestedTag02() = doTest()
+    fun testVerbatimTag() = doTest()
+    fun testTagNoinclude01() = doTest()
 
     // content model
     fun testProofread_page_1() = doTest()
@@ -57,4 +61,7 @@ class WtLexerTest : WtLexerTestCase() {
 
     // transclusions
     fun testTransclusion01() = doTest()
+
+    // ref tags
+    fun testRefTags01() = doTest()
 }

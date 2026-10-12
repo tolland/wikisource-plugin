@@ -48,7 +48,7 @@ class WtStructureViewElement(val element: NavigatablePsiElement) : StructureView
         when (element) {
             is WtFile -> element.name
             is WtHeading -> "H${element.level}: ${element.trimmedText()}"
-            is WtTemplate -> "{{${element.templateName?.text?.trim().orEmpty()}}}"
+            is WtTemplate -> "{{${element.templateHead?.text?.trim().orEmpty()}}}"
             is WtInternalLink -> "[[${element.linkTarget?.text?.trim().orEmpty()}]]"
             is WtContainedElement -> element.trimmedText()
             else -> element.name ?: element.trimmedText()

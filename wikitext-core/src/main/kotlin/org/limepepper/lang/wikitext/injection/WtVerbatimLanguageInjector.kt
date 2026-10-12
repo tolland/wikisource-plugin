@@ -23,7 +23,7 @@ class WtVerbatimLanguageInjector : MultiHostInjector {
         val tag = content.parent as? WtVerbatimTag ?: return
 
         if (!tag.tagName.equals("math", ignoreCase = true)) {
-            println("tag name not math it was ${tag.tagName}")
+//            println("tag name not math it was ${tag.tagName}")
             return
         }
 

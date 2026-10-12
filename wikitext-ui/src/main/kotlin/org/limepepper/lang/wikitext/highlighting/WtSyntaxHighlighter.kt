@@ -93,8 +93,8 @@ class WtSyntaxHighlighter : SyntaxHighlighterBase() {
 
             // Specific token highlighting
             tokenType == WtTypes.TEMPLATE -> arrayOf(TEMPLATE_TRANSCLUSION)
-            tokenType == WtTypes.TEMPLATE_NAME -> arrayOf(IDENTIFIER)
-            tokenType == WtTypes.TEMPLATE_NAME -> arrayOf(TEMPLATE_LANGUAGE_COLOR)
+            tokenType == WtTypes.TEMPLATE_HEAD_TEXT -> arrayOf(IDENTIFIER)
+            tokenType == WtTypes.TEMPLATE_HEAD_TEXT -> arrayOf(TEMPLATE_LANGUAGE_COLOR)
             tokenType == WtTypes.INTERNAL_LINK -> arrayOf(TEMPLATE_LANGUAGE_COLOR)
             tokenType == WtTypes.LINK_TARGET -> arrayOf(IDENTIFIER)
             tokenType == WtTypes.HTML_TAG_SELFCLOSE -> arrayOf(IDENTIFIER)

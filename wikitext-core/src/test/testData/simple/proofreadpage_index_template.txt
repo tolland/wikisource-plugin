@@ -1,5 +1,5 @@
 WtTokenType.{{ ('{{')
-WtTokenType.TEMPLATE_NAME (':MediaWiki:Proofreadpage_index_template\n')
+WtTokenType.TEMPLATE_HEAD_TEXT (':MediaWiki:Proofreadpage_index_template\n')
 WtTokenType.TEMPLATE_PIPE ('|')
 WtTokenType.TEMPLATE_PARAM_TEXT ('Type')
 WtTokenType.TEMPLATE_EQUALS[=] ('=')

@@ -16,6 +16,7 @@ public interface WtTypes {
   IElementType LIST_ITEM = new WtElementType("LIST_ITEM");
   IElementType TABLE = new WtElementType("TABLE");
   IElementType TEMPLATE = new WtElementType("TEMPLATE");
+  IElementType TEMPLATE_HEAD = new WtElementType("TEMPLATE_HEAD");
   IElementType VERBATIM_BODY = new WtElementType("VERBATIM_BODY");
   IElementType VERBATIM_TAG = new WtElementType("VERBATIM_TAG");
 
@@ -53,7 +54,7 @@ public interface WtTypes {
   IElementType TABLE_OPEN = new WtTokenType("TABLE_OPEN[\"{|\"]");
   IElementType TEMPLATE_CLOSE = new WtTokenType("}}");
   IElementType TEMPLATE_EQUALS = new WtTokenType("TEMPLATE_EQUALS[=]");
-  IElementType TEMPLATE_NAME = new WtTokenType("TEMPLATE_NAME");
+  IElementType TEMPLATE_HEAD_TEXT = new WtTokenType("TEMPLATE_HEAD_TEXT");
   IElementType TEMPLATE_OPEN = new WtTokenType("{{");
   IElementType TEMPLATE_PARAM_TEXT = new WtTokenType("TEMPLATE_PARAM_TEXT");
   IElementType TEMPLATE_PIPE = new WtTokenType("TEMPLATE_PIPE");
@@ -87,6 +88,9 @@ public interface WtTypes {
       }
       else if (type == TEMPLATE) {
         return new WtTemplateImpl(node);
+      }
+      else if (type == TEMPLATE_HEAD) {
+        return new WtTemplateHeadImpl(node);
       }
       else if (type == VERBATIM_BODY) {
         return new WtVerbatimBodyImpl(node);

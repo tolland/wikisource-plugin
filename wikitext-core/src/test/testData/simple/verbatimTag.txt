@@ -1,0 +1,4 @@
+WtTokenType.HTML_TAG_OPEN ('<nowiki>')
+WtTokenType.VERBATIM_CONTENT ('some {{not a template}} text')
+WtTokenType.HTML_TAG_CLOSE ('</nowiki>')
+WtTokenType.NEWLINE ('\n')

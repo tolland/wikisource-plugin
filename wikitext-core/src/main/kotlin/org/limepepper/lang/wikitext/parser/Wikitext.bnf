@@ -65,7 +65,7 @@
     // They are tokens now; no rule below may share these names
     // (case-insensitively).
     LINK_TARGET='regexp:[^]|]+'
-    TEMPLATE_NAME='regexp:[^{}|]+'
+    TEMPLATE_HEAD_TEXT='regexp:[^{}|\[<&]+'
 
     // Heading open/close markers
     H_START='regexp:[ \t]{0,3}={1,6}'
@@ -178,13 +178,11 @@ private table_cell_content ::= (content_element | TABLE_CELL_TEXT)*
 // =========================================================================
 // --- Templates ---
 // =========================================================================
-// The lexer's <TEMPLATE_NAME> state scans the name as ONE token
-// ([^{}|]+ -> TEMPLATE_NAME) rather than as PLAIN_TEXT/SPACE runs the
-// parser reassembles -- so template_name is consumed directly as a leaf
-// token here, NOT re-parsed as a composite of smaller tokens (that was
-// the old grammar's design, and it collided with this same TEMPLATE_NAME
-// identifier -- seethe header comment above).
-template ::= TEMPLATE_OPEN TEMPLATE_NAME (TEMPLATE_PIPE template_param)* TEMPLATE_CLOSE {pin=1}
+// The header is a composite: nested calls and tags can occur before the
+// first pipe. Hashes and colons remain text; function/target interpretation
+// belongs to consumers of this structure.
+template ::= TEMPLATE_OPEN template_head (TEMPLATE_PIPE template_param)* TEMPLATE_CLOSE {pin=1}
+template_head ::= (content_element | TEMPLATE_HEAD_TEXT)*
 private template_param ::= [ TEMPLATE_PARAM_TEXT TEMPLATE_EQUALS ] template_param_value
 private template_param_value ::= (content_element | TEMPLATE_PARAM_TEXT)*
 
@@ -195,8 +193,8 @@ private template_param_value ::= (content_element | TEMPLATE_PARAM_TEXT)*
 // =========================================================================
 // Internal Links: [[TargetPage]] or [[TargetPage|Display Text]]
 // LINK_TARGET is matched whole by the lexer's <LINK_TARGET> state
-// ([^\]|]+ -> LINK_TARGET), consumed directly as a leaf -- same reasoning
-// as TEMPLATE_NAME above. link_display covers the post-PIPE portion,
+// ([^\]|]+ -> LINK_TARGET), consumed directly as a leaf.
+// link_display covers the post-PIPE portion,
 // which the lexer tokenizes as LINK_DISPLAY_TEXT runs interleaved with
 // nested constructs (links/templates/tags), hence reusing inline_item.
 internal_link ::= LINK_OPEN LINK_TARGET (LINK_PIPE link_display)? LINK_CLOSE {pin=1}
@@ -212,7 +210,7 @@ private link_display ::= (content_element | LINK_PIPE)*
 // returning to the SAME state on open (see handleOpenTag in the .flex).
 html_tag ::= HTML_TAG_SELFCLOSE
            | HTML_TAG_OPEN html_tag_content HTML_TAG_CLOSE {pin=1}
-private html_tag_content ::= content_element*
+private html_tag_content ::= (content_element | TEMPLATE_HEAD_TEXT | TEMPLATE_PARAM_TEXT)*
 
 // Verbatim tags (<nowiki>, <pre>, <syntaxhighlight>, etc.) -- content is
 // opaque VERBATIM_CONTENT runs, never re-parsed as wikitext, matching the
