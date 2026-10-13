@@ -96,6 +96,7 @@ class PrpTextEditor(
         wrapper.add(toolbar.component, BorderLayout.NORTH)
         wrapper.add(delegate.component, BorderLayout.CENTER)
 
+        PrpSelectAllAction.install(delegate.editor, this)
         updateDecorations()
         document.addDocumentListener(object : DocumentListener {
             override fun documentChanged(event: DocumentEvent) = updateDecorations()
@@ -110,7 +111,7 @@ class PrpTextEditor(
         dividers = emptyList()
         bodyStartOffset = 0
         bodyEndOffset = document.textLength
-        delegate.editor.putUserData(PrpSelectAllHandler.BODY_RANGE, null)
+        delegate.editor.putUserData(PrpSelectAllAction.BODY_RANGE, null)
 
         val spans = ProofreadPageParts.tagSpans(document.text)
         val model = delegate.editor.customWrapModel
@@ -141,7 +142,7 @@ class PrpTextEditor(
         bodyStartOffset = spans.headerClose.last + 1
         bodyEndOffset = spans.footerOpen.first
         delegate.editor.putUserData(
-            PrpSelectAllHandler.BODY_RANGE,
+            PrpSelectAllAction.BODY_RANGE,
             TextRange(bodyStartOffset, bodyEndOffset),
         )
 
@@ -249,7 +250,7 @@ class PrpTextEditor(
     }
 
     override fun dispose() {
-        delegate.editor.putUserData(PrpSelectAllHandler.BODY_RANGE, null)
+        delegate.editor.putUserData(PrpSelectAllAction.BODY_RANGE, null)
         guards.forEach { if (it.isValid) document.removeGuardedBlock(it) }
         dividers.forEach { Disposer.dispose(it) }
         if (wraps.isNotEmpty()) {
