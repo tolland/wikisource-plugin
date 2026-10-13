@@ -6,7 +6,7 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.TokenType
 import com.intellij.psi.tree.TokenSet
 import org.limepepper.lang.wikitext.psi.WtFile
-import org.limepepper.lang.wikitext.psi.WtReferenceTag
+import org.limepepper.lang.wikitext.semantics.WtSemanticViews
 import org.limepepper.lang.wikitext.psi.WtTypes
 import java.text.BreakIterator
 import java.util.Locale
@@ -52,7 +52,7 @@ internal fun fileSentenceBandRanges(file: WtFile): List<TextRange> {
             } else {
                 flush()
                 // Preserve prose inside structural elements, without joining across them.
-                if (child.firstChild != null && child !is WtReferenceTag) visitChildren(child)
+                if (child.firstChild != null && WtSemanticViews.reference(child) == null) visitChildren(child)
             }
             child = child.nextSibling
         }

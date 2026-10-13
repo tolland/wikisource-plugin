@@ -63,15 +63,14 @@ class WtHighlightingSettingsTest : LightPlatformTestCase() {
             "refs.wt", WtFileType, "Body<ref>Note with ''italics''.</ref><ref name=\"note\"/>Tail",
         )
         val references = com.intellij.psi.util.PsiTreeUtil.findChildrenOfType(
-            file, org.limepepper.lang.wikitext.psi.WtReferenceTag::class.java,
-        ).toList()
+            file, org.limepepper.lang.wikitext.psi.WtHtmlTag::class.java,
+        ).filter { org.limepepper.lang.wikitext.semantics.WtSemanticViews.reference(it) != null }
         assertEquals(2, references.size)
         val annotator = org.limepepper.lang.wikitext.annotator.WtReferenceAnnotator()
         fun annotations(): AnnotationHolderImpl {
             val holder = AnnotationHolderImpl(AnnotationSession(file), false)
             references.forEach { ref ->
                 holder.runAnnotatorWithContext(ref, annotator)
-                ref.referenceBody?.let { holder.runAnnotatorWithContext(it, annotator) }
             }
             holder.assertAllAnnotationsCreated()
             return holder

@@ -118,7 +118,6 @@ private content_element ::= internal_link
               | heading
               | list_item
               | table
-              | reference_tag
               | html_tag
               | verbatim_tag
               | comment
@@ -209,16 +208,9 @@ private link_display ::= (content_element | LINK_PIPE)*
 // Non-verbatim open/close pairs (<ref>...</ref>, <div>...</div>) wrap
 // ordinary wikitext content recursively, matching the lexer's behavior of
 // returning to the SAME state on open (see handleOpenTag in the .flex).
-// References are first-class PSI nodes while retaining parsed wikitext in their body.
-// Predicates distinguish <ref> from generic tags without changing lexer tokens.
-reference_tag ::= reference_self_close | reference_definition
-private reference_definition ::= reference_open reference_body HTML_TAG_CLOSE {pin=1}
-private reference_self_close ::= &<<isReferenceTag>> HTML_TAG_SELFCLOSE
-private reference_open ::= &<<isReferenceTag>> HTML_TAG_OPEN
-reference_body ::= (content_element | TEMPLATE_HEAD_TEXT | TEMPLATE_PARAM_TEXT)*
-
-html_tag ::= HTML_TAG_SELFCLOSE
-           | HTML_TAG_OPEN html_tag_content HTML_TAG_CLOSE {pin=1}
+html_tag ::= HTML_TAG_SELFCLOSE | parsed_tag
+// Keep incomplete parsed tags as nodes, while leaving opaque bodies to verbatim_tag.
+private parsed_tag ::= HTML_TAG_OPEN !VERBATIM_CONTENT html_tag_content HTML_TAG_CLOSE {pin=2}
 private html_tag_content ::= (content_element | TEMPLATE_HEAD_TEXT | TEMPLATE_PARAM_TEXT)*
 
 // Verbatim tags (<nowiki>, <pre>, <syntaxhighlight>, etc.) -- content is

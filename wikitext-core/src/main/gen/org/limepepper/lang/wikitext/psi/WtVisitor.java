@@ -32,14 +32,6 @@ public class WtVisitor extends PsiElementVisitor {
     visitNavigatablePsiElement(o);
   }
 
-  public void visitReferenceBody(@NotNull WtReferenceBody o) {
-    visitNavigatablePsiElement(o);
-  }
-
-  public void visitReferenceTag(@NotNull WtReferenceTag o) {
-    visitNavigatablePsiElement(o);
-  }
-
   public void visitTable(@NotNull WtTable o) {
     visitNavigatablePsiElement(o);
   }

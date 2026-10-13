@@ -14,8 +14,6 @@ public interface WtTypes {
   IElementType HTML_TAG = new WtElementType("HTML_TAG");
   IElementType INTERNAL_LINK = new WtElementType("INTERNAL_LINK");
   IElementType LIST_ITEM = new WtElementType("LIST_ITEM");
-  IElementType REFERENCE_BODY = new WtElementType("REFERENCE_BODY");
-  IElementType REFERENCE_TAG = new WtElementType("REFERENCE_TAG");
   IElementType TABLE = new WtElementType("TABLE");
   IElementType TEMPLATE = new WtElementType("TEMPLATE");
   IElementType TEMPLATE_HEAD = new WtElementType("TEMPLATE_HEAD");
@@ -84,12 +82,6 @@ public interface WtTypes {
       }
       else if (type == LIST_ITEM) {
         return new WtListItemImpl(node);
-      }
-      else if (type == REFERENCE_BODY) {
-        return new WtReferenceBodyImpl(node);
-      }
-      else if (type == REFERENCE_TAG) {
-        return new WtReferenceTagImpl(node);
       }
       else if (type == TABLE) {
         return new WtTableImpl(node);
