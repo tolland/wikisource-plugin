@@ -18,6 +18,7 @@ import com.intellij.openapi.fileEditor.FileEditorState
 import com.intellij.openapi.fileEditor.FileEditorStateLevel
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.util.TextRange
 import com.intellij.openapi.util.UserDataHolderBase
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.pom.Navigatable
@@ -109,6 +110,7 @@ class PrpTextEditor(
         dividers = emptyList()
         bodyStartOffset = 0
         bodyEndOffset = document.textLength
+        delegate.editor.putUserData(PrpSelectAllHandler.BODY_RANGE, null)
 
         val spans = ProofreadPageParts.tagSpans(document.text)
         val model = delegate.editor.customWrapModel
@@ -138,6 +140,10 @@ class PrpTextEditor(
         }
         bodyStartOffset = spans.headerClose.last + 1
         bodyEndOffset = spans.footerOpen.first
+        delegate.editor.putUserData(
+            PrpSelectAllHandler.BODY_RANGE,
+            TextRange(bodyStartOffset, bodyEndOffset),
+        )
 
         val editor = delegate.editor
         dividers = listOfNotNull(
@@ -243,6 +249,7 @@ class PrpTextEditor(
     }
 
     override fun dispose() {
+        delegate.editor.putUserData(PrpSelectAllHandler.BODY_RANGE, null)
         guards.forEach { if (it.isValid) document.removeGuardedBlock(it) }
         dividers.forEach { Disposer.dispose(it) }
         if (wraps.isNotEmpty()) {

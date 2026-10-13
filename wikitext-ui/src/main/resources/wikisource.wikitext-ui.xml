@@ -133,6 +133,11 @@
             implementation="org.limepepper.lang.wikitext.editor.prp.PrpFileEditorProvider"
         />
 
+        <editorActionHandler
+            action="$SelectAll"
+            implementationClass="org.limepepper.lang.wikitext.editor.prp.PrpSelectAllHandler"
+        />
+
         <!--
         this is the old editor that uses profiles to build
         a Page, Index or generic wikitext specific editor/preview split
