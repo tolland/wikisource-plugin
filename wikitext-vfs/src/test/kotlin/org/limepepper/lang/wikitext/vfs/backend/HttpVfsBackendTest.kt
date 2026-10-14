@@ -180,7 +180,7 @@ class HttpVfsBackendTest {
         assertArrayEquals(pixels, bytes)
         assertEquals(
             "/reference-image" +
-                "?path=%2Fwikisource%2Fen%2FIndex%3AFoo.djvu%2FPages%2FPage%3AFoo.djvu%2F1",
+                "?path=%2Fwikisource%2Fen%2FPage%3AFoo.djvu%2F1",
             requestUri,
         )
         assertNotNull(requestIdHeader)
