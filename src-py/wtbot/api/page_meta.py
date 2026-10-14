@@ -13,9 +13,6 @@ from wtbot.model import (
 from wtbot.model.wikisource.proofread_page_meta import SHORT_NAME_RE
 from wtbot.shared_repository import local_file_title_pk
 from wtbot.vfs.nodes import (
-    FileBlobLeaf,
-    FileDir,
-    FileWikitext,
     IndexAssetLeaf,
     IndexDir,
     IndexWikitext,
@@ -67,12 +64,6 @@ def _resolve(
                 return page
             case IndexDir(_, _, index) | IndexWikitext(_, _, index):
                 return index
-            case (
-                FileDir(_, _, file_page)
-                | FileWikitext(_, _, file_page)
-                | FileBlobLeaf(_, _, file_page)
-            ):
-                return file_page
             case _:
                 raise HTTPException(
                     status_code=404, detail=f"no page behind path: {path}"

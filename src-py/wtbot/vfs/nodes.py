@@ -17,20 +17,13 @@ ProofreadPage tree:
     /{family}/{code}/{Index title}/wikitext  IndexWikitext (...and content)
     /.../{Index title}/Pages                 PagesDir
     /.../{Index title}/Pages/{Page title}    PageLeaf
-    /.../{Index title}/{File title}          FileDir       (dual role again)
-    /.../{Index title}/{File title}/wikitext FileWikitext
-    /.../{Index title}/{File title}/blob     FileBlobLeaf
     /.../{Index title}/{subpage}             IndexAssetLeaf (styles.css, ...)
-    /.../{Index title}/Templates             StubDir
-    /.../{Index title}/TranscludedFiles      StubDir
 
 Every VFS operation (stat / list / read / write) resolves first and then
 match/cases on the node type, so the tree shape is defined exactly once.
 Nodes carry the ORM rows the resolver already fetched; operations must not
 re-query what the resolver proved to exist.
 """
-
-STUB_CONTAINERS = ("Templates", "TranscludedFiles")
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,27 +73,6 @@ class PageLeaf:
 
 
 @dataclass(frozen=True, slots=True)
-class FileDir:
-    path: WikiPath
-    site: Site
-    file_page: Entry
-
-
-@dataclass(frozen=True, slots=True)
-class FileWikitext:
-    path: WikiPath
-    site: Site
-    file_page: Entry
-
-
-@dataclass(frozen=True, slots=True)
-class FileBlobLeaf:
-    path: WikiPath
-    site: Site
-    file_page: Entry
-
-
-@dataclass(frozen=True, slots=True)
 class IndexAssetLeaf:
     """Index-namespace subpage of the index (styles.css and friends).
     `name` is the path relative to the index dir; the page title is
@@ -109,12 +81,6 @@ class IndexAssetLeaf:
     path: WikiPath
     site: Site
     page: Entry
-    name: str
-
-
-@dataclass(frozen=True, slots=True)
-class StubDir:
-    path: WikiPath
     name: str
 
 
@@ -130,11 +96,7 @@ type WsNode = (
     | IndexWikitext
     | PagesDir
     | PageLeaf
-    | FileDir
-    | FileWikitext
-    | FileBlobLeaf
     | IndexAssetLeaf
-    | StubDir
     | Missing
 )
 
@@ -176,37 +138,9 @@ def resolve(store: PageStore, raw_path: str) -> WsNode:
         page = store.proofread_page(site, "/".join(rest[1:]), index_title)
         return PageLeaf(path, site, page) if page is not None else Missing(path)
 
-    if len(rest) == 1 and rest[0] in STUB_CONTAINERS:
-        return StubDir(path, rest[0])
-
-    # File: leaf (wikitext/blob) beneath the File: dir
-    if rest[-1] in ("wikitext", "blob") and "/".join(rest[:-1]).startswith("File:"):
-        file_page = _index_file(store, site, index_page, "/".join(rest[:-1]))
-        if file_page is None:
-            return Missing(path)
-        if rest[-1] == "wikitext":
-            return FileWikitext(path, site, file_page)
-        return FileBlobLeaf(path, site, file_page)
-
     joined = "/".join(rest)
-    if joined.startswith("File:"):
-        file_page = _index_file(store, site, index_page, joined)
-        return (
-            FileDir(path, site, file_page) if file_page is not None else Missing(path)
-        )
-
     # Index-namespace subpage asset
     asset = store.entry(site, f"{index_title}/{joined}")
     if asset is None or asset.content_model == PROOFREAD_INDEX_CONTENT_MODEL:
         return Missing(path)
     return IndexAssetLeaf(path, site, asset, joined)
-
-
-def _index_file(store: PageStore, site: Site, index: Entry, name: str) -> Entry | None:
-    """The ``File:`` directory under an index: the file its metadata names,
-    wherever that lives (a Commons scan is Commons's page), else a same-named
-    title on the index's own site."""
-    backing = store.index_file(index)
-    if backing is not None and backing.name == name:
-        return backing
-    return store.entry(site, name)

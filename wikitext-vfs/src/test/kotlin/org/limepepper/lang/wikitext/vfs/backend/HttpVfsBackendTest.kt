@@ -116,8 +116,8 @@ class HttpVfsBackendTest {
     }
 
     @Test fun `listChildren handles empty array`() {
-        handle("/vfs/children", """{"parent_path":"/wikisource/en/Index:Foo/Templates","children":[]}""")
-        val r = backend.listChildren("/wikisource/en/Index:Foo/Templates")
+        handle("/vfs/children", """{"parent_path":"/wikisource/en/Index:Foo/Pages","children":[]}""")
+        val r = backend.listChildren("/wikisource/en/Index:Foo/Pages")
         assertEquals(emptyList<ChildNode>(), r.children)
     }
 

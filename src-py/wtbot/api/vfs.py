@@ -15,7 +15,6 @@ from wtbot.api.schemas import (
 from wtbot.deps import get_session
 from wtbot.vfs import WikisourceVfs
 from wtbot.vfs.errors import (
-    BlobsNotImplemented,
     NotADirectory,
     NotAFile,
     NotFound,
@@ -50,7 +49,6 @@ _ERROR_STATUS: dict[type[VfsError], tuple[int, str]] = {
     NotFound: (404, "not-found"),
     NotADirectory: (404, "not-a-directory"),
     NotAFile: (400, "not-a-file"),
-    BlobsNotImplemented: (501, "blobs-not-implemented"),
 }
 
 

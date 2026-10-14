@@ -10,14 +10,10 @@ from wtbot.api.schemas import (
     WriteResult,
     WriteStatus,
 )
-from wtbot.model import FileBlob, Site
-from wtbot.vfs.errors import BlobsNotImplemented, NotADirectory, NotAFile, NotFound
+from wtbot.model import Site
+from wtbot.vfs.errors import NotADirectory, NotAFile, NotFound
 from wtbot.vfs.mediawiki import MediaWikiVfs, ts_millis
 from wtbot.vfs.nodes import (
-    STUB_CONTAINERS,
-    FileBlobLeaf,
-    FileDir,
-    FileWikitext,
     IndexAssetLeaf,
     IndexDir,
     IndexWikitext,
@@ -26,7 +22,6 @@ from wtbot.vfs.nodes import (
     PagesDir,
     RootDir,
     SiteDir,
-    StubDir,
     resolve,
 )
 from wtbot.vfs.paths import WikiPath
@@ -40,7 +35,7 @@ from wtbot.vfs.store import (
 """wikisource:// overlay — the ProofreadPage-aware VFS service.
 
 This layer owns only the synthetic tree: it resolves each path to a typed
-node (`wtbot.vfs.nodes`), assembles the Index/Pages/File containers, and
+node (`wtbot.vfs.nodes`), assembles the Index/Pages containers, and
 delegates everything title-shaped downward — per-page content operations to
 the mediawiki layer, queries to the PageStore. Domain errors are raised as
 `wtbot.vfs.errors` types; the HTTP router maps them to status codes.
@@ -59,25 +54,6 @@ def _dir_node(path: str, name: str, stable_id: int | None = None) -> Node:
         stable_id=stable_id,
         writable=False,
     )
-
-
-def _blob_node(path: str, blob: FileBlob | None) -> Node:
-    return Node(
-        path=path,
-        name="blob",
-        kind=NodeKind.file,
-        length=blob.size if blob else None,
-        writable=False,
-        stable_id=None,
-        revid=None,
-        content_model=None,
-        timestamp=None,
-    )
-
-
-def _index_to_file_title(index_title: str) -> str:
-    _, _, rest = index_title.partition(":")
-    return f"File:{rest}"
 
 
 __all__ = ["WikisourceVfs", "proofread_page_scaffold"]
@@ -130,29 +106,6 @@ class WikisourceVfs:
                 )
             case PageLeaf(path, _, page):
                 return self.mw.stat_page(path.raw, page, name=page.name)
-            case StubDir(path, name):
-                return Stat(
-                    path=path.raw, exists=True, name=name, kind=NodeKind.directory
-                )
-            case FileDir(path, _, file_page):
-                return Stat(
-                    path=path.raw,
-                    exists=True,
-                    name=file_page.name,
-                    kind=NodeKind.directory,
-                    stable_id=file_page.pageid,
-                )
-            case FileWikitext(path, _, file_page):
-                return self.mw.stat_page(path.raw, file_page, name="wikitext")
-            case FileBlobLeaf(path, _, file_page):
-                blob = self.store.blob(file_page)
-                return Stat(
-                    path=path.raw,
-                    exists=True,
-                    name="blob",
-                    kind=NodeKind.file,
-                    length=blob.size if blob else None,
-                )
             case IndexAssetLeaf(path, _, page, name):
                 return self.mw.stat_page(path.raw, page, name=name)
 
@@ -238,10 +191,6 @@ class WikisourceVfs:
                 return self._index_children(path, site, index)
             case PagesDir(path, site, index):
                 return self._pages_children(path, site, index)
-            case StubDir(path):
-                return ListChildrenResponse(parent_path=path.normalized, children=[])
-            case FileDir(path, _, file_page):
-                return self._file_dir_children(path, file_page)
             case node:
                 raise NotADirectory(f"not a directory: {node.path.raw}")
 
@@ -263,23 +212,9 @@ class WikisourceVfs:
             _dir_node(f"{parent}/Pages", "Pages"),
         ]
 
-        file_page = self.store.index_file(index) or self.store.entry(
-            site, _index_to_file_title(index.name)
-        )
-        if file_page is not None:
-            children.append(
-                _dir_node(
-                    f"{parent}/{file_page.name}",
-                    file_page.name,
-                    stable_id=file_page.pageid,
-                )
-            )
-
         for asset in self._index_assets(site, index):
             name = asset.name.removeprefix(f"{index.name}/")
             children.append(self.mw.page_node(f"{parent}/{name}", asset, name=name))
-
-        children.extend(_dir_node(f"{parent}/{stub}", stub) for stub in STUB_CONTAINERS)
         return ListChildrenResponse(parent_path=parent, children=children)
 
     def _index_assets(self, site: Site, index: Entry) -> list[Entry]:
@@ -308,18 +243,6 @@ class WikisourceVfs:
         ]
         return ListChildrenResponse(parent_path=parent, children=children)
 
-    def _file_dir_children(
-        self, path: WikiPath, file_page: Entry
-    ) -> ListChildrenResponse:
-        parent = path.normalized
-        return ListChildrenResponse(
-            parent_path=parent,
-            children=[
-                self.mw.page_node(f"{parent}/wikitext", file_page, name="wikitext"),
-                _blob_node(f"{parent}/blob", self.store.blob(file_page)),
-            ],
-        )
-
     # -- read / write ------------------------------------------------------------
 
     def read(self, raw_path: str) -> ReadContentResponse:
@@ -327,12 +250,9 @@ class WikisourceVfs:
             case (
                 PageLeaf(path, _, page)
                 | IndexWikitext(path, _, page)
-                | FileWikitext(path, _, page)
                 | IndexAssetLeaf(path, _, page, _)
             ):
                 return self.mw.read_page(path.raw, page)
-            case FileBlobLeaf():
-                raise BlobsNotImplemented("blob streaming not yet implemented")
             case Missing(path):
                 raise NotFound(f"page not found: {path.raw}")
             case _:
@@ -343,7 +263,6 @@ class WikisourceVfs:
             case (
                 PageLeaf(_, _, page)
                 | IndexWikitext(_, _, page)
-                | FileWikitext(_, _, page)
                 | IndexAssetLeaf(_, _, page, _)
             ):
                 return self.mw.write_page(req, page)

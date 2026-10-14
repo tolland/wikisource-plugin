@@ -53,10 +53,8 @@ def resolve_target(session: Session, path: str) -> tuple[Site, str, str | None]:
         title = index_title  # the Index page's own body
     elif rest[0] == "Pages" and len(rest) > 1:
         title = "/".join(rest[1:])
-    elif rest[-1] == "wikitext":
-        title = "/".join(rest[:-1])  # File:…/wikitext
     elif ":" in rest[0]:
-        title = "/".join(rest)  # namespaced asset directly under the index
+        title = "/".join(rest)  # namespaced page directly under the index
     else:
         title = f"{index_title}/{'/'.join(rest)}"  # index subpage, e.g. styles.css
 

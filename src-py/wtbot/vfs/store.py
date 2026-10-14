@@ -8,7 +8,6 @@ from wtbot.model import (
     Commit,
     CommitStatus,
     EditJournal,
-    FileBlob,
     IndexMeta,
     Page,
     Site,
@@ -26,7 +25,7 @@ from wtbot.title_store import Entry, entry_by_pk
 
 Pure data access: no path knowledge, no HTTP, no tree shape. The
 mediawiki:// layer and the wikisource:// overlay both sit on top of this,
-so it is the one place that knows the Title/Page/EditJournal/FileBlob queries
+so it is the one place that knows the Title/Page/EditJournal queries
 and the edit-journal write discipline.
 
 Its unit is the [Entry]: a title, and the page behind it if the wiki holds
@@ -200,20 +199,6 @@ class PageStore:
             .order_by(Title.title)
         )
         return [row for row in rows if row.name.startswith(prefix)]
-
-    def index_file(self, index: Entry) -> Entry | None:
-        """The ``File:`` backing [index], as its IndexMeta names it -- which
-        may be on another site (a Commons scan). None before the index has
-        metadata."""
-        meta = self.session.get(IndexMeta, index.pk)
-        return entry_by_pk(self.session, meta.file_title_pk) if meta else None
-
-    def blob(self, file: Entry) -> FileBlob | None:
-        if file.page is None:
-            return None
-        return self.session.exec(
-            select(FileBlob).where(FileBlob.page_pk == file.pk)
-        ).first()
 
     # -- per-role metadata extensions ---------------------------------------
 

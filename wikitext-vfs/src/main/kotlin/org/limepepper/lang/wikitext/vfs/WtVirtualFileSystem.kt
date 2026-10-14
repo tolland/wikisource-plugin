@@ -24,9 +24,8 @@ private val LOG = Logger.getInstance(WtVirtualFileSystem::class.java)
  *   /{family}/{code}/{Index title}/           index directory
  *   /{family}/{code}/{Index title}/Pages/     pages container
  *   /{family}/{code}/{Index title}/Pages/{Page title}   page file
- *   /{family}/{code}/{Index title}/{File title}/        file directory
- *   /{family}/{code}/{Index title}/{File title}/wikitext
- *   /{family}/{code}/{Index title}/{File title}/blob
+ *   /{family}/{code}/{Index title}/wikitext   the index page's own content
+ *   /{family}/{code}/{Index title}/{subpage}  index-namespace subpage (styles.css, ...)
  *
  * [WtVirtualFile] instances are cached by path so callers always get the
  * same instance for the same path (IntelliJ VFS contract).

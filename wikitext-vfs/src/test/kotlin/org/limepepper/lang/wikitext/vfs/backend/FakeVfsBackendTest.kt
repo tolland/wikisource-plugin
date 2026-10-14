@@ -24,8 +24,6 @@ class FakeVfsBackendTest {
             stableId = 1004, revid = 5004,
             contentModel = "proofread-page",
         )
-        addDirectory("/wikisource/en/Index:Foo.djvu/File:Foo.djvu")
-        addFile("/wikisource/en/Index:Foo.djvu/File:Foo.djvu/wikitext", content = "== Description ==")
     }
 
     @Test
