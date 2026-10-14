@@ -141,6 +141,10 @@ private class PagePositionLabel(
  * Resolves a wikisource:// VFS [path] off the EDT (findFileByPath stats the
  * sidecar) and opens it in the front editor tab.
  */
+// Keep synchronous openFile with requestFocus=true: navigation must focus the
+// custom proofread editor. requestOpenFile has no focus parameter; openTextEditor
+// would constrain editor selection to text editors. Revisit on the next IDE upgrade.
+@Suppress("DEPRECATION")
 private fun openWikisourcePage(project: Project, path: String) {
     ApplicationManager.getApplication().executeOnPooledThread {
         val fileSystem = VirtualFileManager.getInstance().getFileSystem(WtVirtualFile.PROTOCOL)

@@ -1,4 +1,3 @@
-@file:Suppress("UnstableApiUsage")
 package org.limepepper.lang.wikitext.inlay
 
 import com.intellij.codeInsight.hints.ChangeListener
@@ -16,6 +15,9 @@ import org.limepepper.lang.wikitext.psi.WtTypes
 import org.limepepper.lang.wikitext.tool.MyMessageBundle
 import javax.swing.JPanel
 
+// The platform inlay provider API supplies PSI-based hints and their settings UI.
+// Accept its experimental status; adapt this provider when upgrading the target IDE.
+@Suppress("UnstableApiUsage")
 class ProofreadInlayProvider : InlayHintsProvider<NoSettings> {
 
     override fun getCollectorFor(
@@ -48,7 +50,6 @@ class ProofreadInlayProvider : InlayHintsProvider<NoSettings> {
     override val description: String
         get() = MyMessageBundle.message("markdown.table.inlay.kind.description")
 
-    @Suppress("UnstableApiUsage")
     override val key: SettingsKey<NoSettings>
         get() = settingsKey
 

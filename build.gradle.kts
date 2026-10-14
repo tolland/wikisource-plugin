@@ -1,5 +1,6 @@
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.intellij.platform.gradle.tasks.PrepareSandboxTask
+import org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginTask
 import org.jetbrains.kotlin.gradle.dsl.JvmDefaultMode
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 
@@ -79,6 +80,18 @@ dependencies {
 }
 
 intellijPlatform {
+    pluginVerification {
+        // Experimental inlay hints and CustomWrap are accepted dependencies (see
+        // ProofreadInlayProvider and PrpTextEditor). Report them for IDE upgrades,
+        // while still failing on binary incompatibility, internal API usage, and
+        // calls to override-only APIs. Deprecated usages require local justification.
+        failureLevel = listOf(
+            VerifyPluginTask.FailureLevel.COMPATIBILITY_PROBLEMS,
+            VerifyPluginTask.FailureLevel.INTERNAL_API_USAGES,
+            VerifyPluginTask.FailureLevel.OVERRIDE_ONLY_API_USAGES,
+        )
+    }
+
     // Disable buildSearchableOptions for development
     buildSearchableOptions = false
 

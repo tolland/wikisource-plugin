@@ -39,7 +39,7 @@ class PrpSelectAllAction(
             selection.selectionEnd == body.endOffset
         if (body == null || body.isEmpty || alreadyBody) {
             ActionManager.getInstance().getAction(IdeActions.ACTION_SELECT_ALL)
-                ?.let { ActionUtil.performActionDumbAwareWithCallbacks(it, e) }
+                ?.let { ActionUtil.performAction(it, e) }
             return
         }
         editor.caretModel.removeSecondaryCarets()

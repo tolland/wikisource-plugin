@@ -36,7 +36,7 @@ class WtHighlightingSettings : PersistentStateComponent<WtHighlightingSettings.O
         // Restart removes old annotations too, so disabling works without editing the file.
         ApplicationManager.getApplication().invokeLater {
             ProjectManager.getInstance().openProjects.filterNot { it.isDisposed }.forEach {
-                DaemonCodeAnalyzer.getInstance(it).restart()
+                DaemonCodeAnalyzer.getInstance(it).restart(this)
             }
         }
     }

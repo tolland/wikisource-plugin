@@ -8,6 +8,7 @@ import com.intellij.ui.ToolbarDecorator
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBList
 import java.awt.BorderLayout
+import javax.swing.JList
 import javax.swing.JCheckBox
 import javax.swing.JComponent
 import javax.swing.JPanel
@@ -38,8 +39,16 @@ class OcrFavoritesConfigurable(private val project: Project) : SearchableConfigu
     private val listModel = CollectionListModel<OcrFavorite>()
     private val list = JBList(listModel).apply {
         selectionMode = ListSelectionModel.SINGLE_SELECTION
-        cellRenderer = SimpleListCellRenderer.create<OcrFavorite> { label, value, _ ->
-            label.text = value?.displayName().orEmpty()
+        cellRenderer = object : SimpleListCellRenderer<OcrFavorite>() {
+            override fun customize(
+                list: JList<out OcrFavorite>,
+                value: OcrFavorite?,
+                index: Int,
+                selected: Boolean,
+                hasFocus: Boolean,
+            ) {
+                text = value?.displayName().orEmpty()
+            }
         }
     }
     private val useProjectBox = JCheckBox("Use project-specific favourites")

@@ -55,6 +55,9 @@ import javax.swing.JPanel
  * is left fully editable and unwrapped, matching
  * [ProofreadPageParts.tagSpans]'s own fallback.
  */
+// CustomWrap provides visual section breaks without modifying saved wikitext.
+// Accept this experimental editor API and revisit it on target IDE upgrades.
+@Suppress("UnstableApiUsage")
 class PrpTextEditor(
     private val delegate: TextEditor,
 ) : UserDataHolderBase(), TextEditor {

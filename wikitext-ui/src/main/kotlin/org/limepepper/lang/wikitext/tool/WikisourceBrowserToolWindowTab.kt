@@ -103,6 +103,9 @@ internal class WikisourceBrowserToolWindowTab(
         }
 
         tree.addMouseListener(object : MouseAdapter() {
+            // Retain openFile(..., true) to focus the registered custom file editor.
+            // requestOpenFile offers no focus flag; revisit on the next IDE upgrade.
+            @Suppress("DEPRECATION")
             override fun mouseClicked(e: MouseEvent) {
                 if (e.clickCount != 2) return
                 val vFile = elementOf(tree.lastSelectedPathComponent) as? WtVirtualFile ?: return
@@ -176,6 +179,9 @@ internal class WikisourceBrowserToolWindowTab(
 
         val group = DefaultActionGroup().apply {
             add(object : AnAction("Open") {
+                // Retain openFile(..., true) to focus the registered custom file editor.
+                // requestOpenFile offers no focus flag; revisit on the next IDE upgrade.
+                @Suppress("DEPRECATION")
                 override fun actionPerformed(e: AnActionEvent) {
                     val vFile = selectedFile() ?: return
                     if (!vFile.isDirectory) FileEditorManager.getInstance(project).openFile(vFile, true)

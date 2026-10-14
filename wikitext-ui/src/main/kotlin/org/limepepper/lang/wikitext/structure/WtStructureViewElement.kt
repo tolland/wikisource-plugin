@@ -7,6 +7,7 @@ import com.intellij.ide.util.treeView.smartTree.TreeElement
 import com.intellij.navigation.ItemPresentation
 import com.intellij.psi.NavigatablePsiElement
 import com.intellij.psi.PsiElement
+import com.intellij.util.OpenSourceUtil
 import org.limepepper.lang.wikitext.psi.WtContainedElement
 import org.limepepper.lang.wikitext.psi.WtHeading
 import org.limepepper.lang.wikitext.psi.WtFile
@@ -22,7 +23,7 @@ class WtStructureViewElement(val element: NavigatablePsiElement) : StructureView
     }
 
     override fun navigate(requestFocus: Boolean) {
-        element.navigate(requestFocus)
+        OpenSourceUtil.navigate(requestFocus, element)
     }
 
     override fun getPresentation(): ItemPresentation =
