@@ -168,8 +168,7 @@
         <action
             id="org.limepepper.lang.wikitext.editing.toggle.WtToggleItalicAction"
             class="org.limepepper.lang.wikitext.editing.toggle.WtToggleItalicAction"
-            text="Italic"
-            description="Wrap the selection in '' '' (or unwrap it)">
+        >
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
             <keyboard-shortcut keymap="$default" first-keystroke="control I"/>
         </action>
@@ -177,13 +176,12 @@
         <action
             id="org.limepepper.lang.wikitext.editor.prp.CreateTextRangeAction"
             class="org.limepepper.lang.wikitext.editor.prp.CreateTextRangeAction"
-            text="Save Text Range"
-            description="Save the selected text (or the caret position) as a persistable text range"
             icon="AllIcons.General.Add">
             <add-to-group group-id="EditorPopupMenu" anchor="last"/>
             <keyboard-shortcut keymap="$default" first-keystroke="alt shift T"/>
         </action>
     </actions>
+    <resource-bundle>messages.MyMessageBundle</resource-bundle>
 
     <!--    <applicationListeners>-->
     <!-- this is a stub for listing to EditorFactory events -->
