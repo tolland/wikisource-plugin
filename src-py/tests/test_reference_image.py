@@ -49,7 +49,7 @@ def test_a_page_with_no_scan_yet_gets_a_labelled_placeholder(client):
     there is worse than a blank sheet that says which page is waiting."""
     resp = client.get(
         "/reference-image",
-        params={"path": f"/{FAMILY}/{CODE}/{INDEX}/Pages/{PAGE}"},
+        params={"path": f"/{FAMILY}/{CODE}/{PAGE}"},
     )
 
     assert resp.status_code == 200
@@ -91,7 +91,7 @@ def test_preview_still_renders_markup(client):
     one answers with HTML from action=parse."""
     resp = client.post(
         "/preview/render",
-        json={"path": f"/{FAMILY}/{CODE}/{INDEX}/Pages/{PAGE}", "wikitext": "hi"},
+        json={"path": f"/{FAMILY}/{CODE}/{PAGE}", "wikitext": "hi"},
     )
 
     assert resp.status_code == 200

@@ -18,7 +18,7 @@ CODE = "en"
 SCOPE = f"{FAMILY}/{CODE}"
 INDEX = "Index:Hertz.pdf"
 PAGE_TITLE = "Page:Hertz.pdf/103"
-PAGE_PATH = f"/{FAMILY}/{CODE}/{INDEX}/Pages/{PAGE_TITLE}"
+PAGE_PATH = f"/{FAMILY}/{CODE}/{PAGE_TITLE}"
 SOURCE_URL = "https://wiki.example/img/Hertz.pdf/page103-500px.jpg"
 
 

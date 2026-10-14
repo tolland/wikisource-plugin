@@ -209,7 +209,7 @@ _INDEX_PATH = f"/{FAMILY}/{CODE}/{INDEX}"
 
 
 def test_resolve_by_vfs_path(client, seeded):
-    r = client.get("/pages/resolve", params={"path": f"{_INDEX_PATH}/Pages/{PAGE_1}"})
+    r = client.get("/pages/resolve", params={"path": f"/{FAMILY}/{CODE}/{PAGE_1}"})
     assert r.status_code == 200
     body = r.json()
     assert body["pk"] == seeded["page_pk"]
@@ -233,7 +233,7 @@ def test_resolve_by_title_triple(client, seeded):
 
 
 def test_resolve_missing_and_bad_requests(client, seeded):
-    r = client.get("/pages/resolve", params={"path": f"{_INDEX_PATH}/Pages/Page:No/9"})
+    r = client.get("/pages/resolve", params={"path": f"/{FAMILY}/{CODE}/Page:No/9"})
     assert r.status_code == 404
     # Synthetic containers have no backing page.
     r = client.get("/pages/resolve", params={"path": f"{_INDEX_PATH}/Pages"})
@@ -249,7 +249,7 @@ def test_resolve_missing_and_bad_requests(client, seeded):
 def test_resolve_then_meta_roundtrip(client, seeded):
     """The intended flow: VFS path -> pk -> per-role metadata."""
     pk = client.get(
-        "/pages/resolve", params={"path": f"{_INDEX_PATH}/Pages/{PAGE_1}"}
+        "/pages/resolve", params={"path": f"/{FAMILY}/{CODE}/{PAGE_1}"}
     ).json()["pk"]
     r = client.put(f"/pages/{pk}/page-meta", json={"thumb_width": 240})
     assert r.status_code == 200

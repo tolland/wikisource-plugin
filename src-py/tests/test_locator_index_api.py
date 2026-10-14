@@ -25,7 +25,7 @@ _PARAGRAPH_273_BODY = (
 
 
 def _page_path(title: str) -> str:
-    return f"{INDEX_PATH}/Pages/{title}"
+    return f"/{FAMILY}/{CODE}/{title}"
 
 
 def _seed(engine) -> None:

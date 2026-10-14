@@ -78,10 +78,10 @@ def store(engine):
         (f"/{FAMILY}/{CODE}/Index:NoSuch", Missing),
         (f"{_INDEX_PATH}/wikitext", IndexWikitext),
         (f"{_INDEX_PATH}/Pages", PagesDir),
-        (f"{_INDEX_PATH}/Pages/{PAGE_1}", PageLeaf),
+        (f"/{FAMILY}/{CODE}/{PAGE_1}", PageLeaf),
         # exists on the site, but is not a Page: of this index
-        (f"{_INDEX_PATH}/Pages/{FILE}", Missing),
-        (f"{_INDEX_PATH}/Pages/Page:NoSuch.djvu/9", Missing),
+        (f"/{FAMILY}/{CODE}/{FILE}", Missing),
+        (f"/{FAMILY}/{CODE}/Page:NoSuch.djvu/9", Missing),
         (f"{_INDEX_PATH}/Templates", Missing),
         (f"{_INDEX_PATH}/TranscludedFiles", Missing),
         (f"{_INDEX_PATH}/{FILE}", Missing),
@@ -96,9 +96,11 @@ def test_resolve_classifies(store, path, expected):
 
 
 def test_resolve_carries_underlying_pages(store):
-    page_leaf = resolve(store, f"{_INDEX_PATH}/Pages/{PAGE_1}")
+    page_leaf = resolve(store, f"/{FAMILY}/{CODE}/{PAGE_1}")
     assert isinstance(page_leaf, PageLeaf)
     assert page_leaf.page.name == PAGE_1
+    assert page_leaf.index is not None
+    assert page_leaf.index.name == INDEX
 
     # Dual role: the synthetic wikitext leaf is backed by the Index page itself.
     wikitext = resolve(store, f"{_INDEX_PATH}/wikitext")

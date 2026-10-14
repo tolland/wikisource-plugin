@@ -38,6 +38,7 @@ FILE = "File:Sparse.pdf"
 PAGE_5 = "Page:Sparse.pdf/5"
 
 _INDEX_PATH = f"/{FAMILY}/{CODE}/{INDEX}"
+_SITE_PATH = f"/{FAMILY}/{CODE}"
 _PAGES_PATH = f"{_INDEX_PATH}/Pages"
 
 _INDEX_BODY = "<pagelist />"
@@ -283,13 +284,13 @@ def test_placeholders_listed_with_flag(engine, tmp_path):
         assert by_number[PAGE_5]["placeholder"] is False
 
         stat = c.get(
-            "/vfs/stat", params={"path": f"{_PAGES_PATH}/Page:Sparse.pdf/3"}
+            "/vfs/stat", params={"path": f"{_SITE_PATH}/Page:Sparse.pdf/3"}
         ).json()
         assert stat["exists"] is True
         assert stat["placeholder"] is True
 
         # Bulk and individual stat agree on placeholders too.
-        paths = [f"{_PAGES_PATH}/Page:Sparse.pdf/3", f"{_PAGES_PATH}/{PAGE_5}"]
+        paths = [f"{_SITE_PATH}/Page:Sparse.pdf/3", f"{_SITE_PATH}/{PAGE_5}"]
         bulk = c.post("/vfs/stat/bulk", json={"paths": paths}).json()["results"]
         for path, result in zip(paths, bulk):
             assert result == c.get("/vfs/stat", params={"path": path}).json(), path
@@ -297,7 +298,7 @@ def test_placeholders_listed_with_flag(engine, tmp_path):
 
 def test_placeholder_opens_with_prepopulated_ocr_body(engine, tmp_path):
     _seed_and_fan_out(engine, tmp_path)
-    path = f"{_PAGES_PATH}/Page:Sparse.pdf/3"
+    path = f"{_SITE_PATH}/Page:Sparse.pdf/3"
     with _client(engine, tmp_path) as c:
         r = c.get("/vfs/content", params={"path": path}).json()
         assert _unb64(r["content_base64"]) == _ocr_body(3)
@@ -318,7 +319,7 @@ def test_placeholder_opens_with_scaffold_and_saves_as_edit(engine, tmp_path):
     # Page 1 is the slot the wiki offered no OCR body for — the generic
     # proofread-page scaffold is the fallback.
     _seed_and_fan_out(engine, tmp_path)
-    path = f"{_PAGES_PATH}/Page:Sparse.pdf/1"
+    path = f"{_SITE_PATH}/Page:Sparse.pdf/1"
     with _client(engine, tmp_path) as c:
         r = c.get("/vfs/content", params={"path": path}).json()
         body = _unb64(r["content_base64"])
@@ -342,7 +343,7 @@ def test_placeholder_opens_with_scaffold_and_saves_as_edit(engine, tmp_path):
 
 def test_committing_placeholder_creates_remote_page(engine, tmp_path):
     wiki = _seed_and_fan_out(engine, tmp_path)
-    path = f"{_PAGES_PATH}/Page:Sparse.pdf/4"
+    path = f"{_SITE_PATH}/Page:Sparse.pdf/4"
     app = create_app(
         engine=engine, blob_root=tmp_path / "blobs", client_factory=lambda site: wiki
     )

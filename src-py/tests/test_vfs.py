@@ -26,6 +26,7 @@ _PAGE_1_BODY = "{{recto}} Page one content."
 _PAGE_2_BODY = "{{verso}} Page two content."
 
 _INDEX_PATH = f"/{FAMILY}/{CODE}/{INDEX}"
+_SITE_PATH = f"/{FAMILY}/{CODE}"
 _PAGES_PATH = f"{_INDEX_PATH}/Pages"
 _FILE_PATH = f"{_INDEX_PATH}/{FILE}"
 
@@ -192,7 +193,7 @@ def test_stat_pages_container(vfs_client):
 
 
 def test_stat_page(vfs_client):
-    r = vfs_client.get("/vfs/stat", params={"path": f"{_PAGES_PATH}/{PAGE_1}"})
+    r = vfs_client.get("/vfs/stat", params={"path": f"{_SITE_PATH}/{PAGE_1}"})
     assert r.status_code == 200
     body = r.json()
     assert body["exists"] is True
@@ -211,13 +212,13 @@ def test_stat_missing(vfs_client):
 def test_stat_carries_decoration_fields(vfs_client):
     """quality_level / dirty / has_reference_image ride on stat so the tree can
     colour-code without extra round trips."""
-    r = vfs_client.get("/vfs/stat", params={"path": f"{_PAGES_PATH}/{PAGE_1}"}).json()
+    r = vfs_client.get("/vfs/stat", params={"path": f"{_SITE_PATH}/{PAGE_1}"}).json()
     assert r["quality_level"] == 1
     assert r["dirty"] is False
     assert r["has_reference_image"] is True
 
     # No ProofreadPageMeta row for page 2 -- no scan image known (yet).
-    r = vfs_client.get("/vfs/stat", params={"path": f"{_PAGES_PATH}/{PAGE_2}"}).json()
+    r = vfs_client.get("/vfs/stat", params={"path": f"{_SITE_PATH}/{PAGE_2}"}).json()
     assert r["quality_level"] is None
     assert r["has_reference_image"] is False
 
@@ -236,14 +237,14 @@ def test_stat_reports_dirty_after_local_save(vfs_client):
     r = vfs_client.post(
         "/vfs/content",
         json={
-            "path": f"{_PAGES_PATH}/{PAGE_1}",
+            "path": f"{_SITE_PATH}/{PAGE_1}",
             "content_base64": _b64("edited for dirty check"),
             "base_revid": 5003,
         },
     )
     assert r.json()["status"] == "ok"
     assert (
-        vfs_client.get("/vfs/stat", params={"path": f"{_PAGES_PATH}/{PAGE_1}"}).json()[
+        vfs_client.get("/vfs/stat", params={"path": f"{_SITE_PATH}/{PAGE_1}"}).json()[
             "dirty"
         ]
         is True
@@ -251,9 +252,9 @@ def test_stat_reports_dirty_after_local_save(vfs_client):
 
 
 def test_stat_non_page_title_under_pages_is_missing(vfs_client):
-    """A title that exists on the site but is not a Page: of this index must
-    not resolve under the synthetic Pages/ container."""
-    r = vfs_client.get("/vfs/stat", params={"path": f"{_PAGES_PATH}/{FILE}"})
+    """A title that exists on the site but is not a Page: must not resolve as
+    a proofread page."""
+    r = vfs_client.get("/vfs/stat", params={"path": f"{_SITE_PATH}/{FILE}"})
     assert r.status_code == 200
     assert r.json()["exists"] is False
 
@@ -282,12 +283,12 @@ def test_stat_bulk_matches_individual_stat(vfs_client):
         "/",
         _INDEX_PATH,
         f"{_INDEX_PATH}/wikitext",
-        f"{_PAGES_PATH}/{PAGE_1}",
-        f"{_PAGES_PATH}/{PAGE_2}",
+        f"{_SITE_PATH}/{PAGE_1}",
+        f"{_SITE_PATH}/{PAGE_2}",
         "/wikisource/en/Index:NoSuch",
-        f"{_PAGES_PATH}/Page:NoSuchPage.djvu/1",
-        f"{_PAGES_PATH}/{FILE}",
-        "/wikisource/en/Index:NoSuch/Pages/Page:NoSuchPage.djvu/1",
+        f"{_SITE_PATH}/Page:NoSuchPage.djvu/1",
+        f"{_SITE_PATH}/{FILE}",
+        "/wikisource/en/Page:NoSuchPage.djvu/1",
     ]
     bulk = vfs_client.post("/vfs/stat/bulk", json={"paths": paths})
     assert bulk.status_code == 200
@@ -312,14 +313,14 @@ def test_stat_bulk_reflects_uncommitted_edit_length(vfs_client):
     w = vfs_client.post(
         "/vfs/content",
         json={
-            "path": f"{_PAGES_PATH}/{PAGE_1}",
+            "path": f"{_SITE_PATH}/{PAGE_1}",
             "content_base64": _b64(edited_body),
             "base_revid": 5003,
         },
     )
     assert w.json()["status"] == "ok"
 
-    paths = [f"{_PAGES_PATH}/{PAGE_1}", f"{_PAGES_PATH}/{PAGE_2}"]
+    paths = [f"{_SITE_PATH}/{PAGE_1}", f"{_SITE_PATH}/{PAGE_2}"]
     bulk = vfs_client.post("/vfs/stat/bulk", json={"paths": paths})
     results = bulk.json()["results"]
 
@@ -430,6 +431,15 @@ def test_list_pages_container(vfs_client):
     assert PAGE_2 in names
     assert all(c["kind"] == "file" for c in children)
     assert all(c["content_model"] == "proofread-page" for c in children)
+    # a page's path is its own title under the site, not nested under the index
+    assert [c["path"] for c in children] == [
+        f"{_SITE_PATH}/{c['name']}" for c in children
+    ]
+
+
+def test_legacy_nested_page_path_is_missing(vfs_client):
+    r = vfs_client.get("/vfs/stat", params={"path": f"{_PAGES_PATH}/{PAGE_1}"})
+    assert r.json()["exists"] is False
 
 
 def test_list_pages_sorted(vfs_client):
@@ -447,7 +457,7 @@ def test_list_pages_sorted(vfs_client):
 def test_read_page(vfs_client):
     import base64
 
-    r = vfs_client.get("/vfs/content", params={"path": f"{_PAGES_PATH}/{PAGE_1}"})
+    r = vfs_client.get("/vfs/content", params={"path": f"{_SITE_PATH}/{PAGE_1}"})
     assert r.status_code == 200
     body = r.json()
     assert body["revid"] == 5003
@@ -456,7 +466,7 @@ def test_read_page(vfs_client):
 
 
 def test_read_missing_page_returns_404(vfs_client):
-    r = vfs_client.get("/vfs/content", params={"path": f"{_PAGES_PATH}/Page:NoSuch/99"})
+    r = vfs_client.get("/vfs/content", params={"path": f"{_SITE_PATH}/Page:NoSuch/99"})
     assert r.status_code == 404
 
 
@@ -494,7 +504,7 @@ def test_write_page_ok(vfs_client, engine):
     r = vfs_client.post(
         "/vfs/content",
         json={
-            "path": f"{_PAGES_PATH}/{PAGE_1}",
+            "path": f"{_SITE_PATH}/{PAGE_1}",
             "content_base64": _b64(new_body),
             "base_revid": 5003,
             "comment": "fix typo",
@@ -524,10 +534,10 @@ def test_write_page_ok(vfs_client, engine):
         assert journal.committed is False
 
     # read_content/stat serve the uncommitted journal body, not Page.text.
-    r = vfs_client.get("/vfs/content", params={"path": f"{_PAGES_PATH}/{PAGE_1}"})
+    r = vfs_client.get("/vfs/content", params={"path": f"{_SITE_PATH}/{PAGE_1}"})
     assert _unb64(r.json()["content_base64"]) == new_body
 
-    r = vfs_client.get("/vfs/stat", params={"path": f"{_PAGES_PATH}/{PAGE_1}"})
+    r = vfs_client.get("/vfs/stat", params={"path": f"{_SITE_PATH}/{PAGE_1}"})
     assert r.json()["length"] == len(new_body.encode())
 
 
@@ -535,7 +545,7 @@ def test_write_page_conflict(vfs_client):
     r = vfs_client.post(
         "/vfs/content",
         json={
-            "path": f"{_PAGES_PATH}/{PAGE_1}",
+            "path": f"{_SITE_PATH}/{PAGE_1}",
             "content_base64": _b64("stale edit"),
             "base_revid": 1,  # stale -- real revid is 5003
         },
@@ -550,7 +560,7 @@ def test_write_missing_page_returns_error_status(vfs_client):
     r = vfs_client.post(
         "/vfs/content",
         json={
-            "path": f"{_PAGES_PATH}/Page:NoSuch/99",
+            "path": f"{_SITE_PATH}/Page:NoSuch/99",
             "content_base64": _b64("x"),
             "base_revid": None,
         },
@@ -603,14 +613,14 @@ def test_write_twice_read_content_serves_latest_journal(vfs_client):
         r = vfs_client.post(
             "/vfs/content",
             json={
-                "path": f"{_PAGES_PATH}/{PAGE_1}",
+                "path": f"{_SITE_PATH}/{PAGE_1}",
                 "content_base64": _b64(body),
                 "base_revid": 5003,
             },
         )
         assert r.json()["status"] == "ok"
 
-    r = vfs_client.get("/vfs/content", params={"path": f"{_PAGES_PATH}/{PAGE_1}"})
+    r = vfs_client.get("/vfs/content", params={"path": f"{_SITE_PATH}/{PAGE_1}"})
     assert _unb64(r.json()["content_base64"]) == second
 
 
@@ -625,7 +635,7 @@ def test_read_content_falls_back_to_page_text_once_journal_is_committed(
     r = vfs_client.post(
         "/vfs/content",
         json={
-            "path": f"{_PAGES_PATH}/{PAGE_1}",
+            "path": f"{_SITE_PATH}/{PAGE_1}",
             "content_base64": _b64(edited_body),
             "base_revid": 5003,
         },
@@ -648,7 +658,7 @@ def test_read_content_falls_back_to_page_text_once_journal_is_committed(
         s.add(page)
         s.commit()
 
-    r = vfs_client.get("/vfs/content", params={"path": f"{_PAGES_PATH}/{PAGE_1}"})
+    r = vfs_client.get("/vfs/content", params={"path": f"{_SITE_PATH}/{PAGE_1}"})
     assert _unb64(r.json()["content_base64"]) == edited_body
 
 

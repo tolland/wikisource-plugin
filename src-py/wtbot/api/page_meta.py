@@ -60,7 +60,7 @@ def _resolve(
 ) -> Entry:
     if path is not None:
         match resolve(store, path):
-            case PageLeaf(_, _, page) | IndexAssetLeaf(_, _, page, _):
+            case PageLeaf(_, _, page, _) | IndexAssetLeaf(_, _, page, _):
                 return page
             case IndexDir(_, _, index) | IndexWikitext(_, _, index):
                 return index

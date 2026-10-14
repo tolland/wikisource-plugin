@@ -16,7 +16,7 @@ INDEX_PATH = f"/{FAMILY}/{CODE}/{INDEX}"
 
 
 def _page_path(title: str) -> str:
-    return f"{INDEX_PATH}/Pages/{title}"
+    return f"/{FAMILY}/{CODE}/{title}"
 
 
 def _seed(engine, page_numbers: list[int]) -> None:

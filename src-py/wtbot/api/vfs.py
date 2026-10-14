@@ -27,12 +27,11 @@ Path scheme (all relative to wikisource://):
 
   /                                       root — all sites
   /{family}/{code}/                       site root — Index pages for that site
-  /{family}/{code}/{Index title}/         index dir — Pages + File subdir
+  /{family}/{code}/{Index title}/         index dir — wikitext, Pages, subpages
   /{family}/{code}/{Index title}/wikitext            Index: description/pagelist wikitext
-  /{family}/{code}/{Index title}/Pages/{Page title}  page wikitext file
-  /{family}/{code}/{Index title}/{File title}/       file dir
-  /{family}/{code}/{Index title}/{File title}/wikitext   File: description wikitext
-  /{family}/{code}/{Index title}/{File title}/blob       binary (stub — 501)
+  /{family}/{code}/{Index title}/Pages/   listing of the Page: titles the index paginates
+  /{family}/{code}/{Page title}           a Page: -- its own title, slashes included
+                                          (`Page:Foo.djvu/8`), whichever index lists it
 
 All tree/classification logic lives in `wtbot.vfs`; this module only parses
 params, delegates, and maps domain errors to HTTP status codes.

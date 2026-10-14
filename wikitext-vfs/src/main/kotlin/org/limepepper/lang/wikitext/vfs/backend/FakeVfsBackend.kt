@@ -33,12 +33,19 @@ class FakeVfsBackend : VfsBackend {
     private val boxLinks = mutableMapOf<String, LinkedHashMap<String, PageBoxLink>>()
 
     /**
-     * Register a directory. The parent is the longest already-registered
-     * directory path that is a strict prefix of [path].
+     * Register a directory. The parent is [parent] when given, else the
+     * longest already-registered directory path that is a strict prefix of
+     * [path]. A page's path is its own title under the site, so it is not
+     * nested under the container that lists it and needs an explicit [parent].
      */
-    fun addDirectory(path: String, name: String = path.substringAfterLast('/'), stableId: Long? = null): FakeVfsBackend {
+    fun addDirectory(
+        path: String,
+        name: String = path.substringAfterLast('/'),
+        stableId: Long? = null,
+        parent: String? = null,
+    ): FakeVfsBackend {
         entries[path] = Entry(path, name, NodeKind.directory, stableId = stableId)
-        _registerWithParent(path)
+        _registerWithParent(path, parent)
         return this
     }
 
@@ -53,19 +60,22 @@ class FakeVfsBackend : VfsBackend {
         stableId: Long? = null,
         revid: Long? = null,
         contentModel: String? = null,
+        parent: String? = null,
     ): FakeVfsBackend {
         entries[path] = Entry(path, name, NodeKind.file, content.toByteArray(), stableId, revid, contentModel)
-        _registerWithParent(path)
+        _registerWithParent(path, parent)
         return this
     }
 
-    private fun _registerWithParent(path: String) {
-        // Find the longest registered directory that is a strict prefix of path
-        val parent = entries.values
-            .filter { it.kind == NodeKind.directory && path.startsWith(it.path + "/") }
-            .maxByOrNull { it.path.length }
+    private fun _registerWithParent(path: String, explicitParent: String?) {
+        val parentPath = explicitParent
+            // Else the longest registered directory that is a strict prefix of path
+            ?: entries.values
+                .filter { it.kind == NodeKind.directory && path.startsWith(it.path + "/") }
+                .maxByOrNull { it.path.length }
+                ?.path
             ?: return  // root-level entry, no parent to register under
-        childrenOf.getOrPut(parent.path) { mutableListOf() }.add(path)
+        childrenOf.getOrPut(parentPath) { mutableListOf() }.add(path)
     }
 
     override fun stat(path: String): StatResult {

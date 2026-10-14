@@ -16,7 +16,7 @@ FAMILY = "wikisource"
 CODE = "en"
 INDEX = "Index:Tractatus.djvu"
 PAGE_TITLE = "Page:Tractatus.djvu/1"
-PAGE_PATH = f"/{FAMILY}/{CODE}/{INDEX}/Pages/{PAGE_TITLE}"
+PAGE_PATH = f"/{FAMILY}/{CODE}/{PAGE_TITLE}"
 
 
 def _seed(engine) -> int:
