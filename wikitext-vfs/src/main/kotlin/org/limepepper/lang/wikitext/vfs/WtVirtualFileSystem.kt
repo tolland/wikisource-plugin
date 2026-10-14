@@ -23,7 +23,8 @@ private val LOG = Logger.getInstance(WtVirtualFileSystem::class.java)
  *   /{family}/{code}/                         site root
  *   /{family}/{code}/{Index title}/           index directory
  *   /{family}/{code}/{Index title}/Pages/     pages container
- *   /{family}/{code}/{Index title}/Pages/{Page title}   page file
+ *   /{family}/{code}/{Page title}             page file: its own title under the
+ *                                             site, listed by (not nested in) Pages/
  *   /{family}/{code}/{Index title}/wikitext   the index page's own content
  *   /{family}/{code}/{Index title}/{subpage}  index-namespace subpage (styles.css, ...)
  *

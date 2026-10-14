@@ -74,7 +74,7 @@ def test_render_by_vfs_path_uses_cached_content_model(preview_client, wiki_clien
     resp = preview_client.post(
         "/preview/render",
         json={
-            "path": f"/{FAMILY}/{CODE}/{INDEX}/Pages/{PAGE}",
+            "path": f"/{FAMILY}/{CODE}/{PAGE}",
             "wikitext": "Hello ''world''",
         },
     )
@@ -83,15 +83,6 @@ def test_render_by_vfs_path_uses_cached_content_model(preview_client, wiki_clien
     assert data["title"] == PAGE
     assert "Hello" in _decode(data)
     assert wiki_client.render_calls == [(PAGE, "Hello ''world''", "proofread-page")]
-
-
-def test_render_page_directly_under_index_path(preview_client, wiki_client):
-    resp = preview_client.post(
-        "/preview/render",
-        json={"path": f"/{FAMILY}/{CODE}/{INDEX}/{PAGE}", "wikitext": "x"},
-    )
-    assert resp.status_code == 200
-    assert resp.json()["title"] == PAGE
 
 
 def test_render_index_wikitext_path(preview_client, wiki_client):

@@ -165,25 +165,31 @@ class PageStore:
             return []
         return self._entries(self._members(site, index))
 
-    def proofread_page(self, site: Site, title: str, index_title: str) -> Entry | None:
-        """One Page: title, required to be a member of [index_title] — an
-        arbitrary title must not resolve just because it exists on the site."""
-        index = self.index_entry(site, index_title)
-        if index is None:
-            return None
-        return self._first(self._members(site, index).where(Title.title == title))
-
-    def proofread_pages_by_titles(
-        self, site: Site, titles: list[str], index_title: str
-    ) -> list[Entry]:
-        """Batched [proofread_page] with identical membership filters — bulk
-        and individual stat must never disagree."""
-        index = self.index_entry(site, index_title)
-        if index is None:
-            return []
-        return self._entries(
-            self._members(site, index).where(col(Title.title).in_(titles))
+    def _proofread_pages_named(self, site: Site):
+        return select(Title, Page).where(
+            Title.site_pk == site.pk,
+            Title.expected_content_model == PROOFREAD_PAGE_CONTENT_MODEL,
         )
+
+    def proofread_page(self, site: Site, title: str) -> Entry | None:
+        """One Page: title. Membership of an Index is not required -- a page
+        is addressed by its own title, and which index paginates it is a
+        question for [index_of]."""
+        return self._first(
+            self._proofread_pages_named(site).where(Title.title == title)
+        )
+
+    def proofread_pages_by_titles(self, site: Site, titles: list[str]) -> list[Entry]:
+        """Batched [proofread_page] -- bulk and individual stat must never
+        disagree."""
+        return self._entries(
+            self._proofread_pages_named(site).where(col(Title.title).in_(titles))
+        )
+
+    def index_of(self, page: Entry) -> Entry | None:
+        """The Index: that paginates [page], per its ProofreadPageMeta."""
+        meta = self.session.get(ProofreadPageMeta, page.pk)
+        return entry_by_pk(self.session, meta.index_title_pk) if meta else None
 
     def entries_with_title_prefix(self, site: Site, prefix: str) -> list[Entry]:
         """Titles starting with [prefix], case-sensitively. SQLite's LIKE is

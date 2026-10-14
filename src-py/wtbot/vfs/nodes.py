@@ -13,10 +13,10 @@ ProofreadPage tree:
 
     /                                        RootDir
     /{family}/{code}                         SiteDir
+    /{family}/{code}/{Page title}            PageLeaf      (the title verbatim)
     /{family}/{code}/{Index title}           IndexDir      (dual role: container...)
     /{family}/{code}/{Index title}/wikitext  IndexWikitext (...and content)
     /.../{Index title}/Pages                 PagesDir
-    /.../{Index title}/Pages/{Page title}    PageLeaf
     /.../{Index title}/{subpage}             IndexAssetLeaf (styles.css, ...)
 
 Every VFS operation (stat / list / read / write) resolves first and then
@@ -67,9 +67,13 @@ class PagesDir:
 
 @dataclass(frozen=True, slots=True)
 class PageLeaf:
+    """A Page: title, addressed by its own title. `index` is the Index: that
+    paginates it, if its metadata names one."""
+
     path: WikiPath
     site: Site
     page: Entry
+    index: Entry | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,11 +120,15 @@ def resolve(store: PageStore, raw_path: str) -> WsNode:
     if len(parts) == 2:
         return SiteDir(path, site)
 
+    page = store.proofread_page(site, path.title)
+    if page is not None:
+        return PageLeaf(path, site, page, store.index_of(page))
+
     index_title = path.index_title
     rest = path.rest
 
     index_page = store.entry(site, index_title)
-    if index_page is None:
+    if index_page is None or index_page.content_model != PROOFREAD_INDEX_CONTENT_MODEL:
         return Missing(path)
 
     if not rest:
@@ -130,13 +138,7 @@ def resolve(store: PageStore, raw_path: str) -> WsNode:
         return IndexWikitext(path, site, index_page)
 
     if rest[0] == "Pages":
-        if len(rest) == 1:
-            return PagesDir(path, site, index_page)
-        # proofread_page applies the membership filters: an arbitrary title
-        # addressed under this index's Pages/ must not resolve just because
-        # it exists somewhere on the site.
-        page = store.proofread_page(site, "/".join(rest[1:]), index_title)
-        return PageLeaf(path, site, page) if page is not None else Missing(path)
+        return PagesDir(path, site, index_page) if len(rest) == 1 else Missing(path)
 
     joined = "/".join(rest)
     # Index-namespace subpage asset

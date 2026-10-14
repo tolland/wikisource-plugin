@@ -19,7 +19,15 @@ from wtbot.locator_index import (
     scan_section_occurrences,
 )
 from wtbot.model import Site
-from wtbot.vfs.paths import WikiPath
+from wtbot.vfs.nodes import (
+    IndexDir,
+    IndexWikitext,
+    Missing,
+    PageLeaf,
+    PagesDir,
+    resolve,
+)
+from wtbot.vfs.paths import title_path
 from wtbot.vfs.store import Entry, PageStore
 
 """GET /locator-index/{sections,page-numbers,dump} — resolves a back-of-book
@@ -58,32 +66,36 @@ router = APIRouter(
 
 
 def _resolve_index(path: str, session: Session) -> tuple[PageStore, Site, str]:
+    """The Index: a path names -- the Index itself (or its Pages/ container),
+    or any Page: it paginates."""
     store = PageStore(session)
-    wiki_path = WikiPath.parse(path)
-    if len(wiki_path.segments) < 3:
-        raise HTTPException(status_code=400, detail=f"not a work path: {path}")
-    site = store.site(wiki_path.family, wiki_path.code)
-    if site is None:
-        raise HTTPException(
-            status_code=404, detail=f"no such site: {wiki_path.family}/{wiki_path.code}"
-        )
-    index_title = wiki_path.index_title
-    if store.entry(site, index_title) is None:
-        raise HTTPException(status_code=404, detail=f"no such Index: {index_title}")
-    return store, site, index_title
+    match resolve(store, path):
+        case (
+            IndexDir(_, site, index)
+            | IndexWikitext(_, site, index)
+            | PagesDir(_, site, index)
+        ):
+            return store, site, index.name
+        case PageLeaf(_, site, _, index) if index is not None:
+            return store, site, index.name
+        case Missing():
+            raise HTTPException(status_code=404, detail=f"no such path: {path}")
+        case _:
+            raise HTTPException(status_code=400, detail=f"not a work path: {path}")
 
 
-def _pages_dir(path: str) -> str:
-    wiki_path = WikiPath.parse(path)
-    return "/" + "/".join(wiki_path.segments[:3]) + "/Pages"
+def _index_path(site: Site, index_title: str) -> str:
+    return title_path(site.family, site.code, index_title)
 
 
-def _page_ref(store: PageStore, page: Entry, pages_dir: str) -> PageRef | None:
+def _page_ref(store: PageStore, page: Entry, site: Site) -> PageRef | None:
     meta = store.proofread_page_meta(page.pk)
     if meta is None or meta.page_number is None:
         return None
     return PageRef(
-        path=f"{pages_dir}/{page.name}", title=page.name, scan_page=meta.page_number
+        path=title_path(site.family, site.code, page.name),
+        title=page.name,
+        scan_page=meta.page_number,
     )
 
 
@@ -94,11 +106,11 @@ def _matches(candidate: str, query: str) -> bool:
 
 
 def _page_refs_by_scan(
-    store: PageStore, pages: list[Entry], pages_dir: str
+    store: PageStore, pages: list[Entry], site: Site
 ) -> dict[int, PageRef]:
     refs: dict[int, PageRef] = {}
     for page in pages:
-        ref = _page_ref(store, page, pages_dir)
+        ref = _page_ref(store, page, site)
         if ref is not None:
             refs[ref.scan_page] = ref
     return refs
@@ -124,8 +136,7 @@ def lookup_page_numbers(
     index_page = store.entry(site, index_title)
     assert index_page is not None  # checked in _resolve_index
     pages = store.proofread_pages(site, index_title)
-    pages_dir = _pages_dir(path)
-    refs = _page_refs_by_scan(store, pages, pages_dir)
+    refs = _page_refs_by_scan(store, pages, site)
 
     assignments = parse_pagelist_assignments(store.effective_body(index_page))
     labels = compute_labels(assignments, list(refs.keys()))
@@ -163,12 +174,11 @@ def lookup_sections(
 ) -> list[SectionMatch]:
     store, site, index_title = _resolve_index(path, session)
     pages = store.proofread_pages(site, index_title)
-    pages_dir = _pages_dir(path)
     wanted_roles = {r.strip() for r in roles.split(",") if r.strip()}
 
     matches: list[SectionMatch] = []
     for page in pages:
-        ref = _page_ref(store, page, pages_dir)
+        ref = _page_ref(store, page, site)
         if ref is None:
             continue
         for occurrence in scan_section_occurrences(
@@ -205,8 +215,7 @@ def dump_locator_index(
     index_page = store.entry(site, index_title)
     assert index_page is not None  # checked in _resolve_index
     pages = store.proofread_pages(site, index_title)
-    pages_dir = _pages_dir(path)
-    refs = _page_refs_by_scan(store, pages, pages_dir)
+    refs = _page_refs_by_scan(store, pages, site)
 
     assignments = parse_pagelist_assignments(store.effective_body(index_page))
     labels = compute_labels(assignments, list(refs.keys()))
@@ -230,7 +239,7 @@ def dump_locator_index(
 
     sections: list[SectionMatch] = []
     for page in pages:
-        ref = _page_ref(store, page, pages_dir)
+        ref = _page_ref(store, page, site)
         if ref is None:
             continue
         for occurrence in scan_section_occurrences(
@@ -245,7 +254,7 @@ def dump_locator_index(
 
     return LocatorIndexDump(
         index_title=index_title,
-        index_path="/" + "/".join(WikiPath.parse(path).segments[:3]),
+        index_path=_index_path(site, index_title),
         pagelist_assignments=pagelist_entries,
         pages=page_entries,
         sections=sections,

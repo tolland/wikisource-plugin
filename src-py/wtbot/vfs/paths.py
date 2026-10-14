@@ -43,6 +43,12 @@ class WikiPath:
         return self.segments[1]
 
     @property
+    def title(self) -> str:
+        """Everything after the site prefix, as one wiki title -- slashes
+        included (`Page:Foo.djvu/171`)."""
+        return "/".join(self.segments[2:])
+
+    @property
     def index_title(self) -> str:
         return self.segments[2]
 
@@ -50,3 +56,9 @@ class WikiPath:
     def rest(self) -> tuple[str, ...]:
         """Segments below the index title."""
         return self.segments[3:]
+
+
+def title_path(family: str, code: str, title: str) -> str:
+    """The VFS path of a wiki title: `/{family}/{code}/{title}`, the title
+    verbatim. A page that is addressable by its own title has no other path."""
+    return f"/{family}/{code}/{title}"

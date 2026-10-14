@@ -16,7 +16,7 @@ from wtbot.wiki.wiki_types import RemotePage
 
 TITLE = "Page:Foo.djvu/1"
 INDEX_TITLE = "Index:Foo.djvu"
-PATH = "/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1"
+PATH = "/wikisource/en/Page:Foo.djvu/1"
 
 
 def _b64(s: str) -> str:

@@ -48,15 +48,12 @@ def resolve_target(session: Session, path: str) -> tuple[Site, str, str | None]:
             code="site-not-found",
         )
 
-    rest = parts[3:]
-    if not rest or rest == ["wikitext"]:
+    if parts[3:] == ["wikitext"]:
         title = index_title  # the Index page's own body
-    elif rest[0] == "Pages" and len(rest) > 1:
-        title = "/".join(rest[1:])
-    elif ":" in rest[0]:
-        title = "/".join(rest)  # namespaced page directly under the index
     else:
-        title = f"{index_title}/{'/'.join(rest)}"  # index subpage, e.g. styles.css
+        # A title verbatim, slashes and all: `Page:Foo.djvu/8`, and an index
+        # subpage such as `Index:Foo.djvu/styles.css`.
+        title = "/".join(parts[2:])
 
     # The title's expectation, which a fetch keeps equal to the wiki's own
     # answer: a page the wiki does not hold yet still renders as what it is.

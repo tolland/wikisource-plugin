@@ -54,11 +54,11 @@ class HttpVfsBackendTest {
 
     @Test fun `stat parses file response with length`() {
         handle("/vfs/stat", """
-            {"path":"/wikisource/en/Index:Foo/Pages/Page:Foo/1","exists":true,"kind":"file",
+            {"path":"/wikisource/en/Page:Foo/1","exists":true,"kind":"file",
              "stable_id":1003,"revid":5003,"length":19,"timestamp":"1700000000000","writable":true}
         """.trimIndent())
 
-        val r = backend.stat("/wikisource/en/Index:Foo/Pages/Page:Foo/1")
+        val r = backend.stat("/wikisource/en/Page:Foo/1")
         assertEquals(NodeKind.file, r.kind)
         assertEquals(5003L, r.revid)
         assertEquals(19L, r.length)
@@ -76,14 +76,14 @@ class HttpVfsBackendTest {
     @Test fun `statBulk parses results array in order`() {
         handle("/vfs/stat/bulk", """
             {"results":[
-              {"path":"/wikisource/en/Index:Foo/Pages/Page:Foo/1","exists":true,"kind":"file",
+              {"path":"/wikisource/en/Page:Foo/1","exists":true,"kind":"file",
                "stable_id":1003,"revid":5003,"length":19,"timestamp":null,"writable":false},
               {"path":"/wikisource/en/Index:Missing","exists":false}
             ]}
         """.trimIndent())
 
         val r = backend.statBulk(listOf(
-            "/wikisource/en/Index:Foo/Pages/Page:Foo/1",
+            "/wikisource/en/Page:Foo/1",
             "/wikisource/en/Index:Missing",
         ))
         assertEquals(2, r.size)
@@ -99,10 +99,10 @@ class HttpVfsBackendTest {
     @Test fun `listChildren parses children array`() {
         handle("/vfs/children", """
             {"parent_path":"/wikisource/en/Index:Foo.djvu/Pages","children":[
-              {"path":"/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1",
+              {"path":"/wikisource/en/Page:Foo.djvu/1",
                "name":"Page:Foo.djvu/1","kind":"file","stable_id":1003,"revid":5003,
                "length":19,"timestamp":null,"writable":true},
-              {"path":"/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/2",
+              {"path":"/wikisource/en/Page:Foo.djvu/2",
                "name":"Page:Foo.djvu/2","kind":"file","stable_id":1004,"revid":5004,
                "length":20,"timestamp":null,"writable":true}
             ]}
@@ -140,7 +140,7 @@ class HttpVfsBackendTest {
         )
 
         val r = backend.renderPreview(
-            path = "/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1",
+            path = "/wikisource/en/Page:Foo.djvu/1",
             title = null,
             wikitext = "Hello '''world'''",
         )
@@ -174,7 +174,7 @@ class HttpVfsBackendTest {
         }
 
         val bytes = backend.fetchReferenceImage(
-            path = "/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1",
+            path = "/wikisource/en/Page:Foo.djvu/1",
             title = null,
         )
         assertArrayEquals(pixels, bytes)
@@ -208,7 +208,7 @@ class HttpVfsBackendTest {
         }
 
         val e = assertThrows(VfsBackendException::class.java) {
-            backend.fetchReferenceImage(path = "/wikisource/en/Index:X/Pages/Page:X/7", title = null)
+            backend.fetchReferenceImage(path = "/wikisource/en/Page:X/7", title = null)
         }
         assertEquals(502, e.statusCode)
         assertEquals("scan image fetch failed: No scheme supplied.", e.detail)
@@ -225,7 +225,7 @@ class HttpVfsBackendTest {
             ex.responseBody.use { it.write(body) }
         }
         val e = assertThrows(VfsBackendException::class.java) {
-            backend.readContent("/wikisource/en/Index:X/Pages/Page:X/1")
+            backend.readContent("/wikisource/en/Page:X/1")
         }
         assertEquals(502, e.statusCode)
         assertNull(e.detail)
@@ -242,7 +242,7 @@ class HttpVfsBackendTest {
             ]}
         """.trimIndent())
 
-        val r = backend.listAnnotations("/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1")
+        val r = backend.listAnnotations("/wikisource/en/Page:Foo.djvu/1")
         assertEquals(2, r.size)
         val a1 = r[0]
         assertEquals("a1", a1.id)
@@ -267,7 +267,7 @@ class HttpVfsBackendTest {
         }
 
         val saved = backend.saveAnnotation(
-            "/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1",
+            "/wikisource/en/Page:Foo.djvu/1",
             PageAnnotation(id = "a1", x = 1.0, y = 2.0, width = 3.0, height = 4.0,
                 label = "l", category = "body"),
         )
@@ -285,7 +285,7 @@ class HttpVfsBackendTest {
             ex.responseBody.use { it.write(body) }
         }
         assertThrows(VfsBackendException::class.java) {
-            backend.deleteAnnotation("/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1", "a9")
+            backend.deleteAnnotation("/wikisource/en/Page:Foo.djvu/1", "a9")
         }
     }
 
@@ -297,7 +297,7 @@ class HttpVfsBackendTest {
             ]}
         """.trimIndent())
 
-        val r = backend.listTextAnchors("/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1")
+        val r = backend.listTextAnchors("/wikisource/en/Page:Foo.djvu/1")
         assertEquals(2, r.size)
         assertEquals("a1", r[0].annotationId)
         assertEquals(5, r[0].textStart)
@@ -319,7 +319,7 @@ class HttpVfsBackendTest {
         }
 
         val saved = backend.saveTextAnchor(
-            "/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1",
+            "/wikisource/en/Page:Foo.djvu/1",
             PageTextAnchor(annotationId = "a1", textStart = 0, textEnd = 7, anchorRevid = 42L),
         )
         assertEquals(7, saved.textEnd)
@@ -336,7 +336,7 @@ class HttpVfsBackendTest {
             ex.responseBody.use { it.write(body) }
         }
         assertThrows(VfsBackendException::class.java) {
-            backend.deleteTextAnchor("/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1", "a9")
+            backend.deleteTextAnchor("/wikisource/en/Page:Foo.djvu/1", "a9")
         }
     }
 
@@ -348,7 +348,7 @@ class HttpVfsBackendTest {
             ]}
         """.trimIndent())
 
-        val r = backend.listBoxLinks("/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1")
+        val r = backend.listBoxLinks("/wikisource/en/Page:Foo.djvu/1")
         assertEquals(2, r.size)
         assertEquals("b1", r[0].boxId)
         assertEquals("r1", r[0].rangeId)
@@ -367,7 +367,7 @@ class HttpVfsBackendTest {
         }
 
         val saved = backend.saveBoxLink(
-            "/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1",
+            "/wikisource/en/Page:Foo.djvu/1",
             PageBoxLink(boxId = "b1", rangeId = "r1"),
         )
         assertEquals("r1", saved.rangeId)
@@ -382,7 +382,7 @@ class HttpVfsBackendTest {
             ex.responseBody.use { it.write(body) }
         }
         assertThrows(VfsBackendException::class.java) {
-            backend.deleteBoxLink("/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1", "b9")
+            backend.deleteBoxLink("/wikisource/en/Page:Foo.djvu/1", "b9")
         }
     }
 
@@ -400,7 +400,7 @@ class HttpVfsBackendTest {
             ]}
         """.trimIndent())
 
-        val r = backend.listOcrBackends("/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1")
+        val r = backend.listOcrBackends("/wikisource/en/Page:Foo.djvu/1")
         assertEquals(2, r.size)
         assertEquals("wmocr", r[0].name)
         assertEquals(listOf("en", "de"), r[0].defaultLangs)
@@ -420,7 +420,7 @@ class HttpVfsBackendTest {
         }
 
         val result = backend.runOcr(
-            "/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1",
+            "/wikisource/en/Page:Foo.djvu/1",
             OcrRunRequest(
                 backend = "gemini",
                 annotationId = "b1",
@@ -457,7 +457,7 @@ class HttpVfsBackendTest {
         }
 
         val catalog = backend.listOcrModels(
-            "/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1",
+            "/wikisource/en/Page:Foo.djvu/1",
             "wmocr",
         )
         assertEquals("wmocr", catalog.backend)
@@ -476,7 +476,7 @@ class HttpVfsBackendTest {
             {"backend":"wmocr","engines":[],"error":"discovery failed: refused"}
         """.trimIndent())
 
-        val catalog = backend.listOcrModels("/wikisource/en/Index:Foo.djvu/Pages/Page:Foo.djvu/1")
+        val catalog = backend.listOcrModels("/wikisource/en/Page:Foo.djvu/1")
         assertTrue(catalog.engines.isEmpty())
         assertEquals("discovery failed: refused", catalog.error)
     }

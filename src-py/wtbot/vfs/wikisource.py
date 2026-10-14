@@ -24,7 +24,7 @@ from wtbot.vfs.nodes import (
     SiteDir,
     resolve,
 )
-from wtbot.vfs.paths import WikiPath
+from wtbot.vfs.paths import WikiPath, title_path
 from wtbot.vfs.store import (
     PROOFREAD_INDEX_CONTENT_MODEL,
     Entry,
@@ -112,36 +112,32 @@ class WikisourceVfs:
     def stat_bulk(self, paths: list[str]) -> list[Stat]:
         """Batched stat() for refresh() sweeps over many cached paths at once.
 
-        Page-under-Pages/ paths (the dominant case at real-library scale — one
-        query per site+index_title rather than one per page) are batched via
-        `Title.title.in_(...)`; every other path shape falls back to `stat`,
-        since sites/indexes/file-dirs are comparatively few per session.
+        Page: titles (the dominant case at real-library scale) are batched --
+        one query per site rather than one per page -- via
+        `Title.title.in_(...)`; every other path shape, and any title that is
+        not a known Page:, falls back to `stat`, since sites/indexes/assets
+        are comparatively few per session.
         """
         results: dict[int, Stat] = {}
-        page_groups: dict[tuple[str, str, str], list[tuple[int, str, str]]] = {}
+        by_site: dict[tuple[str, str], list[tuple[int, str, str]]] = {}
 
         for i, raw in enumerate(paths):
             parts = WikiPath.parse(raw).segments
-            if len(parts) >= 5 and parts[3] == "Pages":
-                family, code, index_title = parts[0], parts[1], parts[2]
-                page_title = "/".join(parts[4:])
-                page_groups.setdefault((family, code, index_title), []).append(
-                    (i, raw, page_title)
+            if len(parts) >= 3:
+                by_site.setdefault((parts[0], parts[1]), []).append(
+                    (i, raw, "/".join(parts[2:]))
                 )
             else:
                 results[i] = self.stat(raw)
 
-        for (family, code, index_title), entries in page_groups.items():
+        for (family, code), entries in by_site.items():
             site = self.store.site(family, code)
-            index_exists = (
-                site is not None and self.store.entry(site, index_title) is not None
-            )
-            if not index_exists:
+            if site is None:
                 for i, raw, _ in entries:
                     results[i] = Stat(path=raw, exists=False)
                 continue
-            titles = [page_title for _, _, page_title in entries]
-            pages = self.store.proofread_pages_by_titles(site, titles, index_title)
+            titles = [title for _, _, title in entries]
+            pages = self.store.proofread_pages_by_titles(site, titles)
             pages_by_title = {p.name: p for p in pages}
             page_pks = [p.pk for p in pages]
             uncommitted = self.store.latest_uncommitted_bodies(page_pks)
@@ -151,10 +147,10 @@ class WikisourceVfs:
             # earlier push whose refetch is still queued (which supplies the
             # revid), and those are answered independently.
             pushed = self.store.latest_successful_commits(page_pks)
-            for i, raw, page_title in entries:
-                page = pages_by_title.get(page_title)
+            for i, raw, title in entries:
+                page = pages_by_title.get(title)
                 if page is None:
-                    results[i] = Stat(path=raw, exists=False)
+                    results[i] = self.stat(raw)
                     continue
                 # Same rule as the single-page path, over rows already loaded
                 # in bulk -- restating it here is how the two drifted apart.
@@ -238,7 +234,9 @@ class WikisourceVfs:
             return meta.page_number or 0 if meta is not None else 0
 
         children: list[Node] = [
-            self.mw.page_node(f"{parent}/{p.name}", p, meta=metas.get(p.pk))
+            self.mw.page_node(
+                title_path(site.family, site.code, p.name), p, meta=metas.get(p.pk)
+            )
             for p in sorted(pages, key=page_number)
         ]
         return ListChildrenResponse(parent_path=parent, children=children)
