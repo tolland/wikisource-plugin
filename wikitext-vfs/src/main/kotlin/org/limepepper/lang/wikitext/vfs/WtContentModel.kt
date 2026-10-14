@@ -14,8 +14,8 @@ import org.limepepper.lang.wikitext.PrpFileType
  * VFS node today. It is distinct from MediaWiki's per-*slot* `contentformat`
  * (a fetched Revision carries a `slots` map, e.g. `slots.main.contentformat`;
  * multi-content revisions can have more than one slot). The VFS doesn't
- * expose multiple slots per node yet. When File:/transcluded-file support
- * lands and a node can carry non-text slot content (an image blob alongside
+ * expose multiple slots per node yet. When file/transcluded-file support
+ * returns and a node can carry non-text slot content (an image blob alongside
  * its wikitext description, say), that's the place to grow a slot-keyed
  * mapping rather than overloading this one.
  */

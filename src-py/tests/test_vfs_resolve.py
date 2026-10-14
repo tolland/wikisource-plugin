@@ -4,9 +4,6 @@ from sqlmodel import Session
 
 from wtbot.model import Site
 from wtbot.vfs.nodes import (
-    FileBlobLeaf,
-    FileDir,
-    FileWikitext,
     IndexAssetLeaf,
     IndexDir,
     IndexWikitext,
@@ -15,7 +12,6 @@ from wtbot.vfs.nodes import (
     PagesDir,
     RootDir,
     SiteDir,
-    StubDir,
     resolve,
 )
 from wtbot.vfs.store import PageStore
@@ -86,13 +82,11 @@ def store(engine):
         # exists on the site, but is not a Page: of this index
         (f"{_INDEX_PATH}/Pages/{FILE}", Missing),
         (f"{_INDEX_PATH}/Pages/Page:NoSuch.djvu/9", Missing),
-        (f"{_INDEX_PATH}/Templates", StubDir),
-        (f"{_INDEX_PATH}/TranscludedFiles", StubDir),
-        (f"{_INDEX_PATH}/Templates/deeper", Missing),
-        (f"{_INDEX_PATH}/{FILE}", FileDir),
-        (f"{_INDEX_PATH}/{FILE}/wikitext", FileWikitext),
-        (f"{_INDEX_PATH}/{FILE}/blob", FileBlobLeaf),
-        (f"{_INDEX_PATH}/File:NoSuch.djvu", Missing),
+        (f"{_INDEX_PATH}/Templates", Missing),
+        (f"{_INDEX_PATH}/TranscludedFiles", Missing),
+        (f"{_INDEX_PATH}/{FILE}", Missing),
+        (f"{_INDEX_PATH}/{FILE}/wikitext", Missing),
+        (f"{_INDEX_PATH}/{FILE}/blob", Missing),
         (f"{_INDEX_PATH}/styles.css", IndexAssetLeaf),
         (f"{_INDEX_PATH}/nosuch.css", Missing),
     ],
@@ -110,10 +104,6 @@ def test_resolve_carries_underlying_pages(store):
     wikitext = resolve(store, f"{_INDEX_PATH}/wikitext")
     assert isinstance(wikitext, IndexWikitext)
     assert wikitext.index.name == INDEX
-
-    file_wikitext = resolve(store, f"{_INDEX_PATH}/{FILE}/wikitext")
-    assert isinstance(file_wikitext, FileWikitext)
-    assert file_wikitext.file_page.name == FILE
 
     asset = resolve(store, f"{_INDEX_PATH}/styles.css")
     assert isinstance(asset, IndexAssetLeaf)

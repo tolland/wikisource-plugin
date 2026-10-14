@@ -167,7 +167,7 @@ def test_a_local_upload_shadows_the_shared_file(engine: Engine, sites) -> None:
         assert file.site_pk == local.pk
 
 
-def test_the_index_directory_shows_the_file_where_it_lives(
+def test_the_index_directory_does_not_expose_the_backing_file(
     engine: Engine, sites
 ) -> None:
     local, commons = sites
@@ -183,6 +183,5 @@ def test_the_index_directory_shows_the_file_where_it_lives(
 
         vfs = WikisourceVfs(session)
         children = vfs.list_children(f"/wikisource/en/{INDEX}").children
-        assert f"/wikisource/en/{INDEX}/{FILE}" in [c.path for c in children]
-        stat = vfs.stat(f"/wikisource/en/{INDEX}/{FILE}/wikitext")
-        assert stat.exists
+        assert FILE not in [c.name for c in children]
+        assert not vfs.stat(f"/wikisource/en/{INDEX}/{FILE}").exists

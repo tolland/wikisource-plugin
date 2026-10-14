@@ -202,45 +202,6 @@ def test_stat_page(vfs_client):
     assert body["content_model"] == "proofread-page"
 
 
-def test_stat_templates_stub(vfs_client):
-    r = vfs_client.get("/vfs/stat", params={"path": f"{_INDEX_PATH}/Templates"})
-    assert r.status_code == 200
-    assert r.json()["exists"] is True
-    assert r.json()["kind"] == "directory"
-
-
-def test_stat_transcluded_stub(vfs_client):
-    r = vfs_client.get("/vfs/stat", params={"path": f"{_INDEX_PATH}/TranscludedFiles"})
-    assert r.status_code == 200
-    assert r.json()["exists"] is True
-    assert r.json()["kind"] == "directory"
-
-
-def test_stat_file_dir(vfs_client):
-    r = vfs_client.get("/vfs/stat", params={"path": _FILE_PATH})
-    assert r.status_code == 200
-    assert r.json()["exists"] is True
-    assert r.json()["kind"] == "directory"
-
-
-def test_stat_file_wikitext(vfs_client):
-    r = vfs_client.get("/vfs/stat", params={"path": f"{_FILE_PATH}/wikitext"})
-    assert r.status_code == 200
-    body = r.json()
-    assert body["exists"] is True
-    assert body["kind"] == "file"
-    assert body["length"] == len(_FILE_BODY.encode())
-    assert body["content_model"] == "wikitext"
-
-
-def test_stat_blob(vfs_client):
-    r = vfs_client.get("/vfs/stat", params={"path": f"{_FILE_PATH}/blob"})
-    assert r.status_code == 200
-    assert r.json()["exists"] is True
-    assert r.json()["kind"] == "file"
-    assert r.json()["length"] == 4_200_000
-
-
 def test_stat_missing(vfs_client):
     r = vfs_client.get("/vfs/stat", params={"path": "/wikisource/en/Index:NoSuch"})
     assert r.status_code == 200
@@ -323,7 +284,6 @@ def test_stat_bulk_matches_individual_stat(vfs_client):
         f"{_INDEX_PATH}/wikitext",
         f"{_PAGES_PATH}/{PAGE_1}",
         f"{_PAGES_PATH}/{PAGE_2}",
-        f"{_FILE_PATH}/wikitext",
         "/wikisource/en/Index:NoSuch",
         f"{_PAGES_PATH}/Page:NoSuchPage.djvu/1",
         f"{_PAGES_PATH}/{FILE}",
@@ -434,9 +394,10 @@ def test_list_index_has_containers(vfs_client):
     names = [c["name"] for c in r.json()["children"]]
     assert "wikitext" in names
     assert "Pages" in names
-    assert FILE in names
-    assert "Templates" in names
-    assert "TranscludedFiles" in names
+    # the backing File: is not part of the plugin-facing tree
+    assert FILE not in names
+    assert "Templates" not in names
+    assert "TranscludedFiles" not in names
     assert "styles.css" in names
     # no Page: titles directly under index
     assert PAGE_1 not in names
@@ -444,10 +405,7 @@ def test_list_index_has_containers(vfs_client):
     kinds = {c["name"]: c["kind"] for c in r.json()["children"]}
     assert kinds["wikitext"] == "file"
     assert kinds["Pages"] == "directory"
-    assert kinds[FILE] == "directory"
     assert kinds["styles.css"] == "file"
-    assert kinds["Templates"] == "directory"
-    assert kinds["TranscludedFiles"] == "directory"
 
 
 def test_list_index_wikitext_matches_stat(vfs_client):
@@ -481,29 +439,6 @@ def test_list_pages_sorted(vfs_client):
     assert children[1]["name"] == PAGE_2
 
 
-def test_list_templates_stub_empty(vfs_client):
-    r = vfs_client.get("/vfs/children", params={"path": f"{_INDEX_PATH}/Templates"})
-    assert r.status_code == 200
-    assert r.json()["children"] == []
-
-
-def test_list_transcluded_stub_empty(vfs_client):
-    r = vfs_client.get(
-        "/vfs/children", params={"path": f"{_INDEX_PATH}/TranscludedFiles"}
-    )
-    assert r.status_code == 200
-    assert r.json()["children"] == []
-
-
-def test_list_file_dir(vfs_client):
-    r = vfs_client.get("/vfs/children", params={"path": _FILE_PATH})
-    assert r.status_code == 200
-    names = [c["name"] for c in r.json()["children"]]
-    assert "wikitext" in names
-    assert "blob" in names
-    assert len(r.json()["children"]) == 2
-
-
 # ---------------------------------------------------------------------------
 # read_content
 # ---------------------------------------------------------------------------
@@ -518,22 +453,6 @@ def test_read_page(vfs_client):
     assert body["revid"] == 5003
     assert "content_model" not in body
     assert base64.b64decode(body["content_base64"]).decode() == _PAGE_1_BODY
-
-
-def test_read_file_wikitext(vfs_client):
-    """Must serve the File: page's own description body — matching what
-    stat() reports for the same path (and what write() targets) — not the
-    parent Index body."""
-    import base64
-
-    r = vfs_client.get("/vfs/content", params={"path": f"{_FILE_PATH}/wikitext"})
-    assert r.status_code == 200
-    assert base64.b64decode(r.json()["content_base64"]).decode() == _FILE_BODY
-
-
-def test_read_blob_returns_501(vfs_client):
-    r = vfs_client.get("/vfs/content", params={"path": f"{_FILE_PATH}/blob"})
-    assert r.status_code == 501
 
 
 def test_read_missing_page_returns_404(vfs_client):
@@ -625,21 +544,6 @@ def test_write_page_conflict(vfs_client):
     body = r.json()
     assert body["status"] == "conflict"
     assert body["new_revid"] == 5003
-
-
-def test_write_blob_returns_error_status(vfs_client):
-    """The binary blob leaf is not a wikitext page; a write must be refused
-    rather than silently journalled against the File: description page."""
-    r = vfs_client.post(
-        "/vfs/content",
-        json={
-            "path": f"{_FILE_PATH}/blob",
-            "content_base64": _b64("x"),
-            "base_revid": None,
-        },
-    )
-    assert r.status_code == 200
-    assert r.json()["status"] == "error"
 
 
 def test_write_missing_page_returns_error_status(vfs_client):
@@ -746,3 +650,13 @@ def test_read_content_falls_back_to_page_text_once_journal_is_committed(
 
     r = vfs_client.get("/vfs/content", params={"path": f"{_PAGES_PATH}/{PAGE_1}"})
     assert _unb64(r.json()["content_base64"]) == edited_body
+
+
+@pytest.mark.parametrize(
+    "suffix",
+    ["Templates", "TranscludedFiles", FILE, f"{FILE}/wikitext", f"{FILE}/blob"],
+)
+def test_removed_virtual_nodes_are_missing(vfs_client, suffix):
+    r = vfs_client.get("/vfs/stat", params={"path": f"{_INDEX_PATH}/{suffix}"})
+    assert r.status_code == 200
+    assert r.json()["exists"] is False

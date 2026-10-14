@@ -22,7 +22,3 @@ class NotADirectory(VfsError):
 
 class NotAFile(VfsError):
     """read/write on a directory or other non-content node."""
-
-
-class BlobsNotImplemented(VfsError):
-    """Binary blob streaming is not implemented yet."""
