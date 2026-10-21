@@ -268,7 +268,7 @@ class PrpFileEditor private constructor(
                 )
                 val result = WtVfsService.instance.backend.runOcr(vfsPath, request)
                 org.limepepper.lang.wikitext.ocr.OcrProposal(
-                    title = "${file.name} · ${box.label ?: box.id.take(8)}",
+                    title = "${file.presentableName} · ${box.label ?: box.id.take(8)}",
                     pagePath = vfsPath,
                     boxId = box.id,
                     backend = result.backend,
@@ -279,7 +279,7 @@ class PrpFileEditor private constructor(
             } catch (e: Exception) {
                 PRP_LOG.warn("OCR run failed for $vfsPath box ${box.id} via ${choice.label}", e)
                 org.limepepper.lang.wikitext.ocr.OcrProposal(
-                    title = "OCR failed · ${file.name}",
+                    title = "OCR failed · ${file.presentableName}",
                     pagePath = vfsPath,
                     boxId = box.id,
                     backend = backendInfo.name,

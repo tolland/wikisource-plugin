@@ -46,6 +46,7 @@ backend data model and fetch/edit/commit contract live in `src-py/DESIGN.md`.
 | [`preview-design.md`](reference/preview-design.md) | plugin + wtbot | live behaviour | Explains the split editor, the `action=parse` choice and the proofread page form. Consult before changing preview or the editor-by-content-model mapping. |
 | [`ocr-design.md`](reference/ocr-design.md) | plugin + wtbot | live behaviour | Explains the backend contract, engine discovery and the generated favourites menu. |
 | [`locator-index-design.md`](reference/locator-index-design.md) | wtbot | first cut implemented | The one inferential `<pagelist>` rule is flagged in the doc and tracked in `todo/backlog.md`. |
+| [`vfs-paths.md`](reference/vfs-paths.md) | wtbot + plugin | live behaviour | The `wikisource://` path grammar: namespaces, title nodes, `@aspect` files, subpages. Read before touching `wtbot.vfs` or the tool window tree. |
 | [`logging.md`](reference/logging.md) | all components | live behaviour | Start here when tracing a failing request end-to-end; §0 is the port conventions. |
 | [`proofread-page-sha1-discordance.md`](reference/proofread-page-sha1-discordance.md) | wtbot | empirical finding | Why cross-wiki comparison must hash served content, not `Revision.sha1`. Read before writing anything that compares revisions. |
 | [`check_revisions.http`](reference/check_revisions.http) | wtbot | scratch requests | Ready-made `recentchanges` queries against en.wikisource. |

@@ -20,15 +20,14 @@ from wtbot.locator_index import (
 )
 from wtbot.model import Site
 from wtbot.vfs.nodes import (
-    IndexDir,
-    IndexWikitext,
     Missing,
-    PageLeaf,
     PagesDir,
+    entry_behind,
+    proofread_page_of,
     resolve,
+    site_of,
 )
-from wtbot.vfs.paths import title_path
-from wtbot.vfs.store import Entry, PageStore
+from wtbot.vfs.store import PROOFREAD_INDEX_CONTENT_MODEL, Entry, PageStore
 
 """GET /locator-index/{sections,page-numbers,dump} — resolves a back-of-book
 locator (a printed page number, or a section/paragraph id) to the `Page:`
@@ -66,26 +65,26 @@ router = APIRouter(
 
 
 def _resolve_index(path: str, session: Session) -> tuple[PageStore, Site, str]:
-    """The Index: a path names -- the Index itself (or its Pages/ container),
+    """The Index: a path names -- the Index itself (or any of its aspects),
     or any Page: it paginates."""
     store = PageStore(session)
-    match resolve(store, path):
-        case (
-            IndexDir(_, site, index)
-            | IndexWikitext(_, site, index)
-            | PagesDir(_, site, index)
-        ):
-            return store, site, index.name
-        case PageLeaf(_, site, _, index) if index is not None:
-            return store, site, index.name
-        case Missing():
-            raise HTTPException(status_code=404, detail=f"no such path: {path}")
-        case _:
-            raise HTTPException(status_code=400, detail=f"not a work path: {path}")
+    node = resolve(store, path)
+    if isinstance(node, Missing):
+        raise HTTPException(status_code=404, detail=f"no such path: {path}")
+    if isinstance(node, PagesDir):
+        return store, node.site, node.index.name
+    site, entry = site_of(node), entry_behind(node)
+    if site is not None and entry is not None:
+        if entry.content_model == PROOFREAD_INDEX_CONTENT_MODEL:
+            return store, site, entry.name
+        page = proofread_page_of(store, node)
+        if page is not None and page.index is not None:
+            return store, site, page.index.name
+    raise HTTPException(status_code=400, detail=f"not a work path: {path}")
 
 
-def _index_path(site: Site, index_title: str) -> str:
-    return title_path(site.family, site.code, index_title)
+def _index_path(store: PageStore, site: Site, index_title: str) -> str:
+    return store.site_namespaces(site).node_path(site.family, site.code, index_title)
 
 
 def _page_ref(store: PageStore, page: Entry, site: Site) -> PageRef | None:
@@ -93,7 +92,9 @@ def _page_ref(store: PageStore, page: Entry, site: Site) -> PageRef | None:
     if meta is None or meta.page_number is None:
         return None
     return PageRef(
-        path=title_path(site.family, site.code, page.name),
+        path=store.site_namespaces(site).node_path(
+            site.family, site.code, page.name, aspect="wikitext"
+        ),
         title=page.name,
         scan_page=meta.page_number,
     )
@@ -254,7 +255,7 @@ def dump_locator_index(
 
     return LocatorIndexDump(
         index_title=index_title,
-        index_path=_index_path(site, index_title),
+        index_path=_index_path(store, site, index_title),
         pagelist_assignments=pagelist_entries,
         pages=page_entries,
         sections=sections,

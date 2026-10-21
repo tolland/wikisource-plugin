@@ -4,6 +4,7 @@ import com.intellij.ide.util.treeView.AbstractTreeStructure
 import com.intellij.ide.util.treeView.NodeDescriptor
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.ui.tree.LeafState
+import org.limepepper.lang.wikitext.vfs.WtPaths
 import org.limepepper.lang.wikitext.vfs.WtVirtualFile
 import org.limepepper.lang.wikitext.vfs.WtVirtualFileSystem
 import org.limepepper.lang.wikitext.vfs.backend.NodeKind
@@ -28,6 +29,12 @@ internal class BackendErrorElement(val parent: Any, val message: String) {
  * (plus [WikisourceRootElement] and [BackendErrorElement]), so element
  * equality — and with it AsyncTreeModel's expansion/selection preservation
  * across invalidations — falls out of [WtVirtualFileSystem]'s identity cache.
+ *
+ * A title is a directory node that lists its aspect files (`@wikitext`,
+ * `@props`) next to its subpages. The tree shows only the titles and the
+ * `@pages` container: aspects are what a node *offers* (double-click opens the
+ * default one, the context menu the rest), not part of the hierarchy a reader
+ * browses. See [isTreeElement].
  *
  * Child computation blocks on the sidecar; StructureTreeModel only calls it
  * on its background invoker thread, never on the EDT.
@@ -62,6 +69,8 @@ internal class WikisourceTreeStructure(
                     placeholder = child.placeholder,
                     length = child.length,
                     timestamp = child.timestamp,
+                    hasChildren = child.hasChildren,
+                    aspects = child.aspects,
                 ) as Any
             }.toTypedArray()
         } catch (e: VfsBackendException) {
@@ -71,7 +80,7 @@ internal class WikisourceTreeStructure(
     }
 
     private fun directoryChildren(dir: WtVirtualFile): Array<Any> = try {
-        dir.children.map { it as Any }.toTypedArray()
+        dir.children.filter { isTreeElement(it as WtVirtualFile) }.map { it as Any }.toTypedArray()
     } catch (e: VfsBackendException) {
         STRUCTURE_LOG.warn("VFS children load failed for ${dir.path}", e)
         arrayOf(BackendErrorElement(dir, e.message ?: "backend error"))
@@ -86,7 +95,8 @@ internal class WikisourceTreeStructure(
 
     override fun getLeafState(element: Any): LeafState = when (element) {
         WikisourceRootElement -> LeafState.NEVER
-        is WtVirtualFile -> if (element.isDirectory) LeafState.NEVER else LeafState.ALWAYS
+        // A title with no subpages (and no pages to list) has nothing to expand.
+        is WtVirtualFile -> if (element.isDirectory && element.hasChildren) LeafState.NEVER else LeafState.ALWAYS
         else -> LeafState.ALWAYS
     }
 
@@ -101,13 +111,24 @@ internal class WikisourceTreeStructure(
     }
 }
 
+/**
+ * Whether a child of a title node belongs in the tree: titles and the `@pages`
+ * container do; aspect files do not.
+ */
+internal fun isTreeElement(file: WtVirtualFile): Boolean =
+    file.isDirectory || WtPaths.aspectOf(file.path) == null
+
+/** Tree label: the VFS name, except `@pages`, which reads as "Pages". */
+internal fun treeLabel(file: WtVirtualFile): String =
+    if (WtPaths.aspectOf(file.path) == WtPaths.PAGES) "Pages" else file.name
+
 internal class WikisourceNodeDescriptor(
     private val nodeElement: Any,
     parentDescriptor: NodeDescriptor<*>?,
 ) : NodeDescriptor<Any>(null, parentDescriptor) {
 
     init {
-        myName = (nodeElement as? WtVirtualFile)?.name ?: nodeElement.toString()
+        myName = (nodeElement as? WtVirtualFile)?.let(::treeLabel) ?: nodeElement.toString()
     }
 
     override fun update(): Boolean = false

@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-from conftest import FAKE_TIMESTAMP
+from conftest import FAKE_TIMESTAMP, vfs_path
 from sqlalchemy.engine import Engine
 from sqlmodel import Session, select
 
@@ -182,6 +182,6 @@ def test_the_index_directory_does_not_expose_the_backing_file(
         session.commit()
 
         vfs = WikisourceVfs(session)
-        children = vfs.list_children(f"/wikisource/en/{INDEX}").children
+        children = vfs.list_children(vfs_path(INDEX)).children
         assert FILE not in [c.name for c in children]
-        assert not vfs.stat(f"/wikisource/en/{INDEX}/{FILE}").exists
+        assert not vfs.stat(f"{vfs_path(INDEX)}/{FILE}").exists

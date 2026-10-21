@@ -34,8 +34,22 @@
   let lookupError = $state('');
   let copiedPath = $state('');
 
+  // A title segment starting with `@` or `%` is escaped so a trailing `@name`
+  // is always an aspect (see src-py/wtbot/vfs/paths.py).
+  function encodeSegment(segment: string): string {
+    if (segment.startsWith('@')) return `%40${segment.slice(1)}`;
+    if (segment.startsWith('%')) return `%25${segment.slice(1)}`;
+    return segment;
+  }
+
+  // `/{family}/{code}/{namespace}/{title segments}`: the title's namespace
+  // prefix is its own path level.
   function indexPath(work: IndexPageSummary): string {
-    return `/${work.family}/${work.code}/${work.title}`;
+    const colon = work.title.indexOf(':');
+    const namespace = colon === -1 ? '(Main)' : work.title.slice(0, colon);
+    const rest = colon === -1 ? work.title : work.title.slice(colon + 1);
+    const segments = rest.split('/').map(encodeSegment).join('/');
+    return `/${work.family}/${work.code}/${encodeSegment(namespace)}/${segments}`;
   }
 
   async function loadWorks(): Promise<void> {

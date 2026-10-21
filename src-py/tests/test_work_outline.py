@@ -1,3 +1,5 @@
+import base64
+
 import pymupdf
 import pytest
 from sqlmodel import Session, select
@@ -230,6 +232,14 @@ def test_apply_api_uses_normal_pending_commit_workflow(engine, client, proposal)
         "/dev/transclusion", json=request.model_dump(mode="json", by_alias=True)
     )
     assert response.status_code == 200, response.text
+    for page in response.json()["pages"]:
+        assert page["path"].startswith("/local/en/Book/Work/")
+        assert page["path"].endswith("/@wikitext")
+        content = client.get("/vfs/content", params={"path": page["path"]})
+        assert content.status_code == 200, content.text
+        assert (
+            base64.b64decode(content.json()["content_base64"]).decode() == page["body"]
+        )
     pending = client.get("/commits/pending").json()
     assert len(pending) == 10
     assert all(p["title"].startswith("Book:Work/") for p in pending)
@@ -388,7 +398,7 @@ def test_force_keeps_existing_address_but_returns_canonical_path(session, propos
     destination = next(
         p for p in result.pages if p.title == "Book:Work/Part 1/Chapter 1"
     )
-    assert destination.path.endswith("Book:Work/Part_1/Chapter_1")
+    assert destination.path == "/local/en/Book/Work/Part_1/Chapter_1/@wikitext"
     assert len(session.exec(select(Title)).all()) == 10
 
 

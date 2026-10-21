@@ -20,6 +20,7 @@ class FakeVfsBackend : VfsBackend {
         val stableId: Long? = null,
         var revid: Long? = null,
         val contentModel: String? = null,
+        val aspects: List<String> = emptyList(),
     )
 
     private val entries = mutableMapOf<String, Entry>()
@@ -35,16 +36,19 @@ class FakeVfsBackend : VfsBackend {
     /**
      * Register a directory. The parent is [parent] when given, else the
      * longest already-registered directory path that is a strict prefix of
-     * [path]. A page's path is its own title under the site, so it is not
-     * nested under the container that lists it and needs an explicit [parent].
+     * [path]. A page's path is its own title in the Page namespace, so it is
+     * not nested under the `@pages` container that lists it and needs an
+     * explicit [parent]. [aspects] are the names a title node offers (`wikitext`,
+     * `props`); the aspect files themselves are registered with [addFile].
      */
     fun addDirectory(
         path: String,
         name: String = path.substringAfterLast('/'),
         stableId: Long? = null,
         parent: String? = null,
+        aspects: List<String> = emptyList(),
     ): FakeVfsBackend {
-        entries[path] = Entry(path, name, NodeKind.directory, stableId = stableId)
+        entries[path] = Entry(path, name, NodeKind.directory, stableId = stableId, aspects = aspects)
         _registerWithParent(path, parent)
         return this
     }
@@ -89,8 +93,13 @@ class FakeVfsBackend : VfsBackend {
             revid = e.revid,
             length = if (e.kind == NodeKind.file) e.content.size.toLong() else null,
             contentModel = e.contentModel,
+            hasChildren = hasChildren(e),
+            aspects = e.aspects,
         )
     }
+
+    private fun hasChildren(e: Entry): Boolean =
+        e.kind == NodeKind.directory && childrenOf[e.path].orEmpty().isNotEmpty()
 
     override fun statBulk(paths: List<String>): List<StatResult> = paths.map(::stat)
 
@@ -105,6 +114,8 @@ class FakeVfsBackend : VfsBackend {
                 revid = e.revid,
                 length = if (e.kind == NodeKind.file) e.content.size.toLong() else null,
                 contentModel = e.contentModel,
+                hasChildren = hasChildren(e),
+                aspects = e.aspects,
             )
         }
         return ListChildrenResult(parentPath = path, children = children)
@@ -159,7 +170,7 @@ class FakeVfsBackend : VfsBackend {
             .filter { it.kind == NodeKind.file }
         val pos = siblings.indexOfFirst { it.path == path }
         fun entryOf(s: Entry?): PageNavEntry? = s?.let { PageNavEntry(it.path, it.name) }
-        val indexPath = parentPath.removeSuffix("/Pages")
+        val indexPath = parentPath.removeSuffix("/@pages")
         return PageNavResult(
             current = PageNavEntry(e.path, e.name),
             indexPath = indexPath,

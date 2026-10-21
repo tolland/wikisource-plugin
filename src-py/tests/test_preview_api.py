@@ -1,7 +1,7 @@
 import base64
 
 import pytest
-from conftest import add_proofread_meta, make_page
+from conftest import add_proofread_meta, make_page, vfs_path
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
@@ -74,7 +74,7 @@ def test_render_by_vfs_path_uses_cached_content_model(preview_client, wiki_clien
     resp = preview_client.post(
         "/preview/render",
         json={
-            "path": f"/{FAMILY}/{CODE}/{PAGE}",
+            "path": vfs_path(PAGE, "wikitext"),
             "wikitext": "Hello ''world''",
         },
     )
@@ -88,7 +88,7 @@ def test_render_by_vfs_path_uses_cached_content_model(preview_client, wiki_clien
 def test_render_index_wikitext_path(preview_client, wiki_client):
     resp = preview_client.post(
         "/preview/render",
-        json={"path": f"/{FAMILY}/{CODE}/{INDEX}/wikitext", "wikitext": "<pagelist />"},
+        json={"path": vfs_path(INDEX, "wikitext"), "wikitext": "<pagelist />"},
     )
     assert resp.status_code == 200
     assert resp.json()["title"] == INDEX
@@ -126,7 +126,7 @@ def test_render_html_is_escaped_json_safe(preview_client):
 def test_render_unknown_site_404(preview_client):
     resp = preview_client.post(
         "/preview/render",
-        json={"path": "/wikipedia/de/Index:X.pdf/Page:X.pdf/1", "wikitext": "x"},
+        json={"path": "/wikipedia/de/Index/X.pdf/@wikitext", "wikitext": "x"},
     )
     assert resp.status_code == 404
 
