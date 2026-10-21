@@ -4,12 +4,39 @@ from dataclasses import dataclass
 
 """Path parsing for the VFS.
 
-A VFS path is `/{family}/{code}/{title-ish segments...}`. Segments beyond
-the site prefix may themselves contain `/` as part of a MediaWiki title
-(`Page:Foo.djvu/171`), so parsing stops at splitting — how many trailing
-segments form one title is decided by the resolver, which knows the tree
-shape (and, later, by the mediawiki layer's namespace subpage rules).
+A VFS path is
+
+    /{family}/{code}/{namespace}/{title segments...}[/@{aspect}]
+
+`{namespace}` is the site's namespace name (or `(Main)` for the main
+namespace); the title segments are the rest of the wiki title, split on `/`
+(`Page:Foo.djvu/171` is `/Page/Foo.djvu/171`). Parsing stops at splitting --
+whether trailing segments are subpages or one flat title is decided by the
+resolver, against the namespace's `subpages` flag.
+
+An *aspect* is a view of a title (its wikitext, its properties, ...). It is
+the last segment, introduced by `@`. A title segment that itself starts with
+`@` or `%` is escaped (`%40`, `%25`) so the two can never be confused.
 """
+
+ASPECT_PREFIX = "@"
+_ESCAPES = {"@": "%40", "%": "%25"}
+_UNESCAPES = {v: k for k, v in _ESCAPES.items()}
+
+FIRST_TITLE_SEGMENT = 3
+"""Index of the first title segment: after family, code and namespace."""
+
+
+def encode_segment(segment: str) -> str:
+    """Escape a title segment for use in a path; only the leading character
+    can be mistaken for syntax."""
+    head = segment[:1]
+    return _ESCAPES[head] + segment[1:] if head in _ESCAPES else segment
+
+
+def decode_segment(segment: str) -> str:
+    head = segment[:3]
+    return _UNESCAPES[head] + segment[3:] if head in _UNESCAPES else segment
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,22 +70,47 @@ class WikiPath:
         return self.segments[1]
 
     @property
-    def title(self) -> str:
-        """Everything after the site prefix, as one wiki title -- slashes
-        included (`Page:Foo.djvu/171`)."""
-        return "/".join(self.segments[2:])
+    def namespace_segment(self) -> str:
+        return decode_segment(self.segments[2])
 
     @property
-    def index_title(self) -> str:
-        return self.segments[2]
+    def aspect(self) -> str | None:
+        """The trailing `@aspect`, if the path has one. It must follow at
+        least one title segment, so `/f/c/Index/@x` names the aspect `x` of a
+        title only when a title precedes it."""
+        if len(self.segments) <= FIRST_TITLE_SEGMENT:
+            return None
+        last = self.segments[-1]
+        if last.startswith(ASPECT_PREFIX) and len(last) > 1:
+            return last[1:]
+        return None
 
     @property
-    def rest(self) -> tuple[str, ...]:
-        """Segments below the index title."""
-        return self.segments[3:]
+    def node_segments(self) -> tuple[str, ...]:
+        """The segments without the aspect."""
+        if self.aspect is None:
+            return self.segments
+        return self.segments[:-1]
+
+    @property
+    def node_path(self) -> str:
+        """The path of the title node this path addresses or belongs to."""
+        return "/" + "/".join(self.node_segments)
+
+    @property
+    def title_rest(self) -> str:
+        """The title below the namespace, slashes included and escapes
+        undone: `Foo.djvu/171` for `/f/c/Page/Foo.djvu/171`. Empty when the
+        path stops at the namespace (or earlier)."""
+        return "/".join(
+            decode_segment(s) for s in self.node_segments[FIRST_TITLE_SEGMENT:]
+        )
 
 
-def title_path(family: str, code: str, title: str) -> str:
-    """The VFS path of a wiki title: `/{family}/{code}/{title}`, the title
-    verbatim. A page that is addressable by its own title has no other path."""
-    return f"/{family}/{code}/{title}"
+def child_path(parent: str, segment: str) -> str:
+    """`parent` with a title segment appended, escaped."""
+    return f"{parent.rstrip('/')}/{encode_segment(segment)}"
+
+
+def aspect_path(node_path: str, aspect: str) -> str:
+    return f"{node_path.rstrip('/')}/{ASPECT_PREFIX}{aspect}"

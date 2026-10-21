@@ -1,5 +1,5 @@
 import pytest
-from conftest import add_proofread_meta, index_file_title_pk, make_page
+from conftest import add_proofread_meta, index_file_title_pk, make_page, vfs_path
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -21,7 +21,7 @@ FAMILY = "wikisource"
 CODE = "en"
 INDEX = "Index:Tractatus.djvu"
 PAGE_TITLE = "Page:Tractatus.djvu/1"
-PAGE_PATH = f"/{FAMILY}/{CODE}/{PAGE_TITLE}"
+PAGE_PATH = vfs_path(PAGE_TITLE, "wikitext")
 
 
 def _seed(engine) -> int:

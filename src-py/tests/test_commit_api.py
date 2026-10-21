@@ -5,7 +5,14 @@ from __future__ import annotations
 
 import base64
 
-from conftest import FAKE_TIMESTAMP, add_proofread_meta, drain, fake_pageid, make_page
+from conftest import (
+    FAKE_TIMESTAMP,
+    add_proofread_meta,
+    drain,
+    fake_pageid,
+    make_page,
+    vfs_path,
+)
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
@@ -16,7 +23,7 @@ from wtbot.wiki.wiki_types import RemotePage
 
 TITLE = "Page:Foo.djvu/1"
 INDEX_TITLE = "Index:Foo.djvu"
-PATH = "/wikisource/en/Page:Foo.djvu/1"
+PATH = vfs_path("Page:Foo.djvu/1", "wikitext")
 
 
 def _b64(s: str) -> str:

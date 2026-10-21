@@ -1,6 +1,6 @@
 import base64
 
-from conftest import FAKE_TIMESTAMP, drain
+from conftest import FAKE_TIMESTAMP, drain, vfs_path
 from fastapi.testclient import TestClient
 from sqlmodel import Session, col, select
 
@@ -37,9 +37,9 @@ INDEX = "Index:Sparse.pdf"
 FILE = "File:Sparse.pdf"
 PAGE_5 = "Page:Sparse.pdf/5"
 
-_INDEX_PATH = f"/{FAMILY}/{CODE}/{INDEX}"
+_INDEX_PATH = vfs_path(INDEX, family=FAMILY)
 _SITE_PATH = f"/{FAMILY}/{CODE}"
-_PAGES_PATH = f"{_INDEX_PATH}/Pages"
+_PAGES_PATH = f"{_INDEX_PATH}/@pages"
 
 _INDEX_BODY = "<pagelist />"
 _PAGE_5_BODY = "{{c|REPORT}} Page five, the only transcribed one."
@@ -276,21 +276,32 @@ def test_placeholders_listed_with_flag(engine, tmp_path):
         ]
         by_number = {c_["name"]: c_ for c_ in children}
         assert len(children) == 5
-        assert by_number["Page:Sparse.pdf/1"]["placeholder"] is True
-        assert by_number["Page:Sparse.pdf/1"]["writable"] is True
+        assert by_number["1"]["placeholder"] is True
+        # The page is a node; what you edit is its @wikitext aspect.
+        aspects = c.get(
+            "/vfs/children",
+            params={"path": vfs_path("Page:Sparse.pdf/1", family=FAMILY)},
+        ).json()["children"]
+        wikitext = next(a for a in aspects if a["name"] == "@wikitext")
+        assert wikitext["writable"] is True
+        assert wikitext["placeholder"] is True
         # The scan reference image is known even though the page isn't
         # created yet — transcription can start from the placeholder.
-        assert by_number["Page:Sparse.pdf/1"]["has_reference_image"] is True
-        assert by_number[PAGE_5]["placeholder"] is False
+        assert by_number["1"]["has_reference_image"] is True
+        assert by_number["5"]["placeholder"] is False
 
         stat = c.get(
-            "/vfs/stat", params={"path": f"{_SITE_PATH}/Page:Sparse.pdf/3"}
+            "/vfs/stat",
+            params={"path": vfs_path("Page:Sparse.pdf/3", "wikitext", family=FAMILY)},
         ).json()
         assert stat["exists"] is True
         assert stat["placeholder"] is True
 
         # Bulk and individual stat agree on placeholders too.
-        paths = [f"{_SITE_PATH}/Page:Sparse.pdf/3", f"{_SITE_PATH}/{PAGE_5}"]
+        paths = [
+            vfs_path("Page:Sparse.pdf/3", "wikitext", family=FAMILY),
+            vfs_path(PAGE_5, "wikitext", family=FAMILY),
+        ]
         bulk = c.post("/vfs/stat/bulk", json={"paths": paths}).json()["results"]
         for path, result in zip(paths, bulk):
             assert result == c.get("/vfs/stat", params={"path": path}).json(), path
@@ -298,7 +309,7 @@ def test_placeholders_listed_with_flag(engine, tmp_path):
 
 def test_placeholder_opens_with_prepopulated_ocr_body(engine, tmp_path):
     _seed_and_fan_out(engine, tmp_path)
-    path = f"{_SITE_PATH}/Page:Sparse.pdf/3"
+    path = vfs_path("Page:Sparse.pdf/3", "wikitext", family=FAMILY)
     with _client(engine, tmp_path) as c:
         r = c.get("/vfs/content", params={"path": path}).json()
         assert _unb64(r["content_base64"]) == _ocr_body(3)
@@ -308,18 +319,19 @@ def test_placeholder_opens_with_prepopulated_ocr_body(engine, tmp_path):
         # serves — the plugin trusts length for its VirtualFile.
         stat = c.get("/vfs/stat", params={"path": path}).json()
         assert stat["length"] == len(_ocr_body(3).encode())
-        children = c.get("/vfs/children", params={"path": _PAGES_PATH}).json()[
-            "children"
-        ]
+        children = c.get(
+            "/vfs/children",
+            params={"path": vfs_path("Page:Sparse.pdf/3", family=FAMILY)},
+        ).json()["children"]
         by_name = {c_["name"]: c_ for c_ in children}
-        assert by_name["Page:Sparse.pdf/3"]["length"] == len(_ocr_body(3).encode())
+        assert by_name["@wikitext"]["length"] == len(_ocr_body(3).encode())
 
 
 def test_placeholder_opens_with_scaffold_and_saves_as_edit(engine, tmp_path):
     # Page 1 is the slot the wiki offered no OCR body for — the generic
     # proofread-page scaffold is the fallback.
     _seed_and_fan_out(engine, tmp_path)
-    path = f"{_SITE_PATH}/Page:Sparse.pdf/1"
+    path = vfs_path("Page:Sparse.pdf/1", "wikitext", family=FAMILY)
     with _client(engine, tmp_path) as c:
         r = c.get("/vfs/content", params={"path": path}).json()
         body = _unb64(r["content_base64"])
@@ -343,7 +355,7 @@ def test_placeholder_opens_with_scaffold_and_saves_as_edit(engine, tmp_path):
 
 def test_committing_placeholder_creates_remote_page(engine, tmp_path):
     wiki = _seed_and_fan_out(engine, tmp_path)
-    path = f"{_SITE_PATH}/Page:Sparse.pdf/4"
+    path = vfs_path("Page:Sparse.pdf/4", "wikitext", family=FAMILY)
     app = create_app(
         engine=engine, blob_root=tmp_path / "blobs", client_factory=lambda site: wiki
     )

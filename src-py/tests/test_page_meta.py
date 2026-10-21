@@ -1,5 +1,5 @@
 import pytest
-from conftest import add_proofread_meta, make_page
+from conftest import add_proofread_meta, make_page, vfs_path
 from sqlmodel import Session
 
 from wtbot.model import Page, Site
@@ -205,11 +205,11 @@ def test_meta_404_for_missing_page(client, seeded):
 
 # -- /pages/resolve — identity bridge -------------------------------------------
 
-_INDEX_PATH = f"/{FAMILY}/{CODE}/{INDEX}"
+_INDEX_PATH = vfs_path(INDEX)
 
 
 def test_resolve_by_vfs_path(client, seeded):
-    r = client.get("/pages/resolve", params={"path": f"/{FAMILY}/{CODE}/{PAGE_1}"})
+    r = client.get("/pages/resolve", params={"path": vfs_path(PAGE_1, "wikitext")})
     assert r.status_code == 200
     body = r.json()
     assert body["pk"] == seeded["page_pk"]
@@ -219,7 +219,7 @@ def test_resolve_by_vfs_path(client, seeded):
     r = client.get("/pages/resolve", params={"path": _INDEX_PATH})
     assert r.json()["pk"] == seeded["index_pk"]
     # ...as does its synthetic wikitext leaf.
-    r = client.get("/pages/resolve", params={"path": f"{_INDEX_PATH}/wikitext"})
+    r = client.get("/pages/resolve", params={"path": f"{_INDEX_PATH}/@wikitext"})
     assert r.json()["pk"] == seeded["index_pk"]
 
 
@@ -233,10 +233,10 @@ def test_resolve_by_title_triple(client, seeded):
 
 
 def test_resolve_missing_and_bad_requests(client, seeded):
-    r = client.get("/pages/resolve", params={"path": f"/{FAMILY}/{CODE}/Page:No/9"})
+    r = client.get("/pages/resolve", params={"path": vfs_path("Page:No/9", "wikitext")})
     assert r.status_code == 404
     # Synthetic containers have no backing page.
-    r = client.get("/pages/resolve", params={"path": f"{_INDEX_PATH}/Pages"})
+    r = client.get("/pages/resolve", params={"path": f"{_INDEX_PATH}/@pages"})
     assert r.status_code == 404
     r = client.get(
         "/pages/resolve",
@@ -249,7 +249,7 @@ def test_resolve_missing_and_bad_requests(client, seeded):
 def test_resolve_then_meta_roundtrip(client, seeded):
     """The intended flow: VFS path -> pk -> per-role metadata."""
     pk = client.get(
-        "/pages/resolve", params={"path": f"/{FAMILY}/{CODE}/{PAGE_1}"}
+        "/pages/resolve", params={"path": vfs_path(PAGE_1, "wikitext")}
     ).json()["pk"]
     r = client.put(f"/pages/{pk}/page-meta", json={"thumb_width": 240})
     assert r.status_code == 200

@@ -20,6 +20,7 @@ from wtbot.model.wikisource.proofread_page_meta import (
 )
 from wtbot.shared_repository import local_file_title_pk
 from wtbot.title_store import Entry, entry_by_pk
+from wtbot.vfs.namespaces import NsView, SiteNamespaces
 
 """PageStore — all SQL for the VFS layers.
 
@@ -73,6 +74,13 @@ def canonical_title(title: str) -> str:
     return title.replace("_", " ")
 
 
+def _title_has_prefix(prefix: str):
+    """Coarse SQL filter for titles starting with [prefix]. SQLite's LIKE is
+    ASCII-case-insensitive, so callers refine to the exact prefix in Python."""
+    escaped = prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return col(Title.title).like(f"{escaped}%", escape="\\")
+
+
 def meta_has_image(meta: ProofreadPageMeta | None) -> bool:
     return meta is not None and (
         meta.thumb_url is not None
@@ -84,6 +92,7 @@ def meta_has_image(meta: ProofreadPageMeta | None) -> bool:
 class PageStore:
     def __init__(self, session: Session) -> None:
         self.session = session
+        self._namespaces: dict[int | None, SiteNamespaces] = {}
 
     # -- sites / namespaces ---------------------------------------------------
 
@@ -105,6 +114,21 @@ class PageStore:
                 (Namespace.canonical_name == name) | (Namespace.local_name == name),
             )
         ).first()
+
+    def site_namespaces(self, site: Site) -> SiteNamespaces:
+        """The site's namespace map, loaded once per store (one per request)."""
+        loaded = self._namespaces.get(site.pk)
+        if loaded is None:
+            loaded = SiteNamespaces.from_rows(self.namespaces(site))
+            self._namespaces[site.pk] = loaded
+        return loaded
+
+    def namespaces(self, site: Site) -> list[Namespace]:
+        return list(
+            self.session.exec(
+                select(Namespace).where(Namespace.site_pk == site.pk)
+            ).all()
+        )
 
     # -- titles -----------------------------------------------------------------
 
@@ -186,6 +210,61 @@ class PageStore:
             self._proofread_pages_named(site).where(col(Title.title).in_(titles))
         )
 
+    def entries_by_titles(self, site: Site, titles: list[str]) -> list[Entry]:
+        """Entries for exactly these full titles, whatever their content model."""
+        if not titles:
+            return []
+        return self._entries(
+            select(Title, Page).where(
+                Title.site_pk == site.pk, col(Title.title).in_(titles)
+            )
+        )
+
+    def title_prefixes(self, site: Site) -> set[str]:
+        """Every distinct `text before the first colon, colon included` over
+        the site's titles ('' for a title with no colon) -- a cheap way to ask
+        which namespaces have titles without loading them."""
+        prefix = func.substr(Title.title, 1, func.instr(Title.title, ":"))
+        return set(
+            self.session.exec(
+                select(prefix).where(Title.site_pk == site.pk).distinct()
+            ).all()
+        )
+
+    def has_titles_under(self, site: Site, prefix: str) -> bool:
+        return bool(self._titles_with_prefix(site, prefix, limit=1))
+
+    def _titles_with_prefix(
+        self, site: Site, prefix: str, limit: int | None = None
+    ) -> list[str]:
+        statement = select(Title.title).where(
+            Title.site_pk == site.pk, _title_has_prefix(prefix)
+        )
+        if limit is not None:
+            statement = statement.limit(limit)
+        return [t for t in self.session.exec(statement).all() if t.startswith(prefix)]
+
+    def titles_under(self, site: Site, prefix: str) -> list[str]:
+        """Full titles starting with [prefix], case-sensitively."""
+        return sorted(self._titles_with_prefix(site, prefix))
+
+    def namespace_titles(
+        self, site: Site, namespaces: SiteNamespaces, ns: NsView
+    ) -> list[str]:
+        """Every title in [ns], full form. The main namespace is everything
+        that is not in another namespace."""
+        if not ns.is_main:
+            return self.titles_under(site, ns.prefix)
+        others = [v.prefix for v in namespaces.others()]
+        return sorted(
+            t
+            for t in self.session.exec(
+                select(Title.title).where(Title.site_pk == site.pk)
+            ).all()
+            if namespaces.split(t)[0].is_main
+            and not any(t.startswith(o) for o in others)
+        )
+
     def index_of(self, page: Entry) -> Entry | None:
         """The Index: that paginates [page], per its ProofreadPageMeta."""
         meta = self.session.get(ProofreadPageMeta, page.pk)
@@ -195,13 +274,9 @@ class PageStore:
         """Titles starting with [prefix], case-sensitively. SQLite's LIKE is
         ASCII-case-insensitive, so it serves as the coarse index scan and
         Python refines to the exact prefix."""
-        escaped = prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         rows = self._entries(
             select(Title, Page)
-            .where(
-                Title.site_pk == site.pk,
-                col(Title.title).like(f"{escaped}%", escape="\\"),
-            )
+            .where(Title.site_pk == site.pk, _title_has_prefix(prefix))
             .order_by(Title.title)
         )
         return [row for row in rows if row.name.startswith(prefix)]

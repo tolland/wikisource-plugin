@@ -3,19 +3,19 @@ from conftest import add_proofread_meta, make_page
 
 from wtbot.model import Site
 from wtbot.model.wiki.namespace import Namespace
-from wtbot.vfs.mediawiki import MediaWikiVfs, title_namespace_name
 from wtbot.vfs.store import PageStore
 from wtbot.vfs.wikisource import WikisourceVfs
 
-"""Tests for the mediawiki layer: title namespace parsing and the
-Namespace.subpages rule, including how the rule surfaces in the wikisource
-overlay's Index listing (assets follow the ordinary subpage flag).
+"""Tests for the Namespace.subpages rule and how it surfaces in the
+wikisource overlay's tree (Index assets follow the ordinary subpage flag),
+plus title matching across underscore/space spellings.
 """
 
 FAMILY = "wikisource"
 CODE = "en"
-INDEX = "Index:Foo.djvu"
-_INDEX_PATH = f"/{FAMILY}/{CODE}/{INDEX}"
+INDEX_NAME = "Foo.djvu"
+INDEX = f"Index:{INDEX_NAME}"
+_INDEX_PATH = f"/{FAMILY}/{CODE}/Index/{INDEX_NAME}"
 
 LINKED_SUBPAGE = f"{INDEX}/styles.css"
 UNLINKED_SUBPAGE = f"{INDEX}/legacy.css"
@@ -65,46 +65,31 @@ def _add_index_namespace(session, site, *, subpages: bool) -> None:
     session.commit()
 
 
-def test_title_namespace_name():
-    assert title_namespace_name("Index:Foo.djvu") == "Index"
-    assert title_namespace_name("Page:Foo.djvu/1") == "Page"
-    assert title_namespace_name("Mainspace title") == ""
+def _child_names(session, path: str) -> list[str]:
+    return [c.name for c in WikisourceVfs(session).list_children(path).children]
 
 
 def test_subpages_permissive_without_namespace_map(session, site):
     """Namespace rows come from siteinfo; before any fetch the map is empty
-    and subpages cannot be ruled out."""
-    mw = MediaWikiVfs(PageStore(session))
-    assert mw.subpages_enabled(site, INDEX) is True
-    titles = [p.name for p in mw.subpages(site, INDEX)]
-    assert titles == [UNLINKED_SUBPAGE, LINKED_SUBPAGE]
+    and the standard names stand in, so Index subpages show."""
+    names = _child_names(session, _INDEX_PATH)
+    assert {"styles.css", "legacy.css"} <= set(names)
 
 
-def test_subpages_respect_namespace_flag(session, site):
+def test_subpages_follow_namespace_flag(session, site):
+    """With subpages disabled the slash is part of the title: the Index has
+    no subpage children, and the CSS titles are flat nodes of the namespace."""
     _add_index_namespace(session, site, subpages=False)
-    mw = MediaWikiVfs(PageStore(session))
-    assert mw.subpages_enabled(site, INDEX) is False
-    assert mw.subpages(site, INDEX) == []
+    names = _child_names(session, _INDEX_PATH)
+    assert "styles.css" not in names
+    assert "legacy.css" not in names
+    flat = WikisourceVfs(session).list_children(f"/{FAMILY}/{CODE}/Index").children
+    assert f"{_INDEX_PATH}/styles.css" in [c.path for c in flat]
 
 
 def test_subpages_enabled_namespace_lists_them(session, site):
     _add_index_namespace(session, site, subpages=True)
-    mw = MediaWikiVfs(PageStore(session))
-    titles = [p.name for p in mw.subpages(site, INDEX)]
-    assert titles == [UNLINKED_SUBPAGE, LINKED_SUBPAGE]
-
-
-def test_overlay_index_children_follow_subpage_flag(session, site):
-    """With subpages disabled, Index assets disappear from the Index dir."""
-    _add_index_namespace(session, site, subpages=False)
-    names = [c.name for c in WikisourceVfs(session).list_children(_INDEX_PATH).children]
-    assert "styles.css" not in names
-    assert "legacy.css" not in names
-
-
-def test_overlay_index_children_include_subpages_when_enabled(session, site):
-    _add_index_namespace(session, site, subpages=True)
-    names = [c.name for c in WikisourceVfs(session).list_children(_INDEX_PATH).children]
+    names = _child_names(session, _INDEX_PATH)
     assert "styles.css" in names
     assert "legacy.css" in names
 

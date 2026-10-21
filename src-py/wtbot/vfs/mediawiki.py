@@ -10,25 +10,15 @@ from wtbot.api.schemas import (
     WriteResult,
     WriteStatus,
 )
-from wtbot.model import Site
 from wtbot.model.wikisource.proofread_page_meta import ProofreadPageMeta
 from wtbot.vfs.store import EffectiveState, Entry, PageStore, meta_has_image
 
 """mediawiki:// — the title-addressed layer.
 
-Knows pages, namespaces, and subpage semantics; knows nothing about
-ProofreadPage or the wikisource:// synthetic tree. The wikisource overlay
-maps its synthetic paths down to titles and delegates content operations
-(stat/read/write of one page, subpage enumeration) here. A vanilla
-mediawiki:// path surface (`/{family}/{code}/{title}`) can later be mounted
-directly on this object.
-
-Subpage rule: in a namespace with subpages enabled, `Foo/Bar` is a child
-node of `Foo`; otherwise the slash is just part of a flat title. The flag
-comes from the per-site Namespace map (populated from siteinfo). When the
-namespace is unknown — fixtures, or a cache that has pages but no siteinfo
-fetch yet — the rule is permissive: we cannot rule subpages out, and the
-overlay's Index assets (styles.css) depend on being visible.
+Knows pages and their content operations; knows nothing about ProofreadPage
+or the wikisource:// synthetic tree. The wikisource overlay maps its paths
+down to titles and delegates content operations (stat/read/write of one
+page) here. Namespaces and the subpage rule live in `wtbot.vfs.namespaces`.
 """
 
 
@@ -51,33 +41,9 @@ precomputed answer (page has no ProofreadPageMeta row), so absence needs its own
 marker."""
 
 
-def title_namespace_name(title: str) -> str:
-    """The namespace prefix of a title ('' for the main namespace). Whether
-    the prefix is a *real* namespace is decided against the site's Namespace
-    map, not here — a mainspace title like 'Faust: Part One' simply won't
-    match one."""
-    prefix, sep, _ = title.partition(":")
-    return prefix if sep else ""
-
-
 class MediaWikiVfs:
     def __init__(self, store: PageStore) -> None:
         self.store = store
-
-    # -- subpages -----------------------------------------------------------
-
-    def subpages_enabled(self, site: Site, title: str) -> bool:
-        ns = self.store.namespace_by_name(site, title_namespace_name(title))
-        if ns is None:
-            return True  # permissive until siteinfo populates the map
-        return ns.subpages
-
-    def subpages(self, site: Site, title: str) -> list[Entry]:
-        """Direct and nested subpages of [title]; empty when the namespace
-        does not support subpages (the slash is then part of the title)."""
-        if not self.subpages_enabled(site, title):
-            return []
-        return self.store.entries_with_title_prefix(site, f"{title}/")
 
     # -- per-title content operations -----------------------------------------
 
@@ -116,6 +82,54 @@ class MediaWikiVfs:
             # A page we pushed exists remotely even if its refetch is still
             # queued, so this follows the bridged revid, not the snapshot.
             placeholder=state.placeholder,
+        )
+
+    def title_node(
+        self,
+        path: str,
+        name: str,
+        entry: Entry,
+        *,
+        has_children: bool,
+        aspects: list[str],
+        meta: ProofreadPageMeta | None | object = _UNRESOLVED,
+    ) -> Node:
+        """A title as a directory node. Unlike [page_node] this does not
+        work out the effective body -- a node carries no content, and a
+        listing of thousands of titles must not run three queries for each."""
+        resolved = self._resolve_meta(entry, meta)
+        return Node(
+            path=path,
+            name=name,
+            kind=NodeKind.directory,
+            stable_id=entry.pageid,
+            revid=entry.revid,
+            timestamp=ts_millis(entry.timestamp),
+            writable=False,
+            content_model=entry.content_model,
+            quality_level=resolved.quality_level if resolved is not None else None,
+            dirty=entry.title.dirty,
+            has_reference_image=meta_has_image(resolved),
+            placeholder=entry.page is None,
+            has_children=has_children,
+            aspects=aspects,
+        )
+
+    def title_stat(
+        self,
+        raw_path: str,
+        name: str,
+        entry: Entry,
+        *,
+        has_children: bool,
+        aspects: list[str],
+    ) -> Stat:
+        node = self.title_node(
+            raw_path, name, entry, has_children=has_children, aspects=aspects
+        )
+        return Stat(
+            exists=True,
+            **node.model_dump(exclude={"length", "writable"}),
         )
 
     def stat_page(
