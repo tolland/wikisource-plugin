@@ -427,11 +427,19 @@ class PageStore:
         return {row.title_pk: row.body for row in rows}
 
     def append_edit(
-        self, entry: Entry, *, body: str, base_revid: int | None, comment: str | None
+        self,
+        entry: Entry,
+        *,
+        body: str,
+        base_revid: int | None,
+        comment: str | None,
+        commit: bool = True,
     ) -> None:
         """Record a local save: journal row + dirty flag, on the title. Never
         touches Page.text (the cached remote body / conflict diff base), and
-        needs no Page: a title the wiki does not hold can be saved too."""
+        needs no Page: a title the wiki does not hold can be saved too.
+        Set commit=False when the caller owns an atomic batch transaction.
+        """
         self.session.add(
             EditJournal(
                 title_pk=entry.pk,
@@ -443,7 +451,8 @@ class PageStore:
         entry.title.dirty = True
         entry.title.local_modified_at = datetime.now(timezone.utc)
         self.session.add(entry.title)
-        self.session.commit()
+        if commit:
+            self.session.commit()
 
 
 def proofread_page_scaffold() -> str:

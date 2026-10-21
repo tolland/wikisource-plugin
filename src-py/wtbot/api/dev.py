@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlmodel import Session
 
 from wtbot.api.debug_logging_route import DebugLoggingRoute
+from wtbot.api.errors import ApiError
 from wtbot.deps import get_session
 from wtbot.dev_reset import (
     DevResetPlan,
@@ -12,6 +13,11 @@ from wtbot.dev_reset import (
     plan_promotion_reset,
     plan_promotionbatch_reset,
 )
+from wtbot.transclusion import (
+    ApplyTransclusionRequest,
+    ApplyTransclusionResult,
+    apply_transclusion,
+)
 
 router = APIRouter(
     prefix="/dev",
@@ -19,6 +25,17 @@ router = APIRouter(
     route_class=DebugLoggingRoute,
     include_in_schema=False,
 )
+
+
+@router.post("/transclusion", response_model=ApplyTransclusionResult)
+def generate_transclusion(
+    request: ApplyTransclusionRequest, session: Session = Depends(get_session)
+) -> ApplyTransclusionResult:
+    """Generate local edits only; publishing remains a separate commit action."""
+    try:
+        return apply_transclusion(session, request)
+    except ValueError as exc:
+        raise ApiError(400, str(exc), "invalid-transclusion") from exc
 
 
 @router.get("/promotion/reset-plan", response_model=DevResetPlan)

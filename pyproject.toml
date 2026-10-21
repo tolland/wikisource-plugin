@@ -14,6 +14,7 @@ dependencies = [
     "pillow>=11.0.0",
     "pydantic>=2.13.4",
     "pymupdf>=1.28.2",
+    "pyyaml>=6.0.3",
     "python-dotenv>=1.2.1",
     "pytimeparse>=1.1.8",
     "pywikibot>=11.4.2",
@@ -25,6 +26,8 @@ dependencies = [
     "typer-di>=0.1.5",
     "uvicorn[standard]>=0.49.0",
     "vcrpy>=8.3.0",
+    "pypdf>=6.21.1",
+    "pdfreader>=0.1.15",
 ]
 
 [project.urls]

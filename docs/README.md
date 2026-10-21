@@ -31,6 +31,7 @@ backend data model and fetch/edit/commit contract live in `src-py/DESIGN.md`.
 
 | Doc | Surface | Status | Next action |
 |---|---|---|---|
+| [`work-outlines.md`](design/work-outlines.md) | wtbot + plugin | PDF proposal and local generation implemented; navigation planned | Shared source hierarchy, editable transclusion proposals, and labelled/structured VFS navigation. |
 | [`upstream-sync-discussion.md`](design/upstream-sync-discussion.md) | wtbot | living rationale for the sync feature | Read before touching anything in `todo/upstream-sync-TODO.md`; it is the *why* behind every item there. |
 | [`scan-image-modeling.md`](design/scan-image-modeling.md) | wtbot model + plugin | speculative; nothing implemented | Decide whether to normalise annotation coordinates to fractions — the one item worth doing on its own merits. |
 | [`templatedata-future.md`](design/templatedata-future.md) | plugin + wtbot | speculative; nothing implemented | Nothing to build. Keep the editing-feature seams (pure renderers, sidecar-mediated data) compatible. |
@@ -40,6 +41,7 @@ backend data model and fetch/edit/commit contract live in `src-py/DESIGN.md`.
 
 | Doc | Surface | Status | Next action |
 |---|---|---|---|
+| [`transclusion-generation.md`](reference/transclusion-generation.md) | wtbot CLI + API | PDF proposal and local journal generation implemented | Generate, edit, preview, and apply a nested transclusion proposal. |
 | [`api-contract-inventory.md`](reference/api-contract-inventory.md) | wtbot HTTP | current: 20 routers, 78 paths, 99 operations | Keep in step with the routers; the changes proposed on top of it are in `todo/api-refactoring-plan.md`. |
 | [`preview-design.md`](reference/preview-design.md) | plugin + wtbot | live behaviour | Explains the split editor, the `action=parse` choice and the proofread page form. Consult before changing preview or the editor-by-content-model mapping. |
 | [`ocr-design.md`](reference/ocr-design.md) | plugin + wtbot | live behaviour | Explains the backend contract, engine discovery and the generated favourites menu. |

@@ -83,9 +83,13 @@ class ApiClient:
     def post(self, endpoint: str, payload: dict | None = None) -> Any:
         import httpx
 
-        return self._result(
-            httpx.post(self._url(endpoint), json=payload, timeout=self.timeout)
-        )
+        try:
+            return self._result(
+                httpx.post(self._url(endpoint), json=payload, timeout=self.timeout)
+            )
+        except Exception as e:
+            print(f"Error posting to {self.base_url=}  {endpoint=}: {e}")
+            raise
 
     def put(self, endpoint: str, payload: dict | None = None) -> Any:
         import httpx
