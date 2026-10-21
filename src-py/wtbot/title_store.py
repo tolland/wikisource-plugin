@@ -2,6 +2,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 
+from sqlalchemy import func
 from sqlmodel import Session, col, select
 
 from wtbot.model import Page, Title
@@ -84,16 +85,27 @@ def ensure_title(
 ) -> Title:
     """The Title at (site, title), created with this guess if missing.
 
+    MediaWiki treats `_` and a space as the same character in a title, so
+    "Book:A_b" and "Book:A b" are one address: an existing spelling is found
+    whichever the caller used, and a new title is stored in the wiki's own form
+    (spaces). Two rows for one address would show up twice in the VFS tree.
+
     An existing Title keeps its guess: the first caller to name an address
     decides what it is expected to be, and only a fetch overrides that.
     """
+    canonical = canonical_spelling(title)
     existing = session.exec(
-        select(Title).where(Title.site_pk == site_pk, Title.title == title)
+        select(Title)
+        .where(
+            Title.site_pk == site_pk,
+            func.replace(Title.title, "_", " ") == canonical,
+        )
+        .order_by(col(Title.pk))
     ).first()
     if existing is not None:
         return existing
     row = Title(
-        site_pk=site_pk, title=title, expected_content_model=expected_content_model
+        site_pk=site_pk, title=canonical, expected_content_model=expected_content_model
     )
     session.add(row)
     session.flush()
@@ -117,10 +129,19 @@ def record_fetched_content_model(session: Session, row: Title, fetched: str) -> 
     session.add(row)
 
 
+def canonical_spelling(title: str) -> str:
+    """A title as the wiki spells it: spaces, never underscores."""
+    return title.replace("_", " ")
+
+
 def page_at(session: Session, *, site_pk: int, title: str) -> Page | None:
-    """The page the wiki holds at (site, title), if we have fetched it."""
+    """The page the wiki holds at (site, title), if we have fetched it.
+    Either spelling of the title finds it (see [ensure_title])."""
     return session.exec(
         select(Page)
         .join(Title, col(Title.pk) == col(Page.pk))
-        .where(Title.site_pk == site_pk, Title.title == title)
+        .where(
+            Title.site_pk == site_pk,
+            func.replace(Title.title, "_", " ") == canonical_spelling(title),
+        )
     ).first()

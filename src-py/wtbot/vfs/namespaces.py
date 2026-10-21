@@ -153,8 +153,10 @@ class SiteNamespaces:
     def node_path(
         self, family: str, code: str, title: str, aspect: str | None = None
     ) -> str:
-        """The VFS path of a full wiki title."""
-        ns, rest = self.split(title)
+        """The VFS path of a full wiki title, in the wiki's spelling (spaces):
+        `_` and a space are one character to MediaWiki, and the path of a page
+        must not depend on which a caller used."""
+        ns, rest = self.split(title.replace("_", " "))
         path = f"/{family}/{code}/{encode_segment(ns.name)}"
         for segment in rest.split("/"):
             path = child_path(path, segment)

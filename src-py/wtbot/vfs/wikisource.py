@@ -38,6 +38,8 @@ from wtbot.vfs.store import (
     PROOFREAD_INDEX_CONTENT_MODEL,
     Entry,
     PageStore,
+    canonical_title,
+    distinct_addresses,
     proofread_page_scaffold,
 )
 
@@ -217,8 +219,8 @@ class WikisourceVfs:
             if ns is not None and path.title_rest:
                 wanted[i] = ns.title(path.title_rest)
 
-        pages = self.store.entries_by_titles(site, list(wanted.values()))
-        by_title = {p.name: p for p in pages}
+        by_title = self.store.entries_by_titles(site, list(wanted.values()))
+        pages = list(by_title.values())
         page_pks = [p.pk for p in pages]
         uncommitted = self.store.latest_uncommitted_bodies(page_pks)
         metas = self.store.proofread_page_metas_by_pks(page_pks)
@@ -228,7 +230,7 @@ class WikisourceVfs:
         # revid), and those are answered independently.
         pushed = self.store.latest_successful_commits(page_pks)
         for i, raw in entries:
-            page = by_title.get(wanted.get(i, ""))
+            page = by_title.get(canonical_title(wanted.get(i, "")))
             if page is None:
                 results[i] = self.stat(raw)
                 continue
@@ -369,17 +371,14 @@ class WikisourceVfs:
             has_deeper[child] = has_deeper.get(child, False) or bool(sep)
 
         children = sorted(has_deeper, key=_natural)
-        entries = {
-            e.name: e
-            for e in self.store.entries_by_titles(site, [ns.title(c) for c in children])
-        }
+        entries = self.store.entries_by_titles(site, [ns.title(c) for c in children])
         metas = self.store.proofread_page_metas_by_pks([e.pk for e in entries.values()])
         return [
             self._title_child(
                 site,
                 namespaces,
                 ns.title(child),
-                entries.get(ns.title(child)),
+                entries.get(canonical_title(ns.title(child))),
                 has_deeper[child],
                 metas,
             )
@@ -412,7 +411,10 @@ class WikisourceVfs:
     def _pages_children(self, node: PagesDir) -> ListChildrenResponse:
         site, index = node.site, node.index
         namespaces = node.node.namespaces
-        pages = self.store.proofread_pages(site, index.name)
+        # A page the cache holds under two spellings is still one page.
+        pages = list(
+            distinct_addresses(self.store.proofread_pages(site, index.name)).values()
+        )
         metas = self.store.proofread_page_metas_by_pks([p.pk for p in pages])
 
         def page_number(p: Entry) -> int:

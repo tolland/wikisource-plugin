@@ -878,3 +878,75 @@ def test_stat_bulk_agrees_for_generic_titles(book_client):
     ]
     for path, result in zip(paths, results):
         assert result == book_client.get("/vfs/stat", params={"path": path}).json()
+
+
+# ---------------------------------------------------------------------------
+# one address, two spellings
+# ---------------------------------------------------------------------------
+
+
+def test_titles_cached_in_both_spellings_show_once(engine):
+    """MediaWiki treats `_` and a space as one character. Rows spelled both
+    ways (the underscore one from before titles were stored in the wiki's
+    form) are one node, backed by the row the wiki holds."""
+    with Session(engine) as s:
+        site = Site(family=FAMILY, code=CODE)
+        s.add(site)
+        s.commit()
+        s.refresh(site)
+        s.add(
+            Namespace(
+                site_pk=site.pk,
+                key=3000,
+                canonical_name="Book",
+                local_name="Book",
+                subpages=True,
+            )
+        )
+        # the stub row is older than the one the wiki holds
+        stub = Title(
+            site_pk=site.pk,
+            title="Book:12_More_Rules",
+            expected_content_model="wikitext",
+        )
+        s.add(stub)
+        s.commit()
+        s.add(make_page(site_pk=site.pk, title="Book:12 More Rules", text="held"))
+        s.add(make_page(site_pk=site.pk, title="Book:12_More_Rules/Rule_1", text="sub"))
+        s.commit()
+
+        vfs = WikisourceVfs(s)
+        (node,) = vfs.list_children(f"/{FAMILY}/{CODE}/Book").children
+        assert node.path == f"/{FAMILY}/{CODE}/Book/12 More Rules"
+        assert node.has_children is True
+        assert node.stable_id is not None  # the held row, not the stub
+
+        # either spelling of the title reaches it, and its subpage nests
+        for spelled in ("12 More Rules", "12_More_Rules"):
+            assert vfs.stat(f"/{FAMILY}/{CODE}/Book/{spelled}").exists
+            wikitext = vfs.read(f"/{FAMILY}/{CODE}/Book/{spelled}/@wikitext")
+            assert base64.b64decode(wikitext.content_base64) == b"held"
+        children = vfs.list_children(f"/{FAMILY}/{CODE}/Book/12_More_Rules").children
+        assert [c.name for c in children][-1] == "Rule 1"
+
+
+def test_ensure_title_stores_the_wiki_spelling_and_finds_either(session):
+    from wtbot.title_store import ensure_title, page_at
+
+    site = Site(family=FAMILY, code=CODE)
+    session.add(site)
+    session.commit()
+    session.refresh(site)
+
+    first = ensure_title(
+        session, site_pk=site.pk, title="Book:A_b", expected_content_model="wikitext"
+    )
+    assert first.title == "Book:A b"
+    again = ensure_title(
+        session, site_pk=site.pk, title="Book:A b", expected_content_model="wikitext"
+    )
+    assert again.pk == first.pk
+
+    session.add(make_page(site_pk=site.pk, title="Book:C d"))
+    session.commit()
+    assert page_at(session, site_pk=site.pk, title="Book:C_d") is not None
