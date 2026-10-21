@@ -59,6 +59,8 @@ class HttpVfsBackend(
                 dirty = boolOrDefault("dirty", false),
                 hasReferenceImage = boolOrDefault("has_reference_image", false),
                 placeholder = boolOrDefault("placeholder", false),
+                hasChildren = boolOrDefault("has_children", false),
+                aspects = stringArray("aspects"),
             )
         }
     }
@@ -83,6 +85,8 @@ class HttpVfsBackend(
                 dirty = r.boolOrDefault("dirty", false),
                 hasReferenceImage = r.boolOrDefault("has_reference_image", false),
                 placeholder = r.boolOrDefault("placeholder", false),
+                hasChildren = r.boolOrDefault("has_children", false),
+                aspects = r.stringArray("aspects"),
             )
         }
     }
@@ -107,6 +111,8 @@ class HttpVfsBackend(
                         dirty = child.boolOrDefault("dirty", false),
                         hasReferenceImage = child.boolOrDefault("has_reference_image", false),
                         placeholder = child.boolOrDefault("placeholder", false),
+                        hasChildren = child.boolOrDefault("has_children", false),
+                        aspects = child.stringArray("aspects"),
                     )
                 },
             )

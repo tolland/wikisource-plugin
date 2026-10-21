@@ -47,7 +47,7 @@ cache-only. Operations:
 
 | Op       | Meaning                                                       |
 |----------|--------------------------------------------------------------|
-| `list`   | children of a node (Index → its Pages; site → its Indexes)   |
+| `list`   | children of a node (namespace → titles; title → subpages + aspects; `@pages` → Pages) — see `docs/reference/vfs-paths.md` |
 | `read`   | body + metadata of one page (the wikitext shown in the editor)|
 | `write`  | save editor buffer → appends to the **journal**, marks dirty |
 | `stat`   | timestamp / size / dirty flag (drives `VirtualFile` polling) |

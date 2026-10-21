@@ -18,15 +18,16 @@ private val LOG = Logger.getInstance(WtVirtualFileSystem::class.java)
 /**
  * `wikisource://` [VirtualFileSystem] backed by the wtbot FastAPI sidecar.
  *
- * Path scheme mirrors the VFS API:
+ * Path scheme mirrors the VFS API (see [WtPaths]):
  *   /                                         root (all sites)
- *   /{family}/{code}/                         site root
- *   /{family}/{code}/{Index title}/           index directory
- *   /{family}/{code}/{Index title}/Pages/     pages container
- *   /{family}/{code}/{Page title}             page file: its own title under the
- *                                             site, listed by (not nested in) Pages/
- *   /{family}/{code}/{Index title}/wikitext   the index page's own content
- *   /{family}/{code}/{Index title}/{subpage}  index-namespace subpage (styles.css, ...)
+ *   /{family}/{code}                          site: the namespaces holding titles
+ *   /{family}/{code}/{namespace}              namespace container (`(Main)` for main)
+ *   /{family}/{code}/{ns}/{title...}          a title: a directory holding its
+ *                                             subpages and its aspect files
+ *   .../{title}/@wikitext                     the title's content (the file you edit)
+ *   .../{title}/@props                        its properties (read-only JSON)
+ *   .../{Index title}/@pages                  the Page: titles an Index paginates
+ *   /{family}/{code}/Page/{Book.djvu}/{n}     a Page: -- listed by @pages, not nested in it
  *
  * [WtVirtualFile] instances are cached by path so callers always get the
  * same instance for the same path (IntelliJ VFS contract).
@@ -57,16 +58,22 @@ class WtVirtualFileSystem : VirtualFileSystem() {
         placeholder: Boolean = false,
         length: Long? = null,
         timestamp: String? = null,
+        hasChildren: Boolean = false,
+        aspects: List<String> = emptyList(),
     ): WtVirtualFile = cache.getOrPut(path) {
         WtVirtualFile(
             this, name, path, isDir, parent, stableId, revid, contentModel,
             qualityLevel, dirty, hasReferenceImage, placeholder, length, timestamp,
+            hasChildren, aspects,
         )
     }.also {
         if (parent != null) it.setParent(parent)
         // Instances are cached by path; every sighting carries the freshest
         // decoration metadata, so re-apply it to the cached instance too.
-        it.updateMeta(qualityLevel, dirty, hasReferenceImage, placeholder, length, timestamp)
+        it.updateMeta(
+            qualityLevel, dirty, hasReferenceImage, placeholder, length, timestamp,
+            hasChildren, aspects,
+        )
     }
 
     /** Stat the backend and return a [WtVirtualFile] if the path exists. */
@@ -89,6 +96,8 @@ class WtVirtualFileSystem : VirtualFileSystem() {
                 placeholder = stat.placeholder,
                 length = stat.length,
                 timestamp = stat.timestamp,
+                hasChildren = stat.hasChildren,
+                aspects = stat.aspects,
             )
         } catch (_: VfsBackendException) {
             null

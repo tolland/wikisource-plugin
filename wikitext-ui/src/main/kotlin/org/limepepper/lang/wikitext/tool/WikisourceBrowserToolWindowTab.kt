@@ -3,6 +3,7 @@ package org.limepepper.lang.wikitext.tool
 import com.intellij.icons.AllIcons
 import com.intellij.ide.util.treeView.NodeDescriptor
 import com.intellij.ide.util.treeView.TreeState
+import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
@@ -25,6 +26,7 @@ import com.intellij.ui.tree.StructureTreeModel
 import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.ui.tree.TreeUtil
 import org.limepepper.lang.wikitext.WtFileType
+import org.limepepper.lang.wikitext.vfs.WtPaths
 import org.limepepper.lang.wikitext.vfs.WtVirtualFile
 import org.limepepper.lang.wikitext.vfs.WtVirtualFileSystem
 import org.limepepper.lang.wikitext.vfs.backend.NodeKind
@@ -71,7 +73,9 @@ internal class WikisourceBrowserToolWindowTab(
             ) {
                 when (val element = elementOf(value)) {
                     is WtVirtualFile -> {
-                        icon = if (element.isDirectory) AllIcons.Nodes.Folder else WtFileType.icon
+                        // A title (offers aspects) reads as a document that may
+                        // also have subpages; a namespace or `@pages` is a folder.
+                        icon = if (element.isDirectory && element.aspects.isEmpty()) AllIcons.Nodes.Folder else WtFileType.icon
                         // Dirty (uncommitted EditJournal edits) renders like a
                         // modified file in VCS: blue name plus a star. A
                         // placeholder (page not created on the wiki yet) is
@@ -81,7 +85,7 @@ internal class WikisourceBrowserToolWindowTab(
                             element.placeholder -> SimpleTextAttributes.GRAYED_ITALIC_ATTRIBUTES
                             else -> SimpleTextAttributes.REGULAR_ATTRIBUTES
                         }
-                        append(displayLabel(element.name), nameAttributes)
+                        append(treeLabel(element), nameAttributes)
                         if (element.dirty) append(" *", DIRTY_ATTRIBUTES)
                         // ProofreadPage quality bullet in the pagelist colours.
                         element.qualityLevel?.let { level ->
@@ -102,15 +106,18 @@ internal class WikisourceBrowserToolWindowTab(
             }
         }
 
+        // Double-click opens a title's default aspect; the tree's own
+        // double-click-to-toggle would expand it at the same time. Branches
+        // are still expanded by their handle or the arrow keys, and a
+        // container with nothing to open (a namespace) is toggled below.
+        tree.toggleClickCount = 0
         tree.addMouseListener(object : MouseAdapter() {
-            // Retain openFile(..., true) to focus the registered custom file editor.
-            // requestOpenFile offers no focus flag; revisit on the next IDE upgrade.
-            @Suppress("DEPRECATION")
             override fun mouseClicked(e: MouseEvent) {
                 if (e.clickCount != 2) return
-                val vFile = elementOf(tree.lastSelectedPathComponent) as? WtVirtualFile ?: return
-                if (!vFile.isDirectory) {
-                    FileEditorManager.getInstance(project).openFile(vFile, true)
+                val path = tree.getPathForLocation(e.x, e.y) ?: return
+                val vFile = elementOf(path.lastPathComponent) as? WtVirtualFile ?: return
+                if (!openDefaultAspect(vFile, fs)) {
+                    if (tree.isExpanded(path)) tree.collapsePath(path) else tree.expandPath(path)
                 }
             }
         })
@@ -147,7 +154,7 @@ internal class WikisourceBrowserToolWindowTab(
             },
         )
 
-        installContextMenu(tree, structureModel, propertiesArea)
+        installContextMenu(tree, structureModel, propertiesArea, fs)
 
         val refreshButton = JButton("Refresh").apply {
             addActionListener {
@@ -173,18 +180,34 @@ internal class WikisourceBrowserToolWindowTab(
         tree: Tree,
         structureModel: StructureTreeModel<WikisourceTreeStructure>,
         propertiesArea: JBTextArea,
+        fs: WtVirtualFileSystem?,
     ) {
         fun selectedFile(): WtVirtualFile? =
             elementOf(tree.lastSelectedPathComponent) as? WtVirtualFile
 
         val group = DefaultActionGroup().apply {
             add(object : AnAction("Open") {
-                // Retain openFile(..., true) to focus the registered custom file editor.
-                // requestOpenFile offers no focus flag; revisit on the next IDE upgrade.
-                @Suppress("DEPRECATION")
+                override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
+
+                override fun update(e: AnActionEvent) {
+                    val vFile = selectedFile()
+                    e.presentation.isEnabledAndVisible = vFile != null && defaultAspect(vFile) != null
+                }
+
+                override fun actionPerformed(e: AnActionEvent) {
+                    selectedFile()?.let { openDefaultAspect(it, fs) }
+                }
+            })
+            add(object : AnAction("Show Properties") {
+                override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
+
+                override fun update(e: AnActionEvent) {
+                    e.presentation.isEnabledAndVisible = selectedFile()?.aspects?.contains(WtPaths.PROPS) == true
+                }
+
                 override fun actionPerformed(e: AnActionEvent) {
                     val vFile = selectedFile() ?: return
-                    if (!vFile.isDirectory) FileEditorManager.getInstance(project).openFile(vFile, true)
+                    openAspect(vFile, WtPaths.PROPS, fs)
                 }
             })
             add(object : AnAction("Copy Path") {
@@ -222,6 +245,8 @@ internal class WikisourceBrowserToolWindowTab(
             appendLine("name:      ${vFile.name}")
             appendLine("path:      ${vFile.path}")
             appendLine("kind:      ${if (vFile.isDirectory) NodeKind.directory else NodeKind.file}")
+            appendLine("aspects:   ${vFile.aspects.joinToString().ifEmpty { "—" }}")
+            appendLine("children:  ${vFile.hasChildren}")
             appendLine("stableId:  ${vFile.stableId}")
             appendLine("revid:     ${vFile.revid}")
             appendLine("length:    ${vFile.cachedContent?.size ?: "not loaded"}")
@@ -254,19 +279,55 @@ internal class WikisourceBrowserToolWindowTab(
         }
     }
 
+    /**
+     * The aspect a double-click opens: the first one that is a file. `pages`
+     * is a container (the tree expands it), not something to open. A file
+     * is its own default.
+     */
+    private fun defaultAspect(vFile: WtVirtualFile): String? = when {
+        !vFile.isDirectory -> WtPaths.aspectOf(vFile.path)
+        else -> vFile.aspects.firstOrNull { it != WtPaths.PAGES }
+    }
+
+    /** Opens the default aspect of [vFile]; false when it has none (a container). */
+    private fun openDefaultAspect(vFile: WtVirtualFile, fs: WtVirtualFileSystem?): Boolean {
+        if (!vFile.isDirectory) {
+            openFile(vFile)
+            return true
+        }
+        val aspect = defaultAspect(vFile) ?: return false
+        openAspect(vFile, aspect, fs)
+        return true
+    }
+
+    /**
+     * Opens [aspect] of the title node [node]. The aspect file is looked up
+     * (stat) on a pooled thread rather than minted from the node's own
+     * metadata: its revid is the conflict token for saves and can be ahead
+     * of the node's snapshot revid.
+     */
+    private fun openAspect(node: WtVirtualFile, aspect: String, fs: WtVirtualFileSystem?) {
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val file = fs?.findFileByPath(WtPaths.aspectPath(node.path, aspect)) as? WtVirtualFile
+            if (file != null) {
+                ApplicationManager.getApplication().invokeLater { openFile(file) }
+            }
+        }
+    }
+
+    // Retain openFile(..., true) to focus the registered custom file editor.
+    // requestOpenFile offers no focus flag; revisit on the next IDE upgrade.
+    @Suppress("DEPRECATION")
+    private fun openFile(file: WtVirtualFile) {
+        FileEditorManager.getInstance(project).openFile(file, true)
+    }
+
     private companion object {
         /** Structure element behind a rendered tree node, if any. */
         private fun elementOf(node: Any?): Any? {
             val userObject = TreeUtil.getUserObject(node)
             return (userObject as? NodeDescriptor<*>)?.element ?: userObject
         }
-
-        /**
-         * Tree-display-only shorthand. `getName()`/`getPath()` on the underlying
-         * [WtVirtualFile] are untouched - this never leaves the tool window.
-         */
-        private fun displayLabel(name: String): String =
-            if (name.startsWith("Page:") && '/' in name) "Page/${name.substringAfterLast('/')}" else name
 
         /** VCS-modified-style blue for files with uncommitted local edits. */
         private val DIRTY_ATTRIBUTES =
