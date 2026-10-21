@@ -236,7 +236,8 @@ def resolve(store: PageStore, raw_path: str) -> WsNode:
     if ns is None:
         return Missing(path)
 
-    rest = path.title_rest
+    # Either spelling of a title names it; the node carries the wiki's.
+    rest = path.title_rest.replace("_", " ")
     if not rest:
         # `/f/c/ns/@aspect` has no title for the aspect to belong to.
         if len(parts) == 3:
