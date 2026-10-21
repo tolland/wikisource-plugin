@@ -170,25 +170,30 @@ class PdfOutline:
 
     def pagelist(self, entry: PdfOutlineEntry) -> str:
         """Render a section, preserving label transitions and numbering resets."""
-        attributes = [f'from="{entry.pdf_page}"', f'to="{entry.final_index + 1}"']
-        start = entry.page_index
-        while start <= entry.final_index:
-            label = self._labels[start]
-            end = start
-            while end < entry.final_index and self._labels[end + 1].follows(
-                self._labels[end]
-            ):
-                end += 1
-            scan = start + 1
-            scan_range = f"{scan}to{end + 1}"
-            if label.number is not None:
-                attributes.append(f'{scan}="{label.number}"')
-                if label.style != "normal":
-                    attributes.append(f'{scan_range}="{label.style}"')
-            elif label.text is not None:
-                # A range also keeps literal labels distinct from numeric resets.
-                attributes.append(f'{scan_range}="{escape(label.text, quote=True)}"')
-            else:
-                attributes.append(f'{scan}="{scan}"')
-            start = end + 1
-        return "<pagelist " + " ".join(attributes) + " />"
+        return render_pagelist(self._labels, entry.pdf_page, entry.final_index + 1)
+
+
+def render_pagelist(labels: list[PageLabel], first: int, last: int) -> str:
+    """Render an inclusive one-based scan range using its effective labels."""
+    if not 1 <= first <= last <= len(labels):
+        raise ValueError("Pagelist range is outside the source scans")
+    attributes = [f'from="{first}"', f'to="{last}"']
+    start = first - 1
+    while start <= last - 1:
+        label = labels[start]
+        end = start
+        while end < last - 1 and labels[end + 1].follows(labels[end]):
+            end += 1
+        scan = start + 1
+        scan_range = f"{scan}to{end + 1}"
+        if label.number is not None:
+            attributes.append(f'{scan}="{label.number}"')
+            if label.style != "normal":
+                attributes.append(f'{scan_range}="{label.style}"')
+        elif label.text is not None:
+            # A range also keeps literal labels distinct from numeric resets.
+            attributes.append(f'{scan_range}="{escape(label.text, quote=True)}"')
+        else:
+            attributes.append(f'{scan}="{scan}"')
+        start = end + 1
+    return "<pagelist " + " ".join(attributes) + " />"

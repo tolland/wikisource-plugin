@@ -1,9 +1,9 @@
 # Work outlines, transclusion proposals, and page navigation
 
 Status: PDF extraction, nested YAML proposals, validation, rendering, and local
-journal application are implemented. See
+journal application and pagelist rendering from edited YAML are implemented. See
 [the CLI guide](../reference/transclusion-generation.md) for current behaviour.
-Index attribute generation, persistent navigation APIs, plugin presentation,
+Automatic Index attribute updates, persistent navigation APIs, plugin presentation,
 and EPUB support below remain proposed.
 
 ## Purpose
@@ -106,6 +106,15 @@ printed page labels. `scans` describes a node's own transcluded content;
 it does not include its descendants' content. A structural container can
 have `scans: null` and children. Its navigation extent is derived separately
 from its own selection and descendants.
+
+Scan selections also carry editable `numbering` (`normal`, `roman`,
+`highroman`, or `unknown`) and `start` fields. Proposal generation infers them
+from the first scan's PDF label, independently of bookmark availability;
+unknown numbering uses `start: null`. An explicit start overrides imported
+labels across the range, using normal numbering if its style is omitted.
+Ranges may independently restart at 1. Missing fields in older proposals
+retain imported-label fallback. Do not model internal numbering transitions:
+edit the output manually or split into separate page entries for those cases.
 
 Changing `Part_1` to `Book_1` changes all resolved descendant wiki titles.
 The actual heading remains in `title`, for headers and navigation labels.

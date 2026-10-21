@@ -15,7 +15,9 @@ from wtbot.wiki.client import WikiClient
 from wtbot.wiki.namespaces import sync_namespaces
 
 
-def _claim_batch(session: Session, limit: int = 50) -> list[ClaimedFetchRequest]:
+def _claim_batch(
+    session: Session, limit: int = 50, *, request_pks: set[int] | None = None
+) -> list[ClaimedFetchRequest]:
     """Claim up to 50 current-page reads for the next site's priority tier.
 
     The conditional UPDATE prevents two drainers claiming the same row.
@@ -23,11 +25,12 @@ def _claim_batch(session: Session, limit: int = 50) -> list[ClaimedFetchRequest]
     """
     if limit <= 0:
         return []
+    scope = () if request_pks is None else (FetchRequest.pk.in_(request_pks),)
     order = (FetchRequest.priority.desc(), FetchRequest.requested_at, FetchRequest.pk)
     with read_snapshot(session):
         first = session.exec(
             select(FetchRequest)
-            .where(FetchRequest.status == FetchStatus.pending)
+            .where(FetchRequest.status == FetchStatus.pending, *scope)
             .order_by(*order)
             .limit(1)
         ).first()
@@ -40,6 +43,7 @@ def _claim_batch(session: Session, limit: int = 50) -> list[ClaimedFetchRequest]
                     FetchRequest.status == FetchStatus.pending,
                     FetchRequest.site_pk == first.site_pk,
                     FetchRequest.priority == first.priority,
+                    *scope,
                 )
                 .order_by(*order)
                 .limit(min(limit, 50))

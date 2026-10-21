@@ -27,6 +27,8 @@ class DocumentModel(BaseModel):
 class ScanRange(DocumentModel):
     first: int = Field(alias="from", ge=1)
     last: int = Field(alias="to", ge=1)
+    numbering: Literal["normal", "roman", "highroman", "unknown"] | None = None
+    start: int | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
     def ordered(self) -> ScanRange:
@@ -188,6 +190,18 @@ def propose(
     metadata: WorkMetadata,
 ) -> TransclusionProposal:
     unresolved: list[str] = []
+    source_labels = {
+        label.scan: PageLabel.parse(label.label) for label in source.labels
+    }
+
+    def numbered_range(first: int, last: int) -> ScanRange:
+        label = source_labels.get(first, PageLabel.parse(None))
+        return ScanRange(
+            first=first,
+            last=last,
+            numbering=label.style if label.number is not None else "unknown",
+            start=label.number,
+        )
 
     def build(nodes: list[SourceNode], end: int) -> list[ProposedPage]:
         result = []
@@ -221,11 +235,7 @@ def propose(
                 path = f"{kind} {counter}"
             children = build(node.pages, final) if node.level < generation.depth else []
             own_end = node.pages[0].scan - 1 if children else final
-            scans = (
-                ScanRange(first=node.scan, last=own_end)
-                if own_end >= node.scan
-                else None
-            )
+            scans = numbered_range(node.scan, own_end) if own_end >= node.scan else None
             result.append(
                 ProposedPage(
                     path=path.replace(" ", "_"),
@@ -243,7 +253,7 @@ def propose(
             ProposedPage(
                 path="Text",
                 title="Text",
-                scans=ScanRange(first=1, last=source.scan_count),
+                scans=numbered_range(1, source.scan_count),
             )
         ]
     elif source.pages[0].scan > 1:
@@ -252,7 +262,7 @@ def propose(
             ProposedPage(
                 path="Frontmatter",
                 title="Pages before first bookmark",
-                scans=ScanRange(first=1, last=source.pages[0].scan - 1),
+                scans=numbered_range(1, source.pages[0].scan - 1),
             ),
         )
     return TransclusionProposal(

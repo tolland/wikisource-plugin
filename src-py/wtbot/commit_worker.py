@@ -78,6 +78,7 @@ def run_pending_commits(
     *,
     limit: int = 100,
     exclude: set[int] | None = None,
+    refetch_pks: set[int] | None = None,
 ) -> tuple[int, set[int]]:
     """Push up to `limit` pages' worth of pending local edits.
 
@@ -92,7 +93,11 @@ def run_pending_commits(
     with _worker_lock:
         try:
             return _run_pending_commits_unlocked(
-                session, client_factory, limit=limit, exclude=exclude
+                session,
+                client_factory,
+                limit=limit,
+                exclude=exclude,
+                refetch_pks=refetch_pks,
             )
         finally:
             # This worker deliberately opens and closes several short
@@ -109,6 +114,7 @@ def run_pending_commit_for_page(
     *,
     force: bool = False,
     comment: str | None = None,
+    refetch_pks: set[int] | None = None,
 ) -> bool:
     """Push one page's pending local edits.
 
@@ -119,7 +125,12 @@ def run_pending_commit_for_page(
     with _worker_lock:
         try:
             return _push_page(
-                session, page_pk, client_factory, force=force, comment=comment
+                session,
+                page_pk,
+                client_factory,
+                force=force,
+                comment=comment,
+                refetch_pks=refetch_pks,
             )
         finally:
             session.rollback()
@@ -131,6 +142,7 @@ def _run_pending_commits_unlocked(
     *,
     limit: int,
     exclude: set[int] | None,
+    refetch_pks: set[int] | None,
 ) -> tuple[int, set[int]]:
     attempted: set[int] = set(exclude or ())
     failed: set[int] = set()
@@ -140,7 +152,7 @@ def _run_pending_commits_unlocked(
         if page_pk is None:
             break
         attempted.add(page_pk)
-        ok = _push_page(session, page_pk, client_factory)
+        ok = _push_page(session, page_pk, client_factory, refetch_pks=refetch_pks)
         if not ok:
             failed.add(page_pk)
         handled += 1
@@ -168,6 +180,7 @@ def _push_page(
     *,
     force: bool = False,
     comment: str | None = None,
+    refetch_pks: set[int] | None = None,
 ) -> bool:
     """Return True if the page was successfully pushed, False on conflict/error."""
     pending = _load_pending_page_commit(session, page_pk)
@@ -192,7 +205,7 @@ def _push_page(
         )
 
     outcome = _save_pending_page(pending, client_factory, force=force)
-    _record_commit_outcome(session, pending, outcome)
+    _record_commit_outcome(session, pending, outcome, refetch_pks=refetch_pks)
     return outcome.status == CommitStatus.success
 
 
@@ -306,7 +319,11 @@ def _save_pending_page(
 
 
 def _record_commit_outcome(
-    session: Session, pending: _PendingPageCommit, outcome: _CommitOutcome
+    session: Session,
+    pending: _PendingPageCommit,
+    outcome: _CommitOutcome,
+    *,
+    refetch_pks: set[int] | None = None,
 ) -> None:
     commit = Commit(
         title_pk=pending.page_pk,
@@ -327,15 +344,17 @@ def _record_commit_outcome(
                 # creation it is what writes the Page row at all.
                 title.dirty = _has_uncaptured_pending_edits(session, pending)
                 session.add(title)
-                session.add(
-                    FetchRequest(
-                        site_pk=title.site_pk,
-                        title=title.title,
-                        kind=FetchKind.single,
-                        depth=0,
-                        priority=10,  # snapshot refresh jumps bulk fan-outs
-                    )
+                refetch = FetchRequest(
+                    site_pk=title.site_pk,
+                    title=title.title,
+                    kind=FetchKind.single,
+                    depth=0,
+                    priority=10,  # snapshot refresh jumps bulk fan-outs
                 )
+                session.add(refetch)
+                session.flush()
+                if refetch_pks is not None:
+                    refetch_pks.add(refetch.pk)
 
             rows = session.exec(
                 select(EditJournal).where(EditJournal.pk.in_(pending.journal_pks))

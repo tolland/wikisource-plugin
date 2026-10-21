@@ -81,11 +81,15 @@ def run_pending(
     client_factory: ClientFactory,
     *,
     limit: int = 100,
+    request_pks: set[int] | None = None,
     blob_root: Path | None = None,
     on_failure: FailureObserver | None = None,
     image_cache: dict[int, dict[str, RemotePageImages | None]] | None = None,
 ) -> int:
     """Process up to ``limit`` pending requests. Returns how many were handled.
+
+    ``request_pks`` restricts processing to an explicit set of queued requests,
+    used for automatic read-back after commits without draining unrelated work.
 
     ``image_cache`` is shared enrichment fetched in bulk (see
     ``page_processors``): an Index fan-out fills it for its children, and each
@@ -105,7 +109,9 @@ def run_pending(
             on_failure(failure)
 
     while handled < limit:
-        requests = _claim_batch(session, min(50, limit - handled))
+        requests = _claim_batch(
+            session, min(50, limit - handled), request_pks=request_pks
+        )
         if not requests:
             break
         with fetch_stage("load_site"):

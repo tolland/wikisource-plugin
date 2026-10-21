@@ -102,6 +102,14 @@ itself. `page_meta` is currently only exercised by tests and tooling, which is
 why nobody has felt this yet.
 
 `/commits` uses `{page_pk}` and `{commit_pk}` in **the same path position**:
+Successful pushes through `POST /commits/` or `POST /commits/{page_pk}` queue
+and automatically process a read-back of the committed pages in a background
+task after sending the response. This updates SQLite without a CLI refresh or
+drain, and leaves unrelated fetch requests alone. Fetch failures are recorded
+on the fetch queue without changing the successful commit; rate limits stop
+the read-back and leave unprocessed requests pending. Tasks run in the API
+process, so pending requests interrupted by a restart still need a later drain.
+
 `POST /commits/{page_pk}` runs a page's pending commit,
 `GET /commits/{commit_pk}` fetches a commit row. Two id spaces, one URL shape,
 no way to tell from the URL which one you hold.

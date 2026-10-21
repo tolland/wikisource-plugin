@@ -5,12 +5,21 @@ from __future__ import annotations
 
 import base64
 
-from conftest import FAKE_TIMESTAMP, add_proofread_meta, drain, fake_pageid, make_page
+import pytest
+from conftest import FAKE_TIMESTAMP, add_proofread_meta, fake_pageid, make_page
 from fastapi.testclient import TestClient
 from sqlmodel import Session, select
 
 from wtbot.main import create_app
-from wtbot.model import Commit, CommitStatus, EditJournal, Page, Site
+from wtbot.model import (
+    Commit,
+    CommitStatus,
+    EditJournal,
+    FetchRequest,
+    FetchStatus,
+    Page,
+    Site,
+)
 from wtbot.wiki.client import FakeWikiClient
 from wtbot.wiki.wiki_types import RemotePage
 
@@ -55,7 +64,9 @@ def _setup(engine):
         return site, page
 
 
-def test_commit_endpoint_pushes_pending_edits(engine):
+@pytest.mark.parametrize("single", [False, True])
+def test_commit_endpoint_pushes_pending_edits(engine, single, caplog):
+    caplog.set_level("INFO", logger="wtbot.api.commit")
     site, page = _setup(engine)
     fake = FakeWikiClient(
         pages={
@@ -71,6 +82,11 @@ def test_commit_endpoint_pushes_pending_edits(engine):
             )
         }
     )
+    with Session(engine) as session:
+        unrelated = FetchRequest(site_pk=page.site_pk, title="Unrelated", priority=100)
+        session.add(unrelated)
+        session.commit()
+        unrelated_pk = unrelated.pk
     app = create_app(engine=engine, client_factory=lambda site: fake)
     with TestClient(app) as c:
         write = c.post(
@@ -80,27 +96,28 @@ def test_commit_endpoint_pushes_pending_edits(engine):
         assert write.status_code == 200
         assert write.json()["status"] == "ok"
 
-        resp = c.post("/commits/")
+        resp = c.post(f"/commits/{page.pk}" if single else "/commits/")
         assert resp.status_code == 200
-        assert resp.json()["handled"] == 1
+        assert (
+            resp.json()["status"] == "success"
+            if single
+            else resp.json()["handled"] == 1
+        )
 
-        # The push enqueues a refetch rather than performing it: the Page row
-        # is only ever written from fetched remote state, and fetching is a
-        # throttled operation that committing does not wait on. Reads bridge
-        # on the pushed body meanwhile, so this window serves the new content
-        # from the Commit, never the stale (or empty) snapshot.
-        bridged = c.get("/vfs/content", params={"path": PATH}).json()
-        assert base64.b64decode(bridged["content_base64"]).decode() == "edited"
+        # TestClient waits for background tasks: no manual refresh/drain is needed.
+        with Session(engine) as session:
+            assert session.get(Page, page.pk).text == "edited"
+            assert session.get(FetchRequest, unrelated_pk).status == FetchStatus.pending
 
-        with Session(engine) as s:
-            assert s.get(Page, page.pk).text == "original"  # snapshot untouched
-
-        drain(c)
-
-        # Once the refetch lands, the snapshot itself is current.
         read = c.get("/vfs/content", params={"path": PATH}).json()
         assert base64.b64decode(read["content_base64"]).decode() == "edited"
         assert read["revid"] == 101
+
+    assert "commit refetch started: 1 queued request(s)" in caplog.text
+    assert (
+        "commit refetch finished: handled=1 complete=1 errors=0 remaining=0"
+        in caplog.text
+    )
 
     assert fake._pages[TITLE].text == "edited"
 
@@ -287,3 +304,51 @@ def test_bulk_and_single_stat_agree_during_the_push_window(engine):
     assert single == bulk
     assert single["revid"] == 101  # the revision we pushed, not the snapshot's
     assert single["placeholder"] is False
+
+
+def test_failed_automatic_refetch_preserves_successful_commit(engine, monkeypatch):
+    _, page = _setup(engine)
+    fake = FakeWikiClient(
+        pages={
+            TITLE: RemotePage(
+                title=TITLE,
+                namespace_key=0,
+                namespace_canonical="Page",
+                content_model="proofread-page",
+                text="original",
+                revid=100,
+                pageid=fake_pageid(TITLE),
+                timestamp=FAKE_TIMESTAMP,
+            )
+        }
+    )
+
+    def fail_read(titles):
+        raise RuntimeError("wiki read unavailable")
+
+    monkeypatch.setattr(fake, "get_pages", fail_read)
+    app = create_app(engine=engine, client_factory=lambda site: fake)
+    with TestClient(app) as client:
+        assert (
+            client.post(
+                "/vfs/content",
+                json={
+                    "path": PATH,
+                    "content_base64": _b64("edited"),
+                    "base_revid": 100,
+                },
+            ).status_code
+            == 200
+        )
+        response = client.post(f"/commits/{page.pk}")
+        assert response.status_code == 200
+        assert response.json()["status"] == "success"
+        read = client.get("/vfs/content", params={"path": PATH}).json()
+        assert base64.b64decode(read["content_base64"]).decode() == "edited"
+
+    with Session(engine) as session:
+        assert session.get(Page, page.pk).text == "original"
+        fetch = session.exec(select(FetchRequest)).one()
+        assert fetch.status == FetchStatus.error
+        assert "wiki read unavailable" in fetch.error_message
+        assert session.exec(select(EditJournal)).one().committed

@@ -1,6 +1,16 @@
+import logging
+from collections import Counter
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Body,
+    Depends,
+    HTTPException,
+    Query,
+    Request,
+)
 from sqlmodel import Session, select
 
 from wtbot.api.debug_logging_route import DebugLoggingRoute
@@ -12,17 +22,57 @@ from wtbot.api.schemas import (
 )
 from wtbot.commit_worker import run_pending_commit_for_page, run_pending_commits
 from wtbot.deps import get_session
-from wtbot.model import Commit, CommitStatus, EditJournal, Page, Title
+from wtbot.fetch.fetch_worker import run_pending
+from wtbot.model import (
+    Commit,
+    CommitStatus,
+    EditJournal,
+    FetchRequest,
+    FetchStatus,
+    Page,
+    Title,
+)
+
+log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/commits", tags=["commits"], route_class=DebugLoggingRoute)
 
-# A successful push enqueues a refetch of its page -- the Page row is only ever
-# written from fetched remote state -- and, like POST /fetch, this endpoint no
-# longer drains that queue itself. Committing is a write to the wiki; waiting
-# for the throttled read-back is a separate concern with a separate call
-# (POST /fetch/drain). Reads bridge on the Commit body until the refetch lands
-# (see PageStore.effective_state), so the gap between the two is already a
-# designed-for state rather than a new one.
+
+def _refetch_committed_pages(request: Request, request_pks: set[int]) -> None:
+    """Read back only this commit run's queued pages, using a fresh session.
+
+    Fetch failures remain visible on the queue; they cannot undo a remote save.
+    The fetch worker stops on rate limits and leaves unprocessed rows pending.
+    """
+    log.info(
+        "commit refetch started: %d queued request(s), ids=%s",
+        len(request_pks),
+        sorted(request_pks),
+    )
+    with Session(request.app.state.engine) as session:
+        handled = run_pending(
+            session,
+            request.app.state.client_factory,
+            request_pks=request_pks,
+            limit=len(request_pks),
+            blob_root=getattr(request.app.state, "blob_root", None),
+        )
+        statuses = Counter(
+            session.exec(
+                select(FetchRequest.status).where(FetchRequest.pk.in_(request_pks))
+            ).all()
+        )
+        remaining = statuses[FetchStatus.pending] + statuses[FetchStatus.in_progress]
+        errors = statuses[FetchStatus.error]
+        report = log.warning if remaining or errors else log.info
+        report(
+            "commit refetch finished: handled=%d complete=%d errors=%d remaining=%d ids=%s",
+            handled,
+            statuses[FetchStatus.done],
+            errors,
+            remaining,
+            sorted(request_pks),
+        )
 
 
 @router.get("/", response_model=list[Commit])
@@ -109,13 +159,18 @@ def list_pending_commits(
 
 @router.post("/", response_model=CommitRunResponse)
 def run_commits(
-    request: Request, session: Session = Depends(get_session)
+    request: Request,
+    background_tasks: BackgroundTasks,
+    session: Session = Depends(get_session),
 ) -> CommitRunResponse:
     factory = request.app.state.client_factory
+    refetch_pks: set[int] = set()
     handled = 0
     exclude: set[int] = set()
     while True:
-        n, failed = run_pending_commits(session, factory, limit=200, exclude=exclude)
+        n, failed = run_pending_commits(
+            session, factory, limit=200, exclude=exclude, refetch_pks=refetch_pks
+        )
         handled += n
         # Accumulate failed pages into exclude so the next batch doesn't retry
         # pages that already failed this sweep -- prevents the queue from cycling
@@ -123,6 +178,8 @@ def run_commits(
         exclude |= failed
         if n == 0:
             break
+    if refetch_pks:
+        background_tasks.add_task(_refetch_committed_pages, request, refetch_pks)
     return CommitRunResponse(handled=handled)
 
 
@@ -130,6 +187,7 @@ def run_commits(
 def run_commit_for_page(
     page_pk: int,
     request: Request,
+    background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
     body: Annotated[CommitPageRequest, Body()] = CommitPageRequest(),
     force: Annotated[
@@ -152,8 +210,14 @@ def run_commit_for_page(
         raise HTTPException(status_code=404, detail="no pending edits for page")
 
     factory = request.app.state.client_factory
+    refetch_pks: set[int] = set()
     run_pending_commit_for_page(
-        session, page_pk, factory, force=force, comment=body.comment
+        session,
+        page_pk,
+        factory,
+        force=force,
+        comment=body.comment,
+        refetch_pks=refetch_pks,
     )
     commit = session.exec(
         select(Commit)
@@ -162,6 +226,8 @@ def run_commit_for_page(
     ).first()
     if commit is None:
         raise HTTPException(status_code=500, detail="commit result was not recorded")
+    if refetch_pks:
+        background_tasks.add_task(_refetch_committed_pages, request, refetch_pks)
     return commit
 
 

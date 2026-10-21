@@ -2,8 +2,9 @@
 
 The CLI supports an editable proposal followed by local page generation.
 It generates Book subpages, leaves the root untouched, and saves through
-EditJournal. It does not publish to the wiki. Index `Page` attribute
-generation and structured plugin navigation are follow-on work described
+EditJournal. It also renders Index pagelist wikitext from the edited YAML.
+It does not publish to the wiki. Updating the Index template automatically
+and structured plugin navigation are follow-on work described
 in [the work outline design](../design/work-outlines.md).
 
 ## Generate a proposal
@@ -54,6 +55,34 @@ can have `scans: null`. Parents transclude only their own opening material
 and link to their children; the renderer does not duplicate the children's
 content on the parent.
 
+Each generated scan range also has editable printed-page numbering:
+
+```yaml
+scans:
+  from: 8
+  to: 11
+  numbering: roman
+  start: 7
+```
+
+This maps scan 8 to printed page vii and renders
+`<pagelist from="8" to="11" 8="7" 8to11="roman" />`.
+Extraction seeds `numbering` and `start` from the range's first PDF page
+label, both with and without bookmarks. Styles are `normal`, `roman`, and
+`highroman`. Missing or nonnumeric starting labels produce editable
+`numbering: unknown` and `start: null` placeholders.
+
+Set the starting value and style to correct an inferred mapping. Each range
+is independent, so a later volume can restart at 1. Supplying `start` while
+omitting `numbering` uses normal Arabic numbering. Range numbering overrides
+`source.labels` for that range; if `start` remains null, stored labels and
+the existing scan-number fallback remain in use. Older proposals without
+these fields continue to work.
+
+One range describes one continuous numbering run. There is no internal
+override format: rare transitions inside a range can be corrected manually
+in the generated wikitext, or represented by separate page entries.
+
 ```bash
 uv run wtbot dev apply-transclusion \
   --structure structure.yaml --root-page "Book:Work" --dry-run
@@ -100,6 +129,34 @@ transclude the whole shared scan. Later, add section markers to the Page
 content and edit the Book pages' `<pages>` tags to use `fromsection`,
 `tosection`, or `onlysection` as appropriate. The generator does not invent
 markers; partial-page selectors in YAML are not yet supported.
+
+## Generate Index pagelists from the structure
+
+Use the edited page ranges and stored labels, without the original PDF or
+any API access:
+
+```bash
+uv run wtbot dev extract-outline \
+  --structure local/outlines/Foot-Virtues_and_vices-1978.pdf.yml
+```
+
+The output has the same headings and `<pagelist>` format as extraction from
+a PDF, suitable for the Index template's `Page` attribute. Redirect stdout
+to a file to save it. `--structure` and `--pdf-filepath` are mutually exclusive.
+
+Structure input defaults to depth 99; `--depth 1` groups descendants beneath
+their top-level heading. PDF input retains its default depth of 1.
+The edited `pages` tree supplies section boundaries, even when `source.pages`
+is empty. Explicit range numbering takes precedence over `source.labels`.
+Stored labels supply numbering and literal labels where no range start has
+been set. Missing or null labels fall back to physical scan numbers; they
+are not inferred from chapter titles or OCR.
+
+Unlike Book transclusions, an Index pagelist lists each scan only once.
+Shared-start sections are combined under a joined heading. Containers without
+their own scans have no separate pagelist unless collapsed with `--depth`.
+Excluded transclusion scans remain in the Index output under an exclusion
+heading. This command only prints wikitext; it does not edit the Index.
 
 ## Save locally
 

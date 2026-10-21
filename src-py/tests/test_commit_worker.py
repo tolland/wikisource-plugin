@@ -5,6 +5,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from conftest import FAKE_TIMESTAMP, fake_pageid, make_page
+from fastapi import BackgroundTasks
 from sqlmodel import Session, select
 
 from wtbot.api.commit import (
@@ -369,7 +370,7 @@ def test_pending_commit_api_lists_and_pushes_one_page(engine):
         assert pending[0].pending_count == 2
         assert pending[0].submitted_body == "draft 2 final"
 
-        commit = run_commit_for_page(page.pk, request, session=s)
+        commit = run_commit_for_page(page.pk, request, BackgroundTasks(), session=s)
         assert commit.status == CommitStatus.success
         assert commit.submitted_body == "draft 2 final"
 
@@ -408,7 +409,9 @@ def test_pending_commit_api_can_force_overwrite_conflict(engine):
         app=SimpleNamespace(state=SimpleNamespace(client_factory=_client_factory(fake)))
     )
     with Session(engine) as s:
-        commit = run_commit_for_page(page.pk, request, session=s, force=True)
+        commit = run_commit_for_page(
+            page.pk, request, BackgroundTasks(), session=s, force=True
+        )
         assert commit.status == CommitStatus.success
         assert commit.base_revid == 100
         assert commit.result_revid == 201
