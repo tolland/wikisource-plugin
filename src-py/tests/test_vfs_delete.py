@@ -35,6 +35,11 @@ CANONICAL = "Book/The Philosophy of 'As If'"
 SHADOW = "Book/The Philosophy of %27As If%27"
 
 
+def _path(title: str) -> str:
+    ns, sep, rest = title.partition(":")
+    return f"{SITE}/{ns}/{rest}" if sep else f"{SITE}/(Main)/{title}"
+
+
 def _titles(engine) -> set[str]:
     with Session(engine) as s:
         return {t.title for t in s.exec(select(Title)).all()}
@@ -77,36 +82,70 @@ def _delete(client: TestClient, path: str, **params):
 
 
 def test_delete_shadow_node(client, engine):
-    resp = _delete(client, f"{SITE}/{SHADOW}")
+    resp = _delete(client, _path(SHADOW))
     assert resp.status_code == 200
-    assert resp.json()["deleted_paths"] == [f"{SITE}/{SHADOW}"]
+    assert resp.json()["deleted_paths"] == [_path(SHADOW)]
     titles = _titles(engine)
     assert SHADOW not in titles
     assert CANONICAL in titles
     assert (
-        client.get("/vfs/stat", params={"path": f"{SITE}/{SHADOW}"}).json()["exists"]
+        client.get("/vfs/stat", params={"path": _path(SHADOW)}).json()["exists"]
         is False
     )
 
 
 def test_delete_node_leaves_subpages(client, engine):
-    resp = _delete(client, f"{SITE}/{CANONICAL}")
+    resp = _delete(client, _path(CANONICAL))
     assert resp.status_code == 200
-    assert resp.json()["deleted_paths"] == [f"{SITE}/{CANONICAL}"]
+    assert resp.json()["deleted_paths"] == [_path(CANONICAL)]
     assert f"{CANONICAL}/Notes" in _titles(engine)
 
 
 def test_delete_recursive_takes_subpages(client, engine):
-    resp = _delete(client, f"{SITE}/{CANONICAL}", recursive=True)
+    resp = _delete(client, _path(CANONICAL), recursive=True)
     assert resp.json()["deleted_paths"] == sorted(
-        [f"{SITE}/{CANONICAL}", f"{SITE}/{CANONICAL}/Notes"]
+        [_path(CANONICAL), _path(f"{CANONICAL}/Notes")]
     )
     assert not {CANONICAL, f"{CANONICAL}/Notes"} & _titles(engine)
     assert SHADOW in _titles(engine)  # a different spelling is a different title
 
 
+def test_delete_synthetic_node_needs_recursive(client, engine):
+    book = f"{SITE}/(Main)/Book"  # no page of its own: only titles below it
+    resp = _delete(client, book)
+    assert resp.status_code == 400
+    assert resp.json()["code"] == "not-deletable"
+
+    resp = _delete(client, book, recursive=True)
+    assert resp.status_code == 200
+    assert len(resp.json()["deleted_paths"]) == 3  # canonical, Notes, shadow
+    assert not {CANONICAL, f"{CANONICAL}/Notes", SHADOW} & _titles(engine)
+
+
+def test_delete_takes_every_spelling_of_the_address(client, engine):
+    with Session(engine) as s:
+        site = s.exec(select(Site).where(Site.family == FAMILY)).one()
+        s.add(
+            Title(
+                site_pk=site.pk,
+                title="Index:Book_underscored.djvu",
+                expected_content_model="wikitext",
+            )
+        )
+        s.add(
+            Title(
+                site_pk=site.pk,
+                title="Index:Book underscored.djvu",
+                expected_content_model="wikitext",
+            )
+        )
+        s.commit()
+    assert _delete(client, f"{SITE}/Index/Book underscored.djvu").status_code == 200
+    assert not {t for t in _titles(engine) if "underscored" in t}
+
+
 def test_delete_index_alone_is_refused_while_pages_depend_on_it(client, engine):
-    resp = _delete(client, f"{SITE}/{INDEX}")
+    resp = _delete(client, _path(INDEX))
     assert resp.status_code == 409
     assert resp.json()["code"] == "delete-blocked"
     assert "recursive" in resp.json()["detail"]
@@ -114,14 +153,14 @@ def test_delete_index_alone_is_refused_while_pages_depend_on_it(client, engine):
 
 
 def test_delete_index_recursive_takes_pages_and_assets(client, engine):
-    resp = _delete(client, f"{SITE}/{INDEX}", recursive=True)
+    resp = _delete(client, _path(INDEX), recursive=True)
     assert resp.status_code == 200
     assert {INDEX, STYLES, PAGE_1, PAGE_2}.isdisjoint(_titles(engine))
     assert CANONICAL in _titles(engine)
 
 
 def test_delete_page_alone_leaves_index(client, engine):
-    assert _delete(client, f"{SITE}/{PAGE_1}").status_code == 200
+    assert _delete(client, _path(PAGE_1)).status_code == 200
     assert {INDEX, PAGE_2} <= _titles(engine)
     assert PAGE_1 not in _titles(engine)
 
@@ -134,14 +173,12 @@ def test_delete_refuses_uncommitted_edits_unless_discarded(client, engine):
         s.add(title)
         s.commit()
 
-    resp = _delete(client, f"{SITE}/{PAGE_1}")
+    resp = _delete(client, _path(PAGE_1))
     assert resp.status_code == 409
     assert PAGE_1 in resp.json()["detail"]
     assert PAGE_1 in _titles(engine)
 
-    assert (
-        _delete(client, f"{SITE}/{PAGE_1}", discard_local_edits=True).status_code == 200
-    )
+    assert _delete(client, _path(PAGE_1), discard_local_edits=True).status_code == 200
     with Session(engine) as s:
         assert s.exec(select(EditJournal)).all() == []
 
@@ -174,7 +211,7 @@ def test_delete_cascades_revisions_and_orphaned_content_only(client, engine):
         s.add(FetchRequest(site_pk=site_pk, title=PAGE_1))
         s.commit()
 
-    assert _delete(client, f"{SITE}/{PAGE_1}").status_code == 200
+    assert _delete(client, _path(PAGE_1)).status_code == 200
     with Session(engine) as s:
         assert {c.content_sha1 for c in s.exec(select(Content)).all()} == {"shared"}
         assert [r.revid for r in s.exec(select(Revision)).all()] == [2]
@@ -183,7 +220,8 @@ def test_delete_cascades_revisions_and_orphaned_content_only(client, engine):
 
 
 @pytest.mark.parametrize(
-    "path", ["", "/", SITE, f"{SITE}/{INDEX}/Pages", f"{SITE}/{INDEX}/wikitext"]
+    "path",
+    ["/", SITE, f"{SITE}/Index", f"{_path(INDEX)}/@pages", f"{_path(INDEX)}/@wikitext"],
 )
 def test_delete_synthetic_nodes_refused(client, path):
     resp = _delete(client, path)
@@ -191,7 +229,7 @@ def test_delete_synthetic_nodes_refused(client, path):
     assert resp.json()["code"] == "not-deletable"
 
 
-@pytest.mark.parametrize("path", [f"{SITE}/Nope", "/nowhere/xx/Nope"])
+@pytest.mark.parametrize("path", [f"{SITE}/(Main)/Nope", "/nowhere/xx/(Main)/Nope"])
 def test_delete_unknown_is_404(client, path):
     assert _delete(client, path).status_code == 404
 

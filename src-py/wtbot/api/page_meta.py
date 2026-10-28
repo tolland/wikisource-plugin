@@ -12,13 +12,7 @@ from wtbot.model import (
 )
 from wtbot.model.wikisource.proofread_page_meta import SHORT_NAME_RE
 from wtbot.shared_repository import local_file_title_pk
-from wtbot.vfs.nodes import (
-    IndexAssetLeaf,
-    IndexDir,
-    IndexWikitext,
-    PageLeaf,
-    resolve,
-)
+from wtbot.vfs.nodes import entry_behind, resolve
 from wtbot.vfs.store import PROOFREAD_INDEX_CONTENT_MODEL, Entry, PageStore
 
 """Per-role Page metadata extensions (IndexMeta / ProofreadPageMeta).
@@ -59,15 +53,10 @@ def _resolve(
     title: str | None,
 ) -> Entry:
     if path is not None:
-        match resolve(store, path):
-            case PageLeaf(_, _, page, _) | IndexAssetLeaf(_, _, page, _):
-                return page
-            case IndexDir(_, _, index) | IndexWikitext(_, _, index):
-                return index
-            case _:
-                raise HTTPException(
-                    status_code=404, detail=f"no page behind path: {path}"
-                )
+        entry = entry_behind(resolve(store, path))
+        if entry is None:
+            raise HTTPException(status_code=404, detail=f"no page behind path: {path}")
+        return entry
     if family is not None and code is not None and title is not None:
         site = store.site(family, code)
         found = store.entry(site, title) if site is not None else None

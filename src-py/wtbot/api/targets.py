@@ -4,7 +4,9 @@ from fastapi import Request
 from sqlmodel import Session, select
 
 from wtbot.api.errors import ApiError
-from wtbot.model import Site, Title
+from wtbot.model import Site
+from wtbot.vfs.paths import WikiPath
+from wtbot.vfs.store import PageStore
 from wtbot.wiki.client import WikiClient
 
 """Resolving a VFS path to the wiki thing it names.
@@ -17,50 +19,47 @@ a ``/preview`` path.
 """
 
 
-def parse_path(path: str) -> list[str]:
-    return [s for s in path.strip("/").split("/") if s]
-
-
 def resolve_target(session: Session, path: str) -> tuple[Site, str, str | None]:
     """Map a VFS path to (site, page title, content model).
 
-    Mirrors the path shapes served by wtbot.api.vfs. The title is derived from
-    the path even when the page isn't cached yet, so a preview works before the
-    first fetch completes; content model then falls back to title inference on
-    the wiki side.
+    Accepts a title node or any of its aspects (`/f/c/Page/Foo.djvu/8` or
+    `.../@wikitext`). The title is derived from the path even when the page
+    isn't cached yet, so a preview works before the first fetch completes;
+    content model then falls back to title inference on the wiki side.
     """
-    parts = parse_path(path)
-    if len(parts) < 3:
+    parsed = WikiPath.parse(path)
+    if len(parsed.segments) < 4 or not parsed.title_rest:
         raise ApiError(
             status_code=422,
             detail=f"path is not a page: {path}",
             code="path-not-a-page",
         )
 
-    family, code, index_title = parts[0], parts[1], parts[2]
     site = session.exec(
-        select(Site).where(Site.family == family, Site.code == code)
+        select(Site).where(Site.family == parsed.family, Site.code == parsed.code)
     ).first()
     if site is None:
         raise ApiError(
             status_code=404,
-            detail=f"site {family}/{code} not found",
+            detail=f"site {parsed.family}/{parsed.code} not found",
             code="site-not-found",
         )
 
-    if parts[3:] == ["wikitext"]:
-        title = index_title  # the Index page's own body
-    else:
-        # A title verbatim, slashes and all: `Page:Foo.djvu/8`, and an index
-        # subpage such as `Index:Foo.djvu/styles.css`.
-        title = "/".join(parts[2:])
+    store = PageStore(session)
+    ns = store.site_namespaces(site).by_segment(parsed.namespace_segment)
+    if ns is None:
+        raise ApiError(
+            status_code=404,
+            detail=f"namespace {parsed.namespace_segment!r} not found on "
+            f"{parsed.family}/{parsed.code}",
+            code="namespace-not-found",
+        )
+    title = ns.title(parsed.title_rest)
 
     # The title's expectation, which a fetch keeps equal to the wiki's own
     # answer: a page the wiki does not hold yet still renders as what it is.
-    known = session.exec(
-        select(Title).where(Title.site_pk == site.pk, Title.title == title)
-    ).first()
-    return site, title, known.expected_content_model if known else None
+    known = store.entry(site, title)
+    return site, title, known.content_model if known else None
 
 
 _lock = threading.Lock()

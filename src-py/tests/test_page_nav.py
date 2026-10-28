@@ -1,5 +1,5 @@
 import pytest
-from conftest import add_proofread_meta, index_file_title_pk, make_page
+from conftest import add_proofread_meta, index_file_title_pk, make_page, vfs_path
 from sqlmodel import Session
 
 from wtbot.model import Site
@@ -12,11 +12,11 @@ the non-page-path guard."""
 FAMILY = "wikisource"
 CODE = "en"
 INDEX = "Index:Tractatus.djvu"
-INDEX_PATH = f"/{FAMILY}/{CODE}/{INDEX}"
+INDEX_PATH = vfs_path(INDEX)
 
 
 def _page_path(title: str) -> str:
-    return f"/{FAMILY}/{CODE}/{title}"
+    return vfs_path(title, "wikitext")
 
 
 def _seed(engine, page_numbers: list[int]) -> None:

@@ -7,11 +7,11 @@ class FakeVfsBackendTest {
 
     private val backend = FakeVfsBackend().apply {
         addDirectory("/wikisource/en")
-        addDirectory("/wikisource/en/Index:Foo.djvu", stableId = 1001)
-        addDirectory("/wikisource/en/Index:Foo.djvu/Pages")
+        addDirectory("/wikisource/en/Index/Foo.djvu", stableId = 1001)
+        addDirectory("/wikisource/en/Index/Foo.djvu/@pages")
         addFile(
-            "/wikisource/en/Page:Foo.djvu/1",
-            parent = "/wikisource/en/Index:Foo.djvu/Pages",
+            "/wikisource/en/Page/Foo.djvu/1",
+            parent = "/wikisource/en/Index/Foo.djvu/@pages",
             content = "{{recto}} Page one.",
             name = "Page:Foo.djvu/1",
             stableId = 1003,
@@ -19,8 +19,8 @@ class FakeVfsBackendTest {
             contentModel = "proofread-page",
         )
         addFile(
-            "/wikisource/en/Page:Foo.djvu/2",
-            parent = "/wikisource/en/Index:Foo.djvu/Pages",
+            "/wikisource/en/Page/Foo.djvu/2",
+            parent = "/wikisource/en/Index/Foo.djvu/@pages",
             content = "{{verso}} Page two.",
             name = "Page:Foo.djvu/2",
             stableId = 1004, revid = 5004,
@@ -30,7 +30,7 @@ class FakeVfsBackendTest {
 
     @Test
     fun `stat returns exists=true for known directory`() {
-        val r = backend.stat("/wikisource/en/Index:Foo.djvu")
+        val r = backend.stat("/wikisource/en/Index/Foo.djvu")
         assertTrue(r.exists)
         assertEquals(NodeKind.directory, r.kind)
         assertEquals(1001L, r.stableId)
@@ -45,7 +45,7 @@ class FakeVfsBackendTest {
 
     @Test
     fun `stat file has correct length`() {
-        val r = backend.stat("/wikisource/en/Page:Foo.djvu/1")
+        val r = backend.stat("/wikisource/en/Page/Foo.djvu/1")
         assertTrue(r.exists)
         assertEquals(NodeKind.file, r.kind)
         assertEquals("{{recto}} Page one.".toByteArray().size.toLong(), r.length)
@@ -53,7 +53,7 @@ class FakeVfsBackendTest {
 
     @Test
     fun `listChildren returns direct children only`() {
-        val r = backend.listChildren("/wikisource/en/Index:Foo.djvu/Pages")
+        val r = backend.listChildren("/wikisource/en/Index/Foo.djvu/@pages")
         assertEquals(2, r.children.size)
         assertTrue(r.children.all { it.kind == NodeKind.file })
     }
@@ -61,7 +61,7 @@ class FakeVfsBackendTest {
     @Test
     fun `readContent decodes text correctly`() {
         val r = backend.readContent(
-            "/wikisource/en/Page:Foo.djvu/1"
+            "/wikisource/en/Page/Foo.djvu/1"
         )
         assertEquals("{{recto}} Page one.", r.decodeText())
         assertEquals(5003L, r.revid)
@@ -70,13 +70,13 @@ class FakeVfsBackendTest {
     @Test
     fun `readContent throws for missing path`() {
         assertThrows(VfsBackendException::class.java) {
-            backend.readContent("/wikisource/en/Page:Foo.djvu/99")
+            backend.readContent("/wikisource/en/Page/Foo.djvu/99")
         }
     }
 
     @Test
     fun `writeContent succeeds and bumps revid`() {
-        val path = "/wikisource/en/Page:Foo.djvu/1"
+        val path = "/wikisource/en/Page/Foo.djvu/1"
         val newBase64 = java.util.Base64.getEncoder().encodeToString("edited.".toByteArray())
         val result = backend.writeContent(path, newBase64, baseRevid = 5003L)
         assertEquals(WriteStatus.ok, result.status)
@@ -86,7 +86,7 @@ class FakeVfsBackendTest {
 
     @Test
     fun `writeContent returns conflict on stale base revid`() {
-        val path = "/wikisource/en/Page:Foo.djvu/1"
+        val path = "/wikisource/en/Page/Foo.djvu/1"
         val newBase64 = java.util.Base64.getEncoder().encodeToString("edited.".toByteArray())
         val result = backend.writeContent(path, newBase64, baseRevid = 1L)
         assertEquals(WriteStatus.conflict, result.status)
@@ -98,7 +98,7 @@ class FakeVfsBackendTest {
     @Test
     fun `writeContent returns error for missing path`() {
         val result = backend.writeContent(
-            "/wikisource/en/Page:Foo.djvu/99",
+            "/wikisource/en/Page/Foo.djvu/99",
             java.util.Base64.getEncoder().encodeToString("x".toByteArray()),
             baseRevid = null,
         )
@@ -134,7 +134,7 @@ class FakeVfsBackendTest {
 
     @Test
     fun `annotations round trip - save list delete`() {
-        val path = "/wikisource/en/Page:Foo.djvu/1"
+        val path = "/wikisource/en/Page/Foo.djvu/1"
         val annotation = PageAnnotation(
             id = "a1", x = 10.0, y = 20.0, width = 30.0, height = 40.0,
             label = "l", category = "paragraph",
@@ -151,7 +151,7 @@ class FakeVfsBackendTest {
 
     @Test
     fun `text anchors are independent of boxes`() {
-        val path = "/wikisource/en/Page:Foo.djvu/1"
+        val path = "/wikisource/en/Page/Foo.djvu/1"
         val anchor = PageTextAnchor(annotationId = "a1", textStart = 5, textEnd = 9, anchorRevid = 42L)
         backend.saveTextAnchor(path, anchor)
 
@@ -168,7 +168,7 @@ class FakeVfsBackendTest {
 
     @Test
     fun `deleting a box also drops its text anchor`() {
-        val path = "/wikisource/en/Page:Foo.djvu/1"
+        val path = "/wikisource/en/Page/Foo.djvu/1"
         backend.saveAnnotation(path, PageAnnotation(id = "a1", x = 0.0, y = 0.0, width = 1.0, height = 1.0))
         backend.saveTextAnchor(path, PageTextAnchor(annotationId = "a1", textStart = 0, textEnd = 3))
 
@@ -178,7 +178,7 @@ class FakeVfsBackendTest {
 
     @Test
     fun `box links round trip and require an existing range`() {
-        val path = "/wikisource/en/Page:Foo.djvu/1"
+        val path = "/wikisource/en/Page/Foo.djvu/1"
         backend.saveAnnotation(path, PageAnnotation(id = "b1", x = 0.0, y = 0.0, width = 1.0, height = 1.0))
         assertThrows(VfsBackendException::class.java) {
             backend.saveBoxLink(path, PageBoxLink(boxId = "b1", rangeId = "missing"))
@@ -203,7 +203,7 @@ class FakeVfsBackendTest {
 
     @Test
     fun `deleting either endpoint drops the link`() {
-        val path = "/wikisource/en/Page:Foo.djvu/1"
+        val path = "/wikisource/en/Page/Foo.djvu/1"
         backend.saveAnnotation(path, PageAnnotation(id = "b1", x = 0.0, y = 0.0, width = 1.0, height = 1.0))
         backend.saveTextAnchor(path, PageTextAnchor(annotationId = "r1", textStart = 0, textEnd = 3))
         backend.saveBoxLink(path, PageBoxLink(boxId = "b1", rangeId = "r1"))
@@ -219,7 +219,7 @@ class FakeVfsBackendTest {
 
     @Test
     fun `ocr run resolves the backend and echoes decodable text`() {
-        val path = "/wikisource/en/Page:Foo.djvu/1"
+        val path = "/wikisource/en/Page/Foo.djvu/1"
         val result = backend.runOcr(path, OcrRunRequest(annotationId = "b1"))
         assertEquals("fake-ocr", result.backend)
         assertEquals("OCR of b1", result.decodeText())
@@ -232,7 +232,7 @@ class FakeVfsBackendTest {
 
     @Test
     fun `ocr models are advertised per backend`() {
-        val path = "/wikisource/en/Page:Foo.djvu/1"
+        val path = "/wikisource/en/Page/Foo.djvu/1"
         val catalog = backend.listOcrModels(path)
         assertEquals("fake-ocr", catalog.backend)
         assertNull(catalog.error)
@@ -249,7 +249,7 @@ class FakeVfsBackendTest {
     @Test
     fun `ocr discovery failure is reported as data, not an exception`() {
         backend.ocrCatalogError = "discovery failed: refused"
-        val catalog = backend.listOcrModels("/wikisource/en/Page:Foo.djvu/1")
+        val catalog = backend.listOcrModels("/wikisource/en/Page/Foo.djvu/1")
         assertTrue(catalog.engines.isEmpty())
         assertEquals("discovery failed: refused", catalog.error)
     }
@@ -257,7 +257,26 @@ class FakeVfsBackendTest {
     @Test
     fun `deleting an unknown annotation throws`() {
         assertThrows(VfsBackendException::class.java) {
-            backend.deleteAnnotation("/wikisource/en/Page:Foo.djvu/1", "nope")
+            backend.deleteAnnotation("/wikisource/en/Page/Foo.djvu/1", "nope")
         }
+    }
+
+    @Test fun `directories report children and aspects`() {
+        val fake = FakeVfsBackend()
+            .addDirectory("/wikisource/en/Book/Foo", aspects = listOf("wikitext", "props"))
+            .addFile("/wikisource/en/Book/Foo/@wikitext", "body", name = "@wikitext")
+            .addDirectory("/wikisource/en/Book/Bar", aspects = listOf("wikitext"))
+
+        val foo = fake.stat("/wikisource/en/Book/Foo")
+        assertTrue(foo.hasChildren)
+        assertEquals(listOf("wikitext", "props"), foo.aspects)
+        assertFalse(fake.stat("/wikisource/en/Book/Bar").hasChildren)
+        assertEquals(
+            emptyList<String>(),
+            fake.stat("/wikisource/en/Book/Foo/@wikitext").aspects,
+        )
+        val listed = fake.listChildren("/wikisource/en/Book/Foo").children.single()
+        assertEquals("@wikitext", listed.name)
+        assertFalse(listed.hasChildren)
     }
 }

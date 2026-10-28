@@ -9,7 +9,7 @@ from wtbot.deps import get_session
 from wtbot.model.ocr_backend import DEFAULT_SCOPE, OcrBackendConfig, OcrBackendKind
 from wtbot.ocrapi import catalog, service
 from wtbot.ocrapi.client import OcrCrop, OcrError, OcrRequest, OcrResult, build_client
-from wtbot.vfs.nodes import PageLeaf, resolve
+from wtbot.vfs.nodes import ProofreadPageRef, proofread_page_of, resolve
 from wtbot.vfs.store import PageStore
 
 """OCR configuration, discovery, and recognition routes.
@@ -270,9 +270,10 @@ def _scope_for(family: str, code: str) -> str:
     return f"{family}/{code}"
 
 
-def _page_for(session: Session, path: str) -> PageLeaf:
-    node = resolve(PageStore(session), path)
-    if not isinstance(node, PageLeaf):
+def _page_for(session: Session, path: str) -> ProofreadPageRef:
+    store = PageStore(session)
+    node = proofread_page_of(store, resolve(store, path))
+    if node is None:
         raise HTTPException(status_code=404, detail=f"not a proofread page: {path}")
     return node
 

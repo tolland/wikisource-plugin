@@ -4,7 +4,6 @@ from sqlmodel import Session, select
 
 from wtbot.model import Namespace, Site, Title
 from wtbot.title_store import Entry, ensure_title
-from wtbot.vfs.paths import title_path
 from wtbot.vfs.store import PageStore
 from wtbot.work_outline import DocumentModel, TransclusionProposal, render
 
@@ -64,6 +63,7 @@ def apply_transclusion(
         return (f"{ns.local_name}:{name}" if ns.local_name else name), ns.key
 
     store = PageStore(session)
+    site_namespaces = store.site_namespaces(site)
     rendered = render(
         request.proposal, root_page=request.root_page, index_page=request.index_page
     )
@@ -100,7 +100,9 @@ def apply_transclusion(
         planned.append(
             AppliedDestination(
                 title=entry.name if entry else title,
-                path=title_path(site.family, site.code, title),
+                path=site_namespaces.node_path(
+                    site.family, site.code, title, aspect="wikitext"
+                ),
                 body=page.body,
             )
         )

@@ -46,6 +46,8 @@ class WtVirtualFile(
     placeholder: Boolean = false,
     length: Long? = null,
     timestamp: String? = null,
+    hasChildren: Boolean = false,
+    aspects: List<String> = emptyList(),
 ) : VirtualFile() {
 
     // Populated either eagerly by the tool window (BG thread) or lazily on
@@ -81,6 +83,16 @@ class WtVirtualFile(
     /** No remote revision backs this file — a missing proofread page's
      * local stub. Opening it starts a new transcription. */
     @Volatile var placeholder: Boolean = placeholder
+        private set
+    /** A directory node with something to expand: subpages, or an Index's pages. */
+    @Volatile var hasChildren: Boolean = hasChildren
+        private set
+    /**
+     * The aspects this title node offers, default first (`wikitext`, `props`,
+     * `pages`); each is a child at `{path}/@{aspect}`. Empty for aspect files
+     * and for synthetic containers with no page of their own.
+     */
+    @Volatile var aspects: List<String> = aspects
         private set
 
     // Files start valid and only ever go invalid, when a backend switch finds
@@ -122,11 +134,15 @@ class WtVirtualFile(
         placeholder: Boolean,
         length: Long? = null,
         timestamp: String? = null,
+        hasChildren: Boolean = this.hasChildren,
+        aspects: List<String> = this.aspects,
     ) {
         this.qualityLevel = qualityLevel
         this.dirty = dirty
         this.hasReferenceImage = hasReferenceImage
         this.placeholder = placeholder
+        this.hasChildren = hasChildren
+        this.aspects = aspects
         length?.let { statLength = it }
         timestamp?.toLongOrNull()?.let { statTimestamp = it }
     }
@@ -140,7 +156,7 @@ class WtVirtualFile(
     fun invalidateIfStale(stat: StatResult) {
         updateMeta(
             stat.qualityLevel, stat.dirty, stat.hasReferenceImage, stat.placeholder,
-            stat.length, stat.timestamp,
+            stat.length, stat.timestamp, stat.hasChildren, stat.aspects,
         )
         if (stat.revid != revid) {
             revid = stat.revid
@@ -150,6 +166,14 @@ class WtVirtualFile(
     }
 
     override fun getName(): String = _name
+
+    /**
+     * What editor tabs and titles show. The VFS name of a page's content is
+     * its aspect segment (`@wikitext`), which says nothing about which page
+     * is open, so this names the title instead — see [WtPaths.displayName].
+     */
+    override fun getPresentableName(): String =
+        if (WtPaths.aspectOf(_path) != null) WtPaths.displayName(_path) else _name
     override fun getFileSystem(): VirtualFileSystem = fileSystem
     override fun getPath(): String = _path
     override fun isWritable(): Boolean = !isDir
@@ -185,6 +209,8 @@ class WtVirtualFile(
                 placeholder = child.placeholder,
                 length = child.length,
                 timestamp = child.timestamp,
+                hasChildren = child.hasChildren,
+                aspects = child.aspects,
             )
         }.toTypedArray() as Array<VirtualFile>
         cachedChildren = children
@@ -276,6 +302,8 @@ class WtVirtualFile(
                 placeholder = stat.placeholder,
                 length = stat.length,
                 timestamp = stat.timestamp,
+                hasChildren = stat.hasChildren,
+                aspects = stat.aspects,
             )
     }
 }

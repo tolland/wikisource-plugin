@@ -517,6 +517,21 @@ def fake_pageid(title: str) -> int:
     return zlib.crc32(title.encode()) & 0x7FFFFFFF
 
 
+def vfs_path(
+    title: str,
+    aspect: str | None = None,
+    *,
+    family: str = "wikisource",
+    code: str = "en",
+) -> str:
+    """The VFS path of a title, as a site with no fetched siteinfo shows it
+    (the standard namespace names). `aspect="wikitext"` names the file you
+    open; without one it is the title's node."""
+    from wtbot.vfs.namespaces import SiteNamespaces
+
+    return SiteNamespaces.from_rows([]).node_path(family, code, title, aspect)
+
+
 def make_page(session: Session | None = None, **fields: Any) -> Page:
     """A Page fixture: a page the wiki holds. Fields a test does not care
     about get plausible values -- ids derived from the title, empty text,

@@ -20,6 +20,7 @@ from wtbot.model.wikisource.proofread_page_meta import (
 )
 from wtbot.shared_repository import local_file_title_pk
 from wtbot.title_store import Entry, entry_by_pk
+from wtbot.vfs.namespaces import NsView, SiteNamespaces
 
 """PageStore — all SQL for the VFS layers.
 
@@ -73,6 +74,32 @@ def canonical_title(title: str) -> str:
     return title.replace("_", " ")
 
 
+def _title_has_prefix(prefix: str):
+    """Coarse SQL filter for titles starting with [prefix] (canonical
+    spelling). SQLite's LIKE is ASCII-case-insensitive, so callers refine to
+    the exact prefix in Python."""
+    escaped = prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return _canonical(Title.title).like(f"{escaped}%", escape="\\")
+
+
+def _canonical(column):
+    """SQL form of [canonical_title]."""
+    return func.replace(column, "_", " ")
+
+
+def distinct_addresses(entries: list[Entry]) -> dict[str, Entry]:
+    """One entry per address, keyed by canonical title. MediaWiki treats `_`
+    and a space as the same character, so rows spelled both ways name one
+    page; the VFS must show it once. The held one wins, then the first."""
+    chosen: dict[str, Entry] = {}
+    for entry in entries:
+        key = canonical_title(entry.name)
+        kept = chosen.get(key)
+        if kept is None or (kept.page is None and entry.page is not None):
+            chosen[key] = entry
+    return chosen
+
+
 def meta_has_image(meta: ProofreadPageMeta | None) -> bool:
     return meta is not None and (
         meta.thumb_url is not None
@@ -84,6 +111,7 @@ def meta_has_image(meta: ProofreadPageMeta | None) -> bool:
 class PageStore:
     def __init__(self, session: Session) -> None:
         self.session = session
+        self._namespaces: dict[int | None, SiteNamespaces] = {}
 
     # -- sites / namespaces ---------------------------------------------------
 
@@ -106,6 +134,21 @@ class PageStore:
             )
         ).first()
 
+    def site_namespaces(self, site: Site) -> SiteNamespaces:
+        """The site's namespace map, loaded once per store (one per request)."""
+        loaded = self._namespaces.get(site.pk)
+        if loaded is None:
+            loaded = SiteNamespaces.from_rows(self.namespaces(site))
+            self._namespaces[site.pk] = loaded
+        return loaded
+
+    def namespaces(self, site: Site) -> list[Namespace]:
+        return list(
+            self.session.exec(
+                select(Namespace).where(Namespace.site_pk == site.pk)
+            ).all()
+        )
+
     # -- titles -----------------------------------------------------------------
 
     def _entries(self, statement) -> list[Entry]:
@@ -122,8 +165,16 @@ class PageStore:
         return rows[0] if rows else None
 
     def entry(self, site: Site, title: str) -> Entry | None:
+        """The entry at [title], in either spelling. Where the cache holds the
+        address twice (an underscore row from before titles were stored in the
+        wiki's form), the one the wiki holds wins, then the older."""
         return self._first(
-            select(Title, Page).where(Title.site_pk == site.pk, Title.title == title)
+            select(Title, Page)
+            .where(
+                Title.site_pk == site.pk,
+                _canonical(Title.title) == canonical_title(title),
+            )
+            .order_by(col(Page.pk).is_(None), col(Title.pk))
         )
 
     def entry_by_pk(self, pk: int) -> Entry | None:
@@ -186,6 +237,87 @@ class PageStore:
             self._proofread_pages_named(site).where(col(Title.title).in_(titles))
         )
 
+    def entries_by_titles(self, site: Site, titles: list[str]) -> dict[str, Entry]:
+        """Entries for these titles, whatever their content model, keyed by
+        the canonical (space) spelling. Spellings of one address collapse to
+        one entry: the one the wiki holds, then the older."""
+        if not titles:
+            return {}
+        rows = self._entries(
+            select(Title, Page)
+            .where(
+                Title.site_pk == site.pk,
+                _canonical(Title.title).in_([canonical_title(t) for t in titles]),
+            )
+            .order_by(col(Title.pk))
+        )
+        return distinct_addresses(rows)
+
+    def title_prefixes(self, site: Site) -> set[str]:
+        """Every distinct `text before the first colon, colon included` over
+        the site's titles ('' for a title with no colon) -- a cheap way to ask
+        which namespaces have titles without loading them."""
+        prefix = func.substr(Title.title, 1, func.instr(Title.title, ":"))
+        return set(
+            self.session.exec(
+                select(prefix).where(Title.site_pk == site.pk).distinct()
+            ).all()
+        )
+
+    def has_titles_under(self, site: Site, prefix: str) -> bool:
+        return bool(self._titles_with_prefix(site, canonical_title(prefix), limit=1))
+
+    def _titles_with_prefix(
+        self, site: Site, prefix: str, limit: int | None = None
+    ) -> list[str]:
+        statement = select(Title.title).where(
+            Title.site_pk == site.pk, _title_has_prefix(prefix)
+        )
+        if limit is not None:
+            statement = statement.limit(limit)
+        found = {canonical_title(t) for t in self.session.exec(statement).all()}
+        return [t for t in found if t.startswith(prefix)]
+
+    def rows_at_titles(self, site: Site, titles: list[str]) -> list[Entry]:
+        """Every row naming one of these addresses, in each spelling it was
+        recorded under -- unlike [entries_by_titles], which shows one per
+        address. For callers that remove or rewrite the addresses."""
+        if not titles:
+            return []
+        return self._entries(
+            select(Title, Page).where(
+                Title.site_pk == site.pk,
+                _canonical(Title.title).in_({canonical_title(t) for t in titles}),
+            )
+        )
+
+    def titles_under(self, site: Site, prefix: str) -> list[str]:
+        """Full titles (canonical spelling, each once) starting with [prefix],
+        case-sensitively."""
+        return sorted(self._titles_with_prefix(site, canonical_title(prefix)))
+
+    def namespace_titles(
+        self, site: Site, namespaces: SiteNamespaces, ns: NsView
+    ) -> list[str]:
+        """Every title in [ns], full form. The main namespace is everything
+        that is not in another namespace."""
+        if not ns.is_main:
+            return self.titles_under(site, ns.prefix)
+        others = [v.prefix for v in namespaces.others()]
+        return sorted(
+            {
+                t
+                for t in map(
+                    canonical_title,
+                    self.session.exec(
+                        select(Title.title).where(Title.site_pk == site.pk)
+                    ).all(),
+                )
+                if namespaces.split(t)[0].is_main
+                and not any(t.startswith(o) for o in others)
+            }
+        )
+
     def index_of(self, page: Entry) -> Entry | None:
         """The Index: that paginates [page], per its ProofreadPageMeta."""
         meta = self.session.get(ProofreadPageMeta, page.pk)
@@ -195,16 +327,12 @@ class PageStore:
         """Titles starting with [prefix], case-sensitively. SQLite's LIKE is
         ASCII-case-insensitive, so it serves as the coarse index scan and
         Python refines to the exact prefix."""
-        escaped = prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         rows = self._entries(
             select(Title, Page)
-            .where(
-                Title.site_pk == site.pk,
-                col(Title.title).like(f"{escaped}%", escape="\\"),
-            )
+            .where(Title.site_pk == site.pk, _title_has_prefix(prefix))
             .order_by(Title.title)
         )
-        return [row for row in rows if row.name.startswith(prefix)]
+        return [row for row in rows if canonical_title(row.name).startswith(prefix)]
 
     # -- per-role metadata extensions ---------------------------------------
 

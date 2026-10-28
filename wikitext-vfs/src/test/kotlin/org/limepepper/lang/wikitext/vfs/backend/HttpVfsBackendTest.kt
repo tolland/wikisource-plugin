@@ -115,6 +115,49 @@ class HttpVfsBackendTest {
         assertEquals(1003L, r.children[0].stableId)
     }
 
+    @Test fun `listChildren parses title nodes with their aspects`() {
+        handle("/vfs/children", """
+            {"parent_path":"/wikisource/en/Book","children":[
+              {"path":"/wikisource/en/Book/Virtues and vices",
+               "name":"Virtues and vices","kind":"directory","stable_id":7,"revid":9,
+               "length":null,"timestamp":null,"writable":false,
+               "has_children":true,"aspects":["wikitext","props"]},
+              {"path":"/wikisource/en/Book/Part 2",
+               "name":"Part 2","kind":"directory","stable_id":null,"revid":null,
+               "length":null,"timestamp":null,"writable":false,
+               "has_children":true,"aspects":[]}
+            ]}
+        """.trimIndent())
+
+        val r = backend.listChildren("/wikisource/en/Book")
+        assertEquals(listOf("wikitext", "props"), r.children[0].aspects)
+        assertTrue(r.children[0].hasChildren)
+        assertEquals(emptyList<String>(), r.children[1].aspects)
+        assertTrue(r.children[1].hasChildren)
+    }
+
+    @Test fun `stat parses aspects and has_children`() {
+        handle("/vfs/stat", """
+            {"path":"/wikisource/en/Book/Foo","exists":true,"kind":"directory",
+             "has_children":false,"aspects":["wikitext","props","pages"]}
+        """.trimIndent())
+
+        val r = backend.stat("/wikisource/en/Book/Foo")
+        assertEquals(listOf("wikitext", "props", "pages"), r.aspects)
+        assertFalse(r.hasChildren)
+    }
+
+    @Test fun `files carry no aspects and no children`() {
+        handle("/vfs/stat", """
+            {"path":"/wikisource/en/Book/Foo/@wikitext","exists":true,"kind":"file",
+             "length":3}
+        """.trimIndent())
+
+        val r = backend.stat("/wikisource/en/Book/Foo/@wikitext")
+        assertEquals(emptyList<String>(), r.aspects)
+        assertFalse(r.hasChildren)
+    }
+
     @Test fun `listChildren handles empty array`() {
         handle("/vfs/children", """{"parent_path":"/wikisource/en/Index:Foo/Pages","children":[]}""")
         val r = backend.listChildren("/wikisource/en/Index:Foo/Pages")

@@ -3,27 +3,47 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from wtbot.model import Site
+from wtbot.vfs.namespaces import NsView, SiteNamespaces
 from wtbot.vfs.paths import WikiPath
-from wtbot.vfs.store import PROOFREAD_INDEX_CONTENT_MODEL, Entry, PageStore
+from wtbot.vfs.store import (
+    PROOFREAD_INDEX_CONTENT_MODEL,
+    PROOFREAD_PAGE_CONTENT_MODEL,
+    Entry,
+    PageStore,
+)
 
 """Typed resolution of wikisource:// paths.
 
-`resolve()` is the single place that classifies a path against the synthetic
-ProofreadPage tree:
+`resolve()` is the single place that classifies a path against the tree:
 
-    /                                        RootDir
-    /{family}/{code}                         SiteDir
-    /{family}/{code}/{Page title}            PageLeaf      (the title verbatim)
-    /{family}/{code}/{Index title}           IndexDir      (dual role: container...)
-    /{family}/{code}/{Index title}/wikitext  IndexWikitext (...and content)
-    /.../{Index title}/Pages                 PagesDir
-    /.../{Index title}/{subpage}             IndexAssetLeaf (styles.css, ...)
+    /                                          RootDir
+    /{family}/{code}                           SiteDir
+    /{family}/{code}/{namespace}               NamespaceDir  (`(Main)` for main)
+    /{family}/{code}/{ns}/{title segments}     TitleNode     (a title, as a container)
+    .../{title}/@wikitext                      AspectLeaf    (its content)
+    .../{title}/@props                         AspectLeaf    (its properties)
+    .../{Index title}/@pages                   PagesDir      (the Page: titles it paginates)
+
+A title is a *node*: it can be a page, a container of subpages, or both, and
+offers any number of aspects. Aspects are the files; nodes are the
+directories. That keeps one path stable for each thing you can open, however
+many subpages the title later gains.
+
+A title is a node when the wiki holds it, or when titles exist below it
+(`Book:A/B` makes a synthetic `Book:A` with no entry of its own). Whether a
+slash in a title is a subpage separator is the namespace's `subpages` flag.
 
 Every VFS operation (stat / list / read / write) resolves first and then
 match/cases on the node type, so the tree shape is defined exactly once.
 Nodes carry the ORM rows the resolver already fetched; operations must not
 re-query what the resolver proved to exist.
 """
+
+ASPECT_WIKITEXT = "wikitext"
+ASPECT_PROPS = "props"
+ASPECT_PAGES = "pages"
+
+AspectName = str
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,57 +55,80 @@ class RootDir:
 class SiteDir:
     path: WikiPath
     site: Site
+    namespaces: SiteNamespaces
 
 
 @dataclass(frozen=True, slots=True)
-class IndexDir:
-    """An Index: title as a directory — the container half of its dual role."""
-
+class NamespaceDir:
     path: WikiPath
     site: Site
-    index: Entry
+    namespaces: SiteNamespaces
+    ns: NsView
 
 
 @dataclass(frozen=True, slots=True)
-class IndexWikitext:
-    """The synthetic `wikitext` leaf under an IndexDir — the content half."""
+class TitleNode:
+    """A title as a container. `entry` is None for a synthetic node: no page
+    or title of its own, only titles below it."""
 
     path: WikiPath
     site: Site
-    index: Entry
+    namespaces: SiteNamespaces
+    ns: NsView
+    rest: str
+    """The title below the namespace prefix."""
+    entry: Entry | None
+
+    @property
+    def title(self) -> str:
+        return self.ns.title(self.rest)
+
+    @property
+    def is_index(self) -> bool:
+        return (
+            self.entry is not None
+            and self.entry.content_model == PROOFREAD_INDEX_CONTENT_MODEL
+        )
+
+    @property
+    def node_path(self) -> str:
+        return self.path.node_path
+
+
+@dataclass(frozen=True, slots=True)
+class AspectLeaf:
+    """One aspect of a title that has an entry: a file."""
+
+    path: WikiPath
+    node: TitleNode
+    aspect: AspectName
+
+    @property
+    def site(self) -> Site:
+        return self.node.site
+
+    @property
+    def entry(self) -> Entry:
+        assert self.node.entry is not None
+        return self.node.entry
 
 
 @dataclass(frozen=True, slots=True)
 class PagesDir:
-    """Synthetic container grouping the index's Page: leaves. No underlying
-    wiki page, hence no stable_id."""
+    """The `@pages` aspect of an Index: the Page: titles it paginates. Has no
+    underlying wiki page, hence no stable_id."""
 
     path: WikiPath
-    site: Site
-    index: Entry
+    node: TitleNode
 
+    @property
+    def site(self) -> Site:
+        return self.node.site
 
-@dataclass(frozen=True, slots=True)
-class PageLeaf:
-    """A Page: title, addressed by its own title. `index` is the Index: that
-    paginates it, if its metadata names one."""
-
-    path: WikiPath
-    site: Site
-    page: Entry
-    index: Entry | None
-
-
-@dataclass(frozen=True, slots=True)
-class IndexAssetLeaf:
-    """Index-namespace subpage of the index (styles.css and friends).
-    `name` is the path relative to the index dir; the page title is
-    `{index_title}/{name}`."""
-
-    path: WikiPath
-    site: Site
-    page: Entry
-    name: str
+    @property
+    def index(self) -> Entry:
+        assert self.node.entry is not None
+        return self.node.entry
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,15 +137,83 @@ class Missing:
 
 
 type WsNode = (
-    RootDir
-    | SiteDir
-    | IndexDir
-    | IndexWikitext
-    | PagesDir
-    | PageLeaf
-    | IndexAssetLeaf
-    | Missing
+    RootDir | SiteDir | NamespaceDir | TitleNode | AspectLeaf | PagesDir | Missing
 )
+
+
+def aspect_names(entry: Entry | None) -> list[AspectName]:
+    """The aspects a title offers, default first. A synthetic node has no
+    entry, so it offers none."""
+    if entry is None:
+        return []
+    names = [ASPECT_WIKITEXT, ASPECT_PROPS]
+    if entry.content_model == PROOFREAD_INDEX_CONTENT_MODEL:
+        names.append(ASPECT_PAGES)
+    return names
+
+
+def entry_behind(node: WsNode) -> Entry | None:
+    """The cached title a node names or belongs to, for callers that only
+    care which page a path points at -- whether the path names the title or
+    one of its aspects. Containers with no page of their own (a synthetic
+    node, `@pages`) have none."""
+    match node:
+        case TitleNode(entry=entry):
+            return entry
+        case AspectLeaf():
+            return node.entry
+        case _:
+            return None
+
+
+@dataclass(frozen=True, slots=True)
+class ProofreadPageRef:
+    """A proofread `Page:` title and the Index: that paginates it, if its
+    metadata names one."""
+
+    site: Site
+    page: Entry
+    index: Entry | None
+
+
+def proofread_page_of(store: PageStore, node: WsNode) -> ProofreadPageRef | None:
+    """The proofread page a path names -- as the title itself or any of its
+    aspects, so a client holding either form is understood."""
+    entry, site = entry_behind(node), site_of(node)
+    if (
+        entry is None
+        or site is None
+        or entry.content_model != PROOFREAD_PAGE_CONTENT_MODEL
+    ):
+        return None
+    return ProofreadPageRef(site, entry, store.index_of(entry))
+
+
+def site_of(node: WsNode) -> Site | None:
+    match node:
+        case SiteDir(site=site) | NamespaceDir(site=site) | TitleNode(site=site):
+            return site
+        case AspectLeaf() | PagesDir():
+            return node.site
+        case _:
+            return None
+
+
+def title_node(
+    store: PageStore,
+    path: WikiPath,
+    site: Site,
+    namespaces: SiteNamespaces,
+    ns: NsView,
+    rest: str,
+) -> TitleNode | None:
+    """The node for `rest` in [ns]: held by the cache, or synthetic because
+    subpages of it are."""
+    full = ns.title(rest)
+    entry = store.entry(site, full)
+    if entry is None and not (ns.subpages and store.has_titles_under(site, f"{full}/")):
+        return None
+    return TitleNode(WikiPath.parse(path.node_path), site, namespaces, ns, rest, entry)
 
 
 def resolve(store: PageStore, raw_path: str) -> WsNode:
@@ -117,32 +228,36 @@ def resolve(store: PageStore, raw_path: str) -> WsNode:
     site = store.site(parts[0], parts[1])
     if site is None:
         return Missing(path)
+    namespaces = store.site_namespaces(site)
     if len(parts) == 2:
-        return SiteDir(path, site)
+        return SiteDir(path, site, namespaces)
 
-    page = store.proofread_page(site, path.title)
-    if page is not None:
-        return PageLeaf(path, site, page, store.index_of(page))
-
-    index_title = path.index_title
-    rest = path.rest
-
-    index_page = store.entry(site, index_title)
-    if index_page is None or index_page.content_model != PROOFREAD_INDEX_CONTENT_MODEL:
+    ns = namespaces.by_segment(path.namespace_segment)
+    if ns is None:
         return Missing(path)
 
+    # Either spelling of a title names it; the node carries the wiki's.
+    rest = path.title_rest.replace("_", " ")
     if not rest:
-        return IndexDir(path, site, index_page)
-
-    if rest == ("wikitext",):
-        return IndexWikitext(path, site, index_page)
-
-    if rest[0] == "Pages":
-        return PagesDir(path, site, index_page) if len(rest) == 1 else Missing(path)
-
-    joined = "/".join(rest)
-    # Index-namespace subpage asset
-    asset = store.entry(site, f"{index_title}/{joined}")
-    if asset is None or asset.content_model == PROOFREAD_INDEX_CONTENT_MODEL:
+        # `/f/c/ns/@aspect` has no title for the aspect to belong to.
+        if len(parts) == 3:
+            return NamespaceDir(path, site, namespaces, ns)
         return Missing(path)
-    return IndexAssetLeaf(path, site, asset, joined)
+
+    node = title_node(store, path, site, namespaces, ns, rest)
+    if node is None:
+        return Missing(path)
+
+    aspect = path.aspect
+    if aspect is None:
+        return node
+
+    if node.entry is None:
+        return Missing(path)
+    match aspect:
+        case "wikitext" | "props":
+            return AspectLeaf(path, node, aspect)
+        case "pages" if node.is_index:
+            return PagesDir(path, node)
+        case _:
+            return Missing(path)

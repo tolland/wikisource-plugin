@@ -1,5 +1,5 @@
 import pytest
-from conftest import add_proofread_meta, index_file_title_pk, make_page
+from conftest import add_proofread_meta, index_file_title_pk, make_page, vfs_path
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
@@ -18,7 +18,7 @@ CODE = "en"
 SCOPE = f"{FAMILY}/{CODE}"
 INDEX = "Index:Hertz.pdf"
 PAGE_TITLE = "Page:Hertz.pdf/103"
-PAGE_PATH = f"/{FAMILY}/{CODE}/{PAGE_TITLE}"
+PAGE_PATH = vfs_path(PAGE_TITLE, "wikitext")
 SOURCE_URL = "https://wiki.example/img/Hertz.pdf/page103-500px.jpg"
 
 

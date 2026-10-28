@@ -29,17 +29,25 @@ from wtbot.vfs.errors import (
 Path scheme (all relative to wikisource://):
 
   /                                       root — all sites
-  /{family}/{code}/                       site root — Index pages for that site
-  /{family}/{code}/{Index title}/         index dir — wikitext, Pages, subpages
-  /{family}/{code}/{Index title}/wikitext            Index: description/pagelist wikitext
-  /{family}/{code}/{Index title}/Pages/   listing of the Page: titles the index paginates
-  /{family}/{code}/{Page title}           a Page: -- its own title, slashes included
-                                          (`Page:Foo.djvu/8`), whichever index lists it
+  /{family}/{code}                        site — the namespaces that hold titles
+  /{family}/{code}/{namespace}            namespace container (`(Main)` for main)
+  /{family}/{code}/{ns}/{title segments}  a title: a directory holding its
+                                          subpages and its aspect files
+  .../{title}/@wikitext                   the title's content (what you edit)
+  .../{title}/@props                      its properties, read-only JSON
+  .../{Index title}/@pages                the Page: titles the Index paginates
+
+A title is a node, not a file: it can be a page, a container of subpages, or
+both, and offers any number of aspects (`aspects` on its node, default first).
+Whether a slash in a title is a subpage separator is the namespace's
+`subpages` flag, so `Page:Foo.djvu/8` is `/Page/Foo.djvu/8` (one title) while
+`Book:A/B` is `B` under `A`. `A` is a synthetic node when nothing holds it.
 
 All tree/classification logic lives in `wtbot.vfs`; this module only parses
 params, delegates, and maps domain errors to HTTP status codes.
 
-Served here: stat (single + bulk), children, read, write, delete. Rename,
+Served here: stat (single + bulk), children, read, write (read and write act on
+aspect files; a bare title path is a directory), delete. Rename,
 create-child and the change feed are designed but not implemented, and are
 deliberately absent from the routing table rather than present as
 always-"unsupported" answers.

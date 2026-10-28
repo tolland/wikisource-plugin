@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import base64
+import json
+
 import pytest
 from conftest import add_proofread_meta, make_page
 from fastapi.testclient import TestClient
@@ -10,7 +13,9 @@ from sqlmodel import Session, col, select
 from wtbot.api.schemas import WriteContentRequest
 from wtbot.api.vfs import list_children, read_content, write_content
 from wtbot.model import EditJournal, FileBlob, Page, Site, Title
+from wtbot.model.wiki.namespace import Namespace
 from wtbot.vfs import WikisourceVfs
+from wtbot.vfs.namespaces import SiteNamespaces
 
 FAMILY = "wikisource"
 CODE = "en"
@@ -25,10 +30,21 @@ _FILE_BODY = "== Description ==\nA classic."
 _PAGE_1_BODY = "{{recto}} Page one content."
 _PAGE_2_BODY = "{{verso}} Page two content."
 
-_INDEX_PATH = f"/{FAMILY}/{CODE}/{INDEX}"
+_NAMESPACES = SiteNamespaces.from_rows([])
+
+
+def _node(title: str) -> str:
+    return _NAMESPACES.node_path(FAMILY, CODE, title)
+
+
+def _wikitext(title: str) -> str:
+    return _NAMESPACES.node_path(FAMILY, CODE, title, aspect="wikitext")
+
+
+_INDEX_PATH = _node(INDEX)
 _SITE_PATH = f"/{FAMILY}/{CODE}"
-_PAGES_PATH = f"{_INDEX_PATH}/Pages"
-_FILE_PATH = f"{_INDEX_PATH}/{FILE}"
+_PAGES_PATH = f"{_INDEX_PATH}/@pages"
+_STYLES_PATH = f"{_INDEX_PATH}/styles.css"
 
 
 def _add_index_asset_tree(session: Session) -> None:
@@ -174,12 +190,12 @@ def test_stat_index(vfs_client):
 
 
 def test_stat_index_wikitext(vfs_client):
-    r = vfs_client.get("/vfs/stat", params={"path": f"{_INDEX_PATH}/wikitext"})
+    r = vfs_client.get("/vfs/stat", params={"path": f"{_INDEX_PATH}/@wikitext"})
     assert r.status_code == 200
     body = r.json()
     assert body["exists"] is True
     assert body["kind"] == "file"
-    assert body["name"] == "wikitext"
+    assert body["name"] == "@wikitext"
     assert body["stable_id"] == 1001
     assert body["length"] == len(_INDEX_BODY.encode())
     assert body["content_model"] == "proofread-index"
@@ -193,7 +209,7 @@ def test_stat_pages_container(vfs_client):
 
 
 def test_stat_page(vfs_client):
-    r = vfs_client.get("/vfs/stat", params={"path": f"{_SITE_PATH}/{PAGE_1}"})
+    r = vfs_client.get("/vfs/stat", params={"path": _wikitext(PAGE_1)})
     assert r.status_code == 200
     body = r.json()
     assert body["exists"] is True
@@ -204,7 +220,7 @@ def test_stat_page(vfs_client):
 
 
 def test_stat_missing(vfs_client):
-    r = vfs_client.get("/vfs/stat", params={"path": "/wikisource/en/Index:NoSuch"})
+    r = vfs_client.get("/vfs/stat", params={"path": _node("Index:NoSuch")})
     assert r.status_code == 200
     assert r.json()["exists"] is False
 
@@ -212,13 +228,13 @@ def test_stat_missing(vfs_client):
 def test_stat_carries_decoration_fields(vfs_client):
     """quality_level / dirty / has_reference_image ride on stat so the tree can
     colour-code without extra round trips."""
-    r = vfs_client.get("/vfs/stat", params={"path": f"{_SITE_PATH}/{PAGE_1}"}).json()
+    r = vfs_client.get("/vfs/stat", params={"path": _wikitext(PAGE_1)}).json()
     assert r["quality_level"] == 1
     assert r["dirty"] is False
     assert r["has_reference_image"] is True
 
     # No ProofreadPageMeta row for page 2 -- no scan image known (yet).
-    r = vfs_client.get("/vfs/stat", params={"path": f"{_SITE_PATH}/{PAGE_2}"}).json()
+    r = vfs_client.get("/vfs/stat", params={"path": _wikitext(PAGE_2)}).json()
     assert r["quality_level"] is None
     assert r["has_reference_image"] is False
 
@@ -227,46 +243,48 @@ def test_children_carry_decoration_fields(vfs_client):
     children = vfs_client.get("/vfs/children", params={"path": _PAGES_PATH}).json()[
         "children"
     ]
-    by_name = {c["name"]: c for c in children}
-    assert by_name[PAGE_1]["quality_level"] == 1
-    assert by_name[PAGE_1]["has_reference_image"] is True
-    assert by_name[PAGE_2]["has_reference_image"] is False
+    by_path = {c["path"]: c for c in children}
+    assert by_path[_node(PAGE_1)]["quality_level"] == 1
+    assert by_path[_node(PAGE_1)]["has_reference_image"] is True
+    assert by_path[_node(PAGE_2)]["has_reference_image"] is False
 
 
 def test_stat_reports_dirty_after_local_save(vfs_client):
     r = vfs_client.post(
         "/vfs/content",
         json={
-            "path": f"{_SITE_PATH}/{PAGE_1}",
+            "path": _wikitext(PAGE_1),
             "content_base64": _b64("edited for dirty check"),
             "base_revid": 5003,
         },
     )
     assert r.json()["status"] == "ok"
     assert (
-        vfs_client.get("/vfs/stat", params={"path": f"{_SITE_PATH}/{PAGE_1}"}).json()[
-            "dirty"
-        ]
+        vfs_client.get("/vfs/stat", params={"path": _wikitext(PAGE_1)}).json()["dirty"]
         is True
     )
 
 
-def test_stat_non_page_title_under_pages_is_missing(vfs_client):
-    """A title that exists on the site but is not a Page: must not resolve as
-    a proofread page."""
-    r = vfs_client.get("/vfs/stat", params={"path": f"{_SITE_PATH}/{FILE}"})
-    assert r.status_code == 200
-    assert r.json()["exists"] is False
+def test_stat_any_cached_title_resolves(vfs_client):
+    """Every title the cache holds is a node, whatever its namespace."""
+    r = vfs_client.get("/vfs/stat", params={"path": _node(FILE)}).json()
+    assert r["exists"] is True
+    assert r["kind"] == "directory"
+    assert r["aspects"] == ["wikitext", "props"]
+    r = vfs_client.get("/vfs/stat", params={"path": _wikitext(FILE)}).json()
+    assert r["exists"] is True
+    assert r["kind"] == "file"
+    assert r["content_model"] == "wikitext"
 
 
 def test_stat_index_namespace_asset(engine):
     with Session(engine) as s:
         _add_index_asset_tree(s)
 
-        stat = WikisourceVfs(s).stat(f"{_INDEX_PATH}/styles.css")
+        stat = WikisourceVfs(s).stat(f"{_STYLES_PATH}/@wikitext")
 
     assert stat.exists is True
-    assert stat.name == "styles.css"
+    assert stat.name == "@wikitext"
     assert stat.kind == "file"
     assert stat.revid == 5005
     assert stat.length == len(".pagetext {}".encode())
@@ -282,13 +300,13 @@ def test_stat_bulk_matches_individual_stat(vfs_client):
     paths = [
         "/",
         _INDEX_PATH,
-        f"{_INDEX_PATH}/wikitext",
-        f"{_SITE_PATH}/{PAGE_1}",
-        f"{_SITE_PATH}/{PAGE_2}",
-        "/wikisource/en/Index:NoSuch",
-        f"{_SITE_PATH}/Page:NoSuchPage.djvu/1",
-        f"{_SITE_PATH}/{FILE}",
-        "/wikisource/en/Page:NoSuchPage.djvu/1",
+        f"{_INDEX_PATH}/@wikitext",
+        _wikitext(PAGE_1),
+        _wikitext(PAGE_2),
+        _node("Index:NoSuch"),
+        _wikitext("Page:NoSuchPage.djvu/1"),
+        _wikitext(FILE),
+        _node("Page:NoSuchPage.djvu/1"),
     ]
     bulk = vfs_client.post("/vfs/stat/bulk", json={"paths": paths})
     assert bulk.status_code == 200
@@ -313,14 +331,14 @@ def test_stat_bulk_reflects_uncommitted_edit_length(vfs_client):
     w = vfs_client.post(
         "/vfs/content",
         json={
-            "path": f"{_SITE_PATH}/{PAGE_1}",
+            "path": _wikitext(PAGE_1),
             "content_base64": _b64(edited_body),
             "base_revid": 5003,
         },
     )
     assert w.json()["status"] == "ok"
 
-    paths = [f"{_SITE_PATH}/{PAGE_1}", f"{_SITE_PATH}/{PAGE_2}"]
+    paths = [_wikitext(PAGE_1), _wikitext(PAGE_2)]
     bulk = vfs_client.post("/vfs/stat/bulk", json={"paths": paths})
     results = bulk.json()["results"]
 
@@ -350,10 +368,24 @@ def test_list_site(vfs_client):
     r = vfs_client.get("/vfs/children", params={"path": f"/{FAMILY}/{CODE}"})
     assert r.status_code == 200
     children = r.json()["children"]
-    assert len(children) == 1
-    assert children[0]["name"] == INDEX
-    assert children[0]["kind"] == "directory"
-    assert INDEX_STYLES not in [c["name"] for c in children]
+    # namespaces holding titles; Page is browsed through its Index instead
+    assert [c["name"] for c in children] == ["File", "Index"]
+    assert all(c["kind"] == "directory" for c in children)
+
+
+def test_list_namespace_has_top_level_titles_only(vfs_client):
+    r = vfs_client.get("/vfs/children", params={"path": f"{_SITE_PATH}/Index"})
+    children = r.json()["children"]
+    # the styles.css subpage is below the index, not beside it
+    assert [c["path"] for c in children] == [_INDEX_PATH]
+    assert children[0]["has_children"] is True
+    assert children[0]["aspects"] == ["wikitext", "props", "pages"]
+
+
+def test_list_page_namespace_is_addressable_but_unlisted(vfs_client):
+    r = vfs_client.get("/vfs/children", params={"path": f"{_SITE_PATH}/Page"})
+    paths = [c["path"] for c in r.json()["children"]]
+    assert paths == [_node(PAGE_1), _node(PAGE_2)]
 
 
 def test_list_site_excludes_index_namespace_assets(engine):
@@ -362,7 +394,11 @@ def test_list_site_excludes_index_namespace_assets(engine):
 
         response = list_children(path=f"/{FAMILY}/{CODE}", session=s)
 
-    assert [child.name for child in response.children] == [INDEX]
+    assert [child.name for child in response.children] == ["Index"]
+
+    with Session(engine) as s:
+        response = list_children(path=f"/{FAMILY}/{CODE}/Index", session=s)
+    assert [child.path for child in response.children] == [_INDEX_PATH]
 
 
 def test_list_index_includes_index_namespace_assets(engine):
@@ -384,17 +420,19 @@ def test_list_index_includes_index_namespace_assets(engine):
         response = list_children(path=_INDEX_PATH, session=s)
 
     by_name = {child.name: child for child in response.children}
-    assert by_name["styles.css"].kind == "file"
+    assert by_name["styles.css"].kind == "directory"
     assert by_name["styles.css"].content_model == "sanitized-css"
-    assert by_name["legacy.css"].kind == "file"
+    assert by_name["styles.css"].aspects == ["wikitext", "props"]
+    assert by_name["legacy.css"].kind == "directory"
 
 
 def test_list_index_has_containers(vfs_client):
     r = vfs_client.get("/vfs/children", params={"path": _INDEX_PATH})
     assert r.status_code == 200
     names = [c["name"] for c in r.json()["children"]]
-    assert "wikitext" in names
-    assert "Pages" in names
+    assert "@wikitext" in names
+    assert "@props" in names
+    assert "@pages" in names
     # the backing File: is not part of the plugin-facing tree
     assert FILE not in names
     assert "Templates" not in names
@@ -404,16 +442,17 @@ def test_list_index_has_containers(vfs_client):
     assert PAGE_1 not in names
     assert PAGE_2 not in names
     kinds = {c["name"]: c["kind"] for c in r.json()["children"]}
-    assert kinds["wikitext"] == "file"
-    assert kinds["Pages"] == "directory"
-    assert kinds["styles.css"] == "file"
+    assert kinds["@wikitext"] == "file"
+    assert kinds["@props"] == "file"
+    assert kinds["@pages"] == "directory"
+    assert kinds["styles.css"] == "directory"
 
 
 def test_list_index_wikitext_matches_stat(vfs_client):
     r = vfs_client.get("/vfs/children", params={"path": _INDEX_PATH})
-    node = next(c for c in r.json()["children"] if c["name"] == "wikitext")
+    node = next(c for c in r.json()["children"] if c["name"] == "@wikitext")
     stat = vfs_client.get(
-        "/vfs/stat", params={"path": f"{_INDEX_PATH}/wikitext"}
+        "/vfs/stat", params={"path": f"{_INDEX_PATH}/@wikitext"}
     ).json()
     assert node["path"] == stat["path"]
     assert node["stable_id"] == stat["stable_id"]
@@ -426,15 +465,13 @@ def test_list_pages_container(vfs_client):
     r = vfs_client.get("/vfs/children", params={"path": _PAGES_PATH})
     assert r.status_code == 200
     children = r.json()["children"]
-    names = [c["name"] for c in children]
-    assert PAGE_1 in names
-    assert PAGE_2 in names
-    assert all(c["kind"] == "file" for c in children)
+    assert [c["name"] for c in children] == ["1", "2"]
+    assert all(c["kind"] == "directory" for c in children)
     assert all(c["content_model"] == "proofread-page" for c in children)
-    # a page's path is its own title under the site, not nested under the index
-    assert [c["path"] for c in children] == [
-        f"{_SITE_PATH}/{c['name']}" for c in children
-    ]
+    assert all(c["aspects"] == ["wikitext", "props"] for c in children)
+    # a page's path is its own title in the Page namespace, not nested under
+    # the index that lists it
+    assert [c["path"] for c in children] == [_node(PAGE_1), _node(PAGE_2)]
 
 
 def test_legacy_nested_page_path_is_missing(vfs_client):
@@ -445,8 +482,8 @@ def test_legacy_nested_page_path_is_missing(vfs_client):
 def test_list_pages_sorted(vfs_client):
     r = vfs_client.get("/vfs/children", params={"path": _PAGES_PATH})
     children = r.json()["children"]
-    assert children[0]["name"] == PAGE_1
-    assert children[1]["name"] == PAGE_2
+    assert children[0]["path"] == _node(PAGE_1)
+    assert children[1]["path"] == _node(PAGE_2)
 
 
 # ---------------------------------------------------------------------------
@@ -457,7 +494,7 @@ def test_list_pages_sorted(vfs_client):
 def test_read_page(vfs_client):
     import base64
 
-    r = vfs_client.get("/vfs/content", params={"path": f"{_SITE_PATH}/{PAGE_1}"})
+    r = vfs_client.get("/vfs/content", params={"path": _wikitext(PAGE_1)})
     assert r.status_code == 200
     body = r.json()
     assert body["revid"] == 5003
@@ -466,7 +503,7 @@ def test_read_page(vfs_client):
 
 
 def test_read_missing_page_returns_404(vfs_client):
-    r = vfs_client.get("/vfs/content", params={"path": f"{_SITE_PATH}/Page:NoSuch/99"})
+    r = vfs_client.get("/vfs/content", params={"path": _wikitext("Page:NoSuch/99")})
     assert r.status_code == 404
 
 
@@ -476,7 +513,7 @@ def test_read_index_namespace_asset(engine):
     with Session(engine) as s:
         _add_index_asset_tree(s)
 
-        response = read_content(path=f"{_INDEX_PATH}/styles.css", session=s)
+        response = read_content(path=f"{_STYLES_PATH}/@wikitext", session=s)
 
     assert response.revid == 5005
     assert base64.b64decode(response.content_base64).decode() == ".pagetext {}"
@@ -504,7 +541,7 @@ def test_write_page_ok(vfs_client, engine):
     r = vfs_client.post(
         "/vfs/content",
         json={
-            "path": f"{_SITE_PATH}/{PAGE_1}",
+            "path": _wikitext(PAGE_1),
             "content_base64": _b64(new_body),
             "base_revid": 5003,
             "comment": "fix typo",
@@ -534,10 +571,10 @@ def test_write_page_ok(vfs_client, engine):
         assert journal.committed is False
 
     # read_content/stat serve the uncommitted journal body, not Page.text.
-    r = vfs_client.get("/vfs/content", params={"path": f"{_SITE_PATH}/{PAGE_1}"})
+    r = vfs_client.get("/vfs/content", params={"path": _wikitext(PAGE_1)})
     assert _unb64(r.json()["content_base64"]) == new_body
 
-    r = vfs_client.get("/vfs/stat", params={"path": f"{_SITE_PATH}/{PAGE_1}"})
+    r = vfs_client.get("/vfs/stat", params={"path": _wikitext(PAGE_1)})
     assert r.json()["length"] == len(new_body.encode())
 
 
@@ -545,7 +582,7 @@ def test_write_page_conflict(vfs_client):
     r = vfs_client.post(
         "/vfs/content",
         json={
-            "path": f"{_SITE_PATH}/{PAGE_1}",
+            "path": _wikitext(PAGE_1),
             "content_base64": _b64("stale edit"),
             "base_revid": 1,  # stale -- real revid is 5003
         },
@@ -560,7 +597,7 @@ def test_write_missing_page_returns_error_status(vfs_client):
     r = vfs_client.post(
         "/vfs/content",
         json={
-            "path": f"{_SITE_PATH}/Page:NoSuch/99",
+            "path": _wikitext("Page:NoSuch/99"),
             "content_base64": _b64("x"),
             "base_revid": None,
         },
@@ -576,7 +613,7 @@ def test_write_index_namespace_asset(engine):
 
         result = write_content(
             WriteContentRequest(
-                path=f"{_INDEX_PATH}/styles.css",
+                path=f"{_STYLES_PATH}/@wikitext",
                 content_base64=_b64(new_body),
                 base_revid=5005,
                 comment="adjust styles",
@@ -600,7 +637,7 @@ def test_write_index_namespace_asset(engine):
     assert journal.base_revid == 5005
 
     with Session(engine) as s:
-        content = read_content(f"{_INDEX_PATH}/styles.css", session=s)
+        content = read_content(f"{_STYLES_PATH}/@wikitext", session=s)
     assert _unb64(content.content_base64) == new_body
 
 
@@ -613,14 +650,14 @@ def test_write_twice_read_content_serves_latest_journal(vfs_client):
         r = vfs_client.post(
             "/vfs/content",
             json={
-                "path": f"{_SITE_PATH}/{PAGE_1}",
+                "path": _wikitext(PAGE_1),
                 "content_base64": _b64(body),
                 "base_revid": 5003,
             },
         )
         assert r.json()["status"] == "ok"
 
-    r = vfs_client.get("/vfs/content", params={"path": f"{_SITE_PATH}/{PAGE_1}"})
+    r = vfs_client.get("/vfs/content", params={"path": _wikitext(PAGE_1)})
     assert _unb64(r.json()["content_base64"]) == second
 
 
@@ -635,7 +672,7 @@ def test_read_content_falls_back_to_page_text_once_journal_is_committed(
     r = vfs_client.post(
         "/vfs/content",
         json={
-            "path": f"{_SITE_PATH}/{PAGE_1}",
+            "path": _wikitext(PAGE_1),
             "content_base64": _b64(edited_body),
             "base_revid": 5003,
         },
@@ -658,7 +695,7 @@ def test_read_content_falls_back_to_page_text_once_journal_is_committed(
         s.add(page)
         s.commit()
 
-    r = vfs_client.get("/vfs/content", params={"path": f"{_SITE_PATH}/{PAGE_1}"})
+    r = vfs_client.get("/vfs/content", params={"path": _wikitext(PAGE_1)})
     assert _unb64(r.json()["content_base64"]) == edited_body
 
 
@@ -670,3 +707,246 @@ def test_removed_virtual_nodes_are_missing(vfs_client, suffix):
     r = vfs_client.get("/vfs/stat", params={"path": f"{_INDEX_PATH}/{suffix}"})
     assert r.status_code == 200
     assert r.json()["exists"] is False
+
+
+# ---------------------------------------------------------------------------
+# generic title tree: any namespace, subpages, synthetic nodes, aspects
+# ---------------------------------------------------------------------------
+
+BOOK = "Book:Virtues and vices"
+_BOOK_NAMESPACES = SiteNamespaces.from_rows(
+    [
+        Namespace(
+            site_pk=0, key=3000, canonical_name="Book", local_name="Book", subpages=True
+        )
+    ]
+)
+
+
+def _book_node(title: str) -> str:
+    return _BOOK_NAMESPACES.node_path(FAMILY, CODE, title)
+
+
+def _book_wikitext(title: str) -> str:
+    return _BOOK_NAMESPACES.node_path(FAMILY, CODE, title, aspect="wikitext")
+
+
+@pytest.fixture
+def book_client(engine, tmp_path) -> TestClient:
+    """A `Book:` work -- a page with subpages, one level of them synthetic."""
+    from wtbot.main import create_app
+
+    app = create_app(engine=engine, blob_root=tmp_path / "blobs")
+    with Session(engine) as s:
+        site = Site(family=FAMILY, code=CODE)
+        s.add(site)
+        s.commit()
+        s.refresh(site)
+        s.add(
+            Namespace(
+                site_pk=site.pk,
+                key=3000,
+                canonical_name="Book",
+                local_name="Book",
+                subpages=True,
+            )
+        )
+        for title, body in (
+            (BOOK, "{{book}}"),
+            (f"{BOOK}/Chapter 1", "one"),
+            (f"{BOOK}/Chapter 10", "ten"),
+            (f"{BOOK}/Chapter 2", "two"),
+            (f"{BOOK}/Part 2/Section 3", "deep"),
+        ):
+            s.add(make_page(site_pk=site.pk, title=title, text=body, revid=7))
+        s.commit()
+    with TestClient(app) as c:
+        yield c
+
+
+def _children(client: TestClient, path: str) -> list[dict]:
+    r = client.get("/vfs/children", params={"path": path})
+    assert r.status_code == 200
+    return r.json()["children"]
+
+
+def test_book_is_listed_under_its_namespace(book_client):
+    assert [c["name"] for c in _children(book_client, _SITE_PATH)] == ["Book"]
+    (work,) = _children(book_client, f"{_SITE_PATH}/Book")
+    assert work["name"] == "Virtues and vices"
+    assert work["kind"] == "directory"
+    assert work["has_children"] is True
+    assert work["aspects"] == ["wikitext", "props"]
+
+
+def test_node_children_are_aspects_then_subpages_in_natural_order(book_client):
+    children = _children(book_client, _book_node(BOOK))
+    assert [c["name"] for c in children] == [
+        "@wikitext",
+        "@props",
+        "Chapter 1",
+        "Chapter 2",
+        "Chapter 10",
+        "Part 2",
+    ]
+    by_name = {c["name"]: c for c in children}
+    assert by_name["@wikitext"]["kind"] == "file"
+    assert by_name["Part 2"]["kind"] == "directory"
+
+
+def test_synthetic_node_has_children_but_no_aspects(book_client):
+    stat = book_client.get("/vfs/stat", params={"path": _book_node(f"{BOOK}/Part 2")})
+    body = stat.json()
+    assert body["exists"] is True
+    assert body["kind"] == "directory"
+    assert body["has_children"] is True
+    assert body["aspects"] == []
+    assert body["stable_id"] is None
+    assert [
+        c["name"] for c in _children(book_client, _book_node(f"{BOOK}/Part 2"))
+    ] == ["Section 3"]
+
+
+def test_leaf_title_is_a_node_without_children(book_client):
+    body = book_client.get(
+        "/vfs/stat", params={"path": _book_node(f"{BOOK}/Chapter 1")}
+    ).json()
+    assert body["kind"] == "directory"
+    assert body["has_children"] is False
+    assert body["aspects"] == ["wikitext", "props"]
+
+
+def test_read_and_write_go_through_the_wikitext_aspect(book_client):
+    path = _book_wikitext(f"{BOOK}/Chapter 1")
+    r = book_client.get("/vfs/content", params={"path": path})
+    assert base64.b64decode(r.json()["content_base64"]) == b"one"
+
+    w = book_client.post(
+        "/vfs/content",
+        json={"path": path, "content_base64": _b64("edited"), "base_revid": 7},
+    )
+    assert w.json()["status"] == "ok"
+    node = book_client.get(
+        "/vfs/stat", params={"path": _book_node(f"{BOOK}/Chapter 1")}
+    )
+    assert node.json()["dirty"] is True
+
+
+def test_bare_node_path_is_not_a_file(book_client):
+    r = book_client.get("/vfs/content", params={"path": _book_node(BOOK)})
+    assert r.status_code == 400
+    w = book_client.post(
+        "/vfs/content",
+        json={"path": _book_node(BOOK), "content_base64": _b64("x"), "base_revid": 7},
+    )
+    assert w.json()["status"] == "error"
+
+
+def test_props_aspect_is_a_read_only_json_view(book_client):
+    path = f"{_book_node(BOOK)}/@props"
+    stat = book_client.get("/vfs/stat", params={"path": path}).json()
+    assert stat["kind"] == "file"
+    assert stat["content_model"] == "json"
+
+    r = book_client.get("/vfs/content", params={"path": path})
+    props = json.loads(base64.b64decode(r.json()["content_base64"]))
+    assert props["title"] == BOOK
+    assert props["namespace"] == "Book"
+    assert props["revid"] == 7
+    assert props["dirty"] is False
+    assert stat["length"] == len(base64.b64decode(r.json()["content_base64"]))
+
+    w = book_client.post(
+        "/vfs/content",
+        json={"path": path, "content_base64": _b64("{}"), "base_revid": 7},
+    )
+    assert w.json()["status"] == "error"
+    assert "read-only" in w.json()["message"]
+
+
+def test_stat_bulk_agrees_for_generic_titles(book_client):
+    paths = [
+        _book_wikitext(BOOK),
+        _book_wikitext(f"{BOOK}/Chapter 2"),
+        _book_wikitext(f"{BOOK}/Part 2"),
+        _book_node(f"{BOOK}/Part 2"),
+        f"{_book_node(BOOK)}/@props",
+        _book_wikitext(f"{BOOK}/NoSuch"),
+    ]
+    results = book_client.post("/vfs/stat/bulk", json={"paths": paths}).json()[
+        "results"
+    ]
+    for path, result in zip(paths, results):
+        assert result == book_client.get("/vfs/stat", params={"path": path}).json()
+
+
+# ---------------------------------------------------------------------------
+# one address, two spellings
+# ---------------------------------------------------------------------------
+
+
+def test_titles_cached_in_both_spellings_show_once(engine):
+    """MediaWiki treats `_` and a space as one character. Rows spelled both
+    ways (the underscore one from before titles were stored in the wiki's
+    form) are one node, backed by the row the wiki holds."""
+    with Session(engine) as s:
+        site = Site(family=FAMILY, code=CODE)
+        s.add(site)
+        s.commit()
+        s.refresh(site)
+        s.add(
+            Namespace(
+                site_pk=site.pk,
+                key=3000,
+                canonical_name="Book",
+                local_name="Book",
+                subpages=True,
+            )
+        )
+        # the stub row is older than the one the wiki holds
+        stub = Title(
+            site_pk=site.pk,
+            title="Book:12_More_Rules",
+            expected_content_model="wikitext",
+        )
+        s.add(stub)
+        s.commit()
+        s.add(make_page(site_pk=site.pk, title="Book:12 More Rules", text="held"))
+        s.add(make_page(site_pk=site.pk, title="Book:12_More_Rules/Rule_1", text="sub"))
+        s.commit()
+
+        vfs = WikisourceVfs(s)
+        (node,) = vfs.list_children(f"/{FAMILY}/{CODE}/Book").children
+        assert node.path == f"/{FAMILY}/{CODE}/Book/12 More Rules"
+        assert node.has_children is True
+        assert node.stable_id is not None  # the held row, not the stub
+
+        # either spelling of the title reaches it, and its subpage nests
+        for spelled in ("12 More Rules", "12_More_Rules"):
+            assert vfs.stat(f"/{FAMILY}/{CODE}/Book/{spelled}").exists
+            wikitext = vfs.read(f"/{FAMILY}/{CODE}/Book/{spelled}/@wikitext")
+            assert base64.b64decode(wikitext.content_base64) == b"held"
+        children = vfs.list_children(f"/{FAMILY}/{CODE}/Book/12_More_Rules").children
+        assert [c.name for c in children][-1] == "Rule 1"
+
+
+def test_ensure_title_stores_the_wiki_spelling_and_finds_either(session):
+    from wtbot.title_store import ensure_title, page_at
+
+    site = Site(family=FAMILY, code=CODE)
+    session.add(site)
+    session.commit()
+    session.refresh(site)
+
+    first = ensure_title(
+        session, site_pk=site.pk, title="Book:A_b", expected_content_model="wikitext"
+    )
+    assert first.title == "Book:A b"
+    again = ensure_title(
+        session, site_pk=site.pk, title="Book:A b", expected_content_model="wikitext"
+    )
+    assert again.pk == first.pk
+
+    session.add(make_page(site_pk=site.pk, title="Book:C d"))
+    session.commit()
+    assert page_at(session, site_pk=site.pk, title="Book:C_d") is not None

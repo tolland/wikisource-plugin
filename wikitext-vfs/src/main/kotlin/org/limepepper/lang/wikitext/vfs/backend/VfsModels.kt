@@ -29,6 +29,14 @@ data class StatResult(
     val hasReferenceImage: Boolean = false,
     /** No remote revision backs this file — a missing proofread page's local stub. */
     val placeholder: Boolean = false,
+    /** A directory with something to expand: subpages, or an Index's pages. */
+    val hasChildren: Boolean = false,
+    /**
+     * The aspects a title node offers, default first — `wikitext`, `props`,
+     * `pages`. Each is a child of the node at `{path}/@{aspect}`. Empty for
+     * files and for synthetic containers with no page of their own.
+     */
+    val aspects: List<String> = emptyList(),
 )
 
 data class ChildNode(
@@ -45,6 +53,8 @@ data class ChildNode(
     val dirty: Boolean = false,
     val hasReferenceImage: Boolean = false,
     val placeholder: Boolean = false,
+    val hasChildren: Boolean = false,
+    val aspects: List<String> = emptyList(),
 )
 
 data class ListChildrenResult(

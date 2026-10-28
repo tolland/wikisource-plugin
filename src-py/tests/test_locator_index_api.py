@@ -1,5 +1,5 @@
 import pytest
-from conftest import add_proofread_meta, make_page
+from conftest import add_proofread_meta, make_page, vfs_path
 from sqlmodel import Session, col, select
 
 from wtbot.model import EditJournal, Page, Site, Title
@@ -12,7 +12,7 @@ this endpoint only reads what's already cached)."""
 FAMILY = "wikisource"
 CODE = "en"
 INDEX = "Index:Principles_of_mechanics.pdf"
-INDEX_PATH = f"/{FAMILY}/{CODE}/{INDEX}"
+INDEX_PATH = vfs_path(INDEX)
 
 _PAGELIST_BODY = "<pagelist from=155 to=170 155=121 170=- />"
 
@@ -25,7 +25,7 @@ _PARAGRAPH_273_BODY = (
 
 
 def _page_path(title: str) -> str:
-    return f"/{FAMILY}/{CODE}/{title}"
+    return vfs_path(title, "wikitext")
 
 
 def _seed(engine) -> None:
@@ -79,7 +79,7 @@ def seeded(engine):
 
 
 BARE_INDEX = "Index:NeglectedArgument.pdf"
-BARE_INDEX_PATH = f"/{FAMILY}/{CODE}/{BARE_INDEX}"
+BARE_INDEX_PATH = vfs_path(BARE_INDEX)
 
 
 def _seed_bare_pagelist(engine) -> None:
@@ -282,7 +282,7 @@ def test_dump_works_from_a_page_path_too(client, seeded):
 def test_dump_of_unknown_index_is_404(client, seeded):
     r = client.get(
         "/locator-index/dump",
-        params={"path": f"/{FAMILY}/{CODE}/Index:Nope.pdf"},
+        params={"path": vfs_path("Index:Nope.pdf")},
     )
     assert r.status_code == 404
 
@@ -290,7 +290,7 @@ def test_dump_of_unknown_index_is_404(client, seeded):
 def test_unknown_index_is_404(client, seeded):
     r = client.get(
         "/locator-index/page-numbers",
-        params={"path": f"/{FAMILY}/{CODE}/Index:Nope.pdf", "query": "1"},
+        params={"path": vfs_path("Index:Nope.pdf"), "query": "1"},
     )
     assert r.status_code == 404
 

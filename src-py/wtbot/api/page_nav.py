@@ -5,8 +5,7 @@ from sqlmodel import Session
 from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.deps import get_session
 from wtbot.model.wikisource.proofread_page_meta import ProofreadPageMeta
-from wtbot.vfs.nodes import PageLeaf, resolve
-from wtbot.vfs.paths import title_path
+from wtbot.vfs.nodes import ProofreadPageRef, proofread_page_of, resolve
 from wtbot.vfs.store import Entry, PageStore
 
 """Page-navigation metadata for the split editor's toolbar.
@@ -46,8 +45,8 @@ def get_page_nav(
     session: Session = Depends(get_session),
 ) -> PageNavInfo:
     store = PageStore(session)
-    node = resolve(store, path)
-    if not isinstance(node, PageLeaf):
+    node = proofread_page_of(store, resolve(store, path))
+    if node is None:
         raise HTTPException(status_code=404, detail=f"not a proofread page: {path}")
 
     index_page = node.index
@@ -56,7 +55,8 @@ def get_page_nav(
             status_code=404, detail=f"no Index: paginates this page: {path}"
         )
     index_title = index_page.name
-    index_path = title_path(node.site.family, node.site.code, index_title)
+    namespaces = store.site_namespaces(node.site)
+    index_path = namespaces.node_path(node.site.family, node.site.code, index_title)
 
     siblings, metas = _ordered_siblings(store, node)
     pos = next(i for i, p in enumerate(siblings) if p.pk == node.page.pk)
@@ -64,7 +64,9 @@ def get_page_nav(
     def entry(p: Entry) -> PageNavEntry:
         meta = metas.get(p.pk)
         return PageNavEntry(
-            path=title_path(node.site.family, node.site.code, p.name),
+            path=namespaces.node_path(
+                node.site.family, node.site.code, p.name, aspect="wikitext"
+            ),
             title=p.name,
             page_number=meta.page_number if meta is not None else None,
         )
@@ -83,7 +85,7 @@ def get_page_nav(
 
 
 def _ordered_siblings(
-    store: PageStore, node: PageLeaf
+    store: PageStore, node: ProofreadPageRef
 ) -> tuple[list[Entry], dict[int, ProofreadPageMeta]]:
     """All Page: members of the leaf's index in Pages/-listing order —
     ascending page_number, missing numbers sorting first (as 0) — plus

@@ -8,7 +8,7 @@ ProofreadPage's own API calls it ``imageforpage``.
 """
 
 import pytest
-from conftest import add_proofread_meta, make_page
+from conftest import add_proofread_meta, make_page, vfs_path
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
@@ -49,7 +49,7 @@ def test_a_page_with_no_scan_yet_gets_a_labelled_placeholder(client):
     there is worse than a blank sheet that says which page is waiting."""
     resp = client.get(
         "/reference-image",
-        params={"path": f"/{FAMILY}/{CODE}/{PAGE}"},
+        params={"path": vfs_path(PAGE, "wikitext")},
     )
 
     assert resp.status_code == 200
@@ -91,7 +91,7 @@ def test_preview_still_renders_markup(client):
     one answers with HTML from action=parse."""
     resp = client.post(
         "/preview/render",
-        json={"path": f"/{FAMILY}/{CODE}/{PAGE}", "wikitext": "hi"},
+        json={"path": vfs_path(PAGE, "wikitext"), "wikitext": "hi"},
     )
 
     assert resp.status_code == 200

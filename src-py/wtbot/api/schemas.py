@@ -90,6 +90,18 @@ class Node(BaseModel):
         "proofread page's local stub, or a locally created page not pushed "
         "yet. Opening it starts a new transcription.",
     )
+    has_children: bool = Field(
+        False,
+        description="A directory node that has something to expand: subpages, "
+        "or an Index's pages. False for files.",
+    )
+    aspects: list[str] = Field(
+        default_factory=list,
+        description="The aspects a title node offers, default first. Each is a "
+        "child of the node at `{path}/@{aspect}` -- `wikitext` and `props` are "
+        "files, `pages` is a directory. Empty for files and for synthetic nodes "
+        "(containers with no page of their own).",
+    )
 
 
 class Stat(BaseModel):
@@ -106,6 +118,8 @@ class Stat(BaseModel):
     dirty: bool = False
     has_reference_image: bool = False
     placeholder: bool = False
+    has_children: bool = False
+    aspects: list[str] = Field(default_factory=list)
 
 
 class StatBulkRequest(BaseModel):
