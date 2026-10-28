@@ -484,7 +484,12 @@ class WikisourceVfs:
     # -- delete --------------------------------------------------------------
 
     def delete(
-        self, raw_path: str, *, recursive: bool, discard_local_edits: bool
+        self,
+        raw_path: str,
+        *,
+        recursive: bool,
+        discard_local_edits: bool,
+        dry_run: bool = False,
     ) -> DeleteResponse:
         """Remove a title -- and with [recursive], its subtree -- from the
         local cache. The wiki is never touched (see `wtbot.title_delete`).
@@ -532,10 +537,12 @@ class WikisourceVfs:
             hint = "" if recursive else " (recursive delete includes its dependants)"
             raise DeleteBlocked("; ".join(reasons) + hint)
 
-        delete_titles(self.store.session, pks)
+        if not dry_run:
+            delete_titles(self.store.session, pks)
         return DeleteResponse(
             path=raw_path,
             recursive=recursive,
+            dry_run=dry_run,
             deleted_paths=sorted(
                 {
                     node.namespaces.node_path(node.site.family, node.site.code, t)

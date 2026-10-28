@@ -98,10 +98,13 @@ class ApiClient:
             httpx.put(self._url(endpoint), json=payload, timeout=self.timeout)
         )
 
-    def delete(self, endpoint: str) -> Any:
+    def delete(self, endpoint: str, **params: Any) -> Any:
         import httpx
 
-        return self._result(httpx.delete(self._url(endpoint), timeout=self.timeout))
+        kwargs = {"params": params} if params else {}
+        return self._result(
+            httpx.delete(self._url(endpoint), timeout=self.timeout, **kwargs)
+        )
 
     @staticmethod
     def _result(response) -> Any:

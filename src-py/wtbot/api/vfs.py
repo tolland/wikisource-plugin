@@ -126,6 +126,7 @@ def delete_node(
     path: str = Query(...),
     recursive: bool = Query(False),
     discard_local_edits: bool = Query(False),
+    dry_run: bool = Query(False),
     session: Session = Depends(get_session),
 ) -> DeleteResponse:
     """Remove a title from the local cache; the wiki is untouched.
@@ -135,10 +136,14 @@ def delete_node(
     an Index the Page: titles it paginates. Refused (409) when a deleted title
     has uncommitted local edits (unless `discard_local_edits`) or when a title
     that stays still references one that goes. Any known title is addressable,
-    including ones the synthetic tree cannot place."""
+    including ones the synthetic tree cannot place. `dry_run` runs every check
+    and reports what would go, deleting nothing."""
     try:
         return WikisourceVfs(session).delete(
-            path, recursive=recursive, discard_local_edits=discard_local_edits
+            path,
+            recursive=recursive,
+            discard_local_edits=discard_local_edits,
+            dry_run=dry_run,
         )
     except VfsError as exc:
         raise _http_error(exc) from exc

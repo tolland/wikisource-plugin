@@ -7,6 +7,7 @@ from wtbot.cli.commands import (
     page,
     show_config,
     sync,
+    vfs,
 )
 from wtbot.cli.commands.dev import dev
 from wtbot.cli.commands.fetch import fetch
@@ -38,6 +39,7 @@ def create_app() -> typer.Typer:
     cli.add_typer(site.app, rich_help_panel="Model commands")
     cli.add_typer(site_credential.app, rich_help_panel="Model commands")
     cli.add_typer(page.app, rich_help_panel="Model commands")
+    cli.add_typer(vfs.app, rich_help_panel="Model commands")
     # commands for queue pages to sync to local sqlite cache
     cli.add_typer(fetch.app, rich_help_panel="Fetch Page")
     # sync between two sites ib local cache

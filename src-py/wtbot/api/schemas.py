@@ -184,6 +184,10 @@ class DeleteResponse(BaseModel):
 
     path: str
     recursive: bool
+    dry_run: bool = Field(
+        False,
+        description="True when nothing was removed: these are the paths that would be.",
+    )
     deleted_paths: list[str]
 
 

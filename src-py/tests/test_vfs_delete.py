@@ -253,3 +253,18 @@ def test_every_title_reference_is_either_cascaded_or_blocks():
         if fk.column.table.name in {"title", "page"}
     }
     assert referencing <= handled, referencing - handled
+
+
+def test_dry_run_reports_without_deleting(client, engine):
+    resp = _delete(client, _path(CANONICAL), recursive=True, dry_run=True)
+    assert resp.status_code == 200
+    assert resp.json()["dry_run"] is True
+    assert resp.json()["deleted_paths"] == sorted(
+        [_path(CANONICAL), _path(f"{CANONICAL}/Notes")]
+    )
+    assert CANONICAL in _titles(engine)
+
+
+def test_dry_run_still_refuses(client):
+    resp = _delete(client, _path(INDEX), dry_run=True)
+    assert resp.status_code == 409
