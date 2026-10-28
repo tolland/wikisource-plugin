@@ -22,3 +22,13 @@ class NotADirectory(VfsError):
 
 class NotAFile(VfsError):
     """read/write on a directory or other non-content node."""
+
+
+class NotDeletable(VfsError):
+    """delete on a synthetic node (root, site, `Pages`, `wikitext`) -- there is
+    no title behind it to remove."""
+
+
+class DeleteBlocked(VfsError):
+    """The delete would lose local edits or strand rows that reference the
+    title; the message says which."""

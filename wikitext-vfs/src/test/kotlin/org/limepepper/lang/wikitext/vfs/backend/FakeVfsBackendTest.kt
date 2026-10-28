@@ -106,6 +106,33 @@ class FakeVfsBackendTest {
     }
 
     @Test
+    fun `deleteNode removes only the node by default`() {
+        val r = backend.deleteNode("/wikisource/en/Page:Foo.djvu/1")
+
+        assertEquals(listOf("/wikisource/en/Page:Foo.djvu/1"), r.deletedPaths)
+        assertFalse(backend.stat("/wikisource/en/Page:Foo.djvu/1").exists)
+        assertTrue(backend.stat("/wikisource/en/Page:Foo.djvu/2").exists)
+        assertEquals(
+            listOf("/wikisource/en/Page:Foo.djvu/2"),
+            backend.listChildren("/wikisource/en/Index:Foo.djvu/Pages").children.map { it.path },
+        )
+    }
+
+    @Test
+    fun `deleteNode recursive takes the registered subtree`() {
+        val r = backend.deleteNode("/wikisource/en/Index:Foo.djvu/Pages", recursive = true)
+
+        assertEquals(3, r.deletedPaths.size)
+        assertFalse(backend.stat("/wikisource/en/Page:Foo.djvu/2").exists)
+        assertTrue(backend.stat("/wikisource/en/Index:Foo.djvu").exists)
+    }
+
+    @Test
+    fun `deleteNode on unknown path throws`() {
+        assertThrows(VfsBackendException::class.java) { backend.deleteNode("/wikisource/en/Nope") }
+    }
+
+    @Test
     fun `annotations round trip - save list delete`() {
         val path = "/wikisource/en/Page:Foo.djvu/1"
         val annotation = PageAnnotation(

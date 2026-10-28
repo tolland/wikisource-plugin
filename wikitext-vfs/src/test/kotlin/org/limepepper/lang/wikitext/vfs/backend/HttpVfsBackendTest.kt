@@ -289,6 +289,45 @@ class HttpVfsBackendTest {
         }
     }
 
+    @Test fun `deleteNode sends flags and parses deleted paths`() {
+        var query: String? = null
+        var method: String? = null
+        server.createContext("/vfs/node") { ex ->
+            query = ex.requestURI.rawQuery
+            method = ex.requestMethod
+            val body = """
+                {"path":"/mywikisource/en/Index:Foo.djvu","recursive":true,
+                 "deleted_paths":["/mywikisource/en/Index:Foo.djvu","/mywikisource/en/Page:Foo.djvu/1"]}
+            """.trimIndent().toByteArray()
+            ex.sendResponseHeaders(200, body.size.toLong())
+            ex.responseBody.use { it.write(body) }
+        }
+
+        val r = backend.deleteNode("/mywikisource/en/Index:Foo.djvu", recursive = true)
+
+        assertEquals("DELETE", method)
+        assertTrue(query!!.contains("recursive=true"))
+        assertTrue(query!!.contains("discard_local_edits=false"))
+        assertTrue(r.recursive)
+        assertEquals(
+            listOf("/mywikisource/en/Index:Foo.djvu", "/mywikisource/en/Page:Foo.djvu/1"),
+            r.deletedPaths,
+        )
+    }
+
+    @Test fun `deleteNode surfaces a blocked delete as an exception with its code`() {
+        server.createContext("/vfs/node") { ex ->
+            val body = """{"detail":"uncommitted local edits would be lost","code":"delete-blocked"}""".toByteArray()
+            ex.sendResponseHeaders(409, body.size.toLong())
+            ex.responseBody.use { it.write(body) }
+        }
+        val e = assertThrows(VfsBackendException::class.java) {
+            backend.deleteNode("/mywikisource/en/Page:Foo.djvu/1")
+        }
+        assertEquals(409, e.statusCode)
+        assertEquals("delete-blocked", e.errorCode)
+    }
+
     @Test fun `listTextAnchors parses anchors`() {
         handle("/pages/text-anchors", """
             {"anchors":[

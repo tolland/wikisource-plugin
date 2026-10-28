@@ -53,7 +53,7 @@ cache-only. Operations:
 | `stat`   | timestamp / size / dirty flag (drives `VirtualFile` polling) |
 | `move`   | rename a title (local-only until committed)                  |
 | `copy`   | duplicate a node                                              |
-| `delete` | tombstone a node locally                                      |
+| `delete` | drop a title from the local cache (never the wiki); node only, or `recursive` for its subtree |
 
 A `write` never goes to the wiki. It records a local revision in the journal and
 flips `dirty=1`. This is the key invariant: **saving in the IDE is cheap and
@@ -172,7 +172,11 @@ HEAD   /vfs/{family}/{code}/{title}          # stat (timestamp, dirty)
 PUT    /vfs/{family}/{code}/{title}          # write → journal, dirty=1
 POST   /vfs/move    { from, to }
 POST   /vfs/copy    { from, to }
-DELETE /vfs/{family}/{code}/{title}
+DELETE /vfs/node?path=…&recursive=false&discard_local_edits=false
+  # node only by default (MediaWiki semantics: subpages stay); recursive also takes
+  # subpages and an Index's Pages. 409 delete-blocked on uncommitted edits or when a
+  # surviving title references one that goes; 400 not-deletable for synthetic nodes.
+  # Any known Title is addressable, including ones the tree cannot place (shadow nodes).
 ```
 
 ### 4.3 Commit API (async, push-back)

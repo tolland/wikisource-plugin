@@ -5,7 +5,7 @@ plus the commit surface's response shapes.
 Three sections:
   A) Operations  -- request/response, map to VirtualFileSystem method calls
   B) Commit      -- shapes for /commits (here for now; they are not VFS)
-  C) Reserved    -- designed, not served: rename/delete/create + change feed
+  C) Reserved    -- designed, not served: rename/create + change feed
 
 The OpenAPI spec is generated from these by FastAPI (GET /openapi.json).
 The Kotlin client is NOT generated from that spec -- wikitext-vfs's
@@ -160,6 +160,19 @@ class WriteResult(BaseModel):
     message: str | None = None
 
 
+class DeleteResponse(BaseModel):
+    """What a VFS delete removed from the local cache.
+
+    The wiki is never touched. `deleted_paths` is every title removed, as the
+    path it is addressed by (`/{family}/{code}/{title}`); an Index's synthetic
+    children (`wikitext`, `Pages`) live under its path, so a client evicting by
+    prefix covers them."""
+
+    path: str
+    recursive: bool
+    deleted_paths: list[str]
+
+
 # --------------------------------------------------------------------------
 # B) Commit
 # --------------------------------------------------------------------------
@@ -222,11 +235,6 @@ class RenameRequest(BaseModel):
         "its own initiated rename from an externally-detected one (null requestor "
         "== external change, mirroring VFS getRequestor() semantics).",
     )
-
-
-class DeleteRequest(BaseModel):
-    path: str
-    requestor: str | None = None
 
 
 class CreateChildRequest(BaseModel):

@@ -4,6 +4,7 @@ from sqlmodel import Session
 from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.api.errors import ApiError
 from wtbot.api.schemas import (
+    DeleteResponse,
     ListChildrenResponse,
     ReadContentResponse,
     Stat,
@@ -15,8 +16,10 @@ from wtbot.api.schemas import (
 from wtbot.deps import get_session
 from wtbot.vfs import WikisourceVfs
 from wtbot.vfs.errors import (
+    DeleteBlocked,
     NotADirectory,
     NotAFile,
+    NotDeletable,
     NotFound,
     VfsError,
 )
@@ -36,7 +39,7 @@ Path scheme (all relative to wikisource://):
 All tree/classification logic lives in `wtbot.vfs`; this module only parses
 params, delegates, and maps domain errors to HTTP status codes.
 
-Served here: stat (single + bulk), children, read, write. Rename, delete,
+Served here: stat (single + bulk), children, read, write, delete. Rename,
 create-child and the change feed are designed but not implemented, and are
 deliberately absent from the routing table rather than present as
 always-"unsupported" answers.
@@ -48,6 +51,8 @@ _ERROR_STATUS: dict[type[VfsError], tuple[int, str]] = {
     NotFound: (404, "not-found"),
     NotADirectory: (404, "not-a-directory"),
     NotAFile: (400, "not-a-file"),
+    NotDeletable: (400, "not-deletable"),
+    DeleteBlocked: (409, "delete-blocked"),
 }
 
 
@@ -108,9 +113,32 @@ def write_content(
     return WikisourceVfs(session).write(req)
 
 
-# Not served: rename, delete, create-child, and the change feed. Each had a
+@router.delete("/node", response_model=DeleteResponse)
+def delete_node(
+    path: str = Query(...),
+    recursive: bool = Query(False),
+    discard_local_edits: bool = Query(False),
+    session: Session = Depends(get_session),
+) -> DeleteResponse:
+    """Remove a title from the local cache; the wiki is untouched.
+
+    Like MediaWiki's page delete, the default removes only the node: its
+    subpages stay. `recursive` takes the subtree with it -- subpages, and for
+    an Index the Page: titles it paginates. Refused (409) when a deleted title
+    has uncommitted local edits (unless `discard_local_edits`) or when a title
+    that stays still references one that goes. Any known title is addressable,
+    including ones the synthetic tree cannot place."""
+    try:
+        return WikisourceVfs(session).delete(
+            path, recursive=recursive, discard_local_edits=discard_local_edits
+        )
+    except VfsError as exc:
+        raise _http_error(exc) from exc
+
+
+# Not served: rename, create-child, and the change feed. Each had a
 # route that unconditionally answered "unsupported" (or an empty change
-# list), which put four unimplemented operations in the OpenAPI spec as if
+# list), which put unimplemented operations in the OpenAPI spec as if
 # they were contract. The request/response schemas survive in
 # wtbot.api.schemas as the design record — see its "Reserved" section, which
 # carries the rename-identity invariant these routes will have to honour.

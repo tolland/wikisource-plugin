@@ -113,6 +113,18 @@ data class WriteResult(
 )
 
 /**
+ * What a delete removed from the sidecar's local cache (the wiki is never
+ * touched). [deletedPaths] holds every title removed, by its own path; an
+ * Index's synthetic `wikitext`/`Pages` children live under its path, so evict
+ * by prefix.
+ */
+data class DeleteResult(
+    val path: String,
+    val recursive: Boolean,
+    val deletedPaths: List<String>,
+)
+
+/**
  * One scan annotation from /pages/annotations — a bounding box drawn over
  * the reference image, in normalized full-page coordinates (0 to 1). [category] classifies the
  * region for the OCR pipeline (one of the sidecar's AnnotationCategory wire

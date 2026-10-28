@@ -31,6 +31,23 @@ interface VfsBackend {
     ): WriteResult
 
     /**
+     * Removes the title at [path] from the sidecar's local cache — never from
+     * the wiki. Like MediaWiki's page delete, only that node goes unless
+     * [recursive], which also takes subpages and, for an Index, the Page:
+     * titles it paginates. Refused with [VfsBackendException] (HTTP 409,
+     * error code `delete-blocked`) when a removed title has uncommitted local
+     * edits and [discardLocalEdits] is false, or when a title that stays
+     * still references one that goes; 400 `not-deletable` for synthetic
+     * nodes (root, site, `Pages`, `wikitext`). Any known title is
+     * addressable, including ones the tree cannot place.
+     */
+    fun deleteNode(
+        path: String,
+        recursive: Boolean = false,
+        discardLocalEdits: Boolean = false,
+    ): DeleteResult
+
+    /**
      * Renders an unsaved [wikitext] body to HTML via the wiki's `action=parse`
      * (live-preview semantics). Pass [path] for wikisource:// files so the
      * sidecar resolves the site/title/content-model; pass [title] alone for

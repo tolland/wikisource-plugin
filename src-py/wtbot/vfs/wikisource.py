@@ -1,6 +1,7 @@
 from sqlmodel import Session
 
 from wtbot.api.schemas import (
+    DeleteResponse,
     ListChildrenResponse,
     Node,
     NodeKind,
@@ -11,7 +12,14 @@ from wtbot.api.schemas import (
     WriteStatus,
 )
 from wtbot.model import Site
-from wtbot.vfs.errors import NotADirectory, NotAFile, NotFound
+from wtbot.title_delete import blockers, delete_titles
+from wtbot.vfs.errors import (
+    DeleteBlocked,
+    NotADirectory,
+    NotAFile,
+    NotDeletable,
+    NotFound,
+)
 from wtbot.vfs.mediawiki import MediaWikiVfs, ts_millis
 from wtbot.vfs.nodes import (
     IndexAssetLeaf,
@@ -276,3 +284,71 @@ class WikisourceVfs:
                     status=WriteStatus.error,
                     message="path is not a writable file",
                 )
+
+    # -- delete --------------------------------------------------------------
+
+    def delete(
+        self, raw_path: str, *, recursive: bool, discard_local_edits: bool
+    ) -> DeleteResponse:
+        """Remove a title -- and with [recursive], its subtree -- from the
+        local cache. The wiki is never touched (see `wtbot.title_delete`).
+
+        Without [recursive] only the one title goes, as with MediaWiki's page
+        delete; its subpages stay. A title that others depend on (an Index and
+        the pages it paginates) therefore cannot be deleted alone."""
+        site, root = self._delete_target(raw_path)
+        doomed = self._subtree(site, root) if recursive else [root]
+        pks = [e.pk for e in doomed]
+
+        if not discard_local_edits and (
+            dirty := [e.name for e in doomed if e.title.dirty]
+        ):
+            raise DeleteBlocked(
+                f"uncommitted local edits would be lost: {', '.join(dirty)}"
+                " (pass discard_local_edits to delete anyway)"
+            )
+        if reasons := blockers(self.store.session, pks):
+            hint = "" if recursive else " (recursive delete includes its dependants)"
+            raise DeleteBlocked("; ".join(reasons) + hint)
+
+        delete_titles(self.store.session, pks)
+        return DeleteResponse(
+            path=raw_path,
+            recursive=recursive,
+            deleted_paths=sorted(
+                title_path(site.family, site.code, e.name) for e in doomed
+            ),
+        )
+
+    def _delete_target(self, raw_path: str) -> tuple[Site, Entry]:
+        """The title a delete addresses. Falls back to the bare title for
+        paths the synthetic tree cannot place: a stray title (the shadow nodes
+        that non-canonical fetches leave) is still a Title row to remove."""
+        match resolve(self.store, raw_path):
+            case PageLeaf(_, site, entry) | IndexAssetLeaf(_, site, entry, _):
+                return site, entry
+            case IndexDir(_, site, entry):
+                return site, entry
+            case Missing(path) if len(path.segments) >= 3:
+                if (site := self.store.site(path.family, path.code)) is not None:
+                    if (entry := self.store.entry(site, path.title)) is not None:
+                        return site, entry
+                raise NotFound(f"path not found: {path.raw}")
+            case Missing(path):
+                raise NotFound(f"path not found: {path.raw}")
+            case node:
+                raise NotDeletable(
+                    f"no title behind this node: {node.path.raw}"
+                    " (delete the Index itself, not its synthetic children)"
+                )
+
+    def _subtree(self, site: Site, root: Entry) -> list[Entry]:
+        """[root], its subpages, and -- for an Index -- the Page: titles it
+        paginates, which the tree shows beneath it."""
+        found = {root.pk: root}
+        for entry in self.mw.subpages(site, root.name):
+            found[entry.pk] = entry
+        if root.content_model == PROOFREAD_INDEX_CONTENT_MODEL:
+            for entry in self.store.proofread_pages(site, root.name):
+                found[entry.pk] = entry
+        return list(found.values())

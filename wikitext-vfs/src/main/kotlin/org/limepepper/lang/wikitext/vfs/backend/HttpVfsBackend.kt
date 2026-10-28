@@ -147,6 +147,26 @@ class HttpVfsBackend(
         }
     }
 
+    override fun deleteNode(
+        path: String,
+        recursive: Boolean,
+        discardLocalEdits: Boolean,
+    ): DeleteResult {
+        val json = delete(
+            "/vfs/node",
+            "path" to path,
+            "recursive" to recursive.toString(),
+            "discard_local_edits" to discardLocalEdits.toString(),
+        )
+        return JsonReader(json).run {
+            DeleteResult(
+                path = string("path"),
+                recursive = bool("recursive"),
+                deletedPaths = stringArray("deleted_paths"),
+            )
+        }
+    }
+
     override fun renderPreview(path: String?, title: String?, wikitext: String): PreviewResult {
         val body = buildJsonObject(
             "path" to path,
@@ -450,7 +470,7 @@ class HttpVfsBackend(
         return resp.body()
     }
 
-    private fun delete(endpoint: String, vararg params: Pair<String, String>) {
+    private fun delete(endpoint: String, vararg params: Pair<String, String>): String {
         val uri = queryUri(endpoint, *params)
         val requestId = newRequestId()
         val req = requestBuilder(uri, requestId).DELETE().build()
@@ -458,6 +478,7 @@ class HttpVfsBackend(
         if (resp.statusCode() !in 200..299) {
             throw httpError(uri, resp.statusCode(), resp.body(), requestId)
         }
+        return resp.body()
     }
 
     /**

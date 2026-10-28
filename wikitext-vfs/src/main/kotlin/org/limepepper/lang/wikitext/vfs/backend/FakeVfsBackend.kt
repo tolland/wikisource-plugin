@@ -134,6 +134,33 @@ class FakeVfsBackend : VfsBackend {
         return WriteResult(path, WriteStatus.ok, newRevid = e.revid)
     }
 
+    override fun deleteNode(
+        path: String,
+        recursive: Boolean,
+        discardLocalEdits: Boolean,
+    ): DeleteResult {
+        if (path !in entries) throw VfsBackendException("not found: $path")
+        val doomed = linkedSetOf(path)
+        if (recursive) {
+            // Registered children (an Index's Pages) and nested paths (its assets).
+            val pending = ArrayDeque(listOf(path))
+            while (pending.isNotEmpty()) {
+                val parent = pending.removeFirst()
+                childrenOf[parent].orEmpty().filter(doomed::add).forEach(pending::addLast)
+            }
+            entries.keys.filterTo(doomed) { it.startsWith("$path/") }
+        }
+        for (p in doomed) {
+            entries.remove(p)
+            childrenOf.remove(p)
+            annotations.remove(p)
+            textAnchors.remove(p)
+            boxLinks.remove(p)
+        }
+        childrenOf.values.forEach { it.removeAll(doomed) }
+        return DeleteResult(path, recursive, doomed.sorted())
+    }
+
     override fun renderPreview(path: String?, title: String?, wikitext: String): PreviewResult {
         val escaped = wikitext
             .replace("&", "&amp;")
