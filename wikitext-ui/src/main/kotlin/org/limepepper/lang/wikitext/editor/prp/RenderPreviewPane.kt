@@ -13,6 +13,7 @@ import com.intellij.ui.jcef.JBCefApp
 import com.intellij.ui.jcef.JBCefBrowser
 import com.intellij.ui.jcef.JBCefJSQuery
 import org.limepepper.lang.wikitext.preview.JcefBrowserZoom
+import org.limepepper.lang.wikitext.preview.JcefOpenInBrowserMenu
 import org.limepepper.lang.wikitext.vfs.WtVirtualFile
 import org.limepepper.lang.wikitext.vfs.backend.PreviewResult
 import org.limepepper.lang.wikitext.vfs.backend.WtVfsService
@@ -54,6 +55,14 @@ class RenderPreviewPane(
     // Ctrl-wheel zoom, with the level held across reloads; also drives the
     // toolbar zoom buttons so wheel and buttons share one zoom level.
     private val zoom: JcefBrowserZoom? = jcefBrowser?.let { JcefBrowserZoom(it) }
+
+    // The document last handed to the browser, for the "Open in Browser" menu item.
+    @Volatile
+    private var lastHtml: String? = null
+
+    init {
+        jcefBrowser?.let { JcefOpenInBrowserMenu(it) { lastHtml } }
+    }
 
     /** True when zoom controls apply (JCEF present; the Swing fallback has none). */
     val zoomSupported: Boolean
@@ -235,6 +244,7 @@ class RenderPreviewPane(
     }
 
     private fun showHtml(html: String) {
+        lastHtml = html
         val browser = jcefBrowser
         if (browser != null) {
             browser.loadHTML(html)
