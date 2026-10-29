@@ -381,12 +381,18 @@ def test_spaces_and_underscores_collide(proposal):
         render(proposal, root_page="Book:Work")
 
 
-def test_force_keeps_existing_address_but_returns_canonical_path(session, proposal):
+@pytest.mark.parametrize(
+    "existing_title",
+    ["Book:Work/Part 1/Chapter 1", "Book:Work/Part_1/Chapter_1"],
+)
+def test_force_keeps_existing_address_but_returns_canonical_path(
+    session, proposal, existing_title
+):
     site = seed_site(session)
     session.add(
         Title(
             site_pk=site.pk,
-            title="Book:Work/Part 1/Chapter 1",
+            title=existing_title,
             expected_content_model="wikitext",
         )
     )
@@ -395,10 +401,8 @@ def test_force_keeps_existing_address_but_returns_canonical_path(session, propos
         label="local", proposal=proposal, root_page="Book:Work", force=True
     )
     result = apply_transclusion(session, request)
-    destination = next(
-        p for p in result.pages if p.title == "Book:Work/Part 1/Chapter 1"
-    )
-    assert destination.path == "/local/en/Book/Work/Part_1/Chapter_1/@wikitext"
+    destination = next(p for p in result.pages if p.title == existing_title)
+    assert destination.path == "/local/en/Book/Work/Part 1/Chapter 1/@wikitext"
     assert len(session.exec(select(Title)).all()) == 10
 
 

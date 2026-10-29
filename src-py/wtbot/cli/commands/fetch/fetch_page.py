@@ -15,7 +15,7 @@ def fetch_page(
     ctx: typer.Context = Depends(get_context),
     title: str = typer.Argument(..., help="e.g. Index:Some_book.djvu"),
     depth: int = typer.Option(
-        1, help="expansion depth: 0=page only, 1=expand Index/File"
+        1, help="Expansion: 0=page only, 1=include subpages and Index dependencies"
     ),
     revisions: int = typer.Option(
         1,
@@ -41,8 +41,9 @@ def fetch_page(
     call. ``wtbot drain`` (or ``--drain``) does the work; ``wtbot drain
     --status`` shows what is left.
 
-    For Index: and File: titles, depth=1 (the default) expands the work: blob
-    download plus a child request per page.
+    With depth=1 (the default), namespaces with subpages enabled include all
+    descendants. Index pages also fetch their backing file and scan pages.
+    File pages download their binary at any depth.
     """
     if ctx.invoked_subcommand is not None:
         return

@@ -5,6 +5,8 @@ Enqueue and drain are separate calls, so these tests make the drain explicit --
 which is also the only way to test the state *between* them.
 """
 
+from dataclasses import replace
+
 import pytest
 from conftest import FAKE_TIMESTAMP, fake_pageid, fetch_and_drain, register_site
 from fastapi.testclient import TestClient
@@ -18,6 +20,7 @@ from wtbot.model import (
     FetchStatus,
     FileBlob,
     IndexMeta,
+    Namespace,
     Page,
     ProofreadPageMeta,
     Site,
@@ -371,6 +374,75 @@ def test_index_fanout_creates_pages_and_children(app_with_index_fanout, engine):
         assert fb.size == len(_FAKE_FILE_BYTES)
         assert fb.local_path is not None
         assert fb.local_path == str(blob_file)
+
+
+@pytest.mark.parametrize(
+    ("depth", "subpages", "expected_children"),
+    [(0, True, 0), (1, False, 0), (1, True, 3), (2, True, 3)],
+)
+def test_worker_book_subpage_fanout(session, depth, subpages, expected_children):
+    root = "Book:A work"
+    descendants = [f"{root}/Part 1", f"{root}/Part 1/Chapter 1", f"{root}/Notes"]
+    pages = {
+        title: replace(
+            _remote(title, "wikitext", "Book", 3000, text=f"Body of {title}"),
+            pageid=fake_pageid(title),
+            revid=fake_pageid(title),
+        )
+        for title in [root, *descendants, f"{root} extra/Unrelated"]
+    }
+
+    class SubpageClient(FakeWikiClient):
+        calls: list[str] = []
+
+        def list_subpage_titles(self, title):
+            assert not session.in_transaction()
+            self.calls.append(title)
+            titles = super().list_subpage_titles(title)
+            return titles + titles  # Duplicate enumeration must not duplicate work.
+
+    wiki = SubpageClient(pages=pages)
+    site = Site(family="mywikisource", code="en")
+    session.add(site)
+    session.flush()
+    session.add(
+        Namespace(
+            site_pk=site.pk,
+            key=3000,
+            canonical_name="Book",
+            local_name="Book",
+            subpages=subpages,
+        )
+    )
+    request = FetchRequest(site_pk=site.pk, title=root, depth=depth, revisions=3)
+    session.add(request)
+    session.commit()
+
+    # First pass queues children and leaves the parent awaiting completion.
+    assert run_pending(session, lambda _: wiki, limit=1) == 1
+    session.refresh(request)
+    assert request.progress_total == 1 + expected_children
+    assert request.progress_done == 1
+    assert request.status == (
+        FetchStatus.in_progress if expected_children else FetchStatus.done
+    )
+    assert run_pending(session, lambda _: wiki, limit=20) == expected_children
+    session.refresh(request)
+    assert request.status == FetchStatus.done
+    assert request.progress_done == request.progress_total
+    children = session.exec(
+        select(FetchRequest).where(FetchRequest.parent_pk == request.pk)
+    ).all()
+    assert {child.title for child in children} == (
+        set(descendants) if expected_children else set()
+    )
+    assert all(child.depth == 0 and child.revisions == 3 for child in children)
+    assert all(child.status == FetchStatus.done for child in children)
+    assert {page.address.title for page in session.exec(select(Page)).all()} == {
+        root,
+        *(descendants if expected_children else []),
+    }
+    assert wiki.calls == ([root] if expected_children else [])
 
 
 def test_worker_index_fanout_queues_index_subpages(

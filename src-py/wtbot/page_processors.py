@@ -5,8 +5,9 @@ from pathlib import Path
 from sqlalchemy import func
 from sqlmodel import Session, col, select
 
+from wtbot.db_session import read_snapshot, write_batch
 from wtbot.log.fetch_log import activity, fetch_stage
-from wtbot.model import FetchState, FileBlob, Page, Site, Title
+from wtbot.model import FetchState, FileBlob, Namespace, Page, Site, Title
 from wtbot.model.fetch.fetch_request import FetchKind, FetchRequest, FetchStatus
 from wtbot.model.wiki.namespace import FILE_NAMESPACE_KEY
 from wtbot.model.wikisource.proofread_page_meta import ProofreadPageMeta
@@ -104,7 +105,45 @@ class PageProcessor:
 
 
 class DefaultProcessor(PageProcessor):
-    pass
+    def postprocess(
+        self, ctx: ProcessContext, cached: CachedPage, remote: RemotePage
+    ) -> ProcessOutcome:
+        if ctx.request.depth <= 0:
+            return _DONE
+        with read_snapshot(ctx.session):
+            namespace = ctx.session.exec(
+                select(Namespace).where(
+                    Namespace.site_pk == ctx.request.site_pk,
+                    Namespace.key == remote.namespace_key,
+                )
+            ).first()
+            supports_subpages = namespace is not None and namespace.subpages
+        if not supports_subpages:
+            return _DONE
+
+        with fetch_stage("page_subpages"):
+            titles = ctx.client.list_subpage_titles(remote.title)
+        # Enumerate the whole subtree once, as for Index assets. Children
+        # must not expand again or nested pages would be fetched repeatedly.
+        unique_titles = dict.fromkeys(titles)
+        with write_batch(ctx.session):
+            for title in unique_titles:
+                ctx.session.add(
+                    FetchRequest(
+                        site_pk=ctx.request.site_pk,
+                        parent_pk=ctx.request.pk,
+                        title=title,
+                        kind=FetchKind.single,
+                        depth=0,
+                        revisions=ctx.request.revisions,
+                    )
+                )
+        child_count = len(unique_titles)
+        activity("page fan-out children=%d", child_count)
+        return ProcessOutcome(
+            status=FetchStatus.in_progress if child_count else FetchStatus.done,
+            progress_total=1 + child_count,
+        )
 
 
 class ProofreadPageProcessor(PageProcessor):

@@ -128,6 +128,10 @@ class WikiClient(Protocol):
         """
         ...
 
+    def list_subpage_titles(self, title: str) -> list[str]:
+        """All existing descendants under ``title/``, including nested subpages."""
+        ...
+
     def list_index_subpage_titles(self, title: str) -> list[str]: ...
 
     def get_file_info(self, title: str) -> RemoteFileInfo: ...
@@ -489,16 +493,18 @@ class PywikibotClient:
         )
 
     def list_index_subpage_titles(self, title: str) -> list[str]:
-        from pywikibot import pagegenerators
-        from pywikibot.proofreadpage import IndexPage
+        return self.list_subpage_titles(title)
 
-        index_page = IndexPage(self.site, title)
+    def list_subpage_titles(self, title: str) -> list[str]:
+        from pywikibot import pagegenerators
+
+        parent = self._pwb.Page(self.site, title)
         return [
             page.title()
             for page in pagegenerators.PrefixingPageGenerator(
-                prefix=f"{title}/",
+                prefix=f"{parent.title()}/",
                 site=self.site,
-                namespace=index_page.namespace().id,
+                namespace=parent.namespace().id,
             )
         ]
 
@@ -946,8 +952,11 @@ class FakeWikiClient:
             raise PageNotFound(title) from None
 
     def list_index_subpage_titles(self, title: str) -> list[str]:
-        prefix = f"{title}/"
-        return sorted(t for t in self._pages if t.startswith(prefix))
+        return self.list_subpage_titles(title)
+
+    def list_subpage_titles(self, title: str) -> list[str]:
+        prefix = f"{title.replace('_', ' ')}/"
+        return sorted(t for t in self._pages if t.replace("_", " ").startswith(prefix))
 
     def get_file_info(self, title: str) -> RemoteFileInfo:
         try:
