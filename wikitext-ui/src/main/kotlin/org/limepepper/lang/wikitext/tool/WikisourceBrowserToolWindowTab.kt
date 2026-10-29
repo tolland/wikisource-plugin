@@ -26,6 +26,7 @@ import com.intellij.ui.tree.StructureTreeModel
 import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.ui.tree.TreeUtil
 import org.limepepper.lang.wikitext.WtFileType
+import org.limepepper.lang.wikitext.editor.prp.PageQuality
 import org.limepepper.lang.wikitext.vfs.WtPaths
 import org.limepepper.lang.wikitext.vfs.WtVirtualFile
 import org.limepepper.lang.wikitext.vfs.WtVirtualFileSystem
@@ -185,6 +186,9 @@ internal class WikisourceBrowserToolWindowTab(
         fun selectedFile(): WtVirtualFile? =
             elementOf(tree.lastSelectedPathComponent) as? WtVirtualFile
 
+        fun selectedFiles(): List<WtVirtualFile> =
+            (tree.selectionPaths ?: emptyArray()).mapNotNull { elementOf(it.lastPathComponent) as? WtVirtualFile }
+
         val group = DefaultActionGroup().apply {
             add(object : AnAction("Open") {
                 override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
@@ -210,6 +214,13 @@ internal class WikisourceBrowserToolWindowTab(
                     openAspect(vFile, WtPaths.PROPS, fs)
                 }
             })
+            add(SetPageQualityAction(project, fs, ::selectedFiles))
+            add(
+                SetPageQualityAction(
+                    project, fs, ::selectedFiles,
+                    level = PageQuality.PROOFREAD, text = "Mark Ready to Validate",
+                ),
+            )
             add(object : AnAction("Copy Path") {
                 override fun actionPerformed(e: AnActionEvent) {
                     val vFile = selectedFile() ?: return
