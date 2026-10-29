@@ -54,7 +54,7 @@ class WtRenderPreviewPane(
         // and load handler keep the helper reachable for the browser's life.
         jcefBrowser?.let {
             JcefBrowserZoom(it)
-            JcefOpenInBrowserMenu(it) { lastHtml }
+            JcefOpenInBrowserMenu(it, { previewUrl() }) { lastHtml }
         }
     }
 
@@ -88,6 +88,9 @@ class WtRenderPreviewPane(
                 reload()
             }
         }
+
+    private fun previewUrl(): String? =
+        (file as? WtVirtualFile)?.let { WtVfsService.instance.backend.previewUrl(it.path) }
 
     fun scheduleReload() {
         if (disposed) {

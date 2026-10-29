@@ -61,7 +61,7 @@ class RenderPreviewPane(
     private var lastHtml: String? = null
 
     init {
-        jcefBrowser?.let { JcefOpenInBrowserMenu(it) { lastHtml } }
+        jcefBrowser?.let { JcefOpenInBrowserMenu(it, { previewUrl() }) { lastHtml } }
     }
 
     /** True when zoom controls apply (JCEF present; the Swing fallback has none). */
@@ -117,6 +117,9 @@ class RenderPreviewPane(
                 reload()
             }
         }
+
+    private fun previewUrl(): String? =
+        (file as? WtVirtualFile)?.let { WtVfsService.instance.backend.previewUrl(it.path) }
 
     fun scheduleReload() {
         if (disposed) {

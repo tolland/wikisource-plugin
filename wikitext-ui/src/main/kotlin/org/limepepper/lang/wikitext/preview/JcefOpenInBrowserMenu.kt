@@ -15,18 +15,22 @@ import java.nio.file.Path
 private val MENU_LOG = logger<JcefOpenInBrowserMenu>()
 
 /**
- * Adds "Open in Browser" to a JCEF preview's right-click menu: the currently
- * shown document is written to a temp file and handed to the system browser.
+ * Adds "Open in Browser" to a JCEF preview's right-click menu.
  *
- * The file is a snapshot (it does not live-reload), but the document's
- * `<base href>` and stylesheet links are absolute, so it renders as in the
- * pane. One temp file per menu instance is reused across invocations.
+ * When [urlProvider] yields a URL (a `wikisource://` file, served by the
+ * sidecar's `GET /preview/view`) the system browser opens that, so a refresh
+ * re-renders the saved body plus uncommitted journal entries. Otherwise (local
+ * scratch files) the currently shown document is written to a temp file — a
+ * snapshot that doesn't reload, though its `<base href>` and stylesheet links
+ * are absolute so it renders as in the pane.
  *
+ * @param urlProvider the browser-openable URL for the file, or null.
  * @param htmlProvider the full HTML document currently displayed, or null if
  *   nothing has rendered yet.
  */
 class JcefOpenInBrowserMenu(
     browser: JBCefBrowser,
+    private val urlProvider: () -> String?,
     private val htmlProvider: () -> String?,
 ) {
     private val tempFile: Path by lazy {
@@ -64,9 +68,14 @@ class JcefOpenInBrowserMenu(
     }
 
     private fun openInBrowser() {
-        val html = htmlProvider() ?: return
         ApplicationManager.getApplication().executeOnPooledThread {
             try {
+                val url = urlProvider()
+                if (url != null) {
+                    BrowserUtil.browse(url)
+                    return@executeOnPooledThread
+                }
+                val html = htmlProvider() ?: return@executeOnPooledThread
                 Files.writeString(tempFile, html)
                 BrowserUtil.browse(tempFile.toUri())
             } catch (e: Exception) {

@@ -1,6 +1,8 @@
 import base64
+from html import escape
 
 from fastapi import APIRouter, Depends, Request
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
@@ -10,6 +12,8 @@ from wtbot.api.targets import client_for, resolve_target
 from wtbot.deps import get_session
 from wtbot.model import Site
 from wtbot.shared_repository import is_shared_repository
+from wtbot.vfs.store import PageStore
+from wtbot.wiki.client import RenderedPreview
 
 """Live-preview endpoint — renders an unsaved wikitext body to HTML.
 
@@ -94,3 +98,54 @@ def render_preview(
         server=rendered.server,
         script_path=rendered.script_path,
     )
+
+
+def preview_document(rendered: RenderedPreview) -> str:
+    """Wrap the parser's HTML fragment in a standalone document that pulls the
+    wiki's own stylesheets (site.styles carries the skin-independent content
+    CSS; ext.proofreadpage.base styles the Page-quality banner) and rebases
+    relative links/images onto the wiki server. Mirrors the plugin's own
+    shell, for a browser that opens the page by URL."""
+    head = ""
+    if rendered.server and rendered.script_path:
+        server = escape(rendered.server, quote=True)
+        load = escape(
+            f"{rendered.server}{rendered.script_path}/load.php"
+            "?modules=site.styles%7Cext.proofreadpage.base&only=styles",
+            quote=True,
+        )
+        head = f'<base href="{server}/"><link rel="stylesheet" href="{load}">'
+    return (
+        "<!DOCTYPE html>\n<html>\n<head>\n"
+        f'<meta charset="utf-8"><title>{escape(rendered.title)}</title>\n{head}\n'
+        "<style>body { font-family: sans-serif; margin: 12px; "
+        "background: #fff; color: #202122; }</style>\n</head>\n"
+        f"<body>{rendered.html}</body>\n</html>\n"
+    )
+
+
+@router.get("/view", response_class=HTMLResponse)
+def view_preview(
+    path: str,
+    request: Request,
+    session: Session = Depends(get_session),
+) -> HTMLResponse:
+    """The page as a complete HTML document, addressable by URL so a normal
+    browser (and its dev tools) can open it. Renders the *effective* body --
+    the same one a VFS read reports: latest uncommitted EditJournal row, else
+    a pushed-but-not-refetched commit, else the cached snapshot. Editor text
+    that has not been saved to the VFS is not visible here; use POST /render."""
+    site, title, content_model = resolve_target(session, path)
+    store = PageStore(session)
+    entry = store.entry(site, title)
+    body = store.effective_body(entry) if entry is not None else ""
+    session.close()
+
+    client = client_for(request, site)
+    try:
+        rendered = client.render_preview(title, body, content_model)
+    except Exception as e:
+        raise ApiError(
+            status_code=502, detail=f"parse failed: {e}", code="wiki-parse-failed"
+        ) from e
+    return HTMLResponse(preview_document(rendered))

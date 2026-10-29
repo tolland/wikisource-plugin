@@ -56,6 +56,13 @@ interface VfsBackend {
     fun renderPreview(path: String?, title: String?, wikitext: String): PreviewResult
 
     /**
+     * A URL a normal browser can open to see [path] rendered (saved body plus
+     * uncommitted journal entries, as a full HTML document), or null when this
+     * backend has no server to point at.
+     */
+    fun previewUrl(path: String): String? = null
+
+    /**
      * Navigation metadata for a ProofreadPage Page: leaf — its page number,
      * position within the index, and the previous/next sibling paths that
      * the editor's page back/forward actions open. Throws

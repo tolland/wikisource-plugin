@@ -156,3 +156,25 @@ def test_render_wiki_failure_becomes_502(engine):
         resp = c.post("/preview/render", json={"title": "X", "wikitext": "x"})
         assert resp.status_code == 502
         assert "wiki is down" in resp.json()["detail"]
+
+
+def test_view_renders_cached_body_as_html_document(preview_client, wiki_client):
+    resp = preview_client.get(
+        "/preview/view", params={"path": vfs_path(PAGE, "wikitext")}
+    )
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("text/html")
+    assert resp.text.startswith("<!DOCTYPE html>")
+    assert wiki_client.render_calls == [(PAGE, "old cached body", "proofread-page")]
+
+
+def test_view_prefers_uncommitted_journal_entry(preview_client, wiki_client):
+    path = vfs_path(PAGE, "wikitext")
+    content = base64.b64encode(b"edited locally").decode()
+    wrote = preview_client.post(
+        "/vfs/content", json={"path": path, "content_base64": content}
+    )
+    assert wrote.status_code == 200, wrote.text
+    resp = preview_client.get("/preview/view", params={"path": path})
+    assert resp.status_code == 200
+    assert wiki_client.render_calls[-1][1] == "edited locally"
