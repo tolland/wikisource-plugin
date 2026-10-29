@@ -149,20 +149,37 @@ class WtVirtualFile(
 
     /**
      * Called by [WtVirtualFileSystem.refresh] with a freshly fetched stat.
-     * Content is re-fetched lazily on next access when the revid has moved on;
+     * Content is re-fetched lazily on next access when the body may have moved;
      * children are always invalidated since listings carry no revid of their own.
+     *
+     * The revid alone is not a sufficient key: the effective body is journal >
+     * pushed-not-yet-refetched commit > remote snapshot, and the first two
+     * change it without moving the revid. The backend's timestamp and length
+     * move with the body, so any of revid/timestamp/length/dirty differing
+     * counts as stale.
+     *
+     * @return true when this file's content cache was dropped, so the caller
+     *   can reload an open document that is still showing the old body.
      */
     @Synchronized
-    fun invalidateIfStale(stat: StatResult) {
+    fun invalidateIfStale(stat: StatResult): Boolean {
+        val oldStamp = statTimestamp
+        val oldLength = statLength
+        val oldDirty = dirty
         updateMeta(
             stat.qualityLevel, stat.dirty, stat.hasReferenceImage, stat.placeholder,
             stat.length, stat.timestamp, stat.hasChildren, stat.aspects,
         )
-        if (stat.revid != revid) {
+        val bodyMoved = stat.revid != revid ||
+            statTimestamp != oldStamp ||
+            statLength != oldLength ||
+            dirty != oldDirty
+        if (bodyMoved) {
             revid = stat.revid
             cachedContent = null
         }
         cachedChildren = null
+        return bodyMoved && !isDir
     }
 
     override fun getName(): String = _name
