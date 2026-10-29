@@ -2,6 +2,7 @@ package org.limepepper.lang.wikitext.vfs
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileListener
 import com.intellij.openapi.vfs.VirtualFileSystem
@@ -119,9 +120,10 @@ class WtVirtualFileSystem : VirtualFileSystem() {
             if (files.isEmpty()) return@Runnable
             try {
                 val stats = WtVfsService.instance.backend.statBulk(files.map { it.path })
-                for ((file, stat) in files.zip(stats)) {
-                    if (stat.exists) file.invalidateIfStale(stat)
-                }
+                val changed = files.zip(stats)
+                    .filter { (file, stat) -> stat.exists && file.invalidateIfStale(stat) }
+                    .map { it.first }
+                reloadOpenDocuments(changed)
             } catch (_: VfsBackendException) {
                 // Backend unreachable — leave cached state as-is.
             }
@@ -130,6 +132,23 @@ class WtVirtualFileSystem : VirtualFileSystem() {
             ApplicationManager.getApplication().executeOnPooledThread(doRefresh)
         } else {
             doRefresh.run()
+        }
+    }
+
+    /**
+     * Dropping [WtVirtualFile.cachedContent] is not enough for a file already
+     * open in an editor: the platform keeps its own Document and only re-reads
+     * it when told to. Documents with unsaved edits are left alone -- a refresh
+     * must not discard what the user is typing.
+     */
+    private fun reloadOpenDocuments(changed: List<WtVirtualFile>) {
+        if (changed.isEmpty()) return
+        ApplicationManager.getApplication().invokeLater {
+            val documents = FileDocumentManager.getInstance()
+            val stale = changed.filter {
+                it.isValid && documents.getCachedDocument(it) != null && !documents.isFileModified(it)
+            }
+            if (stale.isNotEmpty()) documents.reloadFiles(*stale.toTypedArray())
         }
     }
 

@@ -285,7 +285,7 @@ def _stage_promotions_for(
     batch.anchor_link_pk = anchor_pk
     session.add(batch)
     revisions = _revisions_after_anchor(
-        session, source_page, source_head, source_anchor
+        session, source_page, source_head, source_anchor, source_site
     )
     if not revisions:
         raise PromotionError(
@@ -325,6 +325,7 @@ def _revisions_after_anchor(
     page: Page,
     head: Revision,
     anchor: Revision | None,
+    source_site: Site,
 ) -> list[Revision]:
     """The complete cached ancestry after ``anchor``, oldest first.
 
@@ -356,7 +357,12 @@ def _revisions_after_anchor(
             raise PromotionError(
                 f"cached history for {page.address.title} is missing parent revid "
                 f"{current.parent_revid}; fetch history through {destination} "
-                "before staging so revisions are not squashed"
+                "before staging so revisions are not squashed. History lives on "
+                f"the SOURCE site ({source_site.label or source_site.family}), "
+                "not the target: `wtbot fetch page --depth=0 --revisions N "
+                f"--label {source_site.label or source_site.family} --drain "
+                f"{page.address.title!r}` with N at least the page's edit count "
+                "(the default of 1 stores only the head)"
             )
         current = parent
     return list(reversed(reverse))
