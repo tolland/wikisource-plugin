@@ -153,6 +153,9 @@ class HttpVfsBackend(
         }
     }
 
+    override fun previewUrl(path: String): String =
+        queryUri("/preview/view", "path" to path).toString()
+
     override fun renderPreview(path: String?, title: String?, wikitext: String): PreviewResult {
         val body = buildJsonObject(
             "path" to path,
