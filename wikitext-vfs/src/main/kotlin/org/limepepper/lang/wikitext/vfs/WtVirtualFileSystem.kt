@@ -115,13 +115,26 @@ class WtVirtualFileSystem : VirtualFileSystem() {
      * a per-file loop here would be thousands of round trips.
      */
     override fun refresh(asynchronous: Boolean) {
+        refreshCachedFiles(cache.values.toList(), asynchronous)
+    }
+
+    /** During migration, a managed save must refresh the corresponding legacy editor. */
+    internal fun refreshCachedPath(path: String, asynchronous: Boolean = true) {
+        refreshCachedFiles(listOfNotNull(cache[path]), asynchronous)
+    }
+
+    private fun refreshCachedFiles(files: List<WtVirtualFile>, asynchronous: Boolean) {
         val doRefresh = Runnable {
-            val files = cache.values.toList()
             if (files.isEmpty()) return@Runnable
             try {
                 val stats = WtVfsService.instance.backend.statBulk(files.map { it.path })
+                val documents = FileDocumentManager.getInstance()
                 val changed = files.zip(stats)
-                    .filter { (file, stat) -> stat.exists && file.invalidateIfStale(stat) }
+                    // Preserve the original revision token as well as unsaved text:
+                    // the next save must still detect concurrent backend changes.
+                    .filter { (file, stat) ->
+                        stat.exists && !documents.isFileModified(file) && file.invalidateIfStale(stat)
+                    }
                     .map { it.first }
                 reloadOpenDocuments(changed)
             } catch (_: VfsBackendException) {

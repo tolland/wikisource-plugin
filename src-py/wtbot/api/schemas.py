@@ -113,6 +113,7 @@ class Stat(BaseModel):
     revid: int | None = None
     timestamp: str | None = None
     length: int | None = None
+    writable: bool = False
     content_model: str | None = None
     quality_level: int | None = None
     dirty: bool = False

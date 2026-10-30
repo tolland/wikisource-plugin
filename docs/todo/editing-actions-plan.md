@@ -76,6 +76,13 @@ VFS impact: none.
 
 ## 4. Search & replace across a subtree of Pages
 
+**Planning update (2026-10-30):** The custom search-panel proposal below is an
+earlier alternative. Follow [Managed Wikisource VFS migration](managed-vfs-migration.md)
+for the current sequence: establish managed lookup, editing, saving and refresh,
+then bounded work attachment, indexing and native Find/Replace. Native search
+has been demonstrated over a bounded work; complete replacement support remains
+to be validated after the basic lifecycle is established.
+
 The OCR-misreading workflow ("force"/"foree" across all `Page:` children of an
 `Index:`). Plain files are already covered by the IDE's Replace in Files over a
 directory. The interesting case is `wikisource://`: platform Find-in-Files does

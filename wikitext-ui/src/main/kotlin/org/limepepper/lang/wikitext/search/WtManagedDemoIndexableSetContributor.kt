@@ -27,3 +27,9 @@ class WtManagedDemoIndexableSetContributor : IndexableSetContributor() {
 fun managedDemoFiles(): Set<VirtualFile> = setOfNotNull(
     VirtualFileManager.getInstance().findFileByUrl(WtManagedDemoFileSystem.URL)
 )
+
+class WtManagedWtbotIndexableSetContributor : IndexableSetContributor() {
+    override fun getAdditionalRootsToIndex(): Set<VirtualFile> = emptySet()
+    override fun getAdditionalProjectRootsToIndex(project: Project): Set<VirtualFile> =
+        project.getService(WtManagedWorkSearch::class.java).loadFiles()
+}

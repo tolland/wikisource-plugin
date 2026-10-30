@@ -21,6 +21,7 @@ class FakeVfsBackend : VfsBackend {
         var revid: Long? = null,
         val contentModel: String? = null,
         val aspects: List<String> = emptyList(),
+        val writable: Boolean = false,
     )
 
     private val entries = mutableMapOf<String, Entry>()
@@ -65,8 +66,10 @@ class FakeVfsBackend : VfsBackend {
         revid: Long? = null,
         contentModel: String? = null,
         parent: String? = null,
+        writable: Boolean = true,
     ): FakeVfsBackend {
-        entries[path] = Entry(path, name, NodeKind.file, content.toByteArray(), stableId, revid, contentModel)
+        entries[path] = Entry(path, name, NodeKind.file, content.toByteArray(), stableId, revid, contentModel,
+            writable = writable)
         _registerWithParent(path, parent)
         return this
     }
@@ -92,6 +95,7 @@ class FakeVfsBackend : VfsBackend {
             stableId = e.stableId,
             revid = e.revid,
             length = if (e.kind == NodeKind.file) e.content.size.toLong() else null,
+            writable = e.writable,
             contentModel = e.contentModel,
             hasChildren = hasChildren(e),
             aspects = e.aspects,
@@ -113,6 +117,7 @@ class FakeVfsBackend : VfsBackend {
                 stableId = e.stableId,
                 revid = e.revid,
                 length = if (e.kind == NodeKind.file) e.content.size.toLong() else null,
+                writable = e.writable,
                 contentModel = e.contentModel,
                 hasChildren = hasChildren(e),
                 aspects = e.aspects,

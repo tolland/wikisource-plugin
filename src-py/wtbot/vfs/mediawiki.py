@@ -129,7 +129,7 @@ class MediaWikiVfs:
         )
         return Stat(
             exists=True,
-            **node.model_dump(exclude={"length", "writable"}),
+            **node.model_dump(exclude={"length"}),
         )
 
     def stat_page(
@@ -151,6 +151,7 @@ class MediaWikiVfs:
             revid=state.revid,
             timestamp=ts_millis(entry.timestamp),
             length=len(state.body.encode()),
+            writable=True,
             content_model=entry.content_model,
             quality_level=resolved.quality_level if resolved is not None else None,
             dirty=entry.title.dirty,

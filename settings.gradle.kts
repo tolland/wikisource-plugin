@@ -6,7 +6,6 @@ pluginManagement {
     repositories {
         mavenCentral()
         gradlePluginPortal()
-        maven("https://packages.jetbrains.team/maven/p/ij/intellij-dependencies/")
     }
     plugins {
         id("org.jetbrains.grammarkit") version "2023.3.0.3"
@@ -33,6 +32,7 @@ dependencyResolutionManagement {
         intellijPlatform {
             defaultRepositories()
         }
+        maven("https://mvnrepository.com/artifact/com.jetbrains.intellij.tools/ide-starter-driver")
     }
 }
 

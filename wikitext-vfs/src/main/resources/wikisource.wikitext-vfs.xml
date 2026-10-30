@@ -3,6 +3,9 @@
         <module name="wikisource.wikitext-core"/>
     </dependencies>
     <extensions defaultExtensionNs="com.intellij">
+        <virtualFileSystem key="wikisource-wtbot"
+            implementationClass="org.limepepper.lang.wikitext.vfs.WtManagedBackendFileSystem"/>
+        <fileTypeOverrider implementation="org.limepepper.lang.wikitext.vfs.WtManagedFileTypeOverrider"/>
         <virtualFileSystem key="wikisource-demo"
             implementationClass="org.limepepper.lang.wikitext.vfs.WtManagedDemoFileSystem"/>
 

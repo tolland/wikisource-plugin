@@ -6,6 +6,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.vfs.VirtualFileWithId
 import com.intellij.util.indexing.IndexableSetContributor
+import org.limepepper.lang.wikitext.vfs.WtVirtualFileSystem
 
 /** An intentionally bounded experiment: never return the database's directory root. */
 class WtStaticIndexableSetContributor : IndexableSetContributor() {
@@ -28,9 +29,14 @@ class WtStaticIndexableSetContributor : IndexableSetContributor() {
 object WtStaticSearchFiles {
     const val URL = "wikisource:///mywikisource/en/Page/Stevenson-Persuasive Definitions-1938.pdf/13/@wikitext"
 
-    fun resolve(): Set<VirtualFile> {
+    fun resolve(cachedOnly: Boolean = false): Set<VirtualFile> {
+        val manager = VirtualFileManager.getInstance()
+        val file = if (cachedOnly) {
+            (manager.getFileSystem(WtVirtualFileSystem.PROTOCOL) as? WtVirtualFileSystem)
+                ?.cachedFiles()?.firstOrNull { it.path == VirtualFileManager.extractPath(URL) }
+        } else manager.findFileByUrl(URL)
         return setOfNotNull(
-            VirtualFileManager.getInstance().findFileByUrl(URL)?.takeIf { it.isValid }
+            file?.takeIf { it.isValid }
         )
     }
 }

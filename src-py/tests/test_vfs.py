@@ -318,6 +318,31 @@ def test_stat_bulk_matches_individual_stat(vfs_client):
         assert result == individual, path
 
 
+def test_stat_writability_matches_children_and_bulk(vfs_client):
+    """Managed VFS uses stat, not child listings, to set document permissions."""
+    for title in (INDEX, PAGE_1, FILE):
+        node = _node(title)
+        listed = {
+            child["path"]: child
+            for child in vfs_client.get("/vfs/children", params={"path": node}).json()[
+                "children"
+            ]
+        }
+        text = f"{node}/@wikitext"
+        props = f"{node}/@props"
+        paths = [node, text, props]
+        expected = [False, True, False]
+        assert listed[text]["writable"] is True
+        assert listed[props]["writable"] is False
+        bulk = vfs_client.post("/vfs/stat/bulk", json={"paths": paths}).json()[
+            "results"
+        ]
+        for path, writable, result in zip(paths, expected, bulk, strict=True):
+            stat = vfs_client.get("/vfs/stat", params={"path": path}).json()
+            assert stat["writable"] is writable, path
+            assert result["writable"] is writable, path
+
+
 def test_stat_bulk_empty(vfs_client):
     r = vfs_client.post("/vfs/stat/bulk", json={"paths": []})
     assert r.status_code == 200
