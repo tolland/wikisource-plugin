@@ -1,5 +1,18 @@
 [versions]
 junit = "4.13.2"
+junit-jupiter = "5.11.4"
+# IDE Starter / Driver, published with the platform builds. Keep on the same
+# branch (262.8665) as intellijPlatformVersion in gradle.properties.
+ide-starter = "262.8665.337"
+kodein = "7.26.1"
 
 [libraries]
 junit = { module = "junit:junit", version.ref = "junit" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit-jupiter" }
+kodein-di = { module = "org.kodein.di:kodein-di-jvm", version.ref = "kodein" }
+ide-starter-squashed = { module = "com.jetbrains.intellij.tools:ide-starter-squashed", version.ref = "ide-starter" }
+ide-starter-junit5 = { module = "com.jetbrains.intellij.tools:ide-starter-junit5", version.ref = "ide-starter" }
+ide-starter-driver = { module = "com.jetbrains.intellij.tools:ide-starter-driver", version.ref = "ide-starter" }
+driver-client = { module = "com.jetbrains.intellij.driver:driver-client", version.ref = "ide-starter" }
+driver-sdk = { module = "com.jetbrains.intellij.driver:driver-sdk", version.ref = "ide-starter" }
+driver-model = { module = "com.jetbrains.intellij.driver:driver-model", version.ref = "ide-starter" }

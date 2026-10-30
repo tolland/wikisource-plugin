@@ -31,7 +31,7 @@ import java.time.Duration
 class WtVfsService : Disposable {
 
     @Volatile
-    private var currentBackend: VfsBackend = buildBackend()
+    private var currentBackend: VfsBackend = buildBackend(allowDemo = true)
 
     /** The backend in force right now. Re-read this per operation. */
     val backend: VfsBackend get() = currentBackend
@@ -66,7 +66,13 @@ class WtVfsService : Disposable {
     companion object {
         private val LOG = Logger.getInstance(WtVfsService::class.java)
 
-        private fun buildBackend(): VfsBackend {
+        private fun buildBackend(allowDemo: Boolean = false): VfsBackend {
+            // Launch-time opt-in for IDE-driven tests (wikitext-ide-tests); a
+            // later settings change still falls through to the real client.
+            if (allowDemo && System.getProperty(DemoVfsBackend.PROPERTY) == "demo") {
+                LOG.info("using in-memory demo backend (-D${DemoVfsBackend.PROPERTY}=demo)")
+                return DemoVfsBackend.create()
+            }
             val settings = WtbotAppSettings.getInstance()
             return HttpVfsBackend(
                 baseUrl = settings.baseUrl,
