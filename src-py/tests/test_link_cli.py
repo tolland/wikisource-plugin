@@ -80,3 +80,95 @@ def test_unpair_still_removes_the_pairing_itself(api):
     assert result.exit_code == 0, result.output
     assert api["deleted"][0].endswith("/links/pairs/4")
     assert "removed pairing 4" in result.output
+
+
+@pytest.fixture
+def revision_api(monkeypatch):
+    posts = []
+
+    def fake_get(url, **kwargs):
+        return httpx.Response(
+            200,
+            json={
+                "local_title": "Page:Book/1",
+                "remote_title": "Page:Other/1",
+                "local_site": "local",
+                "remote_site": "upstream",
+                "local": [
+                    {"revid": 12, "is_head": True},
+                    {"revid": 11, "is_head": False},
+                ],
+                "remote": [{"revid": 902, "is_head": True}],
+            },
+            request=httpx.Request("GET", url),
+        )
+
+    def fake_post(url, json=None, **kwargs):
+        posts.append((url, json))
+        return httpx.Response(201, json={"pk": 8}, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(httpx, "get", fake_get)
+    monkeypatch.setattr(httpx, "post", fake_post)
+    return posts
+
+
+def test_explicit_revision_link_defaults_to_read_only_preview(revision_api):
+    result = runner.invoke(
+        create_app(),
+        ["link", "revision", "4", "--local-revid", "11", "--remote-revid", "902"],
+    )
+    assert result.exit_code == 0, result.output
+    assert revision_api == []
+    assert "Dry run: nothing written" in result.output
+    assert "local: Page:Book/1 @ 11" in result.output
+    assert "upstream: Page:Other/1 @ 902 (cached HEAD)" in result.output
+
+
+def test_explicit_revision_link_force_records_exact_wiki_ids(revision_api):
+    result = runner.invoke(
+        create_app(),
+        [
+            "link",
+            "revision",
+            "4",
+            "--local-revid",
+            "11",
+            "--remote-revid",
+            "902",
+            "--force",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert len(revision_api) == 1
+    url, payload = revision_api[0]
+    assert url.endswith("/links/pairs/4/rungs")
+    assert payload == {
+        "local_revid": 11,
+        "remote_revid": 902,
+        "origin": "manual",
+        "force": True,
+    }
+    assert "no wiki edits made" in result.output
+
+
+@pytest.mark.parametrize("force", [[], ["--force"]])
+@pytest.mark.parametrize("local,remote", [(999, 902), (11, 999)])
+def test_explicit_revision_link_rejects_uncached_or_wrong_page_revision(
+    revision_api, force, local, remote
+):
+    result = runner.invoke(
+        create_app(),
+        [
+            "link",
+            "revision",
+            "4",
+            "--local-revid",
+            str(local),
+            "--remote-revid",
+            str(remote),
+            *force,
+        ],
+    )
+    assert result.exit_code == 1
+    assert "not cached" in result.output
+    assert revision_api == []

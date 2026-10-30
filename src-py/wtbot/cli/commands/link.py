@@ -1,6 +1,7 @@
 from typing import Annotated
 
 import typer
+from pydantic import BaseModel
 from typer_di import Depends, TyperDI
 
 from wtbot.cli.deps import ApiClient, get_api
@@ -422,6 +423,94 @@ def revisions(
     )
     typer.echo(
         f"link #{written['pk']}  {best['local_revid']} <-> {best['remote_revid']}"
+    )
+
+
+class ChosenRevision(BaseModel):
+    revid: int
+    is_head: bool
+
+
+class RevisionPairPreview(BaseModel):
+    local_title: str
+    remote_title: str
+    local_site: str
+    remote_site: str
+    local: list[ChosenRevision]
+    remote: list[ChosenRevision]
+
+
+@app.command("revision")
+def link_revision(
+    pair_pk: int = typer.Argument(
+        ..., min=1, help="Pairing pk (see `wtbot link pairs`)."
+    ),
+    local_revid: int = typer.Option(
+        ..., min=1, help="Local wiki revision ID, not a database pk."
+    ),
+    remote_revid: int = typer.Option(
+        ..., min=1, help="Remote wiki revision ID, not a database pk."
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Write the link, accepting differing content. Default: dry run.",
+    ),
+    api: ApiClient = Depends(get_api),
+) -> None:
+    """Link two explicit wiki revision IDs; dry run unless --force.
+
+    To resume pushing local changes after divergence, choose remote HEAD and
+    the local revision before the changes you want to push (often HEAD's
+    parent). Both revisions must already be cached under this page pairing.
+    This records correspondence only; stage and push the sync separately.
+    """
+    preview = RevisionPairPreview.model_validate(
+        api.get(f"/links/pairs/{pair_pk}/revisions")
+    )
+    typer.echo(f"Pairing #{pair_pk}")
+    for site, title, rows, revid in (
+        (preview.local_site, preview.local_title, preview.local, local_revid),
+        (preview.remote_site, preview.remote_title, preview.remote, remote_revid),
+    ):
+        chosen = next((row for row in rows if row.revid == revid), None)
+        if chosen is None:
+            typer.secho(
+                f"Revision {revid} is not cached for {site}: {title}. "
+                "Fetch its history before linking.",
+                fg=typer.colors.RED,
+                err=True,
+            )
+            raise typer.Exit(1)
+        typer.echo(
+            f"  {site}: {title} @ {revid}"
+            + (" (cached HEAD)" if chosen.is_head else "")
+        )
+
+    typer.echo(
+        "Accepting this correspondence allows sync to replace remote content with later local revisions."
+    )
+    typer.echo(
+        "For local → remote sync, use remote HEAD and leave the local changes to push above the chosen local revision."
+    )
+    if not force:
+        typer.echo(
+            "Dry run: nothing written. Re-run with --force to record this link even if the contents differ."
+        )
+        return
+
+    written = api.post(
+        f"/links/pairs/{pair_pk}/rungs",
+        {
+            "local_revid": local_revid,
+            "remote_revid": remote_revid,
+            "origin": "manual",
+            "force": True,
+        },
+    )
+    typer.echo(f"link #{written['pk']}  {local_revid} <-> {remote_revid}")
+    typer.echo(
+        "Correspondence recorded; no wiki edits made. Run sync report, then stage and push the outstanding changes."
     )
 
 

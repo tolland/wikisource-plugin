@@ -32,7 +32,8 @@
             id="org.limepepper.wikitext.ocr.favorites"
             parentId="tools"
             displayName="OCR Favourites"
-            instance="org.limepepper.lang.wikitext.vfs.settings.OcrFavoritesConfigurable"/>
+            instance="org.limepepper.lang.wikitext.vfs.settings.OcrFavoritesConfigurable"
+        />
 
     </extensions>
 </idea-plugin>

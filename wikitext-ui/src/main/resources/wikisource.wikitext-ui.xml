@@ -5,9 +5,18 @@
         <module name="intellij.platform.ui.jcef"/>
         <module name="intellij.libraries.jcef"/>
         <module name="intellij.platform.structureView"/>
+        <module name="intellij.platform.searchEverywhere"/>
     </dependencies>
 
     <extensions defaultExtensionNs="com.intellij">
+        <indexedRootsProvider
+            implementation="org.limepepper.lang.wikitext.search.WtStaticIndexableSetContributor"/>
+
+        <searchEverywhere.itemsProviderFactory
+            implementation="org.limepepper.lang.wikitext.search.WtStubSearchProviderFactory"/>
+
+        <searchScopesProvider implementation="org.limepepper.lang.wikitext.searchScopes.WsSearchScopeProvider"/>
+
         <applicationConfigurable
             parentId="editor"
             id="org.limepepper.wikitext.highlighting"
@@ -19,10 +28,10 @@
             implementationClass="org.limepepper.lang.wikitext.highlighting.WtSyntaxHighlighterFactory"
         />
 
-<!--        <annotator-->
-<!--            language="Wikitext"-->
-<!--            implementationClass="org.limepepper.lang.wikitext.highlighting.WtAnnotator"-->
-<!--        />-->
+        <!--        <annotator-->
+        <!--            language="Wikitext"-->
+        <!--            implementationClass="org.limepepper.lang.wikitext.highlighting.WtAnnotator"-->
+        <!--        />-->
 
         <annotator
             language="Wikitext"
@@ -148,6 +157,7 @@
         <!--            language="Wikitext"-->
         <!--            implementationClass="org.limepepper.lang.wikitext.inlay.ProofreadInlayProvider"-->
         <!--        />-->
+
 
     </extensions>
 

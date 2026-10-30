@@ -29,6 +29,11 @@
         <multiHostInjector
             implementation="org.limepepper.lang.wikitext.injection.WtVerbatimLanguageInjector"
         />
+
+
+
+<!--        <fileBasedIndex implementation="org.limepepper.lang.wikitext.search.FileIndexImpl"/>-->
+
     </extensions>
 
 <!--    <extensions defaultExtensionNs="org.intellij.intelliLang">-->
