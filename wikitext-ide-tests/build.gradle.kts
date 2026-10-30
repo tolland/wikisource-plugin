@@ -19,6 +19,7 @@ dependencies {
     testImplementation(libs.kodein.di)
     testImplementation(libs.ide.starter.squashed)
     testImplementation(libs.ide.starter.junit5)
+    testImplementation(libs.ide.starter.product.idea.ultimate) // IdeProductProvider.IU
     testImplementation(libs.ide.starter.driver)
     testImplementation(libs.driver.client)
     testImplementation(libs.driver.sdk)
