@@ -26,7 +26,7 @@ class WtStaticIndexableSetContributor : IndexableSetContributor() {
 
 /** Shared by the indexing contributor and the explicit Find/Replace scope. */
 object WtStaticSearchFiles {
-    const val URL = "wikisource:///mywikisource/en/Index/Stevenson-Persuasive Definitions-1938.pdf/13/@wikitext"
+    const val URL = "wikisource:///mywikisource/en/Page/Stevenson-Persuasive Definitions-1938.pdf/13/@wikitext"
 
     fun resolve(): Set<VirtualFile> {
         return setOfNotNull(

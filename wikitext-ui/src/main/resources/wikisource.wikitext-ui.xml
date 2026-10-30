@@ -10,6 +10,8 @@
 
     <extensions defaultExtensionNs="com.intellij">
         <indexedRootsProvider
+            implementation="org.limepepper.lang.wikitext.search.WtManagedDemoIndexableSetContributor"/>
+        <indexedRootsProvider
             implementation="org.limepepper.lang.wikitext.search.WtStaticIndexableSetContributor"/>
 
         <searchEverywhere.itemsProviderFactory

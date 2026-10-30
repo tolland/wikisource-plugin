@@ -3,6 +3,8 @@
         <module name="wikisource.wikitext-core"/>
     </dependencies>
     <extensions defaultExtensionNs="com.intellij">
+        <virtualFileSystem key="wikisource-demo"
+            implementationClass="org.limepepper.lang.wikitext.vfs.WtManagedDemoFileSystem"/>
 
         <virtualFileSystem
             key="wikisource"

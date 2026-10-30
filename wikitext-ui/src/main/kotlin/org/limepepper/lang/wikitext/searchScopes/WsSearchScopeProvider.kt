@@ -7,6 +7,7 @@ import com.intellij.psi.search.SearchScope
 import com.intellij.psi.search.SearchScopeProvider
 import com.intellij.psi.search.GlobalSearchScope
 import org.limepepper.lang.wikitext.search.WtStaticSearchFiles
+import org.limepepper.lang.wikitext.search.managedDemoFiles
 
 class WsSearchScopeProvider : SearchScopeProvider {
     override fun getDisplayName(): @NlsContexts.Separator String? {
@@ -21,6 +22,6 @@ class WsSearchScopeProvider : SearchScopeProvider {
         // file set so Find/Replace can explicitly target this experiment.
         return mutableListOf(GlobalSearchScope.filesScope(
             project, WtStaticSearchFiles.resolve(), "Wikisource (static indexing demo)"
-        ))
+        ), GlobalSearchScope.filesScope(project, managedDemoFiles(), "Wikisource (managed VFS demo)"))
     }
 }
