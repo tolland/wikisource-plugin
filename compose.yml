@@ -139,12 +139,6 @@ services:
     ports:
       - "${WIKIMEDIA_OCR_PORT:-8090}:80"
 
-  # pix2tex/LaTeX-OCR used to be a service here, spoken to directly by a
-  # Pix2TexClient of our own. It now sits behind py-ocrapi
-  # (https://github.com/tolland/py-ocrapi) as one more `engine` value on
-  # the same URL+crop+rotate contract as tesseract and Google Vision, so
-  # the container belongs in that project's compose file, not this one.
-
 volumes:
   mediawiki-db:
   mediawiki-images:

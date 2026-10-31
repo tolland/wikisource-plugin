@@ -1,0 +1,3 @@
+== Integration test ==
+
+A local '''wikitext''' page for editor automation.

@@ -6,8 +6,8 @@ plugins {
 idea {
     module {
         //if for some reason you want to add an extra sourceDirs
-        sourceDirs.add(file("some-extra-source-folder"))
-        name = "this"
+//        sourceDirs.add(file("some-extra-source-folder"))
+//        name = "some name"
     }
 }
 

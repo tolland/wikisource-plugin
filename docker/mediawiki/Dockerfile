@@ -15,9 +15,6 @@ RUN set -eux; \
       https://gerrit.wikimedia.org/r/mediawiki/extensions/ProofreadPage \
       /var/www/html/extensions/ProofreadPage; \
     git clone --depth 1 --branch "$PROOFREADPAGE_BRANCH" \
-      https://gerrit.wikimedia.org/r/mediawiki/extensions/TemplateStyles \
-      /var/www/html/extensions/TemplateStyles; \
-    git clone --depth 1 --branch "$PROOFREADPAGE_BRANCH" \
       https://gerrit.wikimedia.org/r/mediawiki/extensions/Wikisource \
       /var/www/html/extensions/Wikisource; \
     git clone --depth 1 --branch "$PROOFREADPAGE_BRANCH" \

@@ -49,7 +49,7 @@ GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew runIde -PwtbotBaseUrl=http://127
 
 These become the `wtbot.baseUrl` / `wtbot.timeoutSeconds` system properties (`WTBOT_BASE_URL` / `WTBOT_TIMEOUT_SECONDS` env vars work too, for a non-sandbox IDE). They seed the setting at every launch rather than only on a fresh sandbox, and the running IDE can still be moved to another backend from Settings → Tools → WTBot (VFS backend) without restarting.
 
-`runIde` opens a sandbox IDE against `../test-project` (a sibling directory of this repo root, not inside it — create it if it doesn't exist locally). The sandbox config in `sandbox-config/` (editor, look-and-feel, trusted paths, log categories) is copied into the sandbox on every `prepareSandbox` run. The exact target IDE build is pinned in `gradle.properties` (`intellijPlatformVersion`) so Gradle never silently re-resolves a newer RC.
+`runIde` opens a sandbox IDE against `../test-project` (a sibling directory of this repo root, not inside it — create it if it doesn't exist locally). The sandbox config in `sandbox-config/` (editor, look-and-feel, trusted paths, log categories) is copied into the sandbox on every `prepareSandbox` run. The target IDE release is pinned in `gradle.properties` (`intellijPlatformVersion`). Build, sandbox, and Starter integration tests share that target. Update the pin deliberately when adopting a GA release; do not use `latest`, snapshots, or version ranges. Patch releases do not automatically advance the target.
 
 A single test class/method can be run the normal Gradle way, e.g. `GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew :wikitext-core:test --tests "org.limepepper.lang.wikitext.lexer.WtLexerTest.testFooBar"`.
 
@@ -179,4 +179,4 @@ The `LEXER_DEBUG=true` system property is set during `./gradlew test` to enable 
 
 ### Target platform
 
-IntelliJ IDEA **2026.2 RC**, exact build **262.8665.176** (`intellijPlatformVersion` in `gradle.properties`). The sandbox config in `sandbox-config/` is copied into the sandbox on each `prepareSandbox` task run.
+IntelliJ IDEA **2026.2.4 GA**, build **262.11879.100** (`intellijPlatformVersion` in `gradle.properties`). Sandbox preferences in `sandbox-config/` are copied only for development launches; integration tests use separate configuration.

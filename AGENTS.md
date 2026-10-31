@@ -53,6 +53,11 @@ To avoid conflicting with running docker instance, we should use the following c
 - 18584 The wtbot fastapi service
 - 18585 Instance of wikimedia ocr
 
+### Ports for IDE integration tests
+
+The IDE integration suite uses **18590–18599**, separate from pytest’s 1858x
+range. The managed wtbot API listens on **18594**.
+
 ## mediawiki namespace IDs
 
 Upstream en.wikisource.org uses some legacy namespace IDs. This can be seen

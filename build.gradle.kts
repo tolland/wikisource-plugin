@@ -38,12 +38,24 @@ plugins {
     id("com.diffplug.spotless")
 }
 
+// Real IDE tests stay separate from the fast platform/unit tests.
+val integrationTestSourceSet = sourceSets.create("integrationTest")
+
 idea {
     module {
     }
 }
 
 allprojects {
+    plugins.withId("org.jetbrains.intellij.platform.module") {
+        tasks.named<Test>("test") {
+            // The 2026.2.4 Ultimate plugin registers a project startup activity
+            // whose constructor cannot run in the light platform test fixture.
+            // These tests exercise our plugin using the free platform APIs.
+            systemProperty("idea.ignore.disabled.plugins", "false")
+            systemProperty("idea.suppressed.plugins.id", "com.intellij.modules.ultimate")
+        }
+    }
     plugins.withId("org.jetbrains.kotlin.jvm") {
         extensions.configure<KotlinJvmProjectExtension> {
             compilerOptions {
@@ -72,11 +84,26 @@ dependencies {
         pluginModule(implementation(project(":wikitext-core")))
         pluginModule(implementation(project(":wikitext-vfs")))
         pluginModule(implementation(project(":wikitext-ui")))
+        testFramework(TestFrameworkType.Starter, configurationName = "integrationTestImplementation")
         testFramework(TestFrameworkType.Platform)
         bundledModule("intellij.platform.structureView")
         bundledModule("intellij.platform.ui.jcef")
         bundledModule("intellij.libraries.jcef")
     }
+}
+
+dependencies {
+    // The standalone Starter process needs Kotlin even though IDE plugin modules
+    // rely on the IDE-bundled runtime.
+    "integrationTestImplementation"(kotlin("stdlib"))
+    "integrationTestImplementation"(kotlin("reflect"))
+    "integrationTestImplementation"(platform("org.junit:junit-bom:5.12.2"))
+    "integrationTestImplementation"("org.junit.jupiter:junit-jupiter")
+    "integrationTestRuntimeOnly"("org.junit.platform:junit-platform-launcher")
+    // Used by Starter's IDE-process reporter even outside TeamCity.
+    "integrationTestRuntimeOnly"("org.jetbrains.teamcity:serviceMessages:2024.07")
+    "integrationTestImplementation"("org.kodein.di:kodein-di-jvm:7.20.2")
+    "integrationTestImplementation"("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.10.1")
 }
 
 intellijPlatform {
@@ -107,7 +134,11 @@ intellijPlatform {
 
 tasks {
 
-    withType<PrepareSandboxTask> {
+    // Apply workstation preferences only to development IDE launches. Other
+    // sandboxes retain the platform plugin's isolated directories and suffixes.
+    withType<PrepareSandboxTask>().matching {
+        it.name in setOf("prepareSandbox", "prepareSandbox_runIdeWtbotLocal", "prepareSandbox_runIdeWtbotDocker")
+    }.configureEach {
         sandboxDirectory =
             rootProject.layout.projectDirectory.dir(".intellijPlatform/custom-sandbox")
         sandboxSuffix = ""
@@ -191,6 +222,35 @@ tasks {
 }
 
 intellijPlatformTesting {
+    testIdeUi {
+        listOf("integrationTest", "integrationTestExtended").forEach { taskName ->
+            register(taskName) {
+                sandboxDirectory = layout.buildDirectory.dir("$taskName-sandbox")
+                task {
+                    description = if (taskName == "integrationTest") {
+                        "Runs the representative project/editor IDE smoke test."
+                    } else {
+                        "Runs the optional IDE tool-window interaction tests (supports --tests)."
+                    }
+                    testClassesDirs = integrationTestSourceSet.output.classesDirs
+                    classpath = integrationTestSourceSet.runtimeClasspath
+                    useJUnitPlatform {
+                        includeEngines("junit-jupiter")
+                        if (taskName == "integrationTest") {
+                            excludeTags("extended")
+                        } else {
+                            includeTags("extended")
+                        }
+                    }
+                    maxParallelForks = 1
+                    systemProperty("wikitext.test.idePath", platformPath.toString())
+                    jvmArgs("--add-opens=java.base/sun.nio.fs=ALL-UNNAMED")
+                    systemProperty("wtbot.test.baseUrl", "http://127.0.0.1:18594")
+                }
+            }
+        }
+    }
+
     runIde {
         register("runIdeWtbotLocal") {
             task {
