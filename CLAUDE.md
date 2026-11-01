@@ -99,7 +99,7 @@ cd viewer && npm run build
 | Module | Purpose |
 |--------|---------|
 | `wikitext-core` | Language fundamentals: lexer, parser, PSI types, facet |
-| `wikitext-vfs` | `wikisource://` virtual file system + the `VfsBackend` client for the wtbot HTTP contract |
+| `wikitext-vfs` | `wikisource-wtbot://` virtual file system + the `VfsBackend` client for the wtbot HTTP contract |
 | `wikitext-ui` | IDE UI: syntax highlighting, annotator, tool window, structure view, split-editor preview |
 | `src-py` | Python sidecar (`wtbot` package) |
 

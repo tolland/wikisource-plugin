@@ -70,7 +70,7 @@ editor buffer ──POST /preview/render──▶ wtbot (FastAPI)
 ```
 
 * `src-py/wtbot/api/preview.py` — `POST /preview/render` takes
-  `{path | title, wikitext}`. A VFS `path` (for `wikisource://` files) is
+  `{path | title, wikitext}`. A VFS `path` (for `wikisource-wtbot://` files) is
   resolved to site + title + cached content model; a bare `title` (local
   `.wt` scratch files) parses against the first configured site.
 * `WikiClient.render_preview()` (`src-py/wtbot/wiki/client.py`) issues the

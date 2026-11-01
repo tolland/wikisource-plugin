@@ -164,7 +164,7 @@ GET /locator-index/page-numbers?path={vfs path}&query=273[&min_confidence=explic
 GET /locator-index/sections?path={vfs path}&query=p-273[&roles=begin,anchor_template][&limit=20]
 ```
 
-`path` is a *wikisource://* VFS path to either the `Index:` itself or any
+`path` is a *wikisource-wtbot://* VFS path to either the `Index:` itself or any
 `Page:` within it — same contract as `GET /pages/nav`, so a completion
 feature running in the editor of one `Page:` (e.g. the "Index to
 definitions" page itself) can ask about locators for the whole work without

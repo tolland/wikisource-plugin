@@ -85,7 +85,7 @@ know to look.
 
 ### 3.2 Two addressing schemes, unevenly applied
 
-Everything the plugin holds is a `wikisource://` VFS path. Everything the DB
+Everything the plugin holds is a `wikisource-wtbot://` VFS path. Everything the DB
 keys on is a `page_pk`. The API splits along no clear line:
 
 - path-addressed: `/vfs/*`, `/pages/nav`, `/reference-image`,

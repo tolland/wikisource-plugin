@@ -1,6 +1,6 @@
 # Managed Wikisource VFS migration
 
-Status: prototype in progress; lifecycle/URL compatibility updated 2026-11-01.
+Status: managed-only VFS and bounded work attachment; indexing/Find/Replace deferred.
 
 Migrate ordinary Wikisource browsing, opening, editing and saving to platform-managed
 virtual files. Establish those behaviours before enabling indexing and cross-work
@@ -28,10 +28,9 @@ only `wikisource-wtbot`; future search work starts from explicit work attachment
   `wikisource-wtbot://` is the only registered Wikisource protocol.
 - Native Find in Files found content across a bounded work: Index text plus
   20 transcription pages. Complete replacement support is still unverified.
-- The replacement notebook stopped before replacing because its Document was
-  read-only. Child listings exposed `writable`, but `/vfs/stat` omitted it.
-  The API and cached-permission refresh have been corrected and tested; the live
-  workflow needs verification after restarting both wtbot and the sandbox.
+- Early replacement experiments exposed missing writable metadata. The API and
+  managed permission refresh have been corrected and tested. That notebook and
+  its helper are retired; supported Find/Replace work remains deferred.
 - Only managed editor URLs are supported. The old-URL adapter, demo filesystem,
   raw-file classes and their caches/bridges/rebinding fixtures are removed.
   Open old resources again through the browser; no alias or migration fallback
@@ -41,6 +40,12 @@ only `wikisource-wtbot`; future search work starts from explicit work attachment
 Regression coverage: `WtManagedBackendFileSystemTest`, `WtManagedWorkTest`
 and seeded managed IDE lifecycle scenarios.
 Passing fixture tests do not replace verification through the running plugin.
+
+Managed-only cleanup verification: 114 VFS and 90 UI unit tests passed. Seeded
+browser/navigation and two-launch managed offline restoration passed on
+`DISPLAY=:88`, including runtime checks that the old and demo protocols are
+unregistered. The built plugin contains one Wikisource filesystem registration
+and none of the retired file, alias, demo or search-prototype classes.
 
 ## Validation workflow
 
@@ -113,10 +118,10 @@ contract cases; notebooks are supplementary diagnostics.
   canonical `Page/...` paths, not descendants of the container. Decide its managed
   representation without creating duplicate editable identities. The prototype
   currently rejects such non-hierarchical listings during VFS traversal.
-- [x] Choose compatibility for existing URLs: retain managed canonical URLs and
-  accept old `wikisource://` URLs as aliases through the common resolver.
+- [x] Use managed URLs exclusively. The old URL adapter was deliberately removed;
+  resources referenced by old URLs must be reopened from the browser.
 - [ ] Keep path conventions changeable, including a possible authority such as
-  `wikisource://127.0.100.1:18564/...`. Choose protocol cutover and persisted-URL
+  `wikisource-wtbot://127.0.100.1:18564/...`. Choose protocol cutover and persisted-URL
   compatibility before migrating callers; this example is not a required scheme.
 - [x] Define cache behaviour when an address is attached to a different database.
   Backend switching is a robustness test, not a core workflow; stale content must
@@ -297,8 +302,8 @@ Resume after managed VFS feature parity and an explicit attachment model.
 - [ ] Then validate Replace in Files in seeded IDE tests: open/closed files,
   saving, conflicts, cancellation and read-only resources. Compare backend text,
   VFS bytes and Documents rather than relying on the results panel alone.
-- [ ] Remove static scopes, hard-coded roots and prototype providers once the
-  supported implementation replaces them.
+- [x] Remove static scopes, hard-coded roots and prototype providers before
+  implementing supported search on the managed-only base.
 
 Completion: Ctrl+Shift+F and Ctrl+Shift+R work over explicitly attached content
 using the established save and refresh lifecycle.
@@ -386,10 +391,10 @@ Outage and URL compatibility slice (2026-11-01):
   browser and native save refreshes, verifies a rejected save retains unsaved
   text, restarts wtbot with the same SQLite database, retries saving and refreshes
   an independently changed clean Page. Managed IDs remain stable.
-- `seededLegacyUrlsRestoreAsManagedFiles` starts from persisted legacy Index and
-  properties URLs plus a duplicate canonical Index entry. It verifies two managed
-  tabs, read-only properties, a native save and canonical URLs written on close.
-  Its next launch exercises those persistent editor records with wtbot stopped.
+- The former URL compatibility test was retired with the adapter. Current
+  `seededManagedFilesRestoreOffline` coverage seeds only managed Index/properties
+  URLs and exercises cached content, editor profiles and identity with wtbot
+  stopped on the next launch. It checks both retired protocols are unregistered.
 - The test server's explicit `--resume` mode preserves only this scenario's data;
   production serving behavior is unchanged. The VFS unit regression also invokes
   native refresh directly while unavailable and checks the shared Document and ID.
@@ -421,8 +426,7 @@ Database identity, timeout and browser retirement slice (2026-11-01):
   parent. Metadata reload, quality actions, opening and previous/next navigation
   use the same managed files. Backend switching includes managed unsaved documents;
   failed saves cannot approve a switch, and discard is explicit.
-- The legacy URL filesystem owns no records or refresh traversal. General managed
-  refresh iterates existing DB-backed VFS children, not API relationship listings.
+- General managed refresh iterates existing DB-backed VFS children, not API relationship listings.
   Unit checks cover this bound, graph-parent identity and endpoint rebind with
   identical metadata.
 
