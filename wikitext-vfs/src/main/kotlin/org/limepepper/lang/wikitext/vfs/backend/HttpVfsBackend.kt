@@ -524,7 +524,7 @@ class HttpVfsBackend(
      * right after IDE launch, before wtbot has started) surfaces as
      * [VfsBackendException] like every other failure mode here, instead of a
      * raw [IOException]/[InterruptedException] that callers up the VFS chain
-     * (e.g. [WtVirtualFileSystem.findFileByPath] during editor-tab restore)
+     * (e.g. file lookup during editor-tab restore)
      * don't expect and can't catch.
      */
     private fun send(req: HttpRequest): HttpResponse<String> =
@@ -567,7 +567,7 @@ class HttpVfsBackend(
 }
 
 /**
- * Extends [IOException], not [RuntimeException]: [WtVirtualFile]'s
+ * Extends [IOException], not [RuntimeException]: VFS
  * `contentsToByteArray()`/`getInputStream()` overrides implement a Java
  * `VirtualFile` contract that declares `throws IOException`, and IntelliJ
  * platform code around VFS content reads generally catches that — so a

@@ -5,13 +5,10 @@
         <module name="intellij.platform.ui.jcef"/>
         <module name="intellij.libraries.jcef"/>
         <module name="intellij.platform.structureView"/>
-        <module name="intellij.platform.searchEverywhere"/>
     </dependencies>
 
     <extensions defaultExtensionNs="com.intellij">
         <editorTabTitleProvider implementation="org.limepepper.lang.wikitext.preview.WtEditorTabTitleProvider"/>
-        <!-- Search prototypes are unregistered while managed VFS feature parity
-             is established. In particular, startup must not load a hard-coded work. -->
 
         <applicationConfigurable
             parentId="editor"

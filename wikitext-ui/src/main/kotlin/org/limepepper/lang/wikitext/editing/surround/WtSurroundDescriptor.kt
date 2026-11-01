@@ -12,7 +12,7 @@ import org.limepepper.lang.wikitext.editing.WtWrapTagSets
  *
  * Registered on the Wikitext language, so it applies equally to plain `.wt`
  * files and to `wikisource://` files — the whole feature is a
- * [com.intellij.openapi.editor.Document] operation, and `WtVirtualFile` already
+ * [com.intellij.openapi.editor.Document] operation, and the managed VFS already
  * routes saves through the VFS backend, so there is nothing VFS-specific to do
  * here.
  */

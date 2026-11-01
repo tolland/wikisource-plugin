@@ -101,15 +101,12 @@ class WtManagedBackendFileSystemTest : BasePlatformTestCase() {
     }
 
 
-    fun testNativeReplacementSavesAndLegacyRefreshReloadsDocument() {
+    fun testNativeReplacementSavesManagedDocument() {
         val path = testPath("managed-replace")
         val backend = fake(path)
         WtVfsService.instance.setBackendForTesting(backend)
         val managed = requireNotNull(fileSystem.findFileByPath(path))
-        val legacyFs = WtVirtualFileSystem()
-        val legacy = requireNotNull(legacyFs.findFileByPath(path))
         val documents = FileDocumentManager.getInstance()
-        val legacyDocument = requireNotNull(documents.getDocument(legacy))
         val managedDocument = requireNotNull(documents.getDocument(managed))
         assertTrue(managedDocument.isWritable)
         val psi = requireNotNull(PsiManager.getInstance(project).findFile(managed))
@@ -128,32 +125,8 @@ class WtManagedBackendFileSystemTest : BasePlatformTestCase() {
         }
         documents.saveDocument(managedDocument)
         assertEquals("Initial ambitions.", backend.readContent(path).decodeText())
-        // Module-only tests use a manually created legacy filesystem; exercise
-        // the same refresh hook called by managed saves in the registered IDE.
-        legacyFs.refreshCachedPath(path, asynchronous = false)
-        UIUtil.dispatchAllInvocationEvents()
-        assertEquals("Initial ambitions.", legacyDocument.text)
-    }
-
-    fun testLegacyRefreshPreservesUnsavedEdits() {
-        val path = testPath("legacy-unsaved")
-        val backend = fake(path)
-        WtVfsService.instance.setBackendForTesting(backend)
-        val legacyFs = WtVirtualFileSystem()
-        val legacy = requireNotNull(legacyFs.findFileByPath(path))
-        val documents = FileDocumentManager.getInstance()
-        val document = requireNotNull(documents.getDocument(legacy))
-        try {
-            WriteCommandAction.runWriteCommandAction(project) { document.setText("Unsaved local edit") }
-            backend.writeContent(path, Base64.getEncoder().encodeToString("Managed replacement".toByteArray()), 41)
-            legacyFs.refreshCachedPath(path, asynchronous = false)
-            UIUtil.dispatchAllInvocationEvents()
-            assertEquals("Unsaved local edit", document.text)
-            assertEquals(41L, (legacy as WtVirtualFile).revid)
-            assertTrue(documents.isDocumentUnsaved(document))
-        } finally {
-            documents.reloadFromDisk(document)
-        }
+        assertEquals("Initial ambitions.", managedDocument.text)
+        assertFalse(documents.isDocumentUnsaved(managedDocument))
     }
 
     fun testRemoteChangeConflictsWithReadRevision() {

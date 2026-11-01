@@ -120,9 +120,26 @@ The lexer uses a frame/state stack to disambiguate context-dependent tokens (e.g
 
 ### Virtual file system (`wikitext-vfs`)
 
-`WtVirtualFileSystem` implements the `wikisource://` protocol (`/{family}/{code}/{namespace}/{title…}[/@aspect]` — a title is a directory node, the `@wikitext`/`@props` aspect files are what you open; see `docs/reference/vfs-paths.md`) and is backed by the `VfsBackend` interface (`wikitext-vfs/.../vfs/backend/VfsBackend.kt`), which talks to the wtbot FastAPI sidecar over HTTP — `HttpVfsBackend` is the real implementation, `FakeVfsBackend` is used for tests/offline.
+`WtManagedBackendFileSystem` implements `wikisource-wtbot://` using platform-managed
+persistent files with positive `VirtualFileWithId` identities. `WtWikiFiles` resolves
+editor files and exposes cached content-model/revision metadata; `WtManagedAddress`
+owns URL construction. `wikisource://` remains a cacheless lookup adapter for old
+saved URLs and returns the same managed files. The old raw filesystem/file classes
+have been removed. See `docs/reference/vfs-paths.md` for path grammar and identity.
 
-Which sidecar that is lives in `WtbotAppSettings` (application-scoped: wtbot itself mediates between wikis, so one sidecar serves every project, and the VFS is an app singleton). `WtVfsService` owns the live backend and *replaces* it — `HttpVfsBackend` is immutable — when the settings change, so callers must keep reading `WtVfsService.instance.backend` per operation rather than holding a reference. A base-URL change also runs `WtBackendSwitcher`: prompt about unsaved `wikisource://` documents while the old sidecar is still theirs to save to, drop every cached file's content/children, re-stat them against the new backend, close editors on paths it doesn't have, reload the ones it does, then fire `WtVfsService.BACKEND_SWITCHED` for the tool window. Cached `WtVirtualFile` instances are never evicted wholesale — the VFS contract requires one instance per path, and editors/tree nodes hold them — only paths absent from the new backend are evicted and marked invalid. A timeout-only change just swaps the client. `VfsBackend` covers stat (single + bulk), list, read, write (with `baseRevid` conflict detection), live preview rendering, ProofreadPage page navigation, and reference-scan image URLs. The tool window (`MyToolWindowFactory`, in `wikitext-ui`) follows the DataGrip Database Explorer pattern: a custom tree in a side panel, opening real editor tabs via `FileEditorManager` on double-click, which applies the full PSI/lexer/annotator stack.
+`WtVfsService` owns the live `VfsBackend` (`HttpVfsBackend` for wtbot,
+`FakeVfsBackend` for tests), replacing its immutable HTTP client when application
+settings change. Read the current backend per operation. `WtBackendSwitcher`
+handles Save/Discard/Cancel before endpoint changes, resets connection bindings
+and refreshes open managed files. Failed refreshes preserve cached content and
+unsaved edits. Cached read versions bind writes to the backend database UUID and
+revision; an independent replacement database must not receive stale writes.
+
+The browser uses `WikiBrowserNode` relationship values, including `@pages` links
+to canonical Page paths. These are presentation nodes, never editor files.
+Opening uses `WtWikiFiles` and `FileEditorManager`; do not construct VirtualFiles
+for browser nodes. `WtWorkAttachments` persists explicitly selected bounded works
+in project state. It does not register indexable roots or enable Find/Replace.
 
 ### Split-editor preview (`wikitext-ui/.../preview/`)
 

@@ -23,7 +23,7 @@ import java.io.OutputStream
 import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
 
-/** Managed file objects backed by wtbot; legacy URL lookups resolve to these same identities. */
+/** Platform-managed file objects backed by wtbot. */
 
 class WtManagedBackendFileSystem : NewVirtualFileSystem() {
     private data class ContentSnapshot(val connection: String, val revision: Long?, val model: String?, val databaseId: String?)

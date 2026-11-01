@@ -6,7 +6,6 @@ import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.ui.Messages
 import org.limepepper.lang.wikitext.vfs.WtManagedBackendFileSystem
-import org.limepepper.lang.wikitext.vfs.WtVirtualFile
 import org.limepepper.lang.wikitext.vfs.settings.OcrCatalogService
 
 /** Rebind open managed documents after an explicit endpoint change. */
@@ -59,18 +58,5 @@ internal object WtBackendSwitcher {
                 ApplicationManager.getApplication().messageBus.syncPublisher(WtVfsService.BACKEND_SWITCHED).backendSwitched(baseUrl)
             }
         }
-    }
-}
-
-
-/** Result retained for the unregistered legacy-filesystem regression fixtures. */
-internal data class RebindOutcome(
-    /** Cached files the new backend also has — kept, with caches dropped. */
-    val surviving: List<WtVirtualFile>,
-    /** Cached files the new backend does not have — to be closed and invalidated. */
-    val missing: List<WtVirtualFile>,
-) {
-    companion object {
-        val EMPTY = RebindOutcome(emptyList(), emptyList())
     }
 }

@@ -60,7 +60,7 @@ Dependencies point from frontend/backend modules to their shared contracts.
 Remote modules depend explicitly on the language plugin and the language
 content modules whose classes they use. Language modules never depend on
 remote modules. The frontend must not depend on the remote backend or concrete
-`WtVirtualFile` implementations.
+managed filesystem implementations.
 
 ## Concrete moves and refactoring
 

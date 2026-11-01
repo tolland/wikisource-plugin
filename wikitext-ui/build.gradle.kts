@@ -21,7 +21,6 @@ dependencies {
         bundledModule("intellij.platform.ui.jcef")
         bundledModule("intellij.libraries.jcef")
         bundledModule("intellij.platform.structureView")
-        bundledModule("intellij.platform.searchEverywhere")
     }
 }
 

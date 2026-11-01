@@ -18,7 +18,9 @@ The browser uses `WikiBrowserNode` presentation values, including `@pages` links
 to canonical Page paths. A graph occurrence is keyed by database UUID, parent
 occurrence and resource path. It is never a VirtualFile and has no independent
 editor buffer. The legacy URL filesystem is a cacheless lookup delegate; the
-managed-to-legacy save bridge has been removed. Initial lookup of an uncached
+old `WtVirtualFileSystem`/`WtVirtualFile` implementation and its save/refresh
+bridge have been removed. The alias owns no file objects, content caches or
+backend rebinding logic. Initial lookup of an uncached
 resource still needs wtbot; known managed records and cached editor content can
 survive a service outage.
 

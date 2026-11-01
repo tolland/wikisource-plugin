@@ -1,6 +1,6 @@
 package org.limepepper.lang.wikitext.vfs
 
-/** The managed prototype's address boundary. Backend paths currently pass through unchanged. */
+/** Address boundary for managed Wikisource files. */
 @JvmInline
 value class WtManagedAddress private constructor(val backendPath: String) {
     val url: String get() = "$PROTOCOL://$backendPath"

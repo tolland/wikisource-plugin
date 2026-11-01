@@ -95,7 +95,7 @@ paid per keystroke.
 
 `WtPreviewEditorProvider` picks the split-editor subclass from the file's
 MediaWiki content model via `WtEditorProfile.forFile()` (backed by
-`WtVirtualFile.contentModel` / `WtContentModel`):
+`WtWikiFiles.contentModelOf()` / `WtContentModel`):
 
 | content model     | editor                   | reference image | page nav | notes |
 |-------------------|--------------------------|-----------------|----------|-------|

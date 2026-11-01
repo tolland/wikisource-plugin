@@ -22,8 +22,8 @@ work these seams should stay compatible with.
 Each ships independently; 1–2 are pure-editor features usable on plain files
 and VFS files alike from day one. Features 1–3 operate purely on the
 `Editor`/`Document`/PSI layer, so they work identically for plain `.wt` files
-and `wikisource://` VFS files with **zero** VFS-specific code — `WtVirtualFile`
-is writable and routes saves through `getOutputStream` →
+and managed Wikisource VFS files with **zero** VFS-specific code — the managed
+filesystem routes writable file saves through `getOutputStream` →
 `VfsBackend.writeContent` → EditJournal. Only feature 4 needs new contract
 surface on `VfsBackend` and the sidecar.
 
