@@ -117,7 +117,7 @@ def store(engine):
         ),
         (
             f"{_SITE}/Page/Wittgenstein - Tractatus Logico-Philosophicus, 1922.djvu",
-            Missing,
+            TitleNode,  # physical scan-name ancestor, with no page/aspects of its own
         ),
         # any namespace is browsable, not only Index/Page
         (

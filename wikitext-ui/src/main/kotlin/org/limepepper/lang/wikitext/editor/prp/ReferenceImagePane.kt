@@ -11,7 +11,7 @@ import org.limepepper.lang.wikitext.annotation.BoundingBox
 import org.limepepper.lang.wikitext.annotation.BoundingBoxModel
 import org.limepepper.lang.wikitext.annotation.ImageAnnotationPane
 import org.limepepper.lang.wikitext.editing.WtEditingFlags
-import org.limepepper.lang.wikitext.vfs.WtVirtualFile
+import org.limepepper.lang.wikitext.vfs.WtWikiFiles
 import org.limepepper.lang.wikitext.vfs.backend.VfsBackendException
 import org.limepepper.lang.wikitext.vfs.backend.WtVfsService
 import java.awt.Rectangle
@@ -79,7 +79,7 @@ class ReferenceImagePane(
 
     /** Revision the file's cached content is based on, for new anchors. */
     val baseRevid: Long?
-        get() = (file as? WtVirtualFile)?.revid
+        get() = WtWikiFiles.revisionOf(file)
 
     /** Hands the right-click menu over to the host (see [org.limepepper.lang.wikitext.annotation.ImageAnnotationCanvas.popupMenuFactory]). */
     fun installPopupMenu(factory: (BoundingBox?) -> JPopupMenu?) {
@@ -147,14 +147,14 @@ class ReferenceImagePane(
         }
         loadStarted = true
         annotationPane.showStatus("Loading reference image…")
-        val vfsPath = (file as? WtVirtualFile)?.path
+        val vfsPath = WtWikiFiles.pathOf(file)
         ApplicationManager.getApplication().executeOnPooledThread {
             var failure: String? = null
             val backend = WtVfsService.instance.backend
             val image = try {
                 loadImage(backend.fetchReferenceImage(
                     vfsPath,
-                    if (file is WtVirtualFile) null else file.nameWithoutExtension,
+                    if (WtWikiFiles.pathOf(file) != null) null else file.nameWithoutExtension,
                 ))
             } catch (e: VfsBackendException) {
                 // The sidecar already explained itself (its error object's

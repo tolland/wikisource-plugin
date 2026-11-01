@@ -54,6 +54,7 @@ class WtVirtualFile(
     // first access. Protected by `@Synchronized` on each accessor.
     @Volatile var cachedChildren: Array<VirtualFile>? = null
     @Volatile var cachedContent: ByteArray? = null
+    @Volatile private var readDatabaseId: String? = null
 
     // Backend-reported facts about the effective body — the same content a
     // read of this path serves (server precedence: uncommitted journal >
@@ -239,7 +240,9 @@ class WtVirtualFile(
         val cached = cachedContent
         if (cached != null) return cached
         // Blocking fetch — IntelliJ calls this off the EDT via LoadTextUtil.
-        val bytes = WtVfsService.instance.backend.readContent(_path).decodeContent()
+        val content = WtVfsService.instance.backend.readContent(_path)
+        val bytes = content.decodeContent()
+        readDatabaseId = content.databaseId
         cachedContent = bytes
         return bytes
     }
@@ -248,6 +251,10 @@ class WtVirtualFile(
 
     override fun getOutputStream(requestor: Any?, newModificationStamp: Long, newTimeStamp: Long): OutputStream {
         if (isDir) throw IOException("cannot write a directory: $_path")
+        val expectedDatabaseId = readDatabaseId
+        if (WtVfsService.instance.backend.requiresDatabaseIdentity && expectedDatabaseId == null) {
+            throw IOException("Database identity is unknown; reload before saving")
+        }
         return object : ByteArrayOutputStream() {
             // IntelliJ calls close() once on save, off the EDT, after the
             // editor has finished writing the new buffer into this stream.
@@ -256,7 +263,7 @@ class WtVirtualFile(
                 val bytes = toByteArray()
                 val base64 = java.util.Base64.getEncoder().encodeToString(bytes)
                 val result = try {
-                    WtVfsService.instance.backend.writeContent(_path, base64, revid)
+                    WtVfsService.instance.backend.writeContent(_path, base64, revid, databaseId = expectedDatabaseId)
                 } catch (e: VfsBackendException) {
                     throw IOException("save failed for $_path: ${e.message}", e)
                 }
@@ -269,6 +276,7 @@ class WtVirtualFile(
                         // content without waiting for the next re-stat.
                         statTimestamp = System.currentTimeMillis()
                         revid = result.newRevid
+                        readDatabaseId = result.databaseId
                         // A local save is journalled, not pushed — the page is
                         // now dirty relative to the wiki until committed.
                         dirty = true

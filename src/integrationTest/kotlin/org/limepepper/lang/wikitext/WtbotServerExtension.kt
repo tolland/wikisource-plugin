@@ -6,6 +6,7 @@ import org.junit.jupiter.api.extension.ExtensionContext
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.URI
+import java.net.URLEncoder
 import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
@@ -22,6 +23,7 @@ annotation class WithWtbot
 /** Starts a real local API only for tests annotated with [WithWtbot]. */
 class WtbotServerExtension : BeforeEachCallback, AfterEachCallback {
     private var process: Process? = null
+    private var launchBuilder: ProcessBuilder? = null
     var baseUrl: String? = null
         private set
 
@@ -44,7 +46,7 @@ class WtbotServerExtension : BeforeEachCallback, AfterEachCallback {
         val builder = ProcessBuilder(
             "uv", "run", "--no-sync", "python", "-m", "ide_test_support",
             "--data-dir", directory.toString(), "--port", "18594", "--scenario", "browser",
-        ).directory(root.toFile()).redirectErrorStream(true).redirectOutput(log.toFile())
+        ).directory(root.toFile()).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.appendTo(log.toFile()))
         builder.environment().apply {
             put("PYTHONPATH", root.resolve("src-py").toString())
             put("WTBOT_DATABASE_URL", "sqlite:///${directory.resolve("wtbot.db")}")
@@ -53,6 +55,13 @@ class WtbotServerExtension : BeforeEachCallback, AfterEachCallback {
             put("WTBOT_FAILURE_LOG", directory.resolve("failure.log").toString())
         }
         println("Managed wtbot artifacts: $directory")
+        launchBuilder = builder
+        startServer()
+    }
+
+    private fun startServer() {
+        val builder = requireNotNull(launchBuilder)
+        val log = builder.redirectOutput().file()
         try {
             val child = builder.start()
             process = child
@@ -81,7 +90,51 @@ class WtbotServerExtension : BeforeEachCallback, AfterEachCallback {
 
     override fun afterEach(context: ExtensionContext) = stop()
 
-    private fun stop() {
+    fun restartServer() {
+        check(process == null) { "Stop the owned backend before restarting it" }
+        val builder = requireNotNull(launchBuilder)
+        if ("--resume" !in builder.command()) builder.command(builder.command() + "--resume")
+        startServer()
+    }
+
+    fun replaceDatabase(lastPage: Int) {
+        stopServer()
+        val builder = requireNotNull(launchBuilder)
+        val directory = java.nio.file.Files.createTempDirectory(builder.directory().toPath().resolve("build/ide-backends"), "replacement-")
+        val args = builder.command().toMutableList()
+        args.remove("--resume")
+        args[args.indexOf("--data-dir") + 1] = directory.toString()
+        val indexArg = args.indexOf("--index-last-page")
+        if (indexArg >= 0) args[indexArg + 1] = lastPage.toString()
+        else args.addAll(listOf("--index-last-page", lastPage.toString()))
+        builder.command(args)
+        builder.environment()["WTBOT_DATABASE_URL"] = "sqlite:///${directory.resolve("wtbot.db")}"
+        builder.environment()["WTBOT_BLOB_ROOT"] = directory.resolve("blobs").toString()
+        builder.environment()["WTBOT_FAILURE_LOG"] = directory.resolve("failure.log").toString()
+        // Keep the scenario log together across owned replacement processes.
+        startServer()
+    }
+
+    fun stall(method: String = "", path: String = "", seconds: Int = 0) {
+        val encoded = URLEncoder.encode(path, Charsets.UTF_8)
+        val request = HttpRequest.newBuilder(URI.create("${requireNotNull(baseUrl)}/__ide_test/stall?method=$method&path=$encoded&seconds=$seconds"))
+            .version(HttpClient.Version.HTTP_1_1).timeout(Duration.ofSeconds(10))
+            .POST(HttpRequest.BodyPublishers.noBody()).build()
+        check(HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString()).statusCode() == 204)
+    }
+
+    fun revise(path: String, text: String, revid: Long) {
+        val encoded = URLEncoder.encode(path, Charsets.UTF_8)
+        val request = HttpRequest.newBuilder(URI.create("${requireNotNull(baseUrl)}/__ide_test/revise?path=$encoded&revid=$revid"))
+            .version(HttpClient.Version.HTTP_1_1)
+            .timeout(Duration.ofSeconds(10))
+            .header("Content-Type", "text/plain; charset=utf-8")
+            .POST(HttpRequest.BodyPublishers.ofString(text)).build()
+        val response = HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString())
+        check(response.statusCode() == 204) { "Revision injection failed: ${response.statusCode()}: ${response.body()}" }
+    }
+
+    fun stopServer() {
         process?.let { child ->
             // uv can retain a child Python process; terminate the whole owned tree.
             val descendants = child.descendants().toList()
@@ -91,6 +144,11 @@ class WtbotServerExtension : BeforeEachCallback, AfterEachCallback {
             descendants.filter { it.isAlive }.forEach { it.destroyForcibly() }
         }
         process = null
+    }
+
+    private fun stop() {
+        stopServer()
+        launchBuilder = null
         baseUrl = null
     }
 }

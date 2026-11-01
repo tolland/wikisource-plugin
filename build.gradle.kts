@@ -96,6 +96,7 @@ dependencies {
     // The standalone Starter process needs Kotlin even though IDE plugin modules
     // rely on the IDE-bundled runtime.
     "integrationTestImplementation"(kotlin("stdlib"))
+    "integrationTestImplementation"(project(":wikitext-vfs"))
     "integrationTestImplementation"(kotlin("reflect"))
     "integrationTestImplementation"(platform("org.junit:junit-bom:5.12.2"))
     "integrationTestImplementation"("org.junit.jupiter:junit-jupiter")
@@ -243,7 +244,14 @@ intellijPlatformTesting {
                         }
                     }
                     maxParallelForks = 1
+                    if (taskName == "integrationTestExtended") {
+                        // Both Starter suites replace the same cached IDE copy.
+                        // Ordering applies only when both tasks are requested.
+                        mustRunAfter("integrationTest")
+                    }
                     systemProperty("wikitext.test.idePath", platformPath.toString())
+                    systemProperty("wikitext.test.pluginProfile", providers.gradleProperty("ideTestPluginProfile").getOrElse("platform"))
+                    systemProperty("wikitext.test.pauseSeconds", providers.gradleProperty("ideTestPauseSeconds").getOrElse("0"))
                     jvmArgs("--add-opens=java.base/sun.nio.fs=ALL-UNNAMED")
                     systemProperty("wtbot.test.baseUrl", "http://127.0.0.1:18594")
                 }

@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlmodel import Session
 
+from wtbot.api.database_identity import get_database_id
 from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.api.errors import ApiError
 from wtbot.api.schemas import (
@@ -73,28 +74,44 @@ def _http_error(exc: VfsError) -> ApiError:
 def stat(
     path: str = Query(...),
     session: Session = Depends(get_session),
+    database_id: str = Depends(get_database_id),
 ) -> Stat:
-    return WikisourceVfs(session).stat(path)
+    return (
+        WikisourceVfs(session)
+        .stat(path)
+        .model_copy(update={"database_id": database_id})
+    )
 
 
 @router.post("/stat/bulk", response_model=StatBulkResponse)
 def stat_bulk(
     body: StatBulkRequest,
     session: Session = Depends(get_session),
+    database_id: str = Depends(get_database_id),
 ) -> StatBulkResponse:
     """Batched stat() for refresh() sweeps over many cached paths at once.
     Results are in request order — index i answers paths[i]."""
-    return StatBulkResponse(results=WikisourceVfs(session).stat_bulk(body.paths))
+    return StatBulkResponse(
+        results=[
+            stat.model_copy(update={"database_id": database_id})
+            for stat in WikisourceVfs(session).stat_bulk(body.paths)
+        ]
+    )
 
 
 @router.get("/children", response_model=ListChildrenResponse)
 def list_children(
     path: str = Query(...),
     session: Session = Depends(get_session),
+    database_id: str = Depends(get_database_id),
 ) -> ListChildrenResponse:
     """VFS getChildren(). Pure cache reads — never triggers a wiki fetch."""
     try:
-        return WikisourceVfs(session).list_children(path)
+        return (
+            WikisourceVfs(session)
+            .list_children(path)
+            .model_copy(update={"database_id": database_id})
+        )
     except VfsError as exc:
         raise _http_error(exc) from exc
 
@@ -103,9 +120,14 @@ def list_children(
 def read_content(
     path: str = Query(...),
     session: Session = Depends(get_session),
+    database_id: str = Depends(get_database_id),
 ) -> ReadContentResponse:
     try:
-        return WikisourceVfs(session).read(path)
+        return (
+            WikisourceVfs(session)
+            .read(path)
+            .model_copy(update={"database_id": database_id})
+        )
     except VfsError as exc:
         raise _http_error(exc) from exc
 
@@ -114,11 +136,22 @@ def read_content(
 def write_content(
     req: WriteContentRequest,
     session: Session = Depends(get_session),
+    database_id: str = Depends(get_database_id),
 ) -> WriteResult:
     """Local save only — appends to the edit journal and marks the page
     dirty; the wiki is untouched until the commit worker pushes. A base_revid
     mismatch against the cached remote revid returns status='conflict'."""
-    return WikisourceVfs(session).write(req)
+    if req.database_id is not None and req.database_id != database_id:
+        raise ApiError(
+            409,
+            "Database changed since this content was read; reload before saving",
+            "database-changed",
+        )
+    return (
+        WikisourceVfs(session)
+        .write(req)
+        .model_copy(update={"database_id": database_id})
+    )
 
 
 @router.delete("/node", response_model=DeleteResponse)

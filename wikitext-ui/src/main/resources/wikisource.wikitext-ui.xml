@@ -9,13 +9,9 @@
     </dependencies>
 
     <extensions defaultExtensionNs="com.intellij">
-        <indexedRootsProvider
-            implementation="org.limepepper.lang.wikitext.search.WtManagedWtbotIndexableSetContributor"/>
-
-        <searchEverywhere.itemsProviderFactory
-            implementation="org.limepepper.lang.wikitext.search.WtStubSearchProviderFactory"/>
-
-        <searchScopesProvider implementation="org.limepepper.lang.wikitext.searchScopes.WsSearchScopeProvider"/>
+        <editorTabTitleProvider implementation="org.limepepper.lang.wikitext.preview.WtEditorTabTitleProvider"/>
+        <!-- Search prototypes are unregistered while managed VFS feature parity
+             is established. In particular, startup must not load a hard-coded work. -->
 
         <applicationConfigurable
             parentId="editor"

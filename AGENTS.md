@@ -10,6 +10,26 @@ Use:
 GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew <task>
 ```
 
+### IDE integration tests
+
+Run IDE integration tests under Xvfb so the launched IDE does not interfere with
+the user's desktop, unless the user explicitly requests a visible desktop run:
+
+The user currently prefers watching tests on display `:88`. For this session,
+use `DISPLAY=:88 GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew <IDE-test-task> --no-daemon`
+instead of `xvfb-run`. Keep the seeded backend and temporary-project isolation.
+
+```bash
+GRADLE_USER_HOME="$PWD/.gradle-codex" xvfb-run -a ./gradlew integrationTest
+```
+
+Seeded backend scenarios are currently tagged `extended`; run them with
+`integrationTestExtended`, using the same display choice. Use the test-owned wtbot
+backend and temporary projects for migration checks. See
+[IDE integration tests](docs/reference/ide-integration-tests.md) for commands,
+fixtures and artifacts, and
+[the migration plan](docs/todo/managed-vfs-migration.md) for milestone coverage.
+
 ## Python conventions
 
 We are using modern python version 3.13 and above for generics, type aliases, better f-strings, and unpacking kwargs. please use modern python.

@@ -17,6 +17,7 @@ import com.intellij.psi.PsiManager
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.usages.UsageInfo2UsageAdapter
 import org.limepepper.lang.wikitext.vfs.WtManagedAddress
+import org.limepepper.lang.wikitext.vfs.WtManagedBackendFileSystem
 import org.limepepper.lang.wikitext.vfs.WtVirtualFileSystem
 import org.limepepper.lang.wikitext.vfs.backend.VfsBackend
 import org.limepepper.lang.wikitext.vfs.backend.WriteStatus
@@ -28,6 +29,7 @@ import java.util.Base64
 class WtManagedReplaceProbe private constructor(
     private val project: Project,
     private val backend: VfsBackend,
+    private val databaseId: String?,
     private val path: String,
     private val managed: VirtualFile,
     private val legacy: VirtualFile,
@@ -159,23 +161,24 @@ class WtManagedReplaceProbe private constructor(
             val latest = backend.readContent(path)
             check(latest.decodeText() == current.backend) { "Backend changed during restore" }
             val result = backend.writeContent(path,
-                Base64.getEncoder().encodeToString(before.backend.toByteArray()), latest.revid)
+                Base64.getEncoder().encodeToString(before.backend.toByteArray()), latest.revid, databaseId = databaseId)
             check(result.status == WriteStatus.ok) { "Restore failed: ${result.status}: ${result.message}" }
         }
-        managed.refresh(false, false)
-        legacy.fileSystem.refresh(false)
-        // Prefetch off the EDT before reloading the two controlled documents.
+        (managed.fileSystem as WtManagedBackendFileSystem).refreshFile(managed, false)
+        if (legacy != managed) legacy.refresh(false, false)
+        // Legacy URLs now alias managed files. Refresh only this resource.
         managed.contentsToByteArray()
         legacy.contentsToByteArray()
-        onEdt { FileDocumentManager.getInstance().reloadFiles(managed, legacy) }
+        onEdt { FileDocumentManager.getInstance().reloadFiles(*listOf(managed, legacy).distinct().toTypedArray()) }
         return capture().also {
             check(it.backend == before.backend && it.managedDocument == before.backend &&
                 it.legacyDocument == before.backend) { "Restore did not converge; inspect capture() and the IDE log" }
         }
     }
 
-    private fun checkBackend() = check(WtVfsService.instance.backend === backend) {
-        "Backend changed; create a new probe rather than writing to another backend"
+    private fun checkBackend() {
+        check(WtVfsService.instance.backend === backend) { "Backend changed; create a new probe" }
+        check(backend.stat(path).databaseId == databaseId) { "Database changed; create a new probe" }
     }
 
     companion object {
@@ -183,6 +186,7 @@ class WtManagedReplaceProbe private constructor(
             checkBackground()
             require(find.isNotEmpty() && find != replacement)
             val backend = WtVfsService.instance.backend
+            val databaseId = backend.readContent(path).databaseId
             val manager = VirtualFileManager.getInstance()
             val managed = requireNotNull(manager.findFileByUrl(WtManagedAddress.fromPath(path).url))
             val legacy = requireNotNull(manager.findFileByUrl("${WtVirtualFileSystem.PROTOCOL}://$path"))
@@ -204,7 +208,7 @@ class WtManagedReplaceProbe private constructor(
             }
             check(before.managedDocument == before.backend) { "Managed document already differs from backend; inspect before replacing" }
             check(find in before.backend) { "Target page does not contain '$find'; choose another search string" }
-            return WtManagedReplaceProbe(project, backend, path, managed, legacy, find, replacement, before, retainedDocuments)
+            return WtManagedReplaceProbe(project, backend, databaseId, path, managed, legacy, find, replacement, before, retainedDocuments)
         }
 
         private fun snapshot(backend: VfsBackend, path: String,

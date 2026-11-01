@@ -9,6 +9,7 @@ from wtbot.model.annotation.box_range_link import BoxRangeLink
 from wtbot.model.annotation.scan_annotation import AnnotationCategory, ScanAnnotation
 from wtbot.model.annotation.text_target_anchor import TextTargetAnchor
 from wtbot.model.commit import Commit, CommitStatus
+from wtbot.model.database_identity import DatabaseIdentity
 from wtbot.model.edit_journal import EditJournal
 from wtbot.model.fetch.fetch_request import FetchKind, FetchRequest, FetchStatus
 from wtbot.model.file_blob import FileBlob
@@ -46,6 +47,7 @@ classes. See ``src-py/DESIGN.md`` for the rationale behind each table.
 """
 
 __all__ = [
+    "DatabaseIdentity",
     "AnnotationCategory",
     "ScanAnnotation",
     "TextTargetAnchor",

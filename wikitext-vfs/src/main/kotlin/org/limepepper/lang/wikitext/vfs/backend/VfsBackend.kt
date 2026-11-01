@@ -5,6 +5,9 @@ package org.limepepper.lang.wikitext.vfs.backend
  * Implementations: [HttpVfsBackend] (real), [FakeVfsBackend] (tests/offline).
  */
 interface VfsBackend {
+    /** Stable connection identity for persistent VFS content metadata, when available. */
+    val cacheIdentity: String? get() = null
+    val requiresDatabaseIdentity: Boolean get() = false
     /** Returns stat for any path; [StatResult.exists] is false for unknown paths. */
     fun stat(path: String): StatResult
 
@@ -28,6 +31,7 @@ interface VfsBackend {
         contentBase64: String,
         baseRevid: Long?,
         comment: String? = null,
+        databaseId: String? = null,
     ): WriteResult
 
     /**

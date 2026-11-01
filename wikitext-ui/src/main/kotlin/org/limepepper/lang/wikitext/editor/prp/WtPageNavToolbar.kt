@@ -9,11 +9,10 @@ import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.JBUI
-import org.limepepper.lang.wikitext.vfs.WtVirtualFile
+import org.limepepper.lang.wikitext.vfs.WtWikiFiles
 import org.limepepper.lang.wikitext.vfs.backend.PageNavEntry
 import org.limepepper.lang.wikitext.vfs.backend.PageNavResult
 import org.limepepper.lang.wikitext.vfs.backend.VfsBackendException
@@ -72,7 +71,7 @@ internal class WtPageNavToolbar(
     }
 
     private fun loadNav(file: VirtualFile?) {
-        val path = (file as? WtVirtualFile)?.path ?: return
+        val path = WtWikiFiles.pathOf(file) ?: return
         ApplicationManager.getApplication().executeOnPooledThread {
             try {
                 nav = WtVfsService.instance.backend.pageNav(path)
@@ -147,8 +146,7 @@ private class PagePositionLabel(
 @Suppress("DEPRECATION")
 private fun openWikisourcePage(project: Project, path: String) {
     ApplicationManager.getApplication().executeOnPooledThread {
-        val fileSystem = VirtualFileManager.getInstance().getFileSystem(WtVirtualFile.PROTOCOL)
-        val target = fileSystem?.findFileByPath(path)
+        val target = WtWikiFiles.find(path)
         if (target == null) {
             NAV_LOG.warn("page nav target did not resolve: $path")
             return@executeOnPooledThread

@@ -10,7 +10,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
 import org.limepepper.lang.wikitext.annotation.BoundingBox
-import org.limepepper.lang.wikitext.vfs.WtVirtualFile
+import org.limepepper.lang.wikitext.vfs.WtWikiFiles
 import org.limepepper.lang.wikitext.vfs.backend.WtVfsService
 import java.awt.Component
 import java.awt.KeyboardFocusManager
@@ -206,7 +206,7 @@ class PrpFileEditor private constructor(
      * discover from, has real engines and languages to offer.
      */
     private fun loadOcrBackends() {
-        val vfsPath = (file as? WtVirtualFile)?.path ?: return
+        val vfsPath = WtWikiFiles.pathOf(file) ?: return
         org.limepepper.lang.wikitext.vfs.settings.OcrCatalogService
             .getInstance(project)
             .discoverAsync(vfsPath) { backends, _ -> ocrBackends = backends }
@@ -232,7 +232,7 @@ class PrpFileEditor private constructor(
         box: org.limepepper.lang.wikitext.annotation.BoundingBox,
         choice: OcrMenuChoice,
     ) {
-        val vfsPath = (file as? WtVirtualFile)?.path ?: return
+        val vfsPath = WtWikiFiles.pathOf(file) ?: return
         val backendInfo = choice.backend
         val segment = if (backendInfo.supportsSegment) {
             previewHalf.referenceImagePane.cropBoxImage(box)
@@ -326,7 +326,7 @@ class PrpFileEditor private constructor(
 
     /** Loads persisted text ranges + box links off the EDT, then seeds models + syncs. */
     private fun loadTextRanges(model: TextRangeModel, linkModel: BoxLinkModel) {
-        val vfsPath = (file as? WtVirtualFile)?.path ?: return
+        val vfsPath = WtWikiFiles.pathOf(file) ?: return
         ApplicationManager.getApplication().executeOnPooledThread {
             val backend = WtVfsService.instance.backend
             val loaded = try {

@@ -207,11 +207,13 @@ def title_node(
     ns: NsView,
     rest: str,
 ) -> TitleNode | None:
-    """The node for `rest` in [ns]: held by the cache, or synthetic because
-    subpages of it are."""
+    """A cached title, or a physical ancestor of cached titles below it."""
     full = ns.title(rest)
     entry = store.entry(site, full)
-    if entry is None and not (ns.subpages and store.has_titles_under(site, f"{full}/")):
+    # Managed VFS must resolve every slash-separated ancestor, including the
+    # scan-name container in flat Page/File namespaces. This is a path container,
+    # not a claim that MediaWiki enables subpages in that namespace.
+    if entry is None and not store.has_titles_under(site, f"{full}/"):
         return None
     return TitleNode(WikiPath.parse(path.node_path), site, namespaces, ns, rest, entry)
 

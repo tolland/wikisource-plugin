@@ -161,7 +161,7 @@ class WikisourceVfs:
     def _has_children(self, node: TitleNode) -> bool:
         if node.is_index:
             return True
-        return node.ns.subpages and self.store.has_titles_under(
+        return (node.ns.subpages or node.entry is None) and self.store.has_titles_under(
             node.site, f"{node.title}/"
         )
 
@@ -331,10 +331,15 @@ class WikisourceVfs:
                         f"{ASPECT_PREFIX}{ASPECT_PAGES}",
                     )
                 )
-        if node.ns.subpages:
+        if node.ns.subpages or node.entry is None:
             titles = self.store.titles_under(node.site, f"{node.title}/")
             children += self._subpage_nodes(
-                node.site, node.namespaces, node.ns, titles, parent=node.rest
+                node.site,
+                node.namespaces,
+                node.ns,
+                titles,
+                parent=node.rest,
+                physical_children=True,
             )
         return ListChildrenResponse(parent_path=parent, children=children)
 
@@ -359,6 +364,8 @@ class WikisourceVfs:
         ns: NsView,
         titles: list[str],
         parent: str | None,
+        *,
+        physical_children: bool = False,
     ) -> list[Node]:
         """The title nodes one level below [parent] (None: the namespace
         itself), from the full titles at or below it.
@@ -366,6 +373,8 @@ class WikisourceVfs:
         In a namespace with subpages, `A/B/C` is a descendant of `A` through
         `A/B` -- which is a synthetic node when nothing holds it. Without
         subpages the slash belongs to the title, so every title is one node.
+        `physical_children` instead groups immediate path segments when listing
+        a title/container directly, including in flat namespaces.
         """
         base = "" if parent is None else f"{parent}/"
         has_deeper: dict[str, bool] = {}
@@ -374,7 +383,11 @@ class WikisourceVfs:
             if rest == parent or not rest.startswith(base):
                 continue
             tail = rest[len(base) :]
-            segment, sep, _ = tail.partition("/") if ns.subpages else (tail, "", "")
+            segment, sep, _ = (
+                tail.partition("/")
+                if ns.subpages or physical_children
+                else (tail, "", "")
+            )
             child = f"{base}{segment}"
             has_deeper[child] = has_deeper.get(child, False) or bool(sep)
 

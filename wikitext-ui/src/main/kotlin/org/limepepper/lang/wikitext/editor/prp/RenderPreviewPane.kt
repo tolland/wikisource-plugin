@@ -14,7 +14,7 @@ import com.intellij.ui.jcef.JBCefBrowser
 import com.intellij.ui.jcef.JBCefJSQuery
 import org.limepepper.lang.wikitext.preview.JcefBrowserZoom
 import org.limepepper.lang.wikitext.preview.JcefOpenInBrowserMenu
-import org.limepepper.lang.wikitext.vfs.WtVirtualFile
+import org.limepepper.lang.wikitext.vfs.WtWikiFiles
 import org.limepepper.lang.wikitext.vfs.backend.PreviewResult
 import org.limepepper.lang.wikitext.vfs.backend.WtVfsService
 import java.util.concurrent.atomic.AtomicLong
@@ -119,7 +119,7 @@ class RenderPreviewPane(
         }
 
     private fun previewUrl(): String? =
-        (file as? WtVirtualFile)?.let { WtVfsService.instance.backend.previewUrl(it.path) }
+        WtWikiFiles.pathOf(file)?.let { WtVfsService.instance.backend.previewUrl(it) }
 
     fun scheduleReload() {
         if (disposed) {
@@ -142,8 +142,8 @@ class RenderPreviewPane(
         ApplicationManager.getApplication().executeOnPooledThread {
             val html = try {
                 shellHtml(WtVfsService.instance.backend.renderPreview(
-                    path = (file as? WtVirtualFile)?.path,
-                    title = if (file is WtVirtualFile) null else file.nameWithoutExtension,
+                    path = WtWikiFiles.pathOf(file),
+                    title = if (WtWikiFiles.pathOf(file) != null) null else file.nameWithoutExtension,
                     wikitext = wikitext,
                 ))
             } catch (e: Exception) {

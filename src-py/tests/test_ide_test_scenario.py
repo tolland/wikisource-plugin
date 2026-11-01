@@ -2,11 +2,42 @@ import base64
 from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlmodel import Session
 
-from ide_test_support.__main__ import seed_browser
+from ide_test_support.__main__ import add_test_controls, seed_browser
 from wtbot.db import create_db_engine
+from wtbot.main import create_app
 from wtbot.vfs import WikisourceVfs
+
+
+def test_test_owned_revision_control(tmp_path: Path) -> None:
+    database = tmp_path / "wtbot.db"
+    seed_browser(database)
+    engine = create_db_engine(f"sqlite:///{database}")
+    try:
+        app = create_app(engine=engine, blob_root=tmp_path / "blobs")
+        with TestClient(app) as client:
+            assert client.post("/__ide_test/revise").status_code == 404
+        app = create_app(engine=engine, blob_root=tmp_path / "blobs")
+        add_test_controls(app, engine)
+        with TestClient(app) as client:
+            path = "/ide/en/Index/IDE integration.djvu/@wikitext"
+            result = client.post(
+                "/__ide_test/revise",
+                params={"path": path, "revid": 202},
+                content="Externally revised",
+                headers={"Content-Type": "text/plain"},
+            )
+            assert result.status_code == 204, result.text
+            read = client.get("/vfs/content", params={"path": path}).json()
+            assert read["revid"] == 202
+            assert (
+                base64.b64decode(read["content_base64"]).decode()
+                == "Externally revised"
+            )
+    finally:
+        engine.dispose()
 
 
 def test_browser_scenario_exposes_index_and_two_readable_pages(tmp_path: Path) -> None:

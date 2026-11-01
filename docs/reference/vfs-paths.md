@@ -4,6 +4,32 @@ How the VFS names things today. Code: `src-py/wtbot/vfs/` (`paths.py`,
 `namespaces.py`, `nodes.py`, `aspects.py`, `wikisource.py`); client side
 `wikitext-vfs/.../vfs/WtPaths.kt` and the tool window's `WikisourceTreeStructure`.
 
+## IDE URL identity
+
+`wikisource-wtbot:///...` is currently the canonical managed editor URL.
+`wikisource:///...` remains a compatibility alias: the registered
+`WtLegacyUrlFileSystem` delegates lookup to the same managed filesystem through
+`WtWikiFiles`. Both forms return a platform-owned positive VFS ID and share the
+same Document. Restored editor entries are saved with the canonical managed URL.
+Protocol/address construction remains in `WtManagedAddress`; the backend path
+grammar remains in `WtPaths`. This does not prescribe a future authority format.
+
+The browser uses `WikiBrowserNode` presentation values, including `@pages` links
+to canonical Page paths. A graph occurrence is keyed by database UUID, parent
+occurrence and resource path. It is never a VirtualFile and has no independent
+editor buffer. The legacy URL filesystem is a cacheless lookup delegate; the
+managed-to-legacy save bridge has been removed. Initial lookup of an uncached
+resource still needs wtbot; known managed records and cached editor content can
+survive a service outage.
+
+VFS stat, listings and content responses include `database_id`. Managed saves
+send that UUID alongside `base_revid`; the API rejects a mismatched UUID before
+writing. The URL remains a logical connection/resource address; the persistent
+content snapshot binds its cached bytes and revision to the database. Independent
+replacement at the same URL forces clean buffers to reload even when ordinary
+metadata is identical, while unsaved buffers retain their original write identity.
+Backups preserve the UUID; independent forks must receive a new identity.
+
 ## Grammar
 
 ```
@@ -59,7 +85,12 @@ The namespace's `subpages` flag decides what a slash means:
   holds `A/B`, it is a **synthetic node** (a container with no page of its own,
   no aspects, no `stable_id`).
 - `subpages = false` (`Page`, `File`) — the slash belongs to the title, so
-  `Page:Foo.djvu/171` is `/Page/Foo.djvu/171`, one node.
+  `Page:Foo.djvu/171` is `/Page/Foo.djvu/171`, one title node in namespace
+  listings. Its physical ancestors (such as `/Page/Foo.djvu`) are also
+  addressable synthetic directories when cached descendant titles exist.
+  Listing such a directory returns immediate physical children. This allows
+  managed VFS lookup to walk every segment without changing canonical title
+  paths or claiming MediaWiki subpage semantics for the namespace.
 
 `Page` is not listed under the site (one title per scanned page); it stays
 addressable by path and listable directly. Pages are browsed through their

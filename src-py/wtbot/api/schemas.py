@@ -105,6 +105,7 @@ class Node(BaseModel):
 
 
 class Stat(BaseModel):
+    database_id: str | None = None
     path: str
     exists: bool
     name: str | None = None
@@ -137,11 +138,13 @@ class StatBulkResponse(BaseModel):
 # A) Operations
 # --------------------------------------------------------------------------
 class ListChildrenResponse(BaseModel):
+    database_id: str | None = None
     parent_path: str
     children: list[Node]
 
 
 class ReadContentResponse(BaseModel):
+    database_id: str | None = None
     path: str
     revid: int | None = None
     # Body returned base64 so the OpenAPI contract is JSON-clean; the raw-bytes
@@ -151,6 +154,7 @@ class ReadContentResponse(BaseModel):
 
 
 class WriteContentRequest(BaseModel):
+    database_id: str | None = None
     path: str
     content_base64: str
     base_revid: int | None = Field(
@@ -169,6 +173,7 @@ class WriteStatus(str, Enum):
 
 
 class WriteResult(BaseModel):
+    database_id: str | None = None
     path: str
     status: WriteStatus
     new_revid: int | None = None

@@ -33,7 +33,7 @@ private val LOG = Logger.getInstance(WtVirtualFileSystem::class.java)
  * [WtVirtualFile] instances are cached by path so callers always get the
  * same instance for the same path (IntelliJ VFS contract).
  */
-class WtVirtualFileSystem : VirtualFileSystem() {
+open class WtVirtualFileSystem : VirtualFileSystem() {
 
     companion object {
         const val PROTOCOL: String = "wikisource"

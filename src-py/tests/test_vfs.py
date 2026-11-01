@@ -47,6 +47,27 @@ _PAGES_PATH = f"{_INDEX_PATH}/@pages"
 _STYLES_PATH = f"{_INDEX_PATH}/styles.css"
 
 
+def test_flat_page_namespace_has_addressable_physical_ancestors(vfs_client):
+    container = _node(PAGE_1).rsplit("/", 1)[0]
+    stat = vfs_client.get("/vfs/stat", params={"path": container}).json()
+    assert stat["exists"] is True
+    assert stat["kind"] == "directory"
+    assert stat["has_children"] is True
+    assert stat["aspects"] == []
+    children = vfs_client.get("/vfs/children", params={"path": container}).json()[
+        "children"
+    ]
+    assert [child["path"] for child in children] == [_node(PAGE_1), _node(PAGE_2)]
+    assert all(child["path"].rsplit("/", 1)[0] == container for child in children)
+    assert all(child["kind"] == "directory" for child in children)
+    bulk = vfs_client.post("/vfs/stat/bulk", json={"paths": [container]}).json()
+    assert bulk["results"][0] == stat
+    missing = vfs_client.get(
+        "/vfs/stat", params={"path": container + "-missing"}
+    ).json()
+    assert missing["exists"] is False
+
+
 def _add_index_asset_tree(session: Session) -> None:
     site = Site(family=FAMILY, code=CODE)
     session.add(site)

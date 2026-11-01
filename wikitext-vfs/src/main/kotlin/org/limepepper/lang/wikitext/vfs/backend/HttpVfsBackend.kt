@@ -30,6 +30,8 @@ class HttpVfsBackend(
     private val timeout: Duration = Duration.ofSeconds(10),
     private val client: HttpClient = buildClient(timeout),
 ) : VfsBackend {
+    override val cacheIdentity: String get() = baseUrl
+    override val requiresDatabaseIdentity = true
 
     companion object {
         private fun buildClient(timeout: Duration): HttpClient =
@@ -47,6 +49,7 @@ class HttpVfsBackend(
             StatResult(
                 path = string("path"),
                 exists = bool("exists"),
+                databaseId = stringOrNull("database_id"),
                 name = stringOrNull("name"),
                 kind = stringOrNull("kind")?.let { NodeKind.valueOf(it) },
                 stableId = longOrNull("stable_id"),
@@ -73,6 +76,7 @@ class HttpVfsBackend(
             StatResult(
                 path = r.string("path"),
                 exists = r.bool("exists"),
+                databaseId = r.stringOrNull("database_id"),
                 name = r.stringOrNull("name"),
                 kind = r.stringOrNull("kind")?.let { NodeKind.valueOf(it) },
                 stableId = r.longOrNull("stable_id"),
@@ -96,6 +100,7 @@ class HttpVfsBackend(
         return JsonReader(json).run {
             ListChildrenResult(
                 parentPath = string("parent_path"),
+                databaseId = stringOrNull("database_id"),
                 children = array("children") { child ->
                     ChildNode(
                         path = child.string("path"),
@@ -126,6 +131,7 @@ class HttpVfsBackend(
                 path = string("path"),
                 revid = longOrNull("revid"),
                 contentBase64 = string("content_base64"),
+                databaseId = stringOrNull("database_id"),
             )
         }
     }
@@ -135,12 +141,14 @@ class HttpVfsBackend(
         contentBase64: String,
         baseRevid: Long?,
         comment: String?,
+        databaseId: String?,
     ): WriteResult {
         val body = buildJsonObject(
             "path" to path,
             "content_base64" to contentBase64,
             "base_revid" to baseRevid,
             "comment" to comment,
+            "database_id" to databaseId,
         )
         val json = post("/vfs/content", body)
         return JsonReader(json).run {
@@ -148,6 +156,7 @@ class HttpVfsBackend(
                 path = string("path"),
                 status = WriteStatus.valueOf(string("status")),
                 newRevid = longOrNull("new_revid"),
+                databaseId = stringOrNull("database_id"),
                 message = stringOrNull("message"),
             )
         }

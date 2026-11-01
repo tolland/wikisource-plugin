@@ -140,6 +140,7 @@ class FakeVfsBackend : VfsBackend {
         contentBase64: String,
         baseRevid: Long?,
         comment: String?,
+        databaseId: String?,
     ): WriteResult {
         val e = entries[path] ?: return WriteResult(path, WriteStatus.error, message = "not found: $path")
         if (baseRevid != null && e.revid != null && baseRevid != e.revid) {

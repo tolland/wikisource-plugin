@@ -37,6 +37,7 @@ data class StatResult(
      * files and for synthetic containers with no page of their own.
      */
     val aspects: List<String> = emptyList(),
+    val databaseId: String? = null,
 )
 
 data class ChildNode(
@@ -60,12 +61,22 @@ data class ChildNode(
 data class ListChildrenResult(
     val parentPath: String,
     val children: List<ChildNode>,
+    val databaseId: String? = null,
+)
+
+fun ChildNode.asStatResult(databaseId: String? = null) = StatResult(
+    path = path, exists = true, name = name, kind = kind, stableId = stableId,
+    revid = revid, timestamp = timestamp, length = length, writable = writable,
+    contentModel = contentModel, qualityLevel = qualityLevel, dirty = dirty,
+    hasReferenceImage = hasReferenceImage, placeholder = placeholder,
+    hasChildren = hasChildren, aspects = aspects, databaseId = databaseId,
 )
 
 data class ContentResult(
     val path: String,
     val revid: Long? = null,
     val contentBase64: String,
+    val databaseId: String? = null,
 ) {
     fun decodeContent(): ByteArray = java.util.Base64.getDecoder().decode(contentBase64)
     fun decodeText(): String = String(decodeContent(), Charsets.UTF_8)
@@ -120,6 +131,7 @@ data class WriteResult(
     val status: WriteStatus,
     val newRevid: Long? = null,
     val message: String? = null,
+    val databaseId: String? = null,
 )
 
 /**

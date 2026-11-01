@@ -3,7 +3,7 @@ package org.limepepper.lang.wikitext.preview
 import com.intellij.openapi.vfs.VirtualFile
 import org.limepepper.lang.wikitext.preview.WtEditorProfile.Companion.forFile
 import org.limepepper.lang.wikitext.vfs.WtContentModel
-import org.limepepper.lang.wikitext.vfs.WtVirtualFile
+import org.limepepper.lang.wikitext.vfs.WtWikiFiles
 
 /**
  * What the split editor offers for a given MediaWiki content model. The
@@ -32,7 +32,7 @@ enum class WtEditorProfile {
          * [WIKITEXT], as does any model this plugin doesn't recognize.
          */
         fun forFile(file: VirtualFile): WtEditorProfile =
-            when ((file as? WtVirtualFile)?.contentModel) {
+            when (WtWikiFiles.contentModelOf(file)) {
                 WtContentModel.PROOFREAD_INDEX.wikiId -> PROOFREAD_INDEX
                 else -> WIKITEXT
             }
