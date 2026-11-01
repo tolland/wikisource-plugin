@@ -137,7 +137,7 @@ private class PagePositionLabel(
 }
 
 /**
- * Resolves a wikisource:// VFS [path] off the EDT (findFileByPath stats the
+ * Resolves a wikisource-wtbot:// VFS [path] off the EDT (findFileByPath stats the
  * sidecar) and opens it in the front editor tab.
  */
 // Keep synchronous openFile with requestFocus=true: navigation must focus the

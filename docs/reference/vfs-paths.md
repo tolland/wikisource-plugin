@@ -1,4 +1,4 @@
-# The `wikisource://` tree: paths, nodes and aspects
+# Wikisource backend tree: paths, nodes and aspects
 
 How the VFS names things today. Code: `src-py/wtbot/vfs/` (`paths.py`,
 `namespaces.py`, `nodes.py`, `aspects.py`, `wikisource.py`); client side
@@ -6,23 +6,20 @@ How the VFS names things today. Code: `src-py/wtbot/vfs/` (`paths.py`,
 
 ## IDE URL identity
 
-`wikisource-wtbot:///...` is currently the canonical managed editor URL.
-`wikisource:///...` remains a compatibility alias: the registered
-`WtLegacyUrlFileSystem` delegates lookup to the same managed filesystem through
-`WtWikiFiles`. Both forms return a platform-owned positive VFS ID and share the
-same Document. Restored editor entries are saved with the canonical managed URL.
-Protocol/address construction remains in `WtManagedAddress`; the backend path
-grammar remains in `WtPaths`. This does not prescribe a future authority format.
+`wikisource-wtbot:///...` is the only registered Wikisource editor protocol.
+`WtManagedBackendFileSystem` owns managed files with platform-assigned positive
+VFS IDs. Resolve files through `WtWikiFiles`; construct addresses through
+`WtManagedAddress`. The backend path grammar remains in `WtPaths`.
+
+The old `wikisource://` adapter and `wikisource-demo://` filesystem have been
+removed. Old editor URLs are not redirected or migrated: reopen those resources
+from the browser. Persisted managed URLs and cached content can restore while
+wtbot is offline; an uncached resource still requires the backend.
 
 The browser uses `WikiBrowserNode` presentation values, including `@pages` links
 to canonical Page paths. A graph occurrence is keyed by database UUID, parent
 occurrence and resource path. It is never a VirtualFile and has no independent
-editor buffer. The legacy URL filesystem is a cacheless lookup delegate; the
-old `WtVirtualFileSystem`/`WtVirtualFile` implementation and its save/refresh
-bridge have been removed. The alias owns no file objects, content caches or
-backend rebinding logic. Initial lookup of an uncached
-resource still needs wtbot; known managed records and cached editor content can
-survive a service outage.
+editor buffer. Its root is labelled **Wikisource**, not a filesystem URL.
 
 VFS stat, listings and content responses include `database_id`. Managed saves
 send that UUID alongside `base_revid`; the API rejects a mismatched UUID before

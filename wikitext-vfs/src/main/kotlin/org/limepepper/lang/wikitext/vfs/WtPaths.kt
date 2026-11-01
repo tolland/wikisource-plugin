@@ -1,7 +1,7 @@
 package org.limepepper.lang.wikitext.vfs
 
 /**
- * The `wikisource://` path grammar, client side:
+ * The `wikisource-wtbot://` path grammar, client side:
  *
  *     /{family}/{code}/{namespace}/{title segments...}[/@{aspect}]
  *

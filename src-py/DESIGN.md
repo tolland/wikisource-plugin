@@ -43,8 +43,8 @@ performance profiles, different consistency needs, and different triggers.
 
 ### A. VFS surface (read / write / list / move)
 Backs `WtManagedBackendFileSystem` (`wikisource-wtbot://`) and the browser's
-relationship model. `wikisource://` is a compatibility lookup alias returning
-the same managed editor files. Synchronous, low-latency, cache-only. Operations:
+relationship model. The IDE registers only this managed filesystem.
+Synchronous, low-latency, cache-only. Operations:
 
 | Op       | Meaning                                                       |
 |----------|--------------------------------------------------------------|

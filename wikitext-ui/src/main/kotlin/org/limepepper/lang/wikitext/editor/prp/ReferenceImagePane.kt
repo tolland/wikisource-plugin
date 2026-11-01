@@ -40,7 +40,7 @@ private const val BOXES_VISIBLE_KEY = "wikitext.referenceImage.boxesVisible"
  * The drawing surface is the reusable [ImageAnnotationPane]: bounding boxes
  * drawn over the scan (left-drag draws, drag moves, handles resize,
  * Delete removes, wheel scrolls, Shift-wheel scrolls horizontally,
- * Ctrl-wheel zooms, middle-drag pans). For wikisource:// pages
+ * Ctrl-wheel zooms, middle-drag pans). For wikisource-wtbot:// pages
  * the boxes persist: they load from the sidecar with the image (boxes and
  * their text anchors are separate resources, merged here by annotation id)
  * and every change is written behind via [WtAnnotationSync]. For non-VFS

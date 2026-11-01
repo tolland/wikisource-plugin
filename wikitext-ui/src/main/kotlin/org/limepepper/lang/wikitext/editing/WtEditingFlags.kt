@@ -54,7 +54,7 @@ object WtEditingFlags {
      * [DOCUMENT] is the dumb one — a single document edit, with the
      * placeholder left selected. No template state machine, so nothing can get
      * stuck, and it behaves identically whether the file is a real file or a
-     * `wikisource://` one. Keep it until [TEMPLATE] has proven itself.
+     * `wikisource-wtbot://` one. Keep it until [TEMPLATE] has proven itself.
      */
     enum class SurroundStrategy(val id: String) {
         TEMPLATE("template"),

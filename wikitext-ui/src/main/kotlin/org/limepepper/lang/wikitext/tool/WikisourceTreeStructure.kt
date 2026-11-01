@@ -12,9 +12,9 @@ import org.limepepper.lang.wikitext.vfs.backend.VfsBackendException
 
 private val STRUCTURE_LOG = logger<WikisourceTreeStructure>()
 
-/** Synthetic root element for the whole `wikisource://` tree. */
+/** Synthetic root element for the backend relationship browser. */
 internal object WikisourceRootElement {
-    override fun toString(): String = "wikisource://"
+    override fun toString(): String = "Wikisource"
 }
 
 internal object AttachedWorksElement {

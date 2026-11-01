@@ -37,7 +37,8 @@ existing association rather than creating a duplicate.
 `WtManagedAddress` remains the address boundary, `discoverManagedWork` discovers
 bounded membership, and the project service `WtWorkAttachments` owns persistence
 and lifecycle operations. The tree is a view over that state, not an alternate
-filesystem. Search prototypes consume attachments but remain unregistered.
+filesystem. Future search/indexing integrations will use the attachment model;
+the earlier demo and search/replace scaffolding has been removed.
 
 The seeded IDE scenarios `seededWorkAttachmentPersistsAndDetaches` and
 `seededWorkMembershipRefreshAndRecovery` exercise these flows; see

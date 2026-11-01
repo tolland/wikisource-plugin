@@ -53,7 +53,7 @@ interface VfsBackend {
 
     /**
      * Renders an unsaved [wikitext] body to HTML via the wiki's `action=parse`
-     * (live-preview semantics). Pass [path] for wikisource:// files so the
+     * (live-preview semantics). Pass [path] for wikisource-wtbot:// files so the
      * sidecar resolves the site/title/content-model; pass [title] alone for
      * local scratch files (parsed against the sidecar's first configured site).
      */

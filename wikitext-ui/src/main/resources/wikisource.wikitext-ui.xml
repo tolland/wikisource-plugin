@@ -65,7 +65,7 @@
         />
 
         <!-- Text editing: Surround With (Ctrl+Alt+T). Language-scoped, so it
-        covers plain .wt files and wikisource:// files alike — the feature only
+        covers plain .wt files and wikisource-wtbot:// files alike — the feature only
         ever touches the Document. -->
         <lang.surroundDescriptor
             language="Wikitext"

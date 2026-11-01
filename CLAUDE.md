@@ -123,9 +123,10 @@ The lexer uses a frame/state stack to disambiguate context-dependent tokens (e.g
 `WtManagedBackendFileSystem` implements `wikisource-wtbot://` using platform-managed
 persistent files with positive `VirtualFileWithId` identities. `WtWikiFiles` resolves
 editor files and exposes cached content-model/revision metadata; `WtManagedAddress`
-owns URL construction. `wikisource://` remains a cacheless lookup adapter for old
-saved URLs and returns the same managed files. The old raw filesystem/file classes
-have been removed. See `docs/reference/vfs-paths.md` for path grammar and identity.
+owns URL construction. This is the only registered Wikisource filesystem: the
+old protocol adapter, raw file classes and demo filesystem have been removed.
+Old editor URLs are unsupported; reopen resources from the browser. See
+`docs/reference/vfs-paths.md` for path grammar and identity.
 
 `WtVfsService` owns the live `VfsBackend` (`HttpVfsBackend` for wtbot,
 `FakeVfsBackend` for tests), replacing its immutable HTTP client when application

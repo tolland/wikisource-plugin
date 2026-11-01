@@ -17,7 +17,7 @@ private val MENU_LOG = logger<JcefOpenInBrowserMenu>()
 /**
  * Adds "Open in Browser" to a JCEF preview's right-click menu.
  *
- * When [urlProvider] yields a URL (a `wikisource://` file, served by the
+ * When [urlProvider] yields a URL (a `wikisource-wtbot://` file, served by the
  * sidecar's `GET /preview/view`) the system browser opens that, so a refresh
  * re-renders the saved body plus uncommitted journal entries. Otherwise (local
  * scratch files) the currently shown document is written to a temp file — a

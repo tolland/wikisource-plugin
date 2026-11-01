@@ -16,7 +16,7 @@ import java.net.URI
  * Application- rather than project-scoped on purpose: wtbot itself mediates
  * between wikis, so one sidecar serves every project, and the things that
  * consume this — [org.limepepper.lang.wikitext.vfs.backend.WtVfsService] and
- * the `wikisource://` filesystem with its path→file cache — are application
+ * the `wikisource-wtbot://` filesystem with its path→file cache — are application
  * singletons with no project to scope to.
  *
  * Changes are published on [TOPIC] as a (previous, current) pair so listeners

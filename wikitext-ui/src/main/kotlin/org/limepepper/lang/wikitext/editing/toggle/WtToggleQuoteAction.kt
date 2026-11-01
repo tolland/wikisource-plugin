@@ -17,7 +17,7 @@ import org.limepepper.lang.wikitext.editing.WtQuoteToggle
  *
  * The editing itself lives in
  * [org.limepepper.lang.wikitext.editing.WtQuoteToggle]; this class is only the
- * IDE plumbing. Works identically on plain `.wt` files and `wikisource://`
+ * IDE plumbing. Works identically on plain `.wt` files and `wikisource-wtbot://`
  * files: it touches nothing but the Document.
  *
  * ## Sharing shortcuts with the platform

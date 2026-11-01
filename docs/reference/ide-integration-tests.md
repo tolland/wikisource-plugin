@@ -248,10 +248,11 @@ Lifecycle scenarios:
 - `seededManagedRecoversFromBackendOutage`: stop the owned HTTP server, refresh and
   attempt Save All, check local text remains unsaved, restart against the same
   database, retry saving, then verify a clean Page editor refreshes with the same ID.
-- `seededLegacyUrlsRestoreAsManagedFiles`: seed persisted legacy Index/properties
-  editor entries plus a duplicate canonical URL; verify two managed tabs, read-only
-  properties, saving and canonical URLs on disk. The second IDE launch runs with
-  wtbot stopped to exercise persistent content and editor identity before recovery.
+- `seededManagedFilesRestoreOffline`: seed persisted managed Index/properties
+  entries, verify two managed tabs, read-only properties and native saving. The
+  second IDE launch runs with wtbot stopped to check persistent content, editor
+  profile and file identity before recovery. It also verifies the old and demo
+  protocols are unregistered and only `wikisource-wtbot` resolves.
 
 The managed test server alone exposes `POST /__ide_test/revise` for these scenarios.
 It changes the seeded remote Page revision directly; it is not registered in the
@@ -277,7 +278,7 @@ DISPLAY=:88 GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew integrationTestExten
 ```
 
 ```bash
-DISPLAY=:88 GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew integrationTestExtended --tests '*seededManagedRecoversFromBackendOutage*' --tests '*seededLegacyUrlsRestoreAsManagedFiles*' --no-daemon
+DISPLAY=:88 GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew integrationTestExtended --tests '*seededManagedRecoversFromBackendOutage*' --tests '*seededManagedFilesRestoreOffline*' --no-daemon
 ```
 
 ```bash

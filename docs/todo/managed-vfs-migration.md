@@ -12,9 +12,9 @@ platform-owned `VirtualFileWithId` identities and reproduction of existing plugi
 behaviour, verified in seeded IDE integration tests. Do not make indexing, work
 attachment or native Find/Replace a prerequisite for this cutover.
 
-Search prototype sources remain available for later diagnosis, but their indexing
-contributor, scope provider and static Search Everywhere provider are unregistered.
-Startup must not fetch or index the hard-coded Stevenson work.
+The earlier demo filesystems, old-URL adapter, indexing/scope/Search Everywhere
+prototypes and replacement notebook/helper have been removed. The plugin registers
+only `wikisource-wtbot`; future search work starts from explicit work attachments.
 
 ## Current evidence and limitations
 
@@ -25,26 +25,21 @@ Startup must not fetch or index the hard-coded Stevenson work.
   Platform VFS IDs must not come from a plugin-local sequence or backend title PK.
 - `WtManagedBackendFileSystem`, based on `NewVirtualFileSystem`, lets the platform
   create persistent records and resolve IDs back to the correct files. Its
-  temporary `wikisource-wtbot://` protocol runs alongside `wikisource://`.
+  `wikisource-wtbot://` is the only registered Wikisource protocol.
 - Native Find in Files found content across a bounded work: Index text plus
   20 transcription pages. Complete replacement support is still unverified.
 - The replacement notebook stopped before replacing because its Document was
   read-only. Child listings exposed `writable`, but `/vfs/stat` omitted it.
   The API and cached-permission refresh have been corrected and tested; the live
   workflow needs verification after restarting both wtbot and the sandbox.
-- Registered `wikisource://` URL lookups now resolve through `WtLegacyUrlFileSystem`
-  to the canonical `wikisource-wtbot://` managed file. Restored editor entries are
-  saved with canonical URLs. The browser now uses typed `WikiBrowserNode` graph
-  occurrences, independent of editor files. The managed-to-legacy save bridge is
-  removed, together with the old raw-file classes, their rebinding result and
-  obsolete fixtures/static indexing experiment. Only the cacheless URL adapter
-  remains for saved-tab compatibility.
-- Retirement checks pass: 115 VFS and 91 UI unit tests, plus seeded IDE browser/
-  navigation, ordinary Index/Page saving and two-launch legacy URL restoration
-  on `DISPLAY=:88`. The built plugin contains none of the retired raw-file classes.
+- Only managed editor URLs are supported. The old-URL adapter, demo filesystem,
+  raw-file classes and their caches/bridges/rebinding fixtures are removed.
+  Open old resources again through the browser; no alias or migration fallback
+  remains. The browser uses typed `WikiBrowserNode` graph occurrences, independent
+  of editor files. Offline managed restoration remains an integration scenario.
 
-Diagnostics: [replacement notebook](../notebooks/managed-replace.ipynb),
-`WtManagedReplaceProbe`, `WtManagedBackendFileSystemTest`, `WtManagedWorkTest`.
+Regression coverage: `WtManagedBackendFileSystemTest`, `WtManagedWorkTest`
+and seeded managed IDE lifecycle scenarios.
 Passing fixture tests do not replace verification through the running plugin.
 
 ## Validation workflow
@@ -248,18 +243,18 @@ editors, lose local edits or trigger unbounded traversal.
   remove assumptions that every resource is an old `WtVirtualFile` instance.
 - [ ] Check highlighting, PSI, formatting/actions, page navigation and associated
   views on managed files.
-- [x] Apply URL compatibility to legacy lookups and persisted Index/properties
-  editor tabs, including duplicate legacy/canonical entries. Save canonical URLs
-  for subsequent starts and keep one managed editor identity per resource.
+- [x] Persist and restore managed Index/properties editor tabs with one managed
+  identity per resource. Old-URL compatibility was deliberately removed for the
+  clean managed-only base.
 - [ ] Extend persisted-state coverage to other content models and project roots.
   Restart the IDE to move from a plugin version with raw legacy Documents;
   preserving those old in-memory objects through live plugin replacement is unsupported.
 - [x] Retire legacy browser-file construction and the managed-to-legacy save bridge.
-  Graph occurrences are `WikiBrowserNode` values; old URL lookup is a cacheless
-  compatibility delegate. Editor files remain managed through `WtWikiFiles`.
+  Graph occurrences are `WikiBrowserNode` values. Editor files remain managed
+  through `WtWikiFiles`.
 - [x] Remove the old raw filesystem/file classes, compatibility branches and
-  static legacy indexing experiment. Retain old-URL restoration as a managed alias.
-- [ ] Remove unrelated managed demo filesystem wiring after its diagnostic use ends.
+  static legacy indexing experiment, including the old-URL adapter.
+- [x] Remove managed demo filesystem wiring and obsolete search/replace scaffolding.
 
 Completion: every supported entry point opens the same managed file/Document
 for a resource, with existing plugin workflows preserved.

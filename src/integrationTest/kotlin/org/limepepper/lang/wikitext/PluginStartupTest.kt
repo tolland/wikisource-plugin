@@ -31,6 +31,7 @@ import com.intellij.platform.testFramework.teamCity.TeamCityReporter.SyntheticTe
 import com.intellij.tools.ide.starter.product.idea.ultimate.IdeaUltimate
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.fail
@@ -197,14 +198,14 @@ class PluginStartupTest {
             closeToolWindow("Project")
             openToolWindow("MyToolWindow")
             val tree = ui.tree("//div[@accessiblename='Wikisource Browser']")
-            val work = arrayOf("wikisource://", "Attached works", "IDE integration.djvu")
+            val work = arrayOf("Wikisource", "Attached works", "IDE integration.djvu")
             when (phase++) {
                 0 -> {
-                    tree.doubleClickPath("wikisource://", "ide/en", "Index", "IDE integration.djvu")
+                    tree.doubleClickPath("Wikisource", "ide/en", "Index", "IDE integration.djvu")
                     managedId = assertManagedEditor(path, original)
-                    tree.clickPath("wikisource://", "ide/en", "Index", "IDE integration.djvu")
+                    tree.clickPath("Wikisource", "ide/en", "Index", "IDE integration.djvu")
                     ui.button("Attach Work").click()
-                    tree.expandPath("wikisource://", "Attached works")
+                    tree.expandPath("Wikisource", "Attached works")
                     waitFor("Work appears with bounded membership", 30.seconds) {
                         tree.collectExpandedPaths().any { it.path.last().contains("IDE integration.djvu (3 files)") }
                     }
@@ -213,9 +214,9 @@ class PluginStartupTest {
                     tree.doubleClickPath(*(work + "Index text"), fullMatch = false)
                     assertEquals(managedId, assertManagedEditor(path, original))
                     // Reattaching through the ordinary browser updates the same association.
-                    tree.clickPath("wikisource://", "ide/en", "Index", "IDE integration.djvu")
+                    tree.clickPath("Wikisource", "ide/en", "Index", "IDE integration.djvu")
                     ui.button("Attach Work").click()
-                    tree.expandPath("wikisource://", "Attached works")
+                    tree.expandPath("Wikisource", "Attached works")
                     waitFor("Reattach remains a single work", 30.seconds) {
                         tree.collectExpandedPaths().count { it.path.size == 3 && it.path[1] == "Attached works" } == 1
                     }
@@ -241,7 +242,7 @@ class PluginStartupTest {
                     }
                 }
                 else -> {
-                    tree.expandPath("wikisource://", "Attached works")
+                    tree.expandPath("Wikisource", "Attached works")
                     assertTrue(tree.collectExpandedPaths().none { it.path.size > 2 && it.path[1] == "Attached works" })
                     assertEquals(managedId, assertManagedEditor(path, original + marker))
                 }
@@ -259,8 +260,8 @@ class PluginStartupTest {
             openToolWindow("MyToolWindow")
             val tree = ui.tree("//div[@accessiblename='Wikisource Browser']")
             val status = cast(ui.x("//div[@accessiblename='Wikisource Work Status']").component, ManagedTestLabel::class)
-            val work = arrayOf("wikisource://", "Attached works", "IDE integration.djvu")
-            tree.clickPath("wikisource://", "ide/en", "Index", "IDE integration.djvu")
+            val work = arrayOf("Wikisource", "Attached works", "IDE integration.djvu")
+            tree.clickPath("Wikisource", "ide/en", "Index", "IDE integration.djvu")
             ui.button("Attach Work").click()
             waitFor("Attach completes", 30.seconds) { status.getText().startsWith("Attached IDE integration.djvu: 3 files") }
             tree.expandPath(*work, fullMatch = false)
@@ -335,7 +336,7 @@ class PluginStartupTest {
             // Browser is the initial content. Address its accessible tree directly:
             // narrow tool-window headers may fold the content tabs into a menu.
             val tree = ui.tree("//div[@accessiblename='Wikisource Browser']")
-            val index = arrayOf("wikisource://", "ide/en", "Index", "IDE integration.djvu")
+            val index = arrayOf("Wikisource", "ide/en", "Index", "IDE integration.djvu")
             val page = index + arrayOf("Pages", "1")
 
             tree.doubleClickPath(*index)
@@ -392,7 +393,7 @@ class PluginStartupTest {
             closeToolWindow("Project")
             openToolWindow("MyToolWindow")
             val tree = ui.tree("//div[@accessiblename='Wikisource Browser']")
-            val index = arrayOf("wikisource://", "ide/en", "Index", "IDE integration.djvu")
+            val index = arrayOf("Wikisource", "ide/en", "Index", "IDE integration.djvu")
             tree.doubleClickPath(*index)
             val id = assertManagedEditor(path, original)
 
@@ -451,7 +452,7 @@ class PluginStartupTest {
             closeToolWindow("Project")
             openToolWindow("MyToolWindow")
             ui.tree("//div[@accessiblename='Wikisource Browser']").doubleClickPath(
-                "wikisource://", "ide/en", "Index", "IDE integration.djvu")
+                "Wikisource", "ide/en", "Index", "IDE integration.djvu")
             val id = assertManagedEditor(path, original)
             val revised = original.replace("to=\"2\"", "to=\"3\"")
             assertEquals(original.length, revised.length)
@@ -478,7 +479,7 @@ class PluginStartupTest {
                 closeToolWindow("Project")
                 openToolWindow("MyToolWindow")
                 ui.tree("//div[@accessiblename='Wikisource Browser']").doubleClickPath(
-                    "wikisource://", "ide/en", "Index", "IDE integration.djvu")
+                    "Wikisource", "ide/en", "Index", "IDE integration.djvu")
                 firstId = assertManagedEditor(path, original)
                 invokeAction("SaveAll")
             } else {
@@ -504,7 +505,7 @@ class PluginStartupTest {
             closeToolWindow("Project")
             openToolWindow("MyToolWindow")
             ui.tree("//div[@accessiblename='Wikisource Browser']").doubleClickPath(
-                "wikisource://", "ide/en", "Index", "IDE integration.djvu")
+                "Wikisource", "ide/en", "Index", "IDE integration.djvu")
             assertManagedEditor(path, original)
             invokeAction("EditorTextEnd")
             ui.keyboard { typeText(" Unsaved local edit.") }
@@ -697,25 +698,28 @@ class PluginStartupTest {
     @Test
     @Tag("extended")
     @WithWtbot
-    fun seededLegacyUrlsRestoreAsManagedFiles(@TempDir projectDirectory: Path) {
+    fun seededManagedFilesRestoreOffline(@TempDir projectDirectory: Path) {
         val path = "/ide/en/Index/IDE integration.djvu/@wikitext"
         val propsPath = "/ide/en/Index/IDE integration.djvu/@props"
         val backend = HttpVfsBackend(requireNotNull(wtbot.baseUrl))
         val original = backend.readContent(path).decodeText()
-        val marker = " Restored legacy URL."
+        val marker = " Restored managed file."
         var phase = 0
         var id = 0
-        withProject(projectDirectory, "wikitext-legacy-urls", runs = 2,
-            restoredFiles = listOf("wikisource://$propsPath", "wikisource://$path", "wikisource-wtbot://$path"),
+        withProject(projectDirectory, "wikitext-managed-offline-restore", runs = 2,
+            restoredFiles = listOf("wikisource-wtbot://$propsPath", "wikisource-wtbot://$path"),
             afterRun = { run, workspace ->
                 val xml = java.nio.file.Files.readString(workspace)
-                assertTrue(!xml.contains("file=\"wikisource://"), "Saved editor entries must use canonical URLs")
                 assertTrue(xml.contains("file=\"wikisource-wtbot://$path\""))
                 if (run == 0) wtbot.stopServer()
             }) {
+            val manager = service<ManagedTestVirtualFileManager>()
+            assertNull(manager.getFileSystem("wikisource"), "The old protocol must not be registered")
+            assertNull(manager.getFileSystem("wikisource-demo"), "The demo protocol must not be registered")
+            assertEquals("wikisource-wtbot", requireNotNull(manager.getFileSystem("wikisource-wtbot")).getProtocol())
             try {
                 if (phase == 1) assertTrue(runCatching { backend.stat(path) }.isFailure)
-                waitFor("Restored URLs share canonical managed editor tabs", 30.seconds) {
+                waitFor("Managed editor tabs restore", 30.seconds) {
                     withContext(OnDispatcher.EDT) {
                         service<ManagedTestEditorManager>(singleProject()).getOpenFiles().map { it.getUrl() }.sorted() ==
                             listOf("wikisource-wtbot://$path", "wikisource-wtbot://$propsPath").sorted()
@@ -732,9 +736,9 @@ class PluginStartupTest {
             } finally {
                 if (phase == 1) wtbot.restartServer()
             }
-            val props = requireNotNull(service<ManagedTestVirtualFileManager>().findFileByUrl("wikisource://$propsPath"))
+            val props = requireNotNull(manager.findFileByUrl("wikisource-wtbot://$propsPath"))
             assertTrue(!props.isWritable())
-            openManagedUrl("wikisource://$path")
+            openManagedUrl("wikisource-wtbot://$path")
             if (phase++ == 0) {
                 id = assertManagedEditor(path, original)
                 openManagedUrl("wikisource-wtbot://$path")
@@ -744,7 +748,7 @@ class PluginStartupTest {
                 invokeAction("EditorTextEnd")
                 ui.keyboard { typeText(marker) }
                 invokeAction("SaveAll")
-                waitFor("Legacy-restored editor saves through managed VFS", 30.seconds) {
+                waitFor("Restored editor saves through managed VFS", 30.seconds) {
                     backend.readContent(path).decodeText() == original + marker
                 }
             } else {
@@ -949,6 +953,12 @@ class PluginStartupTest {
 @Remote("com.intellij.openapi.vfs.VirtualFileManager")
 interface ManagedTestVirtualFileManager {
     fun findFileByUrl(url: String): ManagedTestVirtualFile?
+    fun getFileSystem(protocol: String): ManagedTestFileSystem?
+}
+
+@Remote("com.intellij.openapi.vfs.VirtualFileSystem")
+interface ManagedTestFileSystem {
+    fun getProtocol(): String
 }
 
 @Remote("javax.swing.JLabel")

@@ -20,7 +20,7 @@ import javax.swing.JTextField
 import javax.swing.SwingUtilities
 
 /**
- * Settings page for the wtbot sidecar the `wikisource://` VFS talks to.
+ * Settings page for the wtbot sidecar the `wikisource-wtbot://` VFS talks to.
  *
  * Application-scoped: one sidecar serves every project (it is the thing that
  * mediates between wikis), and the VFS it feeds is an application singleton.

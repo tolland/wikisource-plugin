@@ -15,7 +15,7 @@ import org.limepepper.lang.wikitext.editing.WtWrapTag
  * template state machine, no in-editor popup unless asked for.
  *
  * Worth keeping around even if [WtTemplateWrapExecutor] wins, because it has no
- * way to get stuck half-finished and behaves identically for `wikisource://`
+ * way to get stuck half-finished and behaves identically for `wikisource-wtbot://`
  * files and real files — it only ever touches the [com.intellij.openapi.editor.Document].
  */
 class WtDocumentWrapExecutor : WtWrapExecutor {
