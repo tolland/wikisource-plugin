@@ -689,3 +689,27 @@ export interface ChangePushResult {
   correspondence_materialized: boolean;
   error?: string | null;
 }
+
+export interface PageTreeRequest {
+  source_label: string;
+  target_label: string;
+  source_root: string;
+  target_root: string;
+}
+
+export interface PageTree extends PageTreeRequest {
+  pk: number;
+}
+
+export interface PageTreeRow {
+  path: string;
+  page: SyncPage;
+  proposal: { outcome: string; proposable: boolean; detail: string | null;
+    local_revid: number | null; remote_revid: number | null } | null;
+}
+
+export interface PageTreeReport {
+  tree: PageTree;
+  rows: PageTreeRow[];
+  note: string;
+}

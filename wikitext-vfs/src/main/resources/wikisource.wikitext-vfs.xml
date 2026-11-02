@@ -3,13 +3,16 @@
         <module name="wikisource.wikitext-core"/>
     </dependencies>
     <extensions defaultExtensionNs="com.intellij">
-        <fileDocumentManagerListener implementation="org.limepepper.lang.wikitext.vfs.WtManagedDocumentListener"/>
+        <fileDocumentManagerListener
+            implementation="org.limepepper.lang.wikitext.vfs.WtManagedDocumentListener"/>
 
         <!--suppress JetBrainsInternalExtensionsUsage -->
-        <virtualFileSystem key="wikisource-wtbot"
+        <virtualFileSystem
+            key="wikisource-wtbot"
             implementationClass="org.limepepper.lang.wikitext.vfs.WtManagedBackendFileSystem"/>
 
-        <fileTypeOverrider implementation="org.limepepper.lang.wikitext.vfs.WtManagedFileTypeOverrider"/>
+        <fileTypeOverrider
+            implementation="org.limepepper.lang.wikitext.vfs.WtManagedFileTypeOverrider"/>
 
         <applicationService
             serviceImplementation="org.limepepper.lang.wikitext.vfs.backend.WtVfsService"

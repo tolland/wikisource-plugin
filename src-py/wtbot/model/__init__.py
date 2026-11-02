@@ -16,6 +16,7 @@ from wtbot.model.file_blob import FileBlob
 from wtbot.model.ocr_backend import OcrBackendConfig, OcrBackendKind
 from wtbot.model.sync.index_link import IndexLink
 from wtbot.model.sync.page_link import PageLink
+from wtbot.model.sync.page_tree_link import PageTreeLink
 from wtbot.model.sync.promotion import (
     BatchStatus,
     Promotion,
@@ -47,6 +48,7 @@ classes. See ``src-py/DESIGN.md`` for the rationale behind each table.
 """
 
 __all__ = [
+    "PageTreeLink",
     "DatabaseIdentity",
     "AnnotationCategory",
     "ScanAnnotation",

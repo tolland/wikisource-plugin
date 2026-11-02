@@ -148,6 +148,8 @@
   <Notice kind="success">{message}</Notice>
 {/if}
 
+<p>For arbitrary pages across namespaces or renamed roots, use <a href="/page-trees">Page trees</a>.</p>
+
 <section class="tracked" aria-label="Tracked works">
   {#if loading}
     <p class="state">Loading...</p>

@@ -22,7 +22,7 @@ def test_restore_roundtrip_with_new_ids_and_named_constraints(tmp_path: Path) ->
     )
     after = read_dump(rebuilt)
     assert result.rows == sum(len(table.rows) for table in before.tables)
-    assert result.tables == 18
+    assert result.tables == len(before.tables)
     for table in before.tables:
         for row in table.rows:
             row.fields.pop("legacy_note", None)

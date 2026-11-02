@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Literal
 
@@ -542,12 +542,21 @@ def _page_reports(
             target_page = target_by_title.get(canonical_title(source_page.name))
         if target_page is not None:
             seen_targets.add(target_page.pk)
+        # Pagination titles are not transcriptions. There is nothing to
+        # compare or copy when neither side has a cached revision.
+        if head_revision(session, source_page.page) is None and (
+            target_page is None or head_revision(session, target_page.page) is None
+        ):
+            continue
         rows.append(_page_report(session, number, source_page, target_page))
 
     # Pages the target has and the source does not. A work that grew on the
     # other side is precisely what a sync should surface.
     for number, target_page in target_children:
-        if target_page.pk in seen_targets:
+        if (
+            target_page.pk in seen_targets
+            or head_revision(session, target_page.page) is None
+        ):
             continue
         rows.append(
             SyncPage(
@@ -576,6 +585,19 @@ def _page_report(
         "source_revid": source.revid,
     }
 
+    if source.page is None or head_revision(session, source.page) is None:
+        return SyncPage(
+            verdict=SyncVerdict.unknown,
+            detail=(
+                "source is a placeholder: nothing to write"
+                if _is_placeholder(source)
+                else "source has no cached revision"
+            ),
+            target_title=target.name if target else None,
+            target_revid=target.revid if target else None,
+            **base,
+        )
+
     if target is None:
         return SyncPage(
             verdict=SyncVerdict.create,
@@ -601,16 +623,6 @@ def _page_report(
                 "placeholder: paginated by the index, never transcribed"
                 if placeholder
                 else "target has no cached revision -- fetch it before syncing"
-            ),
-            **base,
-        )
-    if source.page is None or head_revision(session, source.page) is None:
-        return SyncPage(
-            verdict=SyncVerdict.unknown,
-            detail=(
-                "source is a placeholder: nothing to write"
-                if _is_placeholder(source)
-                else "source has no cached revision"
             ),
             **base,
         )
@@ -755,7 +767,9 @@ def build_page_report(
             "A sync reports on what we hold: fetch the source page first."
         )
     target = entry_at(session, site_pk=target_site.pk, title=target_title)
-    return _page_report(session, None, source, target)
+    row = _page_report(session, None, source, target)
+    # A create still needs its explicit destination when the title is uncached.
+    return replace(row, target_title=target_title)
 
 
 def _side(

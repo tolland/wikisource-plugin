@@ -772,3 +772,55 @@ def test_an_in_sync_page_is_not_actionable(client, engine):
     assert page["verdict"] == "in_sync"
     assert page["actionable"] is False
     assert page["linkable"] is False
+
+
+def test_pagination_without_revisions_is_omitted_from_the_report(client, engine):
+    seed_source_only(engine, pages=1)
+    with Session(engine) as session:
+        upstream = session.exec(select(Site).where(Site.label == "wikisource")).one()
+        local = session.exec(select(Site).where(Site.label == "mywikisource")).one()
+        build_index(session, local, SOURCE_INDEX, sha1=SCAN_SHA1)
+        # Both-sided, source-only, target-only and unfetched pagination slots.
+        for number, fetched in [(2, True), (3, True), (5, False)]:
+            build_page(
+                session, upstream, SOURCE_INDEX, number, text=None, fetched=fetched
+            )
+        for number, fetched in [(2, True), (4, True), (5, False)]:
+            build_page(session, local, SOURCE_INDEX, number, text=None, fetched=fetched)
+
+    for labels in [
+        ("wikisource", "mywikisource"),
+        ("mywikisource", "wikisource"),
+    ]:
+        response = client.post(
+            "/sync/report",
+            json=request(source_label=labels[0], target_label=labels[1]),
+        )
+        assert response.status_code == 200, response.text
+        data = response.json()
+        assert [row["page_number"] for row in data["pages"]] == [1]
+        assert data["counts"] == {
+            "create" if labels[0] == "wikisource" else "source_missing": 1
+        }
+
+
+def test_a_source_without_a_revision_cannot_create_a_target(client, engine):
+    from wtbot.sync import build_page_report
+
+    seed_source_only(engine, pages=0)
+    with Session(engine) as session:
+        upstream = session.exec(select(Site).where(Site.label == "wikisource")).one()
+        local = session.exec(select(Site).where(Site.label == "mywikisource")).one()
+        source = build_page(session, upstream, SOURCE_INDEX, 1, text=None)
+        for target_is_placeholder in [False, True]:
+            if target_is_placeholder:
+                build_page(session, local, SOURCE_INDEX, 1, text=None)
+            row = build_page_report(
+                session,
+                source_site=upstream,
+                target_site=local,
+                source_title=source.title,
+            )
+            assert row.verdict == "unknown"
+            assert row.actionable is False
+            assert "nothing to write" in row.detail

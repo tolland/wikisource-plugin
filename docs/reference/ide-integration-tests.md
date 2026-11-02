@@ -308,7 +308,7 @@ DTrace profiler configurations on Linux. Seeding supported settings avoids those
 unrelated errors without disabling IDE error reporting. Revisit this fixture
 workaround when changing the pinned IDE version.
 
-Use this suite for the completion checks in
+Use this suite for the baseline coverage and follow-ups in
 [Managed Wikisource VFS migration](../todo/managed-vfs-migration.md). The existing
 seeded Debug-window test proves connection and fixture visibility; it does not
 yet prove managed-file lookup, editor saving, refresh or native replacement.

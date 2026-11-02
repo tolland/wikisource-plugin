@@ -19,6 +19,7 @@ from wtbot.api import (
     ocr,
     page_meta,
     page_nav,
+    page_trees,
     pages,
     preview,
     reference_image,
@@ -136,6 +137,7 @@ def create_app(
     # Before `links`: /links/works must not be matched by
     # DELETE /links/{link_pk}, which would 422 on parsing "works" as an int.
     app.include_router(works.router)
+    app.include_router(page_trees.router)
     app.include_router(links.router)
     app.include_router(file_blob.router)
     app.include_router(namespace.router)

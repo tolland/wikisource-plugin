@@ -1323,3 +1323,21 @@ def test_the_page_title_step_downgrades(baseline_engine: Engine) -> None:
         assert connection.exec_driver_sql(
             "SELECT pk, title, revid FROM page"
         ).all() == [(10, "Page:B.djvu/1", 7)]
+
+
+def test_page_tree_mapping_migration_matches_model_and_downgrades(baseline_engine):
+    from sqlalchemy import inspect
+
+    previous = "a71b9d42e608"
+    revision = "c92a713e4b06"
+    _run(baseline_engine, command.upgrade, previous)
+    assert "pagetreelink" not in inspect(baseline_engine).get_table_names()
+    _run(baseline_engine, command.upgrade, revision)
+    with baseline_engine.connect() as connection:
+        context = MigrationContext.configure(connection)
+        differences = compare_metadata(context, SQLModel.metadata)
+    assert not [
+        difference for difference in differences if "pagetreelink" in str(difference)
+    ]
+    _run(baseline_engine, command.downgrade, previous)
+    assert "pagetreelink" not in inspect(baseline_engine).get_table_names()

@@ -405,3 +405,23 @@ export function skipPromotion(batchPk: number, promotionPk: number): Promise<Bat
 export function abortBatch(batchPk: number): Promise<Batch> {
   return postJson<Batch>(`/sync/batches/${batchPk}/abort`, {});
 }
+
+export function listPageTrees(): Promise<import('$lib/types').PageTree[]> {
+  return getJson('/links/trees');
+}
+
+export function createPageTree(payload: import('$lib/types').PageTreeRequest): Promise<import('$lib/types').PageTree> {
+  return postJson('/links/trees', payload);
+}
+
+export function reportPageTree(pk: number, reverse: boolean): Promise<import('$lib/types').PageTreeReport> {
+  return postJson(`/links/trees/${pk}/report`, { reverse });
+}
+
+export function fetchPageTree(pk: number, reverse: boolean, revisions: number): Promise<{ queued: number }> {
+  return postJson(`/links/trees/${pk}/fetch`, { reverse, revisions });
+}
+
+export function selectPageTree(pk: number, action: 'pairs' | 'confirm' | 'batches', reverse: boolean, source_titles: string[]): Promise<unknown> {
+  return postJson(`/links/trees/${pk}/${action}`, { reverse, source_titles });
+}

@@ -13,6 +13,7 @@
     { href: '/pages', label: 'Pages' },
     { href: '/indexes', label: 'Indexes' },
     { href: '/links', label: 'Links' },
+    { href: '/page-trees', label: 'Page trees' },
     { href: '/locator-index', label: 'Locator index' },
     { href: '/sync', label: 'Sync' },
     { href: '/sync-page', label: 'Promote page' },

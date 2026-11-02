@@ -2,7 +2,7 @@ from sqlalchemy import func
 from sqlmodel import Session, select
 
 from wtbot.linking.remote_link_store import LinkError
-from wtbot.model import LinkOrigin, PageLink, RevisionLink, Site, Title
+from wtbot.model import LinkOrigin, PageLink, PageTreeLink, RevisionLink, Site, Title
 
 """Reading and writing page pairings.
 
@@ -158,6 +158,10 @@ def unpair(session: Session, link: PageLink) -> int:
     inherit assertions made under a different one.
     """
     removed = retract_rungs(session, link)
+    tree = session.get(PageTreeLink, link.pk)
+    if tree is not None:
+        session.delete(tree)
+        session.flush()
     session.delete(link)
     session.flush()
     return removed
