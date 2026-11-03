@@ -33,6 +33,41 @@ class WtReferenceParsingTest : ParsingTestCase("", "wt", true, WtParserDefinitio
         assertNull(PsiTreeUtil.findChildOfType(myFile, PsiErrorElement::class.java))
     }
 
+    fun testReferenceInTableCellKeepsBodyAndFollowingCells() {
+        val body = "This fifth alternative is ''transitional'' and seeks to ''change'' the structure."
+        val source = """
+            {| class="" style="margin: auto; border: none;"
+            |-
+            !
+            !
+            ! Culture Goals
+            ! Institutionalized Means
+            |-
+            | style="text-align: right;" | I. || Conformity || + || +
+            |-
+            | colspan="4" style="text-align: center;" |{{Hr}}
+            |-
+            | style="text-align: right;" | V. || Rebellion<ref>$body</ref> || ± || ±
+            |}
+        """.trimIndent()
+        val ref = references(source).single()
+        assertEquals(body, ref.bodyRange?.substring(source))
+        assertEquals("<ref>$body</ref>", ref.source.text)
+        assertNull(PsiTreeUtil.findChildOfType(myFile, PsiErrorElement::class.java))
+    }
+
+    fun testTableReferenceKeepsNestedTagsTemplatesAndLinks() {
+        val body = "Note <span>detail</span> {{cite|book}} [[Author|Name]]\nsecond line"
+        val source = "{|\n| <ref name=note>$body</ref><ref name=note/> || next\n|}"
+        val refs = references(source)
+        assertEquals(2, refs.size)
+        assertEquals(body, refs[0].bodyRange?.substring(source))
+        assertNotNull(PsiTreeUtil.findChildOfType(refs[0].source, WtTemplate::class.java))
+        assertNotNull(PsiTreeUtil.findChildOfType(refs[0].source, WtInternalLink::class.java))
+        assertNull(refs[1].bodyRange)
+        assertNull(PsiTreeUtil.findChildOfType(myFile, PsiErrorElement::class.java))
+    }
+
     fun testOnlyRefTagsAreReferences() {
         assertEquals(1, references("<REF>Note</REF><reference>Other</reference><nowiki><ref>literal</ref></nowiki>").size)
     }

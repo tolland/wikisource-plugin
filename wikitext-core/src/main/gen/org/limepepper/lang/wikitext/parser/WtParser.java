@@ -163,7 +163,7 @@ public class WtParser implements PsiParser, LightPsiParser {
   }
 
   /* ********************************************************** */
-  // (content_element | TEMPLATE_HEAD_TEXT | TEMPLATE_PARAM_TEXT)*
+  // (content_element | TEMPLATE_HEAD_TEXT | TEMPLATE_PARAM_TEXT | TABLE_CELL_TEXT)*
   static boolean html_tag_content(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "html_tag_content")) return false;
     while (true) {
@@ -174,13 +174,14 @@ public class WtParser implements PsiParser, LightPsiParser {
     return true;
   }
 
-  // content_element | TEMPLATE_HEAD_TEXT | TEMPLATE_PARAM_TEXT
+  // content_element | TEMPLATE_HEAD_TEXT | TEMPLATE_PARAM_TEXT | TABLE_CELL_TEXT
   private static boolean html_tag_content_0(PsiBuilder b, int l) {
     if (!recursion_guard_(b, l, "html_tag_content_0")) return false;
     boolean r;
     r = content_element(b, l + 1);
     if (!r) r = consumeToken(b, TEMPLATE_HEAD_TEXT);
     if (!r) r = consumeToken(b, TEMPLATE_PARAM_TEXT);
+    if (!r) r = consumeToken(b, TABLE_CELL_TEXT);
     return r;
   }
 

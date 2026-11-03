@@ -211,7 +211,8 @@ private link_display ::= (content_element | LINK_PIPE)*
 html_tag ::= HTML_TAG_SELFCLOSE | parsed_tag
 // Keep incomplete parsed tags as nodes, while leaving opaque bodies to verbatim_tag.
 private parsed_tag ::= HTML_TAG_OPEN !VERBATIM_CONTENT html_tag_content HTML_TAG_CLOSE {pin=2}
-private html_tag_content ::= (content_element | TEMPLATE_HEAD_TEXT | TEMPLATE_PARAM_TEXT)*
+// Tag bodies retain the text token of their enclosing lexer context, including tables.
+private html_tag_content ::= (content_element | TEMPLATE_HEAD_TEXT | TEMPLATE_PARAM_TEXT | TABLE_CELL_TEXT)*
 
 // Verbatim tags (<nowiki>, <pre>, <syntaxhighlight>, etc.) -- content is
 // opaque VERBATIM_CONTENT runs, never re-parsed as wikitext, matching the
