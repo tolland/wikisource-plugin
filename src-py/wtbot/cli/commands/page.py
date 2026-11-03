@@ -108,3 +108,37 @@ def query(
             typer.echo(f"  {revision_line} slots={len(slots)}")
             for slot in slots:
                 typer.echo(f"    {_slot_summary(slot)}")
+
+
+@app.command("delete")
+def delete_cached(
+    title: str = typer.Argument(..., help="Exact cached title, including namespace."),
+    label: str = typer.Option(..., "--label", help="Registered site label."),
+    force: bool = typer.Option(
+        False, "--force", help="Delete; without this, preview only."
+    ),
+    discard_local_edits: bool = typer.Option(
+        False,
+        "--discard-local-edits",
+        help="Also discard uncommitted edits at this title.",
+    ),
+    api: ApiClient = Depends(get_api),
+) -> None:
+    """Forget a cached title, revisions, links and associated promotion batches.
+
+    Other sites' pages and revisions are kept. No remote wiki is changed.
+    Subpages are not deleted. Dirty local edits require --discard-local-edits.
+    """
+    plan = api.delete(
+        "/cache/title",
+        label=label,
+        title=title,
+        dry_run=not force,
+        discard_local_edits=discard_local_edits,
+    )
+    verb = "would delete" if plan["dry_run"] else "deleted"
+    typer.echo(f"{verb} {plan['title']} on {plan['site_label']} (local cache only):")
+    for count in plan["counts"]:
+        typer.echo(f"  {count['table']}: {count['rows']}")
+    if plan["dry_run"]:
+        typer.echo("nothing deleted -- pass --force to delete these.")

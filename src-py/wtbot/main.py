@@ -8,6 +8,7 @@ from sqlmodel import Session, select
 
 from wtbot.api import (
     annotations,
+    cache_delete,
     dev,
     edit_journal,
     fetch,
@@ -145,6 +146,7 @@ def create_app(
     app.include_router(reference_image.router)
     app.include_router(sites.router)
     app.include_router(sync.router)
+    app.include_router(cache_delete.router)
     app.include_router(vfs.router)
     app.include_router(viewer.router)
 

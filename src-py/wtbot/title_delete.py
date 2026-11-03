@@ -48,7 +48,9 @@ def _in(column, pks: list[int]):
     return col(column).in_(pks)
 
 
-def blockers(session: Session, pks: list[int]) -> list[str]:
+def blockers(
+    session: Session, pks: list[int], *, include_sync: bool = True
+) -> list[str]:
     """Why deleting exactly [pks] would strand a survivor, one line per cause.
 
     Empty means the delete can run. A pk in [pks] referencing another in
@@ -70,6 +72,8 @@ def blockers(session: Session, pks: list[int]) -> list[str]:
             reasons.append(
                 f"index {index.title_pk} holds its scan at file {index.file_title_pk}"
             )
+    if not include_sync:
+        return reasons
     for link in session.exec(
         select(PageLink).where(
             or_(_in(PageLink.local_page_pk, pks), _in(PageLink.remote_page_pk, pks))
