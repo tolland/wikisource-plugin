@@ -3,11 +3,12 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import Session
+from sqlmodel import Session, select
 
-from ide_test_support.__main__ import add_test_controls, seed_browser
+from ide_test_support.__main__ import add_test_controls, seed_browser, seed_search_work
 from wtbot.db import create_db_engine
 from wtbot.main import create_app
+from wtbot.model import EditJournal, Page, Title
 from wtbot.vfs import WikisourceVfs
 
 
@@ -68,5 +69,42 @@ def test_browser_scenario_exposes_index_and_two_readable_pages(tmp_path: Path) -
                 len(WikisourceVfs(session).list_children(f"{index}/@pages").children)
                 == 2
             )
+    finally:
+        engine.dispose()
+
+
+def test_search_scenario_distinguishes_defaults_from_saved_local_transcriptions(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "search.db"
+    seed_search_work(database)
+    engine = create_db_engine(f"sqlite:///{database}")
+    try:
+        with Session(engine) as session:
+            vfs = WikisourceVfs(session)
+            prefix = "/ide/en/Page/IDE integration.djvu"
+            stats = vfs.stat_bulk([f"{prefix}/{n}/@wikitext" for n in (1, 2, 3, 4, 5)])
+            assert [(s.placeholder, s.dirty) for s in stats] == [
+                (False, False),
+                (False, False),
+                (True, False),
+                (True, False),
+                (True, True),
+            ]
+            defaults = [
+                session.exec(
+                    select(Title).where(Title.title == f"Page:IDE integration.djvu/{n}")
+                ).one()
+                for n in (3, 4)
+            ]
+            assert all(session.get(Page, title.pk) is None for title in defaults)
+            assert all(
+                session.exec(
+                    select(EditJournal).where(EditJournal.title_pk == title.pk)
+                ).first()
+                is None
+                for title in defaults
+            )
+            assert len(session.exec(select(EditJournal)).all()) == 1
     finally:
         engine.dispose()

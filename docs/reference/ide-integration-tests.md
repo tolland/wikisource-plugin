@@ -62,6 +62,24 @@ the database at the same address. Failure must retain the last confirmed
 membership; replacement requires explicit reattachment. See
 [work attachments](work-attachments.md) for the supported behavior.
 
+`attachedWorkIndexSkipsUnreviewedDefaults` uses `@WithWtbot(scenario = "search")`:
+two fetched Pages, untouched OCR/scaffold defaults, a locally saved Page without
+a remote revision, and an unrelated title. It checks contributor membership and
+native `IdIndex` results for unopened files, selects the named scope in the real
+Find in Files chooser and checks matching results, confirms default-only pages remain
+clean placeholders, then explicitly edits/saves one default and verifies that it
+joins indexing. Detach must remove roots and scopes. The ordinary browser scenario
+is unchanged.
+
+The search scenario also opens a result, injects a new backend revision and clicks Browser Refresh.
+The existing editor must reload with the same file ID. VFS unit regressions cover
+the actual cache-avoiding wrapper for both clean Documents and unsaved text during
+invalidation; IDE navigation paths may retain either form of the file.
+
+```bash
+DISPLAY=:88 GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew integrationTestExtended --tests '*attachedWorkIndexSkipsUnreviewedDefaults*' --no-daemon
+```
+
 Gradle may download the IDE and test framework on the first run. Starter uses
 a separate copy of Gradle's resolved IDE installation rather than selecting the
 latest available IDE. Allow disk space for that copy. To compile the tests

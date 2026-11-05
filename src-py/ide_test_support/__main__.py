@@ -8,11 +8,11 @@ from typing import Annotated
 import uvicorn
 from fastapi import Body, FastAPI, HTTPException, Request, Response
 from sqlalchemy import Engine
-from sqlmodel import Session
+from sqlmodel import Session, select
 
 from wtbot.db import create_db_engine, init_db
 from wtbot.main import create_app
-from wtbot.model import Page, ProofreadPageMeta, Site
+from wtbot.model import EditJournal, Page, ProofreadPageMeta, Site
 from wtbot.model.wiki.title import FetchState
 from wtbot.title_store import ensure_title
 from wtbot.vfs.nodes import AspectLeaf, resolve
@@ -142,11 +142,81 @@ def seed_browser(database: Path, index_last_page: int = 2) -> BrowserScenario:
     return scenario
 
 
+def seed_search_work(database: Path) -> None:
+    """Two real pages, two untouched defaults and one saved local transcription."""
+    seed_browser(database)
+    engine = create_db_engine(f"sqlite:///{database.resolve()}")
+    try:
+        with Session(engine) as session:
+            site = session.exec(
+                select(Site).where(Site.family == "ide", Site.code == "en")
+            ).one()
+            index = ensure_title(
+                session,
+                site_pk=site.pk,
+                title="Index:IDE integration.djvu",
+                expected_content_model="proofread-index",
+            )
+            for number in (3, 4, 5):
+                title = ensure_title(
+                    session,
+                    site_pk=site.pk,
+                    title=f"Page:IDE integration.djvu/{number}",
+                    expected_content_model="proofread-page",
+                )
+                title.namespace_key = 250
+                title.fetch_status = FetchState.done
+                session.add(
+                    ProofreadPageMeta(
+                        title_pk=title.pk,
+                        index_title_pk=index.pk,
+                        page_number=number,
+                        quality_level=1,
+                        default_body=(
+                            f'<noinclude><pagequality level="1" user="" /></noinclude>\nUnreviewed OCR default {number}.\n<noinclude></noinclude>'
+                            if number != 4
+                            else None
+                        ),
+                    )
+                )
+                if number == 5:
+                    session.add(
+                        EditJournal(
+                            title_pk=title.pk,
+                            base_revid=None,
+                            body='<noinclude><pagequality level="1" user="" /></noinclude>\nSaved local transcription.\n<noinclude></noinclude>',
+                        )
+                    )
+                    title.dirty = True
+            # An unrelated real page must stay outside attached-work roots and scopes.
+            unrelated = ensure_title(
+                session,
+                site_pk=site.pk,
+                title="Page:Unrelated.djvu/1",
+                expected_content_model="proofread-page",
+            )
+            unrelated.namespace_key = 250
+            session.add(
+                Page(
+                    pk=unrelated.pk,
+                    site_pk=site.pk,
+                    content_model="proofread-page",
+                    text="Unrelated transcription.",
+                    pageid=900,
+                    revid=900,
+                    remote_timestamp=datetime(2026, 1, 1, tzinfo=UTC),
+                )
+            )
+            session.commit()
+    finally:
+        engine.dispose()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Serve a fresh IDE test scenario.")
     parser.add_argument("--data-dir", type=Path, required=True)
     parser.add_argument("--port", type=int, default=18594)
-    parser.add_argument("--scenario", choices=["browser"], default="browser")
+    parser.add_argument("--scenario", choices=["browser", "search"], default="browser")
     parser.add_argument(
         "--resume",
         action="store_true",
@@ -159,7 +229,10 @@ def main() -> None:
         if not database.is_file():
             raise FileNotFoundError(f"No IDE test database to resume: {database}")
     else:
-        seed_browser(database, args.index_last_page)
+        if args.scenario == "search":
+            seed_search_work(database)
+        else:
+            seed_browser(database, args.index_last_page)
     engine = create_db_engine(f"sqlite:///{database}")
     try:
         app = create_app(engine=engine, blob_root=args.data_dir / "blobs")

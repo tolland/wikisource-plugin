@@ -21,6 +21,11 @@ to canonical Page paths. A graph occurrence is keyed by database UUID, parent
 occurrence and resource path. It is never a VirtualFile and has no independent
 editor buffer. Its root is labelled **Wikisource**, not a filesystem URL.
 
+Native Find/Replace navigation can open a `CacheAvoidingVirtualFileWrapper` with
+the same filesystem and persistent ID. Such a wrapper is not a `NewVirtualFile`.
+Managed refresh resolves `CacheAvoidingVirtualFile.asCacheable()` before marking
+the persistent file dirty, invalidating content or reloading its shared Document.
+
 VFS stat, listings and content responses include `database_id`. Managed saves
 send that UUID alongside `base_revid`; the API rejects a mismatched UUID before
 writing. The URL remains a logical connection/resource address; the persistent

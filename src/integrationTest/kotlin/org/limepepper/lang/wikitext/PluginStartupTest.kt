@@ -7,6 +7,8 @@ import com.intellij.driver.client.utility
 import com.intellij.driver.model.OnDispatcher
 import com.intellij.driver.sdk.*
 import com.intellij.driver.sdk.ui.components.UiComponent
+import com.intellij.driver.sdk.ui.components.common.ideFrame
+import com.intellij.driver.sdk.ui.components.common.popups.findInPathPopup
 import com.intellij.driver.sdk.ui.components.elements.button
 import com.intellij.driver.sdk.ui.components.elements.contentTabLabel
 import com.intellij.driver.sdk.ui.components.elements.tree
@@ -249,6 +251,110 @@ class PluginStartupTest {
             }
         }
     }
+
+    @Test
+    @Tag("extended")
+    @WithWtbot(scenario = "search")
+    fun attachedWorkIndexSkipsUnreviewedDefaults(@TempDir projectDirectory: Path) =
+        withProject(projectDirectory, "wikitext-attached-work-index") {
+            val backend = HttpVfsBackend(requireNotNull(wtbot.baseUrl))
+            val prefix = "/ide/en/Page/IDE integration.djvu"
+            val indexPath = "/ide/en/Index/IDE integration.djvu/@wikitext"
+            val expected = setOf(indexPath, "$prefix/1/@wikitext", "$prefix/2/@wikitext", "$prefix/5/@wikitext")
+            closeToolWindow("Project")
+            openToolWindow("MyToolWindow")
+            val tree = ui.tree("//div[@accessiblename='Wikisource Browser']")
+            tree.clickPath("Wikisource", "ide/en", "Index", "IDE integration.djvu")
+            ui.button("Attach Work").click()
+            val attachedIndex = service<ManagedTestWorkIndex>(singleProject())
+            waitFor("Contributor exposes real and locally saved text leaves", 30.seconds) {
+                attachedIndex.files().map { it.getPath() }.toSet() == expected
+            }
+            val scope = attachedIndex.scopes().single()
+            assertEquals("Wikisource: IDE integration.djvu", scope.getDisplayName())
+            assertTrue(service<ManagedTestEditorManager>(singleProject()).getOpenFiles().isEmpty(), "Indexing must work on unopened files")
+            val fileIndex = utility<ManagedTestFileBasedIndex>().getInstance()
+            val idIndex = requireNotNull(utility<ManagedTestIndexId>().findByName("IdIndex"))
+            fun wordFiles(word: String, searchScope: ManagedTestGlobalScope = scope): Set<String> = withReadAction {
+                val key = new(ManagedTestWordIndexEntry::class, word, true)
+                fileIndex.getContainingFiles(idIndex, key, searchScope).map { it.getPath() }.toSet()
+            }
+            waitFor("Native content index includes unopened remote transcriptions", 30.seconds) {
+                wordFiles("Integration") == setOf("$prefix/1/@wikitext", "$prefix/2/@wikitext")
+            }
+            waitFor("Native content index includes a saved page without a remote revision", 30.seconds) {
+                wordFiles("Saved") == setOf("$prefix/5/@wikitext")
+            }
+            assertTrue(wordFiles("Unreviewed").isEmpty())
+            assertTrue(wordFiles("Unrelated").isEmpty())
+            // Exercise the scope provider through the real Find in Files UI,
+            // rather than relying only on direct FileBasedIndex queries.
+            invokeAction("FindInPath")
+            val findPopup = ui.ideFrame().findInPathPopup()
+            findPopup.scopeActionButton.click()
+            findPopup.scopeChooserComboBox.selectItem(scope.getDisplayName())
+            findPopup.searchTextField.text = "Integration page"
+            waitFor("Find in Files searches unopened work pages", 30.seconds) {
+                findPopup.resultsTable.items.size == 2
+            }
+            findPopup.searchTextField.text = "Saved local transcription"
+            waitFor("Find in Files searches locally created content", 30.seconds) {
+                findPopup.resultsTable.items.size == 1
+            }
+            findPopup.searchTextField.text = "Unreviewed"
+            waitFor("Find in Files excludes untouched defaults", 30.seconds) {
+                findPopup.resultsTable.items.isEmpty()
+            }
+            findPopup.searchTextField.text = "Integration page 1."
+            waitFor("Find result can be opened in the editor", 30.seconds) { findPopup.resultsTable.items.size == 1 }
+            findPopup.resultsTable.doubleClickCell(0, 0)
+            val searchedPath = "$prefix/1/@wikitext"
+            val originalSearchText = backend.readContent(searchedPath).decodeText()
+            val searchedId = assertManagedEditor(searchedPath, originalSearchText)
+            // Navigation may retain a search wrapper (depending on the IDE
+            // path/profile). Refresh must reload the existing editor either way;
+            // unit regressions explicitly exercise CacheAvoidingVirtualFileWrapper.
+            val refreshedSearchText = originalSearchText.replace("Integration page 1.", "Refreshed page 1.")
+            wtbot.revise(searchedPath, refreshedSearchText, 404)
+            ui.button("Refresh").click()
+            assertEquals(searchedId, assertManagedEditor(searchedPath, refreshedSearchText))
+            for (number in listOf(3, 4)) {
+                val stat = backend.stat("$prefix/$number/@wikitext")
+                assertTrue(stat.placeholder)
+                assertTrue(!stat.dirty)
+                assertNull(stat.revid)
+            }
+
+            // Explicitly review and save one default. It should join indexing
+            // through the native save event, without detaching or reopening the project.
+            val path = "$prefix/3/@wikitext"
+            val original = backend.readContent(path).decodeText()
+            openManagedUrl("wikisource-wtbot://$path")
+            assertManagedEditor(path, original)
+            ui.xx("//div[@class='EditorComponentImpl']", UiComponent::class.java).list()
+                .single { it.component.isShowing() }.click()
+            withContext(OnDispatcher.EDT) {
+                val editor = requireNotNull(service<FileEditorManager>(singleProject()).getSelectedTextEditor())
+                val position = original.indexOf("Unreviewed OCR default 3.") + "Unreviewed OCR default 3.".length
+                editor.getCaretModel().moveToLogicalPosition(editor.offsetToLogicalPosition(position))
+            }
+            ui.keyboard { typeText(" Reviewed.") }
+            invokeAction("SaveAll")
+            waitFor("An explicitly saved default joins the contributor", 30.seconds) {
+                attachedIndex.files().map { it.getPath() }.toSet() == expected + path
+            }
+            waitFor("The new transcription is indexed", 30.seconds) {
+                wordFiles("Reviewed", attachedIndex.scopes().single()) == setOf(path)
+            }
+            assertTrue(backend.stat(path).dirty)
+            assertTrue(backend.stat(path).placeholder)
+            assertTrue(!backend.stat("$prefix/4/@wikitext").dirty)
+            tree.clickPath("Wikisource", "Attached works", "IDE integration.djvu", fullMatch = false)
+            ui.button("Detach Work").click()
+            waitFor("Detach removes index roots and work scopes", 30.seconds) {
+                attachedIndex.files().isEmpty() && attachedIndex.scopes().isEmpty()
+            }
+        }
 
     @Test
     @Tag("extended")
@@ -960,6 +1066,31 @@ interface ManagedTestVirtualFileManager {
 interface ManagedTestFileSystem {
     fun getProtocol(): String
 }
+
+@Remote("org.limepepper.lang.wikitext.search.WtAttachedWorkIndex", plugin = "org.limepepper.lang.wikitext/wikisource.wikitext-ui")
+interface ManagedTestWorkIndex {
+    fun files(): Array<ManagedTestVirtualFile>
+    fun scopes(): Array<ManagedTestGlobalScope>
+}
+
+@Remote("com.intellij.psi.search.GlobalSearchScope")
+interface ManagedTestGlobalScope {
+    fun getDisplayName(): String
+}
+
+@Remote("com.intellij.util.indexing.FileBasedIndex")
+interface ManagedTestFileBasedIndex {
+    fun getInstance(): ManagedTestFileBasedIndex
+    fun getContainingFiles(index: ManagedTestIndexId, key: ManagedTestWordIndexEntry, scope: ManagedTestGlobalScope): Collection<ManagedTestVirtualFile>
+}
+
+@Remote("com.intellij.util.indexing.ID")
+interface ManagedTestIndexId {
+    fun findByName(name: String): ManagedTestIndexId?
+}
+
+@Remote("com.intellij.psi.impl.cache.impl.id.IdIndexEntry")
+interface ManagedTestWordIndexEntry
 
 @Remote("javax.swing.JLabel")
 interface ManagedTestLabel {

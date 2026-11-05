@@ -10,6 +10,10 @@
     <extensions defaultExtensionNs="com.intellij">
         <editorTabTitleProvider implementation="org.limepepper.lang.wikitext.preview.WtEditorTabTitleProvider"/>
 
+        <indexedRootsProvider implementation="org.limepepper.lang.wikitext.search.WtAttachedWorkIndexableSetContributor"/>
+
+        <searchScopesProvider implementation="org.limepepper.lang.wikitext.search.WtAttachedWorkSearchScopeProvider"/>
+
         <applicationConfigurable
             parentId="editor"
             id="org.limepepper.wikitext.highlighting"

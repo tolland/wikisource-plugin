@@ -4,7 +4,9 @@ import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.util.xmlb.annotations.XCollection
+import com.intellij.util.messages.Topic
 import org.limepepper.lang.wikitext.vfs.backend.VfsBackend
 import org.limepepper.lang.wikitext.vfs.backend.WtVfsService
 import java.io.IOException
@@ -64,6 +66,7 @@ class WtWorkAttachments : PersistentStateComponent<WtWorkAttachments.State> {
                 WtManagedAddress.fromUrl(stored.indexUrl),
                 stored.contentUrls.map(WtManagedAddress::fromUrl))
         }.distinctBy { it.id }
+        changed()
     }
 
     fun attach(seed: WtManagedAddress, backend: VfsBackend = WtVfsService.instance.backend): WtAttachedWork {
@@ -75,6 +78,7 @@ class WtWorkAttachments : PersistentStateComponent<WtWorkAttachments.State> {
             val attached = WtAttachedWork(previous?.id ?: UUID.randomUUID().toString(),
                 backend.cacheIdentity, discovered.databaseId, discovered.index, discovered.content)
             works = works.filterNot { it.id == attached.id } + attached
+            changed()
             return attached
         }
     }
@@ -89,6 +93,7 @@ class WtWorkAttachments : PersistentStateComponent<WtWorkAttachments.State> {
             if (works.find { it.id == id } !== previous) throw IOException("Work changed during refresh; try again")
             val refreshed = previous.copy(content = discovered.content)
             works = works.map { if (it.id == id) refreshed else it }
+            changed()
             return refreshed
         }
     }
@@ -107,5 +112,21 @@ class WtWorkAttachments : PersistentStateComponent<WtWorkAttachments.State> {
 
     /** Association only: do not delete VFS records, close tabs, or save/discard documents. */
     @Synchronized
-    fun detach(id: String) { works = works.filterNot { it.id == id } }
+    fun detach(id: String) {
+        works = works.filterNot { it.id == id }
+        changed()
+    }
+
+    private fun changed() {
+        ApplicationManager.getApplication()?.takeUnless { it.isDisposed }
+            ?.messageBus?.syncPublisher(CHANGED)?.attachmentsChanged(this)
+    }
+
+    companion object {
+        val CHANGED = Topic.create("WtWorkAttachmentsChanged", WtWorkAttachmentsListener::class.java)
+    }
+}
+
+fun interface WtWorkAttachmentsListener {
+    fun attachmentsChanged(source: WtWorkAttachments)
 }

@@ -2,8 +2,8 @@
 
 Status: **core migration complete** for the supported Index/Page workflow.
 Bounded work attachment is also implemented. Performance and the small parity
-check below are non-blocking follow-ups; indexing and Find/Replace are separate
-feature work.
+check below are non-blocking follow-ups. Initial attached-work indexing/scopes are
+implemented separately; body-aware replacement remains feature work.
 
 ## Completed baseline
 
@@ -46,9 +46,11 @@ regression found during them as a specific bug.
 
 ## Separate feature and reliability work
 
-- **Indexing and native Find/Replace:** choose bounded indexable roots from attached
-  membership; verify initial/incremental indexing and removal after detach, then
-  Find and Replace behavior for unopened files, read-only content and save failures.
+- **Attached-work search:** the initial contributor and named file scopes include
+  real revisions and saved local edits, excluding untouched default bodies.
+  Continue Find UI coverage, restart/recovery and large-work performance checks.
+  Implement transcription-body replacement separately; file scopes do not enforce
+  editor guarded regions in native batch replacement.
 - **Module per Index/content roots:** an experiment for the indexing feature, not
   a requirement for ordinary managed files or attachment.
 - **Other resource grouping and search:** File/Template views, symbol navigation,

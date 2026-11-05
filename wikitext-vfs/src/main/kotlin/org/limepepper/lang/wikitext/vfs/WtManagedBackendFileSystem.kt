@@ -7,6 +7,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileWithId
 import com.intellij.openapi.vfs.newvfs.FileAttribute
 import com.intellij.openapi.vfs.newvfs.NewVirtualFile
+import com.intellij.openapi.vfs.newvfs.CacheAvoidingVirtualFile
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.vfs.newvfs.NewVirtualFileSystem
 import org.limepepper.lang.wikitext.vfs.backend.NodeKind
@@ -117,6 +118,14 @@ class WtManagedBackendFileSystem : NewVirtualFileSystem() {
 
     fun refreshFile(file: VirtualFile, asynchronous: Boolean = true) {
         require(file.fileSystem === this)
+        // Find/Replace can hand editor navigation a cache-avoiding wrapper.
+        // Refresh events and Document reloads must use its persistent file.
+        val cached = if (file is CacheAvoidingVirtualFile) file.asCacheable() else file
+        val persistent = cached as? NewVirtualFile ?: return
+        refreshPersistentFile(persistent, asynchronous)
+    }
+
+    private fun refreshPersistentFile(file: NewVirtualFile, asynchronous: Boolean) {
         if (asynchronous) {
             ApplicationManager.getApplication().executeOnPooledThread {
                 try { refreshFile(file, false) }
@@ -144,7 +153,7 @@ class WtManagedBackendFileSystem : NewVirtualFileSystem() {
                 }
             }
         }
-        (file as NewVirtualFile).markDirty()
+        file.markDirty()
         file.refresh(asynchronous, false)
     }
 

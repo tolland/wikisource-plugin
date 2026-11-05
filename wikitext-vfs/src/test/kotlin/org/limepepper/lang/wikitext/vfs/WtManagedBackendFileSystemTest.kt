@@ -13,6 +13,7 @@ import com.intellij.util.ui.UIUtil
 import com.intellij.openapi.vfs.VirtualFileWithId
 import com.intellij.openapi.vfs.newvfs.ManagingFS
 import com.intellij.openapi.vfs.newvfs.NewVirtualFile
+import com.intellij.openapi.vfs.newvfs.CacheAvoidingVirtualFile
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import org.limepepper.lang.wikitext.vfs.backend.FakeVfsBackend
 import org.limepepper.lang.wikitext.vfs.backend.NodeKind
@@ -206,6 +207,71 @@ class WtManagedBackendFileSystemTest : BasePlatformTestCase() {
         backend.writeContent(path, Base64.getEncoder().encodeToString("External edit".toByteArray()), 41)
         fs.refreshFile(file, false)
         assertEquals("External edit", String(file.contentsToByteArray()))
+    }
+
+    fun testRefreshOfSearchWrapperReloadsTheExistingDocument() {
+        val path = testPath("search-wrapper-refresh")
+        val backend = fake(path)
+        WtVfsService.instance.setBackendForTesting(backend)
+        val file = requireNotNull(fileSystem.findFileByPath(path)) as NewVirtualFile
+        val wrapper = NewVirtualFile.asCacheAvoiding(file)
+        assertTrue(wrapper is CacheAvoidingVirtualFile)
+        assertFalse(wrapper is NewVirtualFile)
+        val documents = FileDocumentManager.getInstance()
+        val document = requireNotNull(documents.getDocument(wrapper))
+        assertSame(document, documents.getDocument(file))
+        val id = (wrapper as VirtualFileWithId).id
+        backend.writeContent(path, Base64.getEncoder().encodeToString("After upstream refresh".toByteArray()), 41)
+
+        fileSystem.refreshFile(wrapper, false)
+        UIUtil.dispatchAllInvocationEvents()
+
+        assertEquals("After upstream refresh", document.text)
+        assertSame(document, documents.getDocument(wrapper))
+        assertEquals(id, file.id)
+        assertEquals(file, ManagingFS.getInstance().findFileById(id))
+    }
+
+    fun testSearchWrapperRefreshPreservesUnsavedTextAndItsReadRevision() {
+        val path = testPath("search-wrapper-unsaved")
+        val base = fake(path)
+        var database = "original"
+        var body = "Initial aspirations."
+        val backend = object : VfsBackend by base {
+            override val cacheIdentity = "test-wrapper-database"
+            override val requiresDatabaseIdentity = true
+            override fun stat(path: String) = base.stat(path).copy(databaseId = database)
+            override fun readContent(path: String) = base.readContent(path).copy(
+                databaseId = database, contentBase64 = Base64.getEncoder().encodeToString(body.toByteArray()))
+            override fun writeContent(path: String, contentBase64: String, baseRevid: Long?, comment: String?, databaseId: String?): WriteResult {
+                if (databaseId != database) throw VfsBackendException("Database changed")
+                body = String(Base64.getDecoder().decode(contentBase64))
+                return WriteResult(path, WriteStatus.ok, 41, databaseId = database)
+            }
+        }
+        WtVfsService.instance.setBackendForTesting(backend)
+        val file = requireNotNull(fileSystem.findFileByPath(path)) as NewVirtualFile
+        val wrapper = NewVirtualFile.asCacheAvoiding(file)
+        val documents = FileDocumentManager.getInstance()
+        val document = requireNotNull(documents.getDocument(wrapper))
+        try {
+            WriteCommandAction.runWriteCommandAction(project) { document.setText("Unsaved local edit") }
+            // Force content invalidation with unchanged length/timestamp, so
+            // this tests preservation without a modal disk-conflict dialog.
+            database = "replacement"
+            body = "Initial definitions."
+            fileSystem.refreshFile(wrapper, false)
+            UIUtil.dispatchAllInvocationEvents()
+            assertEquals("Unsaved local edit", document.text)
+            assertTrue(documents.isDocumentUnsaved(document))
+            assertEquals(41L, fileSystem.cachedContentRevision(wrapper))
+            assertTrue(runCatching {
+                fileSystem.getOutputStream(wrapper, this, 0, 0).use { it.write(document.text.toByteArray()) }
+            }.exceptionOrNull() is IOException)
+            assertEquals("Initial definitions.", backend.readContent(path).decodeText())
+        } finally {
+            documents.reloadFromDisk(document)
+        }
     }
 
     fun testUnavailableRefreshPreservesCachedDocumentAndRecovers() {

@@ -18,7 +18,7 @@ import kotlin.io.path.exists
 
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.RUNTIME)
-annotation class WithWtbot
+annotation class WithWtbot(val scenario: String = "browser")
 
 /** Starts a real local API only for tests annotated with [WithWtbot]. */
 class WtbotServerExtension : BeforeEachCallback, AfterEachCallback {
@@ -28,7 +28,7 @@ class WtbotServerExtension : BeforeEachCallback, AfterEachCallback {
         private set
 
     override fun beforeEach(context: ExtensionContext) {
-        if (!context.requiredTestMethod.isAnnotationPresent(WithWtbot::class.java)) return
+        val scenario = context.requiredTestMethod.getAnnotation(WithWtbot::class.java)?.scenario ?: return
         val root = generateSequence(Path.of("").toAbsolutePath()) { it.parent }
             .firstOrNull { it.resolve("src-py/wtbot/main.py").exists() }
             ?: error("Run IDE tests with a working directory inside the repository")
@@ -45,7 +45,7 @@ class WtbotServerExtension : BeforeEachCallback, AfterEachCallback {
         }
         val builder = ProcessBuilder(
             "uv", "run", "--no-sync", "python", "-m", "ide_test_support",
-            "--data-dir", directory.toString(), "--port", "18594", "--scenario", "browser",
+            "--data-dir", directory.toString(), "--port", "18594", "--scenario", scenario,
         ).directory(root.toFile()).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.appendTo(log.toFile()))
         builder.environment().apply {
             put("PYTHONPATH", root.resolve("src-py").toString())

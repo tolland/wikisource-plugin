@@ -140,7 +140,11 @@ The browser uses `WikiBrowserNode` relationship values, including `@pages` links
 to canonical Page paths. These are presentation nodes, never editor files.
 Opening uses `WtWikiFiles` and `FileEditorManager`; do not construct VirtualFiles
 for browser nodes. `WtWorkAttachments` persists explicitly selected bounded works
-in project state. It does not register indexable roots or enable Find/Replace.
+in project state. `WtAttachedWorkIndex` selects real revisions and saved local
+edits using metadata, excluding untouched default bodies before resolving files.
+An `IndexableSetContributor` and per-work file scope provider share its background-
+resolved snapshots. Native file scopes do not enforce proofread editor guards;
+transcription-body replacement is separate work.
 
 ### Split-editor preview (`wikitext-ui/.../preview/`)
 
