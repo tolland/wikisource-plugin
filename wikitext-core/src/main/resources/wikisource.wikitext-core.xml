@@ -30,6 +30,10 @@
             implementation="org.limepepper.lang.wikitext.injection.WtVerbatimLanguageInjector"
         />
 
+        <facetType
+            implementation="org.limepepper.lang.wikitext.facet.WtFacetType"
+        />
+
 
 
 <!--        <fileBasedIndex implementation="org.limepepper.lang.wikitext.search.FileIndexImpl"/>-->

@@ -28,6 +28,7 @@ dependencies = [
     "vcrpy>=8.3.0",
     "pypdf>=6.21.1",
     "pdfreader>=0.1.15",
+    "jupyterlab>=4.6.5",
 ]
 
 [project.urls]

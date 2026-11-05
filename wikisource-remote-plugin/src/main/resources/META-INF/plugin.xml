@@ -1,0 +1,19 @@
+<idea-plugin>
+    <id>org.limepepper.wikisource</id>
+    <name>Wikisource</name>
+
+    <vendor url="https://www.mycompany.com">The developer</vendor>
+    <description><![CDATA[
+    Wikisource remote editing and collaboration extension. Provides custom VFS, MediaWiki / WTBot backend integration, JCEF-based rendering and scan image previews, OCR review workflows, and ProofreadPage custom editors.
+    ]]></description>
+
+    <depends>org.limepepper.lang.wikitext</depends>
+    <depends>com.intellij.modules.lang</depends>
+    <depends>com.intellij.modules.jcef</depends>
+
+    <content>
+        <module name="wikisource.wikisource-remote-shared" loading="required"/>
+        <module name="wikisource.wikisource-remote-backend" loading="required" required-if-available="intellij.platform.backend"/>
+        <module name="wikisource.wikisource-remote-frontend" loading="required" required-if-available="intellij.platform.frontend"/>
+    </content>
+</idea-plugin>

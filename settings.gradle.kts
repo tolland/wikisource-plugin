@@ -37,6 +37,10 @@ dependencyResolutionManagement {
 }
 
 include("wikitext-core")
-include("wikitext-ui")
-include("wikitext-vfs")
+include("wikitext-language-ui")
+include("wikitext-language-plugin")
+include("wikisource-remote-shared")
+include("wikisource-remote-backend")
+include("wikisource-remote-frontend")
+include("wikisource-remote-plugin")
 include("src-py")

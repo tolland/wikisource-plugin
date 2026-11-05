@@ -12,7 +12,9 @@
 
     <content>
         <module name="wikisource.wikitext-core" loading="required"/>
-        <module name="wikisource.wikitext-vfs" loading="required"/>
-        <module name="wikisource.wikitext-ui"  loading="required"/>
+        <module name="wikisource.wikitext-language-ui" loading="required"/>
+        <module name="wikisource.wikisource-remote-shared" loading="required"/>
+        <module name="wikisource.wikisource-remote-backend" loading="required"/>
+        <module name="wikisource.wikisource-remote-frontend" loading="required"/>
     </content>
 </idea-plugin>

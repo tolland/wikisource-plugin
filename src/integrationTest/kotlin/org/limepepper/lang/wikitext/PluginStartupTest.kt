@@ -87,6 +87,7 @@ class PluginStartupTest {
     fun projectProvidesEditorAndToolWindows(@TempDir projectDirectory: Path) =
         withProject(projectDirectory, "wikitext-project-editor") { fixtureText ->
             assertTrue(isPluginLoaded("org.limepepper.lang.wikitext"), "Wikitext plugin must be loaded")
+            assertTrue(isPluginLoaded("org.limepepper.wikisource"), "Wikisource plugin must be loaded")
 
             openFile("sample.wiki")
             withContext(OnDispatcher.EDT) {
@@ -936,20 +937,27 @@ class PluginStartupTest {
             """<project version="4"><component name="ProjectId" id="$workspaceId" /></project>""",
         )
 
-        val pluginArchive = Path.of(requireNotNull(System.getProperty("path.to.build.plugin")))
+        val langPluginPath = System.getProperty("wikitext.language.plugin.archive")?.let { Path.of(it) }
+        val remotePluginPath = System.getProperty("wikisource.remote.plugin.archive")?.let { Path.of(it) }
+        val fallbackArchive = System.getProperty("path.to.build.plugin")?.let { Path.of(it) }
 
         val ideInfo = IdeInfo.IdeaUltimate.copy(getInstaller = { ideInstaller })
 
         val testContext =
             Starter.newContext(testName, TestCase(ideInfo, LocalProjectInfo(projectDirectory)))
                 .apply {
-                    PluginConfigurator(this).installPluginFromPath(pluginArchive)
+                    if (langPluginPath != null && remotePluginPath != null) {
+                        PluginConfigurator(this).installPluginFromPath(langPluginPath)
+                        PluginConfigurator(this).installPluginFromPath(remotePluginPath)
+                    } else if (fallbackArchive != null) {
+                        PluginConfigurator(this).installPluginFromPath(fallbackArchive)
+                    }
                     if (pluginProfile == "platform") {
                         // Exercise the free platform APIs used by Wikisource. Avoid
                         // the subscription-mode transition and unrelated language plugins.
                         disableUltimateModule()
                         applyVMOptionsPatch {
-                            addSystemProperty("idea.load.plugins.id", "org.limepepper.lang.wikitext,com.jetbrains.performancePlugin")
+                            addSystemProperty("idea.load.plugins.id", "org.limepepper.lang.wikitext,org.limepepper.wikisource,com.jetbrains.performancePlugin")
                         }
                     }
                     val editorEntries = restoredFiles.joinToString("\n") { url ->
@@ -1028,26 +1036,36 @@ class PluginStartupTest {
         repeat(runs) { run ->
             val launchStarted = System.nanoTime()
             var closingStarted = launchStarted
-            testContext.runIdeWithDriver()
-                .useDriverAndCloseIde {
-                    try {
-                        val licenseInfo = ui.dialog(title = "IDE")
-                        if (licenseInfo.present() && licenseInfo.getAllTexts().any { it.text == "Ultimate subscription" }) {
-                            licenseInfo.button("Close").click()
+            try {
+                testContext.runIdeWithDriver()
+                    .useDriverAndCloseIde {
+                        try {
+                            val licenseInfo = ui.dialog(title = "IDE")
+                            if (licenseInfo.present() && licenseInfo.getAllTexts().any { it.text == "Ultimate subscription" }) {
+                                licenseInfo.button("Close").click()
+                            }
+                            waitForIndicators(2.minutes)
+                            println("IDE timing [$testName, run=${run + 1}]: ready=${elapsedSeconds(launchStarted)}s")
+                            val scenarioStarted = System.nanoTime()
+                            try { scenario(fixtureText) }
+                            finally {
+                                println("IDE timing [$testName, run=${run + 1}]: scenario=${elapsedSeconds(scenarioStarted)}s")
+                            }
+                        } finally {
+                            // Optional watched-run pause; keep it off the IDE's EDT.
+                            if (pauseSeconds > 0) Thread.sleep(pauseSeconds * 1000)
+                            closingStarted = System.nanoTime()
                         }
-                        waitForIndicators(2.minutes)
-                        println("IDE timing [$testName, run=${run + 1}]: ready=${elapsedSeconds(launchStarted)}s")
-                        val scenarioStarted = System.nanoTime()
-                        try { scenario(fixtureText) }
-                        finally {
-                            println("IDE timing [$testName, run=${run + 1}]: scenario=${elapsedSeconds(scenarioStarted)}s")
-                        }
-                    } finally {
-                        // Optional watched-run pause; keep it off the IDE's EDT.
-                        if (pauseSeconds > 0) Thread.sleep(pauseSeconds * 1000)
-                        closingStarted = System.nanoTime()
                     }
+            } catch (t: Throwable) {
+                val logFile = testContext.paths.systemDir.resolve("log/idea.log")
+                if (java.nio.file.Files.exists(logFile)) {
+                    println("=== IDEA LOG ===")
+                    println(java.nio.file.Files.readString(logFile))
+                    println("================")
                 }
+                throw t
+            }
             println("IDE timing [$testName, run=${run + 1}]: close=${elapsedSeconds(closingStarted)}s")
             afterRun(run, testContext.paths.configDir.resolve("workspace/$workspaceId.xml"))
         }
@@ -1067,7 +1085,7 @@ interface ManagedTestFileSystem {
     fun getProtocol(): String
 }
 
-@Remote("org.limepepper.lang.wikitext.search.WtAttachedWorkIndex", plugin = "org.limepepper.lang.wikitext/wikisource.wikitext-ui")
+@Remote("org.limepepper.lang.wikitext.search.WtAttachedWorkIndex", plugin = "org.limepepper.wikisource/wikisource.wikisource-remote-frontend")
 interface ManagedTestWorkIndex {
     fun files(): Array<ManagedTestVirtualFile>
     fun scopes(): Array<ManagedTestGlobalScope>

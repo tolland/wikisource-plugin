@@ -1,0 +1,511 @@
+package org.limepepper.lang.wikitext.tool
+
+import com.intellij.icons.AllIcons
+import com.intellij.ide.util.treeView.NodeDescriptor
+import com.intellij.ide.util.treeView.TreeState
+import com.intellij.openapi.actionSystem.ActionUpdateThread
+import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.FileEditorManagerEvent
+import com.intellij.openapi.fileEditor.FileEditorManagerListener
+import com.intellij.openapi.ide.CopyPasteManager
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.wm.ToolWindow
+import com.intellij.ui.ColoredTreeCellRenderer
+import com.intellij.ui.JBColor
+import com.intellij.ui.PopupHandler
+import com.intellij.openapi.fileTypes.FileTypeRegistry
+import com.intellij.ui.SimpleTextAttributes
+import com.intellij.ui.components.JBScrollPane
+import com.intellij.ui.components.JBTextArea
+import com.intellij.ui.components.JBLabel
+import com.intellij.ui.tree.AsyncTreeModel
+import com.intellij.ui.tree.StructureTreeModel
+import com.intellij.ui.treeStructure.Tree
+import com.intellij.util.ui.tree.TreeUtil
+import org.limepepper.lang.wikitext.editor.prp.PageQuality
+import org.limepepper.lang.wikitext.vfs.WtWikiFiles
+import org.limepepper.lang.wikitext.vfs.WtManagedBackendFileSystem
+import org.limepepper.lang.wikitext.vfs.WtPaths
+import org.limepepper.lang.wikitext.vfs.WtManagedAddress
+import org.limepepper.lang.wikitext.vfs.WtWorkAttachments
+import org.limepepper.lang.wikitext.vfs.backend.NodeKind
+import org.limepepper.lang.wikitext.vfs.backend.VfsBackendException
+import org.limepepper.lang.wikitext.vfs.backend.WtBackendSwitchedListener
+import org.limepepper.lang.wikitext.vfs.backend.WtVfsService
+import java.awt.BorderLayout
+import java.awt.GridLayout
+import java.io.IOException
+import java.awt.datatransfer.StringSelection
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseEvent
+import javax.swing.JButton
+import javax.swing.JPanel
+import javax.swing.JSplitPane
+import javax.swing.JTree
+import javax.swing.SwingUtilities
+
+internal class WikisourceBrowserToolWindowTab(
+    private val project: Project,
+    private val toolWindow: ToolWindow,
+) {
+
+    fun createComponent(): JPanel {
+        val model = WikiBrowserModel()
+        val attachments = project.getService(WtWorkAttachments::class.java)
+        val structure = WikisourceTreeStructure(model, attachments)
+        val structureModel = StructureTreeModel(structure, toolWindow.disposable)
+        val tree = Tree(AsyncTreeModel(structureModel, toolWindow.disposable))
+        tree.accessibleContext.accessibleName = "Wikisource Browser"
+        tree.isRootVisible = true
+        tree.cellRenderer = object : ColoredTreeCellRenderer() {
+            override fun customizeCellRenderer(
+                tree: JTree,
+                value: Any?,
+                selected: Boolean,
+                expanded: Boolean,
+                leaf: Boolean,
+                row: Int,
+                hasFocus: Boolean,
+            ) {
+                when (val element = elementOf(value)) {
+                    is WikiBrowserNode -> {
+                        // A title (offers aspects) reads as a document that may
+                        // also have subpages; a namespace or `@pages` is a folder.
+                        icon = if (element.isDirectory && element.aspects.isEmpty()) AllIcons.Nodes.Folder else (FileTypeRegistry.getInstance().getFileTypeByExtension("wiki").icon ?: AllIcons.FileTypes.Text)
+                        // Dirty (uncommitted EditJournal edits) renders like a
+                        // modified file in VCS: blue name plus a star. A
+                        // placeholder (page not created on the wiki yet) is
+                        // grey italic until it has local edits.
+                        val nameAttributes = when {
+                            element.dirty -> DIRTY_ATTRIBUTES
+                            element.placeholder -> SimpleTextAttributes.GRAYED_ITALIC_ATTRIBUTES
+                            else -> SimpleTextAttributes.REGULAR_ATTRIBUTES
+                        }
+                        append(treeLabel(element), nameAttributes)
+                        if (element.dirty) append(" *", DIRTY_ATTRIBUTES)
+                        // ProofreadPage quality bullet in the pagelist colours.
+                        element.qualityLevel?.let { level ->
+                            append(
+                                "  ●",
+                                SimpleTextAttributes(
+                                    SimpleTextAttributes.STYLE_PLAIN,
+                                    qualityColor(level),
+                                ),
+                            )
+                        }
+                    }
+                    is AttachedWorkElement -> {
+                        icon = FileTypeRegistry.getInstance().getFileTypeByExtension("wiki").icon ?: AllIcons.FileTypes.Text
+                        append(element.work.name)
+                        append(" (${element.work.content.size} files)", SimpleTextAttributes.GRAYED_ATTRIBUTES)
+                    }
+                    else -> {
+                        icon = null
+                        append(element?.toString() ?: "")
+                    }
+                }
+            }
+        }
+
+        // Double-click opens a title's default aspect; the tree's own
+        // double-click-to-toggle would expand it at the same time. Branches
+        // are still expanded by their handle or the arrow keys, and a
+        // container with nothing to open (a namespace) is toggled below.
+        tree.toggleClickCount = 0
+        tree.addMouseListener(object : MouseAdapter() {
+            override fun mouseClicked(e: MouseEvent) {
+                if (e.clickCount != 2) return
+                val path = tree.getPathForLocation(e.x, e.y) ?: return
+                when (val element = elementOf(path.lastPathComponent)) {
+                    is AttachedContentElement -> {
+                        openAttachedPath(attachments, element.parent.work.id, element.address.backendPath)
+                        return
+                    }
+                    is AttachedWorkElement -> {
+                        openAttachedPath(attachments, element.work.id,
+                            WtPaths.aspectPath(element.work.index.backendPath, WtPaths.WIKITEXT))
+                        return
+                    }
+                }
+                val vFile = elementOf(path.lastPathComponent) as? WikiBrowserNode
+                if (vFile == null) {
+                    if (tree.isExpanded(path)) tree.collapsePath(path) else tree.expandPath(path)
+                    return
+                }
+                if (!openDefaultAspect(vFile)) {
+                    if (tree.isExpanded(path)) tree.collapsePath(path) else tree.expandPath(path)
+                }
+            }
+        })
+
+        val propertiesArea = JBTextArea(8, 60).apply {
+            accessibleContext.accessibleName = "Wikisource Properties"
+            isEditable = false
+            font = java.awt.Font(java.awt.Font.MONOSPACED, java.awt.Font.PLAIN, 12)
+            text = "Select a file to see its properties."
+        }
+
+        tree.addTreeSelectionListener {
+            val vFile = elementOf(tree.lastSelectedPathComponent) as? WikiBrowserNode
+                ?: return@addTreeSelectionListener
+            showProperties(vFile, propertiesArea)
+        }
+
+        project.messageBus.connect(toolWindow.disposable).subscribe(
+            FileEditorManagerListener.FILE_EDITOR_MANAGER,
+            object : FileEditorManagerListener {
+                override fun selectionChanged(event: FileEditorManagerEvent) {
+                    val file = event.newFile ?: return
+                    showProperties(file, propertiesArea)
+                }
+            },
+        )
+
+        // A different sidecar means a different library: the tree has to be
+        // rebuilt from the new roots rather than left showing the old one's.
+        ApplicationManager.getApplication().messageBus.connect(toolWindow.disposable).subscribe(
+            WtVfsService.BACKEND_SWITCHED,
+            WtBackendSwitchedListener {
+                refreshTreePreservingState(tree, structureModel, model)
+                propertiesArea.text = "Select a file to see its properties."
+            },
+        )
+
+        installContextMenu(tree, structureModel, propertiesArea, model)
+
+        val refreshButton = JButton("Refresh").apply {
+            addActionListener {
+                refreshTreePreservingState(tree, structureModel, model)
+            }
+        }
+        fun selectedWorkId(): String? = when (val element = elementOf(tree.lastSelectedPathComponent)) {
+            is AttachedWorkElement -> element.work.id
+            is AttachedContentElement -> element.parent.work.id
+            else -> null
+        }
+        fun updateAttachments() {
+            val state = TreeState.createOn(tree)
+            structureModel.invalidateAsync().thenRun { SwingUtilities.invokeLater { state.applyTo(tree) } }
+        }
+        val workStatus = JBLabel("Select an Index or Page to attach a work.").apply {
+            accessibleContext.accessibleName = "Wikisource Work Status"
+        }
+        fun workRequest(operation: () -> String) {
+            ApplicationManager.getApplication().executeOnPooledThread {
+                val message = try { operation() } catch (failure: IOException) {
+                    "Work unavailable: ${failure.message}. Last confirmed membership is retained."
+                }
+                ApplicationManager.getApplication().invokeLater {
+                    if (!project.isDisposed) {
+                        propertiesArea.text = message
+                        workStatus.text = message
+                        workStatus.toolTipText = message
+                        updateAttachments()
+                    }
+                }
+            }
+        }
+        val attachButton = JButton("Attach Work").apply {
+            toolTipText = "Attach the selected Index or Page to this project"
+            addActionListener {
+                val node = elementOf(tree.lastSelectedPathComponent) as? WikiBrowserNode ?: return@addActionListener
+                workRequest {
+                    val work = attachments.attach(WtManagedAddress.fromPath(node.path))
+                    "Attached ${work.name}: ${work.content.size} files. Expand Attached works to open its text files."
+                }
+            }
+        }
+        val refreshWorkButton = JButton("Refresh Work").apply {
+            toolTipText = "Reload the selected work's canonical text membership"
+            addActionListener {
+                val id = selectedWorkId() ?: return@addActionListener
+                workRequest {
+                    val work = attachments.refresh(id)
+                    "Refreshed ${work.name}: ${work.content.size} files."
+                }
+            }
+        }
+        val detachButton = JButton("Detach Work").apply {
+            toolTipText = "Remove the project association; keep open editors and backend content"
+            addActionListener {
+                val id = selectedWorkId() ?: return@addActionListener
+                attachments.detach(id)
+                propertiesArea.text = "Work detached. Open editors and backend content are retained."
+                workStatus.text = propertiesArea.text
+                workStatus.toolTipText = propertiesArea.text
+                updateAttachments()
+            }
+        }
+        fun updateWorkButtons() {
+            attachButton.isEnabled = elementOf(tree.lastSelectedPathComponent) is WikiBrowserNode
+            refreshWorkButton.isEnabled = selectedWorkId() != null
+            detachButton.isEnabled = selectedWorkId() != null
+        }
+        tree.addTreeSelectionListener {
+            updateWorkButtons()
+            selectedWorkId()?.let { id ->
+                attachments.attachments().find { it.id == id }?.let { work ->
+                    propertiesArea.text = "Attached work: ${work.name}\nIndex: ${work.index.url}\n" +
+                        "Last confirmed membership: ${work.content.size} text files\n" +
+                        "Use Refresh Work to check membership. Detach keeps open editors and backend content."
+                }
+            }
+        }
+        updateWorkButtons()
+        val buttons = JPanel(GridLayout(0, 2)).apply {
+            add(refreshButton)
+            add(attachButton)
+            add(refreshWorkButton)
+            add(detachButton)
+        }
+        val toolbar = JPanel(BorderLayout()).apply {
+            add(buttons, BorderLayout.NORTH)
+            add(workStatus, BorderLayout.SOUTH)
+        }
+
+        val split = JSplitPane(JSplitPane.VERTICAL_SPLIT, JBScrollPane(tree), JBScrollPane(propertiesArea))
+        split.resizeWeight = 0.75
+
+        val panel = JPanel(BorderLayout())
+        panel.add(toolbar, BorderLayout.NORTH)
+        panel.add(split, BorderLayout.CENTER)
+
+        TreeUtil.promiseExpand(tree, 1)
+
+        return panel
+    }
+
+    /** Browser actions open managed editors; filesystem move/copy operations are unsupported. */
+    private fun installContextMenu(
+        tree: Tree,
+        structureModel: StructureTreeModel<WikisourceTreeStructure>,
+        propertiesArea: JBTextArea,
+        model: WikiBrowserModel,
+    ) {
+        fun selectedFile(): WikiBrowserNode? =
+            elementOf(tree.lastSelectedPathComponent) as? WikiBrowserNode
+
+        fun selectedFiles(): List<WikiBrowserNode> =
+            (tree.selectionPaths ?: emptyArray()).mapNotNull { elementOf(it.lastPathComponent) as? WikiBrowserNode }
+
+        val group = DefaultActionGroup().apply {
+            add(object : AnAction("Open") {
+                override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
+
+                override fun update(e: AnActionEvent) {
+                    val vFile = selectedFile()
+                    e.presentation.isEnabledAndVisible = vFile != null && defaultAspect(vFile) != null
+                }
+
+                override fun actionPerformed(e: AnActionEvent) {
+                    selectedFile()?.let { openDefaultAspect(it) }
+                }
+            })
+            add(object : AnAction("Show Properties") {
+                override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.EDT
+
+                override fun update(e: AnActionEvent) {
+                    e.presentation.isEnabledAndVisible = selectedFile()?.aspects?.contains(WtPaths.PROPS) == true
+                }
+
+                override fun actionPerformed(e: AnActionEvent) {
+                    val vFile = selectedFile() ?: return
+                    openAspect(vFile, WtPaths.PROPS)
+                }
+            })
+            add(SetPageQualityAction(project, { refreshTreePreservingState(tree, structureModel, model) }, ::selectedFiles))
+            add(
+                SetPageQualityAction(
+                    project, { refreshTreePreservingState(tree, structureModel, model) }, ::selectedFiles,
+                    level = PageQuality.PROOFREAD, text = "Mark Ready to Validate",
+                ),
+            )
+            add(object : AnAction("Copy Path") {
+                override fun actionPerformed(e: AnActionEvent) {
+                    val vFile = selectedFile() ?: return
+                    CopyPasteManager.getInstance().setContents(StringSelection(vFile.path))
+                }
+            })
+            add(object : AnAction("Refresh") {
+                override fun actionPerformed(e: AnActionEvent) {
+                    val vFile = selectedFile() ?: return
+                    ApplicationManager.getApplication().executeOnPooledThread {
+                        try {
+                            model.refresh(vFile)
+                        } catch (_: VfsBackendException) {
+                            // Backend unreachable - leave cached state as-is.
+                        }
+                        // Non-invalidated directories re-list from their
+                        // in-memory cachedChildren, so this is cheap.
+                        structureModel.invalidateAsync()
+                        SwingUtilities.invokeLater {
+                            showProperties(vFile, propertiesArea)
+                        }
+                    }
+                }
+            })
+        }
+        PopupHandler.installPopupMenu(tree, group, "WikisourceVfsTreePopup")
+    }
+
+    /** Reflects the in-memory [WikiBrowserNode] state - not a fresh backend query. */
+    private fun showProperties(vFile: WikiBrowserNode, area: JBTextArea) {
+        area.text = buildString {
+            appendLine("name:      ${vFile.name}")
+            appendLine("path:      ${vFile.path}")
+            appendLine("kind:      ${if (vFile.isDirectory) NodeKind.directory else NodeKind.file}")
+            appendLine("aspects:   ${vFile.aspects.joinToString().ifEmpty { "—" }}")
+            appendLine("children:  ${vFile.hasChildren}")
+            appendLine("stableId:  ${vFile.state.stableId}")
+            appendLine("revid:     ${vFile.state.revid}")
+            appendLine("length:    ${vFile.state.length}")
+            appendLine("writable:  ${vFile.state.writable}")
+            appendLine("contentModel: ${vFile.contentModel ?: "—"}")
+            appendLine("quality:   ${vFile.qualityLevel ?: "—"}")
+            appendLine("dirty:     ${vFile.dirty}")
+            appendLine("pageImage: ${vFile.hasReferenceImage}")
+            appendLine("placeholder: ${vFile.placeholder}")
+        }
+    }
+
+    /** Selection notifications must remain local: no backend calls on the EDT. */
+    private fun showProperties(file: VirtualFile, area: JBTextArea) {
+        val state = (file.fileSystem as? WtManagedBackendFileSystem)?.cachedMetadata(file) ?: return
+        area.text = buildString {
+            appendLine("name:      ${file.name}")
+            appendLine("path:      ${file.path}")
+            appendLine("kind:      ${state.kind}")
+            appendLine("aspects:   ${state.aspects.joinToString().ifEmpty { "—" }}")
+            appendLine("children:  ${state.hasChildren}")
+            appendLine("stableId:  ${state.stableId}")
+            appendLine("revid:     ${state.revid}")
+            appendLine("length:    ${state.length}")
+            appendLine("writable:  ${file.isWritable}")
+            appendLine("contentModel: ${state.contentModel ?: "—"}")
+            appendLine("quality:   ${state.qualityLevel ?: "—"}")
+            appendLine("dirty:     ${state.dirty}")
+            appendLine("pageImage: ${state.hasReferenceImage}")
+            appendLine("placeholder: ${state.placeholder}")
+        }
+    }
+
+    private fun refreshTreePreservingState(
+        tree: Tree,
+        structureModel: StructureTreeModel<WikisourceTreeStructure>,
+        model: WikiBrowserModel,
+    ) {
+        val state = TreeState.createOn(tree)
+        val managedFiles = FileEditorManager.getInstance(project).openFiles.filter {
+            it.fileSystem is WtManagedBackendFileSystem
+        }
+
+        ApplicationManager.getApplication().executeOnPooledThread {
+            managedFiles.forEach { file ->
+                try {
+                    (file.fileSystem as WtManagedBackendFileSystem).refreshFile(file, false)
+                } catch (_: VfsBackendException) {
+                    // The tree reload below displays the connection error. Cached
+                    // editor contents and unsaved Documents remain available.
+                }
+            }
+            model.invalidate()
+
+            // AsyncTreeModel already preserves expansion for elements that
+            // survive the invalidation; TreeState covers the rest (selection,
+            // paths whose nodes were dropped and re-listed). applyTo drives a
+            // TreeVisitor that awaits background child loading level by level.
+            structureModel.invalidateAsync().thenRun {
+                SwingUtilities.invokeLater { state.applyTo(tree) }
+            }
+        }
+    }
+
+    /**
+     * The aspect a double-click opens: the first one that is a file. `pages`
+     * is a container (the tree expands it), not something to open. A file
+     * is its own default.
+     */
+    private fun defaultAspect(vFile: WikiBrowserNode): String? = when {
+        !vFile.isDirectory -> WtPaths.aspectOf(vFile.path)
+        else -> vFile.aspects.firstOrNull { it != WtPaths.PAGES }
+    }
+
+    /** Opens the default aspect of [vFile]; false when it has none (a container). */
+    private fun openDefaultAspect(vFile: WikiBrowserNode): Boolean {
+        if (!vFile.isDirectory) {
+            openPath(vFile.path)
+            return true
+        }
+        val aspect = defaultAspect(vFile) ?: return false
+        openAspect(vFile, aspect)
+        return true
+    }
+
+    /**
+     * Opens [aspect] of the title node [node]. The aspect file is looked up
+     * (stat) on a pooled thread rather than minted from the node's own
+     * metadata: its revid is the conflict token for saves and can be ahead
+     * of the node's snapshot revid.
+     */
+    private fun openAspect(node: WikiBrowserNode, aspect: String) =
+        openPath(WtPaths.aspectPath(node.path, aspect))
+
+    private fun openPath(path: String) {
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val file = WtWikiFiles.find(path)
+            if (file != null) {
+                ApplicationManager.getApplication().invokeLater { if (!project.isDisposed) openFile(file) }
+            }
+        }
+    }
+
+    private fun openAttachedPath(attachments: WtWorkAttachments, id: String, path: String) {
+        ApplicationManager.getApplication().executeOnPooledThread {
+            try {
+                val work = attachments.attachments().find { it.id == id } ?: return@executeOnPooledThread
+                attachments.checkAvailable(work)
+                val file = WtWikiFiles.find(path) ?: throw IOException("Work file is unavailable: $path")
+                ApplicationManager.getApplication().invokeLater { if (!project.isDisposed) openFile(file) }
+            } catch (failure: IOException) {
+                ApplicationManager.getApplication().invokeLater {
+                    if (!project.isDisposed) com.intellij.openapi.ui.Messages.showErrorDialog(project,
+                        failure.message ?: "Work is unavailable", "Cannot Open Attached Work")
+                }
+            }
+        }
+    }
+
+    // Retain openFile(..., true) to focus the registered custom file editor.
+    // requestOpenFile offers no focus flag; revisit on the next IDE upgrade.
+    @Suppress("DEPRECATION")
+    private fun openFile(file: VirtualFile) {
+        FileEditorManager.getInstance(project).openFile(file, true)
+    }
+
+    private companion object {
+        /** Structure element behind a rendered tree node, if any. */
+        private fun elementOf(node: Any?): Any? {
+            val userObject = TreeUtil.getUserObject(node)
+            return (userObject as? NodeDescriptor<*>)?.element ?: userObject
+        }
+
+        /** VCS-modified-style blue for files with uncommitted local edits. */
+        private val DIRTY_ATTRIBUTES =
+            SimpleTextAttributes(SimpleTextAttributes.STYLE_PLAIN, JBColor(0x0057D8, 0x589DF6))
+
+        /** ProofreadPage pagelist status colours, light/dark theme pairs. */
+        private fun qualityColor(level: Int): JBColor = when (level) {
+            0 -> JBColor(0x888888, 0x999999) // without text
+            1 -> JBColor(0xD65C5C, 0xE57373) // not proofread
+            2 -> JBColor(0x8E6BC7, 0x9575CD) // problematic
+            3 -> JBColor(0xC7A500, 0xE0C341) // proofread
+            4 -> JBColor(0x2E7D32, 0x66BB6A) // validated
+            else -> JBColor.GRAY
+        }
+    }
+}
