@@ -149,3 +149,21 @@ class QueueStatsResponse(BaseModel):
     oldest_pending_at: datetime | None = Field(
         default=None, description="When the oldest pending request was queued."
     )
+
+
+class RetryRequest(BaseModel):
+    request_pks: list[int] | None = Field(
+        default=None,
+        description="Requests to requeue. Omit to requeue every errored request.",
+    )
+
+
+class RetryResponse(BaseModel):
+    requeued: list[int]
+
+
+class BackgroundDrainResponse(BaseModel):
+    started: bool = Field(
+        description="False when a background drain was already running."
+    )
+    running: bool

@@ -11,6 +11,7 @@ from wtbot.api import (
     cache_delete,
     dev,
     edit_journal,
+    events,
     fetch,
     file_blob,
     health,
@@ -35,6 +36,7 @@ from wtbot.api import (
 )
 from wtbot.api.errors import register_error_handlers
 from wtbot.db import create_db_engine, init_db
+from wtbot.fetch.background import BackgroundDrain
 from wtbot.fetch.fetch_worker import ClientFactory
 from wtbot.log.logging_config import LOGGING_CONFIG, LoggingConfig, configure_logging
 from wtbot.log.logging_config import sqlalchemy_echo as configured_sqlalchemy_echo
@@ -130,11 +132,16 @@ def create_app(
         else Path(os.environ.get("WTBOT_BLOB_ROOT", "./blobs"))
     )
 
+    app.state.background_drain = BackgroundDrain(
+        engine, app.state.client_factory, app.state.blob_root
+    )
+
     app.include_router(health.router)
     app.include_router(dev.router)
     app.include_router(commit_api.router)
     app.include_router(edit_journal.router)
     app.include_router(fetch.router)
+    app.include_router(events.router)
     # Before `links`: /links/works must not be matched by
     # DELETE /links/{link_pk}, which would 422 on parsing "works" as an int.
     app.include_router(works.router)

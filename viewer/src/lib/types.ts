@@ -1,5 +1,5 @@
 export type FetchKind = 'single' | 'index';
-export type FetchStatus = 'pending' | 'running' | 'done' | 'error';
+export type FetchStatus = 'pending' | 'in_progress' | 'done' | 'error' | 'cancelled';
 
 export interface Site {
   pk: number;
@@ -126,11 +126,60 @@ export interface FetchRequest {
   kind: FetchKind;
   depth: number;
   revisions: number;
-  status: string;
+  status: FetchStatus;
+  parent_pk?: number | null;
   progress_total?: number | null;
   progress_done?: number | null;
   error_message?: string | null;
+  requested_at?: string | null;
+  updated_at?: string | null;
 }
+
+export type EventTopic = 'fetch' | 'drain';
+export type EventKind =
+  | 'queued'
+  | 'done'
+  | 'failed'
+  | 'retried'
+  | 'cancelled'
+  | 'drain_started'
+  | 'drain_finished';
+export type EventLevel = 'info' | 'warning' | 'error';
+
+/** One row of the server's change feed (`ChangeEvent`). */
+export interface ChangeEvent {
+  pk: number;
+  at: string;
+  topic: EventTopic;
+  kind: EventKind;
+  level: EventLevel;
+  site_pk?: number | null;
+  request_pk?: number | null;
+  title?: string | null;
+  message?: string | null;
+  failure_kind?: string | null;
+  http_status?: number | null;
+  retry_after?: number | null;
+  /** Traceback tail of a failure. */
+  detail?: string | null;
+}
+
+export type QueueCounts = Partial<Record<FetchStatus, number>>;
+
+/** Queue depth, pushed whenever it changes. */
+export interface QueueFrame {
+  type: 'queue';
+  counts: QueueCounts;
+  pending: number;
+  total: number;
+}
+
+export interface EventFrame {
+  type: 'event';
+  event: ChangeEvent;
+}
+
+export type FeedFrame = EventFrame | QueueFrame;
 
 export interface CachedPage {
   pk: number;

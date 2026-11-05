@@ -7,9 +7,18 @@ from time import monotonic
 
 from sqlmodel import Session, func, select
 
+from wtbot.db_session import write_batch
+from wtbot.events import add_event, record_event
 from wtbot.fetch.fetch_worker import ClientFactory, run_pending
 from wtbot.log.fetch_log import activity
-from wtbot.model import FetchRequest, FetchStatus
+from wtbot.model import (
+    EventKind,
+    EventLevel,
+    EventTopic,
+    FetchRequest,
+    FetchStatus,
+)
+from wtbot.timeutil import utcnow
 from wtbot.wiki.failures import FailureKind, WikiFailure
 
 """Draining the fetch queue.
@@ -96,6 +105,12 @@ def drain_queue(
     """
     started = monotonic()
     activity("drain started batch=%d max_passes=%s", batch, max_passes)
+    record_event(
+        session,
+        EventTopic.drain,
+        EventKind.drain_started,
+        message=f"drain started ({pending_count(session)} queued)",
+    )
     handled = 0
     passes = 0
     stop = DrainStop.queue_empty
@@ -155,6 +170,18 @@ def drain_queue(
         remaining=pending_count(session),
         stop_reason=stop,
         retry_after=limiter.retry_after,
+    )
+    record_event(
+        session,
+        EventTopic.drain,
+        EventKind.drain_finished,
+        level=EventLevel.info if result.complete else EventLevel.warning,
+        retry_after=result.retry_after,
+        failure_kind="rate_limited" if limiter.hit else None,
+        message=(
+            f"drain finished: handled {result.handled}, "
+            f"{result.remaining} remaining ({result.stop_reason.value})"
+        ),
     )
     activity(
         "drain finished handled=%d passes=%d remaining=%d stop=%s elapsed=%.3fs",
@@ -232,3 +259,39 @@ def queue_stats(session: Session) -> QueueStats:
         )
     finally:
         session.rollback()
+
+
+def retry_requests(
+    session: Session, *, request_pks: list[int] | None = None
+) -> list[int]:
+    """Put errored (or cancelled) requests back in the queue.
+
+    Returns the pks requeued. ``request_pks=None`` means every errored request.
+    The error message is cleared; the history of why it failed stays in the
+    change feed, which is what it is for.
+    """
+    retryable = (FetchStatus.error, FetchStatus.cancelled)
+    query = select(FetchRequest).where(FetchRequest.status.in_(retryable))
+    if request_pks is not None:
+        query = query.where(FetchRequest.pk.in_(request_pks))
+    requeued: list[int] = []
+    with write_batch(session):
+        for row in session.exec(query).all():
+            assert row.pk is not None
+            previous = row.error_message
+            row.status = FetchStatus.pending
+            row.error_message = None
+            row.progress_done = 0
+            row.updated_at = utcnow()
+            session.add(row)
+            add_event(
+                session,
+                EventTopic.fetch,
+                EventKind.retried,
+                site_pk=row.site_pk,
+                request_pk=row.pk,
+                title=row.title,
+                message=f"requeued (was: {previous})" if previous else "requeued",
+            )
+            requeued.append(row.pk)
+    return requeued

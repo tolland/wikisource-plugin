@@ -41,6 +41,7 @@ backend data model and fetch/edit/commit contract live in `src-py/DESIGN.md`.
 
 | Doc | Surface | Status | Next action |
 |---|---|---|---|
+| [`change-feed.md`](reference/change-feed.md) | wtbot + viewer | implemented | `ChangeEvent` table + websocket behind the viewer's Fetch page. |
 | [`transclusion-generation.md`](reference/transclusion-generation.md) | wtbot CLI + API | PDF proposal and local journal generation implemented | Generate, edit, preview, and apply a nested transclusion proposal. |
 | [`api-contract-inventory.md`](reference/api-contract-inventory.md) | wtbot HTTP | current: 20 routers, 78 paths, 99 operations | Keep in step with the routers; the changes proposed on top of it are in `todo/api-refactoring-plan.md`. |
 | [`preview-design.md`](reference/preview-design.md) | plugin + wtbot | live behaviour | Explains the split editor, the `action=parse` choice and the proofread page form. Consult before changing preview or the editor-by-content-model mapping. |

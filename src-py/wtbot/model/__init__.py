@@ -8,6 +8,12 @@ SQLModel.metadata.naming_convention = NAMING_CONVENTION
 from wtbot.model.annotation.box_range_link import BoxRangeLink
 from wtbot.model.annotation.scan_annotation import AnnotationCategory, ScanAnnotation
 from wtbot.model.annotation.text_target_anchor import TextTargetAnchor
+from wtbot.model.change_event import (
+    ChangeEvent,
+    EventKind,
+    EventLevel,
+    EventTopic,
+)
 from wtbot.model.commit import Commit, CommitStatus
 from wtbot.model.database_identity import DatabaseIdentity
 from wtbot.model.edit_journal import EditJournal
@@ -48,6 +54,10 @@ classes. See ``src-py/DESIGN.md`` for the rationale behind each table.
 """
 
 __all__ = [
+    "ChangeEvent",
+    "EventKind",
+    "EventLevel",
+    "EventTopic",
     "PageTreeLink",
     "DatabaseIdentity",
     "AnnotationCategory",

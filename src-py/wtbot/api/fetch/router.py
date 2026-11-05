@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlmodel import Session
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlmodel import Session, select
 
 from wtbot.api.debug_logging_route import DebugLoggingRoute
 from wtbot.api.fetch.model import (
+    BackgroundDrainResponse,
     DrainRequest,
     DrainResponse,
     FetchCreate,
@@ -10,15 +11,25 @@ from wtbot.api.fetch.model import (
     RefreshCreate,
     RefreshPlanOut,
     RefreshResult,
+    RetryRequest,
+    RetryResponse,
 )
 from wtbot.api.schemas import PageRow
 from wtbot.deps import get_session
+from wtbot.events import record_event
 from wtbot.fetch.queue_runner import (
     drain_queue,
     queue_stats,
+    retry_requests,
 )
 from wtbot.incremental import RefreshPlan, plan_refresh
-from wtbot.model import FetchKind, FetchRequest
+from wtbot.model import (
+    EventKind,
+    EventTopic,
+    FetchKind,
+    FetchRequest,
+    FetchStatus,
+)
 from wtbot.site_store import require_credentialed_site
 from wtbot.title_store import page_at
 
@@ -71,6 +82,17 @@ def create_fetch(payload: FetchCreate, session: Session = Depends(get_session)) 
     session.add(req)
     session.commit()
     session.refresh(req)
+    record_event(
+        session,
+        EventTopic.fetch,
+        EventKind.queued,
+        site_pk=site.pk,
+        request_pk=req.pk,
+        title=req.title,
+        message=f"queued ({req.kind.value}, depth {req.depth}, {req.revisions} rev)",
+    )
+    # record_event ends idle (rollback), which expires `req`.
+    session.refresh(req)
 
     assert site.pk is not None
     page = page_at(session, site_pk=site.pk, title=payload.title)
@@ -105,6 +127,62 @@ def drain(
         stop_reason=result.stop_reason,
         complete=result.complete,
         retry_after=result.retry_after,
+    )
+
+
+@router.post(
+    "/drain/background", status_code=202, response_model=BackgroundDrainResponse
+)
+def drain_in_background(
+    request: Request, payload: DrainRequest | None = None
+) -> BackgroundDrainResponse:
+    """Start a drain on a server thread and return at once.
+
+    The call for a UI: nothing waits on the wiki. Follow it on the change feed
+    (``WS /events/ws``), which reports each request's result and the drain's own
+    start and finish -- including a stop for rate limiting, with the wait the
+    wiki asked for.
+    """
+    payload = payload or DrainRequest()
+    drain = request.app.state.background_drain
+    started = drain.start(batch=payload.batch, max_passes=payload.max_passes)
+    return BackgroundDrainResponse(started=started, running=drain.running)
+
+
+@router.get("/requests", response_model=list[FetchRequest])
+def list_requests(
+    status: FetchStatus | None = None,
+    parent_pk: int | None = None,
+    limit: int = Query(default=100, ge=1, le=1000),
+    offset: int = Query(default=0, ge=0),
+    session: Session = Depends(get_session),
+) -> list[FetchRequest]:
+    """Requests, newest activity first -- the queue as a table."""
+    query = select(FetchRequest)
+    if status is not None:
+        query = query.where(FetchRequest.status == status)
+    if parent_pk is not None:
+        query = query.where(FetchRequest.parent_pk == parent_pk)
+    return list(
+        session.exec(
+            query.order_by(FetchRequest.updated_at.desc(), FetchRequest.pk.desc())
+            .offset(offset)
+            .limit(limit)
+        ).all()
+    )
+
+
+@router.post("/retry", response_model=RetryResponse)
+def retry(
+    payload: RetryRequest | None = None, session: Session = Depends(get_session)
+) -> RetryResponse:
+    """Requeue errored requests (all of them, or the named ones).
+
+    Like enqueueing, this does not fetch: drain afterwards.
+    """
+    payload = payload or RetryRequest()
+    return RetryResponse(
+        requeued=retry_requests(session, request_pks=payload.request_pks)
     )
 
 
@@ -156,6 +234,14 @@ def refresh(
     for title in plan.titles:
         session.add(FetchRequest(site_pk=site.pk, title=title, kind=FetchKind.single))
     session.commit()
+    if plan.titles:
+        record_event(
+            session,
+            EventTopic.fetch,
+            EventKind.queued,
+            site_pk=site.pk,
+            message=f"refresh queued {len(plan.titles)} title(s)",
+        )
 
     return RefreshResult(
         plan=_plan_summary(plan),

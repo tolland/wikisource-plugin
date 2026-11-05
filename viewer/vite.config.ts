@@ -14,6 +14,8 @@ export default defineConfig(({ mode }) => {
         '/api': {
           target: env.WTBOT_API_URL ?? 'http://127.0.100.1:18564',
           changeOrigin: true,
+        // The change feed is a websocket under /api/events/ws.
+        ws: true,
           rewrite: (path) => path.replace(/^\/api/, '')
         }
       }

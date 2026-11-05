@@ -1,10 +1,12 @@
 import logging
+import traceback
 from collections.abc import Callable
 from pathlib import Path
 
 from sqlmodel import Session
 
 from wtbot.db_session import detached_site, read_snapshot, write_batch
+from wtbot.events import add_event
 from wtbot.fetch.revision_store import (
     RemoteIdentityError,
     head_revision,
@@ -16,6 +18,9 @@ from wtbot.fetch.utils import _claim_batch, _maybe_sync_namespaces
 from wtbot.log.failure_log import FailureContext, record_failure, site_label
 from wtbot.log.fetch_log import activity, fetch_context, fetch_stage
 from wtbot.model import (
+    EventKind,
+    EventLevel,
+    EventTopic,
     FetchKind,
     FetchRequest,
     FetchState,
@@ -195,6 +200,8 @@ def _process(
     progress_total = None
     progress_done = 0
     error_message = None
+    failure: WikiFailure | None = None
+    failure_detail: str | None = None
     try:
         if isinstance(result, Exception):
             raise result
@@ -253,6 +260,9 @@ def _process(
             exc,
         )
         error_message = failure.summary
+        failure_detail = "".join(
+            traceback.format_exception(type(exc), exc, exc.__traceback__)
+        )
         if on_failure is not None:
             on_failure(failure)
 
@@ -264,6 +274,8 @@ def _process(
             progress_total=progress_total,
             progress_done=progress_done,
             error_message=error_message,
+            failure=failure,
+            failure_detail=failure_detail,
         )
 
     activity(
@@ -392,6 +404,8 @@ def _record_fetch_result(
     progress_total: int | None,
     progress_done: int,
     error_message: str | None,
+    failure: WikiFailure | None = None,
+    failure_detail: str | None = None,
 ) -> None:
     with write_batch(session):
         db_req = session.get(FetchRequest, req.pk)
@@ -403,6 +417,32 @@ def _record_fetch_result(
         db_req.error_message = error_message
         db_req.updated_at = utcnow()
         session.add(db_req)
+
+        # Same transaction as the status change: the feed cannot report a
+        # result the row does not hold.
+        failed = status is FetchStatus.error
+        add_event(
+            session,
+            EventTopic.fetch,
+            EventKind.failed if failed else EventKind.done,
+            level=EventLevel.error if failed else EventLevel.info,
+            site_pk=req.site_pk,
+            request_pk=req.pk,
+            title=req.title,
+            message=(
+                error_message
+                if failed
+                else (
+                    f"{status.value} {progress_done}/{progress_total}"
+                    if progress_total
+                    else status.value
+                )
+            ),
+            failure_kind=failure.kind.value if failure else None,
+            http_status=failure.http_status if failure else None,
+            retry_after=failure.retry_after if failure else None,
+            detail=failure_detail,
+        )
 
         # Propagate completion to the parent (if this is a child request).
         if (

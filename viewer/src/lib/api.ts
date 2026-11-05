@@ -1,5 +1,8 @@
 import type {
+  ChangeEvent,
   FetchCreate,
+  FetchRequest,
+  FetchStatus,
   FetchResponse,
   IndexPageDetail,
   IndexPageSummary,
@@ -199,6 +202,38 @@ export function getPage(pk: number): Promise<CachedPage> {
 
 export function createFetch(payload: FetchCreate): Promise<FetchResponse> {
   return postJson<FetchResponse>('/fetch/', payload);
+}
+
+export function listFetchRequests(
+  params: { status?: FetchStatus; limit?: number } = {}
+): Promise<FetchRequest[]> {
+  const query = new URLSearchParams();
+  if (params.status) query.set('status', params.status);
+  query.set('limit', String(params.limit ?? 200));
+  return getJson(`/fetch/requests?${query}`);
+}
+
+/** Requeue errored requests: the named ones, or all of them. */
+export function retryFetches(requestPks?: number[]): Promise<{ requeued: number[] }> {
+  return postJson('/fetch/retry', { request_pks: requestPks ?? null });
+}
+
+/** Start draining on the server and return at once; follow it on the feed. */
+export function startBackgroundDrain(): Promise<{ started: boolean; running: boolean }> {
+  return postJson('/fetch/drain/background', {});
+}
+
+export async function listEvents(after?: number, limit = 100): Promise<ChangeEvent[]> {
+  const query = new URLSearchParams({ limit: String(limit) });
+  if (after !== undefined) query.set('after', String(after));
+  return (await getJson<{ events: ChangeEvent[] }>(`/events?${query}`)).events;
+}
+
+/** The change-feed websocket, via the same `/api` prefix the REST calls use. */
+export function eventsSocketUrl(after?: number): string {
+  const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
+  const query = after === undefined ? '' : `?after=${after}`;
+  return `${scheme}://${location.host}/api/events/ws${query}`;
 }
 
 export function listPendingCommits(): Promise<PendingCommitPage[]> {
