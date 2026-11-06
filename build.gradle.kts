@@ -55,6 +55,18 @@ allprojects {
             systemProperty("idea.ignore.disabled.plugins", "false")
             systemProperty("idea.suppressed.plugins.id", "com.intellij.modules.ultimate")
         }
+        // The platform plugin names a content-module jar `<root>.<project path
+        // with dots>` (e.g. `wikisource.wikitext.wikitext-core`), and the IDE
+        // resolves `<module name="…">` from lib/modules/<name>.jar. Pin it to
+        // `<root>.<project name>` so module IDs (the `<name>.xml` descriptors,
+        // plugin.xml `<content>`, `@Remote(plugin = …)`) don't depend on which
+        // parent directory a module lives under.
+        tasks.named<org.jetbrains.intellij.platform.gradle.tasks.ComposedJarTask>("composedJar") {
+            // Plugin projects also apply the module plugin; leave their main jar alone.
+            if (!pluginManager.hasPlugin("org.jetbrains.intellij.platform")) {
+                archiveBaseName.set("${rootProject.name}.${project.name}")
+            }
+        }
     }
     plugins.withId("org.jetbrains.kotlin.jvm") {
         extensions.configure<KotlinJvmProjectExtension> {
@@ -81,8 +93,8 @@ dependencies {
         plugin("com.intellij.notebooks.core", version = "262.8665.270")
         plugin("intellij.jupyter", version = "262.8665.339")
         plugin("nl.rubensten.texifyidea", version = "1.0.0")
-        localPlugin(project(":wikitext-language-plugin"))
-        localPlugin(project(":wikisource-remote-plugin"))
+        localPlugin(project(":wikitext:wikitext-language-plugin"))
+        localPlugin(project(":wikisource:wikisource-remote-plugin"))
         testFramework(TestFrameworkType.Starter, configurationName = "integrationTestImplementation")
         testFramework(TestFrameworkType.Platform)
         bundledModule("intellij.platform.structureView")
@@ -95,11 +107,11 @@ dependencies {
     // The standalone Starter process needs Kotlin even though IDE plugin modules
     // rely on the IDE-bundled runtime.
     "integrationTestImplementation"(kotlin("stdlib"))
-    "integrationTestImplementation"(project(":wikitext-core"))
-    "integrationTestImplementation"(project(":wikitext-language-ui"))
-    "integrationTestImplementation"(project(":wikisource-remote-shared"))
-    "integrationTestImplementation"(project(":wikisource-remote-backend"))
-    "integrationTestImplementation"(project(":wikisource-remote-frontend"))
+    "integrationTestImplementation"(project(":wikitext:wikitext-core"))
+    "integrationTestImplementation"(project(":wikitext:wikitext-language-ui"))
+    "integrationTestImplementation"(project(":wikisource:wikisource-remote-shared"))
+    "integrationTestImplementation"(project(":wikisource:wikisource-remote-backend"))
+    "integrationTestImplementation"(project(":wikisource:wikisource-remote-frontend"))
     "integrationTestImplementation"(kotlin("reflect"))
     "integrationTestImplementation"(platform("org.junit:junit-bom:5.12.2"))
     "integrationTestImplementation"("org.junit.jupiter:junit-jupiter")
@@ -256,13 +268,13 @@ intellijPlatformTesting {
                         // Ordering applies only when both tasks are requested.
                         mustRunAfter("integrationTest")
                     }
-                    dependsOn(":wikitext-language-plugin:buildPlugin", ":wikisource-remote-plugin:buildPlugin")
-                    archiveFile.set(project(":wikisource-remote-plugin").tasks.named<org.jetbrains.intellij.platform.gradle.tasks.BuildPluginTask>("buildPlugin").flatMap { it.archiveFile })
+                    dependsOn(":wikitext:wikitext-language-plugin:buildPlugin", ":wikisource:wikisource-remote-plugin:buildPlugin")
+                    archiveFile.set(project(":wikisource:wikisource-remote-plugin").tasks.named<org.jetbrains.intellij.platform.gradle.tasks.BuildPluginTask>("buildPlugin").flatMap { it.archiveFile })
                     systemProperty("wikitext.test.idePath", platformPath.toString())
                     systemProperty("wikitext.test.pluginProfile", providers.gradleProperty("ideTestPluginProfile").getOrElse("platform"))
                     systemProperty("wikitext.test.pauseSeconds", providers.gradleProperty("ideTestPauseSeconds").getOrElse("0"))
-                    systemProperty("wikitext.language.plugin.archive", project(":wikitext-language-plugin").layout.buildDirectory.file("distributions/wikitext-language-plugin-1.0.0-SNAPSHOT.zip").get().asFile.absolutePath)
-                    systemProperty("wikisource.remote.plugin.archive", project(":wikisource-remote-plugin").layout.buildDirectory.file("distributions/wikisource-remote-plugin-1.0.0-SNAPSHOT.zip").get().asFile.absolutePath)
+                    systemProperty("wikitext.language.plugin.archive", project(":wikitext:wikitext-language-plugin").layout.buildDirectory.file("distributions/wikitext-language-plugin-1.0.0-SNAPSHOT.zip").get().asFile.absolutePath)
+                    systemProperty("wikisource.remote.plugin.archive", project(":wikisource:wikisource-remote-plugin").layout.buildDirectory.file("distributions/wikisource-remote-plugin-1.0.0-SNAPSHOT.zip").get().asFile.absolutePath)
                     jvmArgs("--add-opens=java.base/sun.nio.fs=ALL-UNNAMED")
                     systemProperty("wtbot.test.baseUrl", "http://127.0.0.1:18594")
                     systemProperty("wtbot.test.projectDir", project.file(providers.gradleProperty("wtbotProjectDir").getOrElse("../wtbot")).absolutePath)

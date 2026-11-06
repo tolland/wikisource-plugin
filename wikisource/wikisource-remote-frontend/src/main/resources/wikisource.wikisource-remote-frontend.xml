@@ -1,0 +1,95 @@
+<idea-plugin>
+    <dependencies>
+        <plugin id="org.limepepper.lang.wikitext"/>
+        <module name="wikisource.wikitext-core" namespace="limepepper-wikitext"/>
+        <module name="wikisource.wikitext-language-ui" namespace="limepepper-wikitext"/>
+        <module name="wikisource.wikisource-remote-shared"/>
+        <module name="wikisource.wikisource-remote-backend"/>
+        <module name="intellij.platform.ui.jcef"/>
+        <module name="intellij.libraries.jcef"/>
+        <module name="intellij.platform.structureView"/>
+    </dependencies>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <editorTabTitleProvider implementation="org.limepepper.lang.wikitext.preview.WtEditorTabTitleProvider"/>
+
+        <indexedRootsProvider implementation="org.limepepper.lang.wikitext.search.WtAttachedWorkIndexableSetContributor"/>
+
+        <searchScopesProvider implementation="org.limepepper.lang.wikitext.search.WtAttachedWorkSearchScopeProvider"/>
+
+        <toolWindow
+            id="MyToolWindow"
+            icon="AllIcons.Toolwindows.ToolWindowPalette"
+            factoryClass="org.limepepper.lang.wikitext.tool.MyToolWindowFactory"
+            anchor="right"
+        />
+
+        <!-- OCR review surface: responses land here for preview before any
+        text is applied (see OcrReviewController for the boundary). -->
+        <toolWindow
+            id="Wikisource OCR"
+            icon="AllIcons.Actions.Preview"
+            factoryClass="org.limepepper.lang.wikitext.ocr.OcrToolWindowFactory"
+            anchor="bottom"
+            canCloseContents="true"
+        />
+
+        <registryKey
+            key="wikitext.editing.preview.mode"
+            defaultValue="both"
+            description="Wikitext: which preview(s) a ProofreadPage editor opens showing - 'both', 'image' (reference scan only), or 'render'"
+        />
+        <registryKey
+            key="wikitext.editing.preview.splitStacked"
+            defaultValue="true"
+            description="Wikitext: when both previews are shown, tile them stacked (scan above render) rather than side by side"
+        />
+        <registryKey
+            key="wikitext.editing.preview.imageFitMode"
+            defaultValue="width"
+            description="Wikitext: how the reference scan's initial zoom fits the pane - 'width' or 'page' (whole page)"
+        />
+
+        <!-- pure Proofread-page editor, separate for dev purposes -->
+        <fileEditorProvider
+            implementation="org.limepepper.lang.wikitext.editor.prp.PrpFileEditorProvider"
+        />
+
+        <!--
+        this is the old editor that uses profiles to build
+        a Page, Index or generic wikitext specific editor/preview split
+        -->
+        <fileEditorProvider
+            implementation="org.limepepper.lang.wikitext.preview.WtPreviewEditorProvider"
+        />
+
+        <!-- this is a stub to provide inlay hints around specific wikisource
+        related psi elements, however, it is disabled because it is messing up
+        the inlay hints in the proofread-page text editor -->
+        <!--        <codeInsight.inlayProvider-->
+        <!--            language="Wikitext"-->
+        <!--            implementationClass="org.limepepper.lang.wikitext.inlay.ProofreadInlayProvider"-->
+        <!--        />-->
+
+
+    </extensions>
+
+    <actions>
+        <action
+            id="org.limepepper.lang.wikitext.editor.prp.CreateTextRangeAction"
+            class="org.limepepper.lang.wikitext.editor.prp.CreateTextRangeAction"
+            icon="AllIcons.General.Add">
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+            <keyboard-shortcut keymap="$default" first-keystroke="alt shift T"/>
+        </action>
+    </actions>
+    <resource-bundle>messages.MyMessageBundle</resource-bundle>
+
+    <!--    <applicationListeners>-->
+    <!-- this is a stub for listing to EditorFactory events -->
+    <!--        <listener-->
+    <!--            class="org.limepepper.lang.wikitext.inlay.ProofreadEditorListener"-->
+    <!--            topic="com.intellij.openapi.editor.event.EditorFactoryListener"-->
+    <!--        />-->
+    <!--    </applicationListeners>-->
+</idea-plugin>

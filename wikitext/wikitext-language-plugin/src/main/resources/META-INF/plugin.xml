@@ -1,0 +1,16 @@
+<idea-plugin>
+    <id>org.limepepper.lang.wikitext</id>
+    <name>Wikitext Language</name>
+
+    <vendor url="https://www.mycompany.com">Lime Pepper Ltd</vendor>
+    <description><![CDATA[
+    Wikitext language support including lexer, parser, PSI tree, syntax highlighting, annotators, live templates, and structure view.
+    ]]></description>
+
+    <depends>com.intellij.modules.lang</depends>
+
+    <content namespace="limepepper-wikitext">
+        <module name="wikisource.wikitext-core" loading="required"/>
+        <module name="wikisource.wikitext-language-ui" loading="required"/>
+    </content>
+</idea-plugin>

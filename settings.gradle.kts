@@ -35,10 +35,10 @@ dependencyResolutionManagement {
     }
 }
 
-include("wikitext-core")
-include("wikitext-language-ui")
-include("wikitext-language-plugin")
-include("wikisource-remote-shared")
-include("wikisource-remote-backend")
-include("wikisource-remote-frontend")
-include("wikisource-remote-plugin")
+include(":wikitext:wikitext-core")
+include(":wikitext:wikitext-language-ui")
+include(":wikitext:wikitext-language-plugin")
+include(":wikisource:wikisource-remote-shared")
+include(":wikisource:wikisource-remote-backend")
+include(":wikisource:wikisource-remote-frontend")
+include(":wikisource:wikisource-remote-plugin")

@@ -1,125 +1,177 @@
-# Wikisource backend tree: paths, nodes and aspects
+# Managed VFS
 
-How the VFS names things today. Code: `src-py/wtbot/vfs/` (`paths.py`,
-`namespaces.py`, `nodes.py`, `aspects.py`, `wikisource.py`); client side
-`wikitext-vfs/.../vfs/WtPaths.kt` and the tool window's `WikisourceTreeStructure`.
+All remote content is exposed as files of one registered filesystem,
+`wikisource-wtbot`, implemented in `wikisource/wikisource-remote-backend`
+(package `org.limepepper.lang.wikitext.vfs`). Every read and write is an HTTP
+call to wtbot through the current `VfsBackend`.
 
-## IDE URL identity
+Backend side — the server's path grammar, node tree, aspects and the `/vfs`
+endpoints: wtbot repository (`../wtbot`), `docs/reference/vfs-paths.md`.
 
-`wikisource-wtbot:///...` is the only registered Wikisource editor protocol.
-`WtManagedBackendFileSystem` owns managed files with platform-assigned positive
-VFS IDs. Resolve files through `WtWikiFiles`; construct addresses through
-`WtManagedAddress`. The backend path grammar remains in `WtPaths`.
-
-The old `wikisource://` adapter and `wikisource-demo://` filesystem have been
-removed. Old editor URLs are not redirected or migrated: reopen those resources
-from the browser. Persisted managed URLs and cached content can restore while
-wtbot is offline; an uncached resource still requires the backend.
-
-The browser uses `WikiBrowserNode` presentation values, including `@pages` links
-to canonical Page paths. A graph occurrence is keyed by database UUID, parent
-occurrence and resource path. It is never a VirtualFile and has no independent
-editor buffer. Its root is labelled **Wikisource**, not a filesystem URL.
-
-Native Find/Replace navigation can open a `CacheAvoidingVirtualFileWrapper` with
-the same filesystem and persistent ID. Such a wrapper is not a `NewVirtualFile`.
-Managed refresh resolves `CacheAvoidingVirtualFile.asCacheable()` before marking
-the persistent file dirty, invalidating content or reloading its shared Document.
-
-VFS stat, listings and content responses include `database_id`. Managed saves
-send that UUID alongside `base_revid`; the API rejects a mismatched UUID before
-writing. The URL remains a logical connection/resource address; the persistent
-content snapshot binds its cached bytes and revision to the database. Independent
-replacement at the same URL forces clean buffers to reload even when ordinary
-metadata is identical, while unsaved buffers retain their original write identity.
-Backups preserve the UUID; independent forks must receive a new identity.
-
-## Grammar
+## Addresses and paths
 
 ```
-/{family}/{code}/{namespace}/{title segments...}[/@{aspect}]
+wikisource-wtbot:///{family}/{code}/{namespace}/{title segments…}[/@{aspect}]
 ```
 
-| Path | Is |
-|---|---|
-| `/` | root: the registered sites |
-| `/{f}/{c}` | a site: the namespaces that hold cached titles (`Page` is unlisted, see below) |
-| `/{f}/{c}/Book` | a namespace container; `(Main)` is the main namespace |
-| `/{f}/{c}/Book/Virtues and vices` | a **title node** — a directory |
-| `…/Virtues and vices/Chapter 1` | a subpage: another title node |
-| `…/Virtues and vices/@wikitext` | an **aspect file**: the content you edit |
-| `…/Virtues and vices/@props` | an aspect file: read-only JSON properties |
-| `/{f}/{c}/Index/Foo.pdf/@pages` | an aspect container: the `Page:` titles the Index paginates |
+- `WtManagedAddress` is the only place URLs are built or parsed
+  (`fromPath`, `fromUrl`, `url`, `backendPath`). The URL is a logical
+  resource address; it does not name the wtbot instance.
+- `WtPaths` splits backend paths without I/O: `aspectOf`, `nodePath`,
+  `aspectPath`, `decodeSegment` and `displayName` (used for editor tab titles
+  and tree labels). A title is a directory node; the files you open are its
+  aspects: `@wikitext` (editable text), `@props` (read-only JSON). `@pages` on
+  an Index is a relationship listing, not a directory of files. A title segment
+  starting with `@` or `%` is escaped as `%40` / `%25`.
+- wtbot's root lists sites as `/{family}/{code}`. The filesystem invents the
+  missing `/{family}` directory (`isFamilyContainer`) so every path segment is
+  a real VFS directory.
 
-Only the **last** segment can be an aspect, and only after at least one title
-segment. A title segment that itself starts with `@` or `%` is escaped (`%40`,
-`%25`), so a trailing `@name` is never ambiguous.
+## Resolving files
 
-## Why a title is a directory
+Use `WtWikiFiles`, never construct a `VirtualFile` yourself:
 
-A wiki title is often a page *and* a container of subpages (`Book:X`,
-`Book:X/Chapter 1`), and can offer more than one view of itself (content,
-properties, later revisions, scan…). The IntelliJ VFS has no node that is both
-file and directory, and flipping a path from file to directory when its first
-subpage is fetched would break every open editor on it. So the title is always
-a directory; the things you open are its `@aspect` files, at paths that never
-change.
+| Call | I/O | Use |
+|---|---|---|
+| `find(path)`, `refreshAndFind(path)` | may contact wtbot | resolve off the EDT before opening an editor |
+| `pathOf(file)` | none | backend path of a managed file, `null` for local files |
+| `contentModelOf(file)`, `revisionOf(file)` | none | cached metadata |
 
-The tool window follows the DataGrip Database Explorer model: it shows titles
-(and `@pages`), not aspect files. Double-click opens the node's default aspect
-(`aspects[0]`, normally `@wikitext`); a branch expands by its handle. Other
-aspects are reached from the context menu ("Show Properties").
+`WtManagedFileTypeOverrider` gives each file the type for its content model
+(`WtContentModel`: `proofread-page` → `PrpFileType`, `proofread-index` and
+`wikitext` → `WtFileType`, `json`, `sanitized-css`; unknown → `WtFileType`). It
+uses cached metadata only, so file-type selection is safe on the EDT.
 
-`read`/`write` act on aspect files only; a bare title path is a directory
-(`NotAFile` / a write error). Endpoints that only ask *which page* a path means
-(`/pages/nav`, `/pages/resolve`, OCR, annotations, locator-index, preview,
-reference image) accept either the title node or any of its aspects.
+The Wikisource browser is not built from VirtualFiles. `WikiBrowserNode`
+(frontend, `tool/WikiBrowserModel.kt`) is a presentation node keyed by database
+id, parent occurrence and path; the same Page can appear under several Indexes'
+`@pages`. Opening a node goes through `WtWikiFiles` and `FileEditorManager`, so
+every route to a resource lands on the same file ID and Document.
+`WtManagedBackendFileSystem.list()` rejects non-hierarchical children (as
+`@pages` returns) rather than minting duplicate identities.
 
-## Namespaces and subpages
+## Identity and caching
 
-A title splits into `(namespace, rest)` against the site's `Namespace` table
-(siteinfo), never by the colon alone — `Faust: Part One` is a mainspace title.
-A site with no siteinfo yet falls back to the standard MediaWiki and
-ProofreadPage names; an unknown prefix then resolves as mainspace, which still
-works because the full title is what is looked up.
+`WtManagedBackendFileSystem` is a `NewVirtualFileSystem`: the platform's
+persistent VFS assigns positive `VirtualFileWithId` IDs and supports reverse
+lookup through `ManagingFS`. Persisted records survive restarts.
 
-The namespace's `subpages` flag decides what a slash means:
+Per file the filesystem keeps:
 
-- `subpages = true` — `Book:A/B/C` is `C` under `B` under `A`. When no title
-  holds `A/B`, it is a **synthetic node** (a container with no page of its own,
-  no aspects, no `stable_id`).
-- `subpages = false` (`Page`, `File`) — the slash belongs to the title, so
-  `Page:Foo.djvu/171` is `/Page/Foo.djvu/171`, one title node in namespace
-  listings. Its physical ancestors (such as `/Page/Foo.djvu`) are also
-  addressable synthetic directories when cached descendant titles exist.
-  Listing such a directory returns immediate physical children. This allows
-  managed VFS lookup to walk every segment without changing canonical title
-  paths or claiming MediaWiki subpage semantics for the namespace.
+- **metadata** from the last `stat`/listing (in memory);
+- a **content snapshot** file attribute (`wikisource.wtbot.content`): backend
+  identity, content model, revision and database id of the last content read.
+  It lets file types, editor profiles and cached text restore with wtbot
+  offline;
+- a **read version** (the revision the editor's text is based on) and a
+  separate **disk version** (the latest bytes read). A refresh or diff that
+  reads newer bytes while a Document has unsaved changes must not advance its
+  conflict token; `WtManagedDocumentListener` promotes the disk version only
+  when the Document actually reloads.
 
-`Page` is not listed under the site (one title per scanned page); it stays
-addressable by path and listable directly. Pages are browsed through their
-Index's `@pages`.
+## Saving
 
-## Wire shape
+`getOutputStream` writes through `VfsBackend.writeContent(path, base64,
+baseRevid, databaseId)`, which wtbot records in its edit journal. Results:
 
-`Node` / `Stat` gained `has_children` (a directory with something to expand)
-and `aspects` (names a title node offers, default first; empty for files and
-synthetic nodes). Each aspect is a child of the node at `{path}/@{aspect}`.
-Title nodes are listed with `kind: directory`; their `length` is `None` and
-`writable` false — the aspect file carries the revid, length and `writable`
-that saves depend on, so open the aspect file, never mint one from node
-metadata.
+- `ok` — the new revision becomes the read version and snapshot;
+- `conflict` / `error` / transport failure — the save throws `IOException`,
+  the path is marked as a failed write, and `WtManagedSaveRecovery` restores
+  the Document's unsaved state after the platform has finished its own
+  after-save bookkeeping.
 
-## Not built yet
+A save is refused before any request when the content revision is unknown,
+when the backend changed since the text was read, or when the database
+identity is unknown.
 
-- **Context-action extension point.** The tool window's popup is a fixed group
-  today. The intent is an action group (`Wikisource.NodeContextMenu`) whose
-  actions receive the selected node (site, namespace, title, content model,
-  aspects, `dirty`) through a `DataKey` and decide their own visibility in
-  `update()` — e.g. "Show in MediaWiki", and the commit workflow (review/approve
-  a dirty page against `GET /commit/pending`, push via `POST /commit/{page_pk}`,
-  discard via `DELETE /commit/{page_pk}/pending`) that the viewer's `/commits`
-  page does out of band.
-- **Editable properties.** `@props` is a read-only JSON view of state other
-  operations own (fetch, commit, journal).
-- **Creating a subpage** from the tree (a `Missing` path).
+### Database identity
+
+Every stat, listing and content response carries wtbot's `database_id`. Writes
+send the id they were read against and wtbot rejects a mismatch.
+`HttpVfsBackend` sets `requiresDatabaseIdentity` and uses its base URL as
+`cacheIdentity`. When a lookup or refresh sees a different database at the same
+address, clean Documents reload even if revision and length are identical, and
+unsaved Documents keep their original write identity (so their save fails
+rather than landing on the wrong database).
+
+## Refresh
+
+- `refresh()` walks only files already in persistent VFS
+  (`iterInDbChildren`); it never traverses backend listings, which are
+  relationship views.
+- `refreshFile(file)` resolves a `CacheAvoidingVirtualFile` (as Find/Replace
+  navigation can hand out) to its persistent file before marking it dirty.
+- A transport failure is never treated as deletion: `getAttributes` and
+  `findFileByPath` fall back to cached records; only `exists=false` from a
+  successful stat removes a file.
+
+Create, copy, move, rename, delete, `setTimeStamp` and `setWritable` throw
+`IOException`.
+
+## Backend service and switching
+
+`WtVfsService` (application service) owns the live `VfsBackend`, built from
+`WtbotAppSettings` as an immutable `HttpVfsBackend(baseUrl, timeout)`. Callers
+read `WtVfsService.instance.backend` per operation and never hold it.
+`FakeVfsBackend` is the in-memory implementation for tests
+(`setBackendForTesting`).
+
+`WtbotAppSettings` (application, `wikitext-vfs.xml`) holds `baseUrl` and
+`timeoutSeconds`. `update(baseUrl, timeout)` sets both and publishes at most one
+`WtbotAppSettings.TOPIC` event carrying `(previous, current)`.
+`normalizeBaseUrl` accepts absolute http(s) URLs with a host, strips a trailing
+slash and rejects query/fragment; invalid persisted values fall back to the
+default. Startup overrides (`wtbot.baseUrl` / `WTBOT_BASE_URL`,
+`wtbot.timeoutSeconds` / `WTBOT_TIMEOUT_SECONDS`) are applied on every load and
+written into the live state. User-facing behaviour:
+[Connecting to wtbot](../user/connecting.md).
+
+On a settings event `WtVfsService` builds a new backend. If the base URL
+changed, `WtBackendSwitcher`:
+
+1. (before Apply, from `WtbotConfigurable`) `confirmPendingEdits()` —
+   Save / Discard / Cancel for unsaved managed Documents, so a save still goes
+   to the backend the text came from;
+2. `rebuildAfterSwitch()` — for each open managed file: `resetConnection`
+   (drop metadata and read versions), `refreshFile`, and reload Documents the
+   user chose to discard; on `VfsBackendException` cached text is kept;
+3. clears `OcrCatalogService` in every open project;
+4. publishes `WtVfsService.BACKEND_SWITCHED` on the EDT.
+
+Subscribers: the browser tab (reloads the tree) and `WtAttachedWorkIndex`
+(recomputes indexed files). Preview panes do not subscribe.
+
+## Attached works
+
+| Piece | Module | Role |
+|---|---|---|
+| `discoverManagedWork(backend, seed)` | backend | resolves a Page seed to its Index (via `pageNav`), lists `@pages`, bulk-stats the members and checks they share one database |
+| `WtWorkAttachments` | backend, project service | persisted attachments (`.idea/wikisource-works.xml`): canonical addresses, backend identity, database id, last confirmed membership; publishes `CHANGED` |
+| `indexableWorkContent(backend, work)` | backend | metadata-only eligibility: real revision (`placeholder=false`) or saved local edit (`dirty=true`) |
+| `WtAttachedWorkIndex` | frontend, project service | resolves eligible files in the background; callbacks read snapshots without HTTP |
+| `WtAttachedWorkIndexableSetContributor`, `WtAttachedWorkSearchScopeProvider` | frontend | contribute those files as extra index roots and one `Wikisource: <work>` scope per work |
+
+Only individual leaves are contributed: returning directories would let the
+indexer visit placeholder pages. The scopes are whole-file; they do not respect
+the proofread editor's guarded regions.
+
+## Why it is like this
+
+- **A title is a directory.** A wiki title is often both a page and a parent
+  of subpages, and the platform has no node that is both. Flipping a file into
+  a directory when its first subpage appears would break open editors, so
+  titles are always directories and the stable, openable things are aspects.
+- **Platform-managed identities.** Find in Files, indexing, editor restore and
+  the file-cache conflict dialog all assume persistent `VirtualFileWithId`
+  files. Owning identity ourselves meant re-implementing those, badly.
+- **Application-scoped backend.** wtbot already mediates between wikis, so one
+  service serves every project, and the VFS is an application singleton.
+- **Replace the backend, don't mutate it.** Swapping the instance gives
+  in-flight operations a consistent client and gives the switcher a single
+  point at which to rebind caches.
+- **Database identity on every write.** A replacement database at the same URL
+  can have identical titles, revisions and lengths; without the id a stale
+  buffer would save into a different wiki's data.
+- **`WtManagedSaveRecovery` uses platform internals** (`PersistentFSImpl`,
+  `FileDocumentManagerImpl`) to undo the platform's optimistic after-save
+  state on build 262. Revalidate it whenever the target IDE changes.

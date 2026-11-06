@@ -1,373 +1,176 @@
-# IDE integration tests
+# Testing
 
-The root `integrationTest` task uses JetBrains Starter and Driver with JUnit 5
-and the IDE version selected by `intellijPlatformVersion`. It is opt-in and is
-not part of the normal unit-test/check cycle.
+Always run Gradle with the repository-local user home:
+`GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew …`.
+
+## Unit tests
+
+Each module has its tests under `src/test/` and uses the platform's light test
+framework (`TestFrameworkType.Platform`).
 
 ```bash
+GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew test                               # all modules
+GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew :wikitext:wikitext-core:test       # one module
+GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew :wikitext:wikitext-core:test \
+    --tests "org.limepepper.lang.wikitext.lexer.WtLexerTest"                       # one class
+GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew check                              # build + tests + spotless (pre-push hook)
+```
+
+| Module | Covers |
+|---|---|
+| `wikitext-core` | lexer, parser, semantic views, quote scanning/toggling, wrap rendering |
+| `wikitext-language-ui` | sentence bands, highlighting settings, colour utilities |
+| `wikisource-remote-shared` | RPC model serialization |
+| `wikisource-remote-backend` | managed filesystem, paths, content models, backend switching, settings, work attachments and eligibility, `HttpVfsBackend` / `FakeVfsBackend`, JSON reader, OCR favourites |
+| `wikisource-remote-frontend` | browser model, annotation geometry and models, text ranges and box links, ProofreadPage parsing, quality edits, OCR menu resolution |
+
+Remote tests use `FakeVfsBackend` (installed with
+`WtVfsService.setBackendForTesting`) or an in-process HTTP server; none needs a
+running wtbot.
+
+`./gradlew :wikisource:wikisource-remote-frontend:runAnnotationDemo` opens the
+standalone `ImageAnnotationPane` harness for manual checks.
+
+### Data-driven lexer and parser tests
+
+Two base classes in `wikitext-core/src/test/kotlin/…/utils/` read fixtures from
+`wikitext-core/src/test/testData/simple/`:
+
+| Base class | Test method `testFooBar()` reads | Compares against |
+|---|---|---|
+| `WtLexerTestCase` | `fooBar.wt` | `fooBar.txt` (token dump) |
+| `WtParsingTextCase` | `fooBar.wt` | `fooBar.parse.txt` (PSI tree; error elements fail the test) |
+
+To add a case, add the `.wt` input, add a test method, run it once and review
+the actual output printed in the failure before saving it as the expected
+file. Set `LEXER_DEBUG=true` (system property or environment variable) for
+verbose token dumps.
+
+### Ultimate is suppressed in unit tests
+
+The module `test` tasks set `idea.suppressed.plugins.id=com.intellij.modules.ultimate`.
+On 2026.2.4 a project startup activity in that plugin cannot be constructed by
+the light fixture and fails unrelated tests. The unit suites use only free
+platform APIs. Revisit on IDE upgrades.
+
+## IDE integration tests
+
+The root `src/integrationTest` source set drives a real IDE with JetBrains
+Starter and Driver (JUnit 5). Both plugin archives are built and installed.
+These tests are opt-in and not part of `check`.
+
+| Task | Runs |
+|---|---|
+| `integrationTest` | `projectProvidesEditorAndToolWindows` only: project startup, opening `sample.wiki`, Project and Wikisource OCR tool windows |
+| `integrationTestExtended` | the tests tagged `extended` (below); supports `--tests` |
+
+```bash
+# headless (default for agents)
 GRADLE_USER_HOME="$PWD/.gradle-codex" xvfb-run -a ./gradlew integrationTest
-```
+GRADLE_USER_HOME="$PWD/.gradle-codex" xvfb-run -a ./gradlew integrationTestExtended --tests '*seededWork*'
 
-The default task runs only `projectProvidesEditorAndToolWindows`: one IDE
-launch covering project startup, a wikitext editor, and tool-window availability.
-The additional interaction scenarios are tagged `extended` and run only
-through the explicit `integrationTestExtended` task:
+# on an existing display, e.g. :88
+DISPLAY=:88 GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew integrationTestExtended \
+    --tests '*seededManagedEditorSavesAndReopens*' --no-daemon
 
-```bash
-# All optional tool-window scenarios
-GRADLE_USER_HOME="$PWD/.gradle-codex" xvfb-run -a ./gradlew integrationTestExtended
-
-# Just one optional scenario
-GRADLE_USER_HOME="$PWD/.gradle-codex" xvfb-run -a ./gradlew integrationTestExtended --tests '*debugRefreshShowsBackendStatus*'
-
-# Everything
-GRADLE_USER_HOME="$PWD/.gradle-codex" xvfb-run -a ./gradlew integrationTest integrationTestExtended
-```
-
-`integrationTest --tests ...` selects within the default smoke suite; use
-`integrationTestExtended --tests ...` for an extended scenario.
-
-A graphical display is required. Agent runs on Linux use Xvfb, including on a
-developer workstation, to avoid opening windows or taking focus on the user's
-desktop:
-
-```bash
-GRADLE_USER_HOME="$PWD/.gradle-codex" xvfb-run -a ./gradlew integrationTest
-```
-
-Omit `xvfb-run -a` only for an explicitly requested visible desktop run.
-
-To watch a run on the existing display `:88` (the user's current preference):
-
-```bash
-DISPLAY=:88 GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew integrationTestExtended --tests '*seededManagedEditorSavesAndReopens*' --no-daemon
-```
-
-This uses the existing display rather than creating or stopping an X server.
-
-Bounded project attachment has two seeded scenarios:
-
-```bash
-DISPLAY=:88 GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew integrationTestExtended --tests '*seededWork*' --no-daemon
-```
-
-`seededWorkAttachmentPersistsAndDetaches` launches the IDE three times against
-one temporary project: attach an Index, reopen the project and detach while its
-editor has unsaved text, then reopen again to verify persisted detachment.
-It checks canonical Page/Index editor identity, duplicate attachment suppression,
-saved membership/identity metadata and independent saving after detach.
-`seededWorkMembershipRefreshAndRecovery` removes one seeded Page through the
-test-owned backend API, refreshes membership, stops/restarts wtbot and replaces
-the database at the same address. Failure must retain the last confirmed
-membership; replacement requires explicit reattachment. See
-[work attachments](work-attachments.md) for the supported behavior.
-
-`attachedWorkIndexSkipsUnreviewedDefaults` uses `@WithWtbot(scenario = "search")`:
-two fetched Pages, untouched OCR/scaffold defaults, a locally saved Page without
-a remote revision, and an unrelated title. It checks contributor membership and
-native `IdIndex` results for unopened files, selects the named scope in the real
-Find in Files chooser and checks matching results, confirms default-only pages remain
-clean placeholders, then explicitly edits/saves one default and verifies that it
-joins indexing. Detach must remove roots and scopes. The ordinary browser scenario
-is unchanged.
-
-The search scenario also opens a result, injects a new backend revision and clicks Browser Refresh.
-The existing editor must reload with the same file ID. VFS unit regressions cover
-the actual cache-avoiding wrapper for both clean Documents and unsaved text during
-invalidation; IDE navigation paths may retain either form of the file.
-
-```bash
-DISPLAY=:88 GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew integrationTestExtended --tests '*attachedWorkIndexSkipsUnreviewedDefaults*' --no-daemon
-```
-
-Gradle may download the IDE and test framework on the first run. Starter uses
-a separate copy of Gradle's resolved IDE installation rather than selecting the
-latest available IDE. Allow disk space for that copy. To compile the tests
-without launching an IDE:
-
-```bash
+# compile only
 GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew compileIntegrationTestKotlin
 ```
 
-`PluginStartupTest` copies the bundled `projects/wikitext/sample.wiki` fixture
-into a fresh JUnit temporary project and opens that project in a real IDE with
-the built plugin installed. It waits for indexing, verifies the plugin is loaded,
-opens the wikitext file and checks its editor text, then opens the Project and
-Wikisource OCR tool windows and checks they are visible. The IDE closes before
-JUnit removes the temporary project, so IDE metadata and edits never modify
-the source fixture. The test trusts only its generated project through the
-isolated IDE's VM options. It also seeds a test-owned Darcula theme configuration
-to avoid the default Islands theme's missing editor scheme error in 2026.2.4.
+A display is required. Use Xvfb unless a visible run is wanted.
 
-IDE-process error reports become JUnit failures outside TeamCity. The test does
-not require wtbot, MediaWiki, or external wiki credentials; it checks the OCR
-tool window's availability without submitting OCR requests. Further editor
-workflows belong under `src/integrationTest/kotlin`.
+Options:
 
-The suite also clicks between the Wikisource window's Browser and Debug tabs,
-clicks Debug's Refresh button and checks the endpoint/status display, and hides
-and reopens the window to check that its selected tab survives. Backend status
-may be connected or offline; these tests do not require a sidecar. Each scenario
-uses its own IDE context and temporary project.
+| Property | Default | Effect |
+|---|---|---|
+| `-PideTestPluginProfile` | `platform` | `platform` loads only the two plugins plus Starter's performance plugin (`idea.load.plugins.id`) with the Ultimate module disabled; `bundled` loads the full bundled set |
+| `-PideTestPauseSeconds` | `0` | pause (0–60 s) before each IDE closes, for watching |
+| `-PwtbotProjectDir` | `../wtbot` | wtbot checkout used for seeded backends |
+| `-PintellijPlatformVersion` | pin in `gradle.properties` | one-off run against another IDE build |
 
-There is no observation delay by default. To pause for three seconds before each
-IDE closes, including after a failure, add `-PideTestPauseSeconds=3` (0–60).
-The pause runs in the test process, leaving the IDE's UI thread responsive.
+If Kotlin compilation runs out of heap:
+`--max-workers=2 -Pkotlin.compiler.execution.strategy=in-process -Dorg.gradle.jvmargs=-Xmx3g`.
 
-## Iteration speed and plugin profiles
+### Fixtures and isolation
 
-The default `platform` profile loads Wikisource, Performance Testing (used by
-Starter), essential platform plugins and their required dependencies via
-`idea.load.plugins.id`. Starter's `disableUltimateModule()` selects the supported
-free-feature mode. These editor/VFS scenarios do not require Ultimate features.
-The earlier full startup enabled Ultimate dynamically, unloaded several bundled
-plugins and restarted indexing, producing the visible plugin-loading notification.
+Each test copies `src/integrationTest/resources/projects/wikitext/sample.wiki`
+into a JUnit temporary project and opens it in its own Starter context
+(configuration, system, plugins and logs). The fixture:
 
-To exercise the full bundled-plugin environment instead:
+- trusts only the generated project, and pre-seeds the workspace with the
+  Project tool window hidden (avoids a `SchemeManagerImpl` race on 262);
+- seeds a Darcula look-and-feel (the default Islands theme references a
+  missing editor scheme on 2026.2.4) and a supported profiler configuration
+  (avoids Windows/DTrace profiler errors on Save All);
+- turns IDE-process error reports into JUnit failures.
 
-```bash
-DISPLAY=:88 GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew integrationTestExtended --tests '*seededManagedRefreshesExternalContent*' -PideTestPluginProfile=bundled --no-daemon
-```
+Revalidate these workarounds when changing the IDE pin.
 
-`OncePerProcessIdeInstaller` copies the pinned IDE once per test JVM. Starter's
-`ExistingIdeInstaller` otherwise deletes and recopies that distribution for every
-test context. Only the distribution is shared: each scenario retains its own
-project, configuration, system cache, plugin directory and seeded backend.
-Nothing is cached across test JVMs, so a new invocation picks up the current IDE
-distribution. Restart scenarios still close and launch two actual IDE processes,
-preserving only that scenario's directories between them.
+`OncePerProcessIdeInstaller` copies the pinned IDE once per test JVM instead of
+once per context. Starter's files are under `out/ide-tests`; Gradle's
+preparation sandboxes under `build/integrationTest-sandbox` and
+`build/integrationTestExtended-sandbox`; reports under
+`build/reports/tests/integrationTest[Extended]`. The development sandbox
+(`.intellijPlatform/custom-sandbox`, `sandbox-config/`) is not used.
 
-The harness prints `IDE timing` lines for preparation, launch-to-ready, scenario
-execution and shutdown. Compare these and JUnit testcase durations separately
-from Gradle configuration/compilation time. Normal indexing, graceful shutdown
-and IDE error reporting remain enabled. Sharing a live IDE across independent
-scenarios is a separate optimization that would require explicit document,
-project and backend reset contracts.
+### Seeded wtbot backend
 
-Observed on 2026-10-31 with the pinned IDE on `DISPLAY=:88`:
+Tests annotated `@WithWtbot(scenario = …)` get a private wtbot from
+`WtbotServerExtension`:
 
-| Seeded scenario | Earlier bundled setup | Platform profile with distribution reuse |
-|---|---:|---:|
-| External refresh | 60.1 s | 35.5 s |
-| IDE restart (two launches) | 86.9 s | 57.5 s |
+- a fresh directory under `build/ide-backends/<test>-…` holding the SQLite
+  database, blobs, `wtbot.log` and `failure.log` (path printed in the output);
+- launched from the wtbot checkout as
+  `uv run --no-sync python -m ide_test_support --data-dir <dir> --port 18594 --scenario <name>`
+  with `PYTHONPATH=<wtbot>/src`;
+- the IDE is pointed at `http://127.0.0.1:18594`. The IDE suite owns ports
+  18590–18599; if 18594 is already taken the test fails rather than attaching
+  to someone else's service;
+- waits up to 60 s for `/health`; the process tree is stopped after the test.
 
-These are individual JUnit testcase durations, including backend setup and IDE
-lifecycle, excluding Gradle configuration/compilation; they are one workstation
-comparison, not a statistical benchmark. The startup smoke and all three lifecycle
-scenarios passed with the platform profile. The measured startup loaded 12 bundled
-plugins plus Wikisource, versus roughly 130 before, without dynamic plugin
-reconfiguration. After the first distribution copy, preparation of subsequent
-contexts took 0.3–0.4 seconds.
+Scenarios: `browser` (site `ide/en`, `Index:IDE integration.djvu`, two
+proofread Pages with quality) and `search` (adds untouched OCR/scaffold
+placeholders, a locally saved Page with no remote revision and an unrelated
+title). No scenario has upstream credentials or scan images, so fetching, OCR
+and successful rendering are out of scope.
 
-The Gradle preparation sandboxes live under `build/integrationTest-sandbox`
-and `build/integrationTestExtended-sandbox`.
-Starter manages its actual IDE configuration, logs, and artifacts under
-`out/ide-tests`, independently of `.intellijPlatform/custom-sandbox` used for
-development. The saved `sandbox-config` preferences and preserved development
-plugins apply only to `prepareSandbox` and the two named wtbot development
-launches. They are not copied into the integration sandbox.
+The test-owned app (not the production one) adds controls used by the
+extension: `revise()` (`POST /__ide_test/revise`, change a Page's remote
+revision without going through the IDE's write path), `stall()` (delay
+matching requests then return 504), `stopServer()` / `restartServer()`
+(restart with `--resume`, keeping the database) and `replaceDatabase()` (new
+database and UUID at the same address).
 
-Tests seed the IDE's wtbot endpoint with `http://127.0.0.1:18594`. The IDE suite
-uses ports 18590–18599, separate from pytest's 18580–18589 range. The default
-smoke test does not start a backend. Gradle reports are in `build/reports/tests/integrationTest`
-and `build/reports/tests/integrationTestExtended`.
+### Scenarios
 
-Reference: [JetBrains integration testing guide](https://plugins.jetbrains.com/docs/intellij/integration-tests-intro.html).
+| Test | Checks |
+|---|---|
+| `browserAndDebugTabsCanBeSwitched`, `debugRefreshShowsBackendStatus`, `reopeningToolWindowPreservesSelectedTab` | tool window tabs; no backend needed |
+| `seededBackendIsVisibleInDebugWindow` | Debug tab shows the seeded site |
+| `seededManagedFilesHavePersistentIds` | positive IDs, repeated and reverse lookup, permissions |
+| `seededBrowserOpensManagedFilesAndNavigatesPages` | open Index text and properties, open a Page, previous/next, tab reuse, quality change reloads the Document |
+| `seededManagedEditorSavesAndReopens` | type in the Page body, Save All, verify via HTTP, close/reopen keeps text and ID |
+| `seededManagedRefreshesExternalContent` | same-length remote revision; browser Refresh updates the clean editor |
+| `seededManagedSurvivesIdeRestart` | two launches; remote change while closed; same ID and editor profile |
+| `seededManagedConflictPreservesUnsavedText` | keep local text in the conflict dialog, rejected save, reload, save |
+| `seededManagedRecoversFromBackendOutage` | stop wtbot, refresh and save fail safely, restart, save succeeds |
+| `seededManagedRejectsReplacementDatabase` | identical-looking replacement database: clean reload, stale save rejected |
+| `seededManagedRecoversFromRequestTimeout` | 1 s client timeout, stalled stat/save, retry after clearing |
+| `seededManagedFilesRestoreOffline` | second launch with wtbot stopped restores tabs, profile and IDs; only `wikisource-wtbot` is registered |
+| `seededWorkAttachmentPersistsAndDetaches` | three launches: attach, reopen and detach with unsaved text, reopen |
+| `seededWorkMembershipRefreshAndRecovery` | membership refresh after removing a Page; outage keeps the snapshot; replacement database needs reattachment |
+| `attachedWorkIndexSkipsUnreviewedDefaults` (`search`) | indexing excludes untouched placeholders, the scope works in the real Find in Files dialog, a saved default joins, detach removes roots; Refresh reloads an opened result |
+
+When adding scenarios: drive user-visible actions through Driver, verify saved
+content independently over HTTP, use IDE-process assertions only for file
+identity, Document state or PSI, and extend the typed seed scenarios in wtbot's
+`ide_test_support` rather than using a developer database.
 
 ## IDE version policy
 
-`gradle.properties` pins a selected GA release in `intellijPlatformVersion`
-(currently `2026.2.4`, build `262.11879.100`). Compilation, development launches,
-and integration tests use that same target. Starter uses the resolved local IDE
-rather than looking up the latest release independently.
+`gradle.properties` pins one GA release (`intellijPlatformVersion`, currently
+`2026.2.4`, build 262.11879.100). Compilation, the sandbox and integration tests
+all use it, and Starter uses the same resolved IDE. Change the pin deliberately;
+there is no automatic patch tracking.
 
-Adopt a new release by explicitly changing that pin. There is no automatic
-patch-release tracking: a workstation IDE update does not require downloading
-another sandbox IDE. Normally keep the chosen GA baseline for its release line,
-and update for a new release line or a patch whose fixes we need to test.
-An exact pin prevents ordinary builds from adopting later patches silently.
-
-For a one-off check of a specific patch without changing the repository default:
-
-```bash
-GRADLE_USER_HOME="$PWD/.gradle-codex" xvfb-run -a ./gradlew integrationTest -PintellijPlatformVersion=2026.2.4
-```
-
-A version not already cached requires a download. Gradle reuses its cached IDE
-for subsequent runs; Starter still creates an isolated copy for execution.
-
-## Platform unit tests on 2026.2.4
-
-The module `test` tasks suppress `com.intellij.modules.ultimate`. Its bundled
-project startup activity (`Q.Q.Q.Q.V`) cannot be constructed by the light
-platform fixture in this GA build, causing unrelated project tests to fail
-before their assertions run. The unit suites use the free platform APIs and
-have no dependency on that plugin. The suppression is scoped to module unit
-test JVMs. Integration tests choose the platform or bundled profile described
-above; development launches retain their normal plugin configuration. Revisit
-this workaround when upgrading the IDE.
-
-## Managed local wtbot
-
-The optional `seededBackendIsVisibleInDebugWindow` test uses a JUnit extension
-to launch wtbot directly from the local uv environment, without Docker, pytest,
-or MediaWiki:
-
-```bash
-GRADLE_USER_HOME="$PWD/.gradle-codex" xvfb-run -a ./gradlew integrationTestExtended --tests '*seededBackendIsVisibleInDebugWindow*' --no-daemon
-```
-
-`xvfb-run -a` selects an available virtual display. The extension is a JUnit lifecycle callback,
-so it also runs when the test is launched from IntelliJ (using the existing
-Gradle test configuration). Only methods annotated `@WithWtbot` start a server;
-other tests can continue working with an already running API.
-
-For every managed test, `WtbotServerExtension` creates a new directory under
-`build/ide-backends`, sets `PYTHONPATH`, `WTBOT_DATABASE_URL`, `WTBOT_BLOB_ROOT`,
-and `WTBOT_PORT`, then launches:
-
-```bash
-PYTHONPATH="$PWD/src" uv run --no-sync python -m ide_test_support --data-dir /absolute/new/scenario-directory --port 18594 --scenario browser
-```
-
-Run the manual command from the wtbot checkout. Gradle defaults to the sibling
-`../wtbot` checkout. Use `-PwtbotProjectDir=/path/to/wtbot` to override it.
-The scenario module runs Alembic via
-`init_db`, seeds SQLModel/domain objects, and serves the real FastAPI app through
-Uvicorn. It refuses an existing database. The `browser` scenario contains site
-`ide/en`, index `Index:IDE integration.djvu`, and two proofread pages with quality
-metadata. It has no upstream credentials or scan images: fetching, OCR, and
-rendered previews are outside this first scenario.
-
-The extension waits up to 60 seconds for `/health` before starting the IDE. A
-port already occupied on 18594 fails the managed setup instead of attaching to
-that process. On completion or assertion failure it stops its process tree;
-startup failures also trigger cleanup. The database and `wtbot.log` are retained
-in the per-run directory, whose path is printed in the test output. These files
-are local build artifacts, not maintained database dumps. The IDE retains its
-existing three-second observation pause before shutdown.
-
-## Managed VFS migration coverage
-
-Lifecycle scenarios:
-
-- `seededManagedRefreshesExternalContent`: inject a same-length upstream revision
-  and use the browser Refresh button to update the clean editor.
-- `seededManagedRejectsReplacementDatabase`: restart against independently seeded
-  databases at the same URL with identical revision, timestamp and length. Verify
-  clean reload, rejected stale save, retained local text and save after explicit reload.
-- `seededManagedRecoversFromRequestTimeout`: configure a one-second IDE client
-  timeout, delay stat and save responses before domain execution, verify retained
-  text/unsaved state and successful retry after clearing the fault.
-- `seededManagedConflictPreservesUnsavedText`: keep local text in the native File
-  Cache Conflict dialog, attempt Save All, verify rejection and unsaved tracking,
-  explicitly reload, then verify a new edit can save.
-- `seededManagedSurvivesIdeRestart`: launch the same Starter context twice, preserving
-  project/configuration/system directories and the backend. Change remote content
-  while the first IDE is closed, then verify updated text, file ID and editor profile.
-- `seededManagedRecoversFromBackendOutage`: stop the owned HTTP server, refresh and
-  attempt Save All, check local text remains unsaved, restart against the same
-  database, retry saving, then verify a clean Page editor refreshes with the same ID.
-- `seededManagedFilesRestoreOffline`: seed persisted managed Index/properties
-  entries, verify two managed tabs, read-only properties and native saving. The
-  second IDE launch runs with wtbot stopped to check persistent content, editor
-  profile and file identity before recovery. It also verifies the old and demo
-  protocols are unregistered and only `wikisource-wtbot` resolves.
-
-The managed test server alone exposes `POST /__ide_test/revise` for these scenarios.
-It changes the seeded remote Page revision directly; it is not registered in the
-production FastAPI app. This avoids simulating external changes through the IDE's
-own write path or creating a local EditJournal entry. The test client forces HTTP/1.1.
-
-For outages, `WtbotServerExtension.stopServer()` terminates only the owned process
-tree. `restartServer()` launches the test module with `--resume`, retaining that
-scenario's SQLite database and blobs rather than reseeding. The address and IDE
-HTTP client remain unchanged. Logs append across restarts; teardown still stops
-the server after each scenario. Recovery runs in `finally` so an assertion failure
-does not leave IDE shutdown attempting to save into a stopped test server.
-
-`replaceDatabase()` creates a fresh scenario directory and UUID while retaining
-the listening address. `stall()` configures only the test-owned application:
-matching requests wait and return 504 without reaching the domain handler. The
-client times out first. This deterministic test checks failure before execution;
-real timeouts after writes may have an ambiguous outcome and need reconciliation.
-These controls are absent from the production app.
-
-```bash
-DISPLAY=:88 GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew integrationTestExtended --tests '*seededManagedRejectsReplacementDatabase*' --tests '*seededManagedRecoversFromRequestTimeout*' --no-daemon
-```
-
-```bash
-DISPLAY=:88 GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew integrationTestExtended --tests '*seededManagedRecoversFromBackendOutage*' --tests '*seededManagedFilesRestoreOffline*' --no-daemon
-```
-
-```bash
-DISPLAY=:88 GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew integrationTestExtended --tests '*seededManagedRefreshesExternalContent*' --tests '*seededManagedConflictPreservesUnsavedText*' --tests '*seededManagedSurvivesIdeRestart*' --no-daemon
-```
-
-If Kotlin compilation exhausts its daemon heap, the validated build-time workaround
-is `--max-workers=2 -Pkotlin.compiler.execution.strategy=in-process -Dorg.gradle.jvmargs=-Xmx3g`.
-These flags affect that invocation, not IDE settings.
-
-The pinned IDE has also logged a startup `ConcurrentModificationException` in
-`SchemeManagerImpl.findSchemeByName` while the Project tree resolves editor
-colours. The fixture now seeds its own product workspace with Project hidden
-before opening the project; hiding it after startup was too late. IDE error
-reporting remains enabled. Revalidate this fixture workaround on IDE upgrades.
-
-`seededManagedEditorSavesAndReopens` opens an Index and a Page through the browser,
-types into the editor (inside the Page's guarded body), invokes native Save All,
-and independently checks content and local dirty state using an HTTP client in
-the test process. Closing and reopening each file must retain its text and managed
-ID. The fixture remains local; no upstream wiki commit is performed.
-
-The test-owned IDE settings also seed a supported IntelliJ profiler configuration
-and record the known configuration-type IDs so unavailable defaults are not recreated.
-Fresh 2026.2.4 runs were logging errors during Save All for unavailable Windows and
-DTrace profiler configurations on Linux. Seeding supported settings avoids those
-unrelated errors without disabling IDE error reporting. Revisit this fixture
-workaround when changing the pinned IDE version.
-
-Use this suite for the baseline coverage and follow-ups in
-[Managed Wikisource VFS migration](../todo/managed-vfs-migration.md). The existing
-seeded Debug-window test proves connection and fixture visibility; it does not
-yet prove managed-file lookup, editor saving, refresh or native replacement.
-
-`seededManagedFilesHavePersistentIds` checks the registered managed filesystem
-against Index text, Page text and properties in the seeded API. It verifies
-distinct positive IDs, repeated lookup, reverse lookup through `ManagingFS` and
-permissions. It does not yet cover browser entry points or editor/save parity.
-Run it with:
-
-```bash
-GRADLE_USER_HOME="$PWD/.gradle-codex" xvfb-run -a ./gradlew integrationTestExtended --tests '*seededManagedFilesHavePersistentIds*'
-```
-
-`seededBrowserOpensManagedFilesAndNavigatesPages` drives the accessible
-`Wikisource Browser` tree and editor toolbar. It opens Index text and read-only
-properties, opens a Page, navigates next/previous, reopens via the browser to
-check tab reuse, and changes page quality to verify the managed Document reloads.
-It checks managed URLs/IDs, content and the Index editor profile. The Project
-pane is hidden in this scenario to leave space for toolbar mouse clicks on the
-small virtual display; no desktop interaction is required.
-
-```bash
-GRADLE_USER_HOME="$PWD/.gradle-codex" xvfb-run -a ./gradlew integrationTestExtended --tests '*seededBrowserOpensManagedFilesAndNavigatesPages*'
-```
-
-The seed has no upstream credentials or scan images. Preview/image requests may
-show their normal unavailable-service state; this scenario does not validate
-successful rendering, scan fetching or OCR.
-
-Add focused `@WithWtbot` scenarios as each milestone is implemented. Exercise
-user-visible actions through Driver, and verify saved content independently
-against the test-owned backend. Use IDE-process assertions where file identity,
-Document state or PSI cannot be established from the UI alone. Extend the typed
-seed scenarios when more resource kinds or a second work are needed; do not use
-a developer database or the hard-coded Stevenson page as the fixture.
-
-Keep unit/API tests for contract details and error cases. The real IDE scenarios
-cover plugin registration and the complete user workflow; notebooks remain
-optional diagnostics rather than required manual acceptance steps. Restart tests
-must deliberately retain the scenario's IDE caches and backend database across
-the restart, while remaining isolated from other tests.
+Reference: [JetBrains integration testing guide](https://plugins.jetbrains.com/docs/intellij/integration-tests-intro.html).

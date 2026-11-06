@@ -76,3 +76,4 @@ __pycache__/
 # Rotating wtbot activity logs
 /logs/
 /matrix_test/
+/.awb/

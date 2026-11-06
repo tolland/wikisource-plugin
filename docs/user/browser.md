@@ -1,86 +1,99 @@
-# Project work attachments
+# Wikisource browser
 
-In the Wikisource **Browser**, select an Index or a proofread Page and choose
-**Attach Work**. A Page resolves to its owning Index. The **Attached works**
-branch shows the Index and its last confirmed text membership. Expand the work
-to open **Index text** or a canonical **Page …** file. Opening a member uses the
-same managed file ID and editor document as ordinary browser navigation.
+The Wikisource tool window (anchored on the right; its stripe button is
+currently titled **My Tool Window**) has two tabs: **Browser** and **Debug**.
+The Debug tab is described in [Connecting to wtbot](connecting.md). The
+browser shows what the configured wtbot has cached; it does not fetch from the
+wiki itself. Fetching new works into wtbot is done with wtbot's own tools (see
+the wtbot repository, `../wtbot`).
 
-An attachment contains the Index's `@wikitext` and the available transcription
-files returned by that Index's `@pages` relationship view. It does not attach
-the entire Page namespace, follow nested subpages recursively, or include
-properties, scan bytes, stylesheets, File or Template namespaces. Those resources
-remain available through ordinary browsing. Attachment does not create modules
-or content roots. The initial indexing integration contributes eligible text files
-as additional project index roots and supplies a `Wikisource: <work>` search scope.
+## The tree
 
-To search it, open **Find in Files** (`Ctrl+Shift+F`), select **Scope**, then choose
-**Wikisource: <work>**. **Project Files** uses IntelliJ content roots and does not
-include these additional files. Search Everywhere is a different search surface.
-The scope provider is registered through `com.intellij.searchScopesProvider`.
+```
+Wikisource
+├── Attached works            (works attached to this project, see below)
+└── wikisource/en            (one node per registered site: family/code)
+    ├── (Main)
+    ├── Index
+    │   └── Some book.djvu
+    │       └── Pages         (the Page: titles this Index paginates)
+    │           ├── Some book.djvu/1
+    │           └── …
+    └── Template, Author, …
+```
 
-Indexing happens inside IntelliJ. The API sees metadata requests for selection
-and content reads when IntelliJ needs bytes; already-cached content and up-to-date
-indexes can avoid new `/vfs/content` requests. A lack of content requests alone
-does not mean indexing failed.
+- A **title** is a node that can both be opened and contain subpages
+  (`Book/Chapter 1`). The `Page` namespace is not listed under the site — there
+  is one title per scan — so pages are reached through their Index's
+  **Pages** node.
+- **Double-click** a title to open its text in an editor. Opening the same
+  title again, from anywhere, reuses the existing editor tab.
+- Names in **blue with a star** have local edits saved in wtbot but not yet
+  committed to the wiki. Names in **grey italics** are placeholders: the page
+  does not exist on the wiki yet and has no local edits.
+- A coloured **●** after a Page shows its proofreading quality, in the usual
+  ProofreadPage colours.
+- Selecting a node shows its properties (path, kind, revision, content model,
+  …) in the pane below the tree.
 
-Index eligibility is determined from metadata: a file must have a real revision
-(`placeholder=false`) or a saved local edit (`dirty=true`). Untouched scaffold and
-prepopulated OCR defaults are excluded, even when they contain substantial text.
-Saved local transcriptions remain eligible while awaiting their first upstream
-commit. Explicitly accepting and saving a default also makes it eligible; no text
-comparison is used to guess whether it has been reviewed. Index text is included;
-properties and unrelated titles are excluded.
+### Context menu
 
-Selection uses bulk stat before resolving managed files. It neither opens default
-bodies nor writes, saves or accepts them. Merely opening a default page does not
-make it eligible. Attachment changes, managed content events and explicit work
-refresh update the cached roots. Index/scope callbacks return cached snapshots
-without HTTP; project reopen revalidates eligibility in the background. An
-unavailable work contributes no files until its metadata can be verified.
+| Item | Does |
+|---|---|
+| Open | Opens the title's text (same as double-click). |
+| Show Properties | Opens the title's read-only JSON properties in an editor. |
+| Set Page Quality… | Sets the ProofreadPage quality level on every selected Page. |
+| Mark Ready to Validate | Sets selected Pages to level 3 (Proofread). |
+| Copy Path | Copies the node's backend path. |
+| Refresh | Re-reads the node from wtbot. |
 
-These are file-level scopes over serialized wikitext. They do not enforce the
-proofread editor's guarded regions during native Replace in Files. A transcription-
-body-only replacement command remains separate work.
+Quality changes are ordinary saves: each page is read, its `<pagequality>` tag
+rewritten and saved, so it becomes a local edit awaiting commit. Pages with
+unsaved changes in an open editor, and pages that changed on the backend in
+the meantime, are skipped and reported.
 
-Select an attached work or one of its members and choose **Refresh Work** to
-replace its membership with a fresh snapshot. Removed members leave the
-snapshot; existing editor tabs remain open. Discovery lists only that Index's
-`@pages` and batches metadata for its text files. It does not read every member's
-content or enumerate namespaces.
+The **Refresh** button above the tree re-reads every open Wikisource editor
+from wtbot and reloads the tree, keeping expansion and selection. Clean
+editors pick up newer text; unsaved text is kept.
 
-Project state is saved in `.idea/wikisource-works.xml`, including canonical
-addresses, connection identity, database UUID and the last confirmed membership.
-Project reopen restores that snapshot without rediscovering work membership.
-**Refresh Work** checks it explicitly. Failed discovery leaves the snapshot
-intact. A different connection or replacement database cannot silently replace
-an existing attachment: detach it and attach the intended work explicitly.
-Opening an attached member validates the current backend binding; already-open
-managed editors retain their existing offline caching and save guards.
+Saving in an editor stores the text in wtbot's local edit journal. Nothing is
+sent to the wiki until it is committed, which is currently done outside the
+IDE (with wtbot's tools or its viewer).
 
-**Detach Work** removes only the project association. It does not delete backend
-content or managed VFS records, close editors, or save/discard unsaved text.
-Detaching the last work may cause IntelliJ to remove the now-empty settings file.
-Reattaching the same Index (including through one of its Pages) updates the
-existing association rather than creating a duplicate.
+## Attached works
 
-`WtManagedAddress` remains the address boundary, `discoverManagedWork` discovers
-bounded membership, and the project service `WtWorkAttachments` owns persistence
-and lifecycle operations. The tree is a view over that state, not an alternate
-filesystem. `indexableWorkContent` selects persisted content, and the project
-service `WtAttachedWorkIndex` resolves eligible managed leaves in the background.
-Its contributor and scope provider share those snapshots. The earlier static
-demos and replacement probes remain removed.
+Attaching a work makes its transcriptions part of the project for searching.
 
-The seeded IDE scenarios `seededWorkAttachmentPersistsAndDetaches` and
-`seededWorkMembershipRefreshAndRecovery` exercise these flows; see
-[IDE integration tests](ide-integration-tests.md) for execution and artifacts.
-`attachedWorkIndexSkipsUnreviewedDefaults` checks native content indexing against a
-partially transcribed work and eligibility after an explicit save. It also opens
-the actual Find in Files popup, selects the contributed scope and checks matches
-for unopened remote pages and local transcriptions, excluding unreviewed defaults.
+1. Select an Index, or any proofread Page of it, and click **Attach Work**.
+   A Page resolves to its owning Index.
+2. The work appears under **Attached works**. Expand it to open **Index text**
+   or any **Page …** member; these are the same editors as ordinary browsing.
+3. Search it with **Find in Files** (`Ctrl+Shift+F`): set **Scope** to
+   **Wikisource: <work>**. The **Project Files** scope does not include it.
 
-Initial integration verification: 118 VFS and 90 UI tests, 11 backend fixture/
-placeholder tests, the native-index scenario and the three-launch attachment
-persistence/detach scenario passed. No content read was made for the untouched
-scaffold page in the indexing scenario.
+A work contains the Index text and the Page texts listed by the Index's
+**Pages**. It does not include properties, scans, stylesheets, or the File and
+Template namespaces, and it does not add modules or content roots.
+
+Only pages with real content are indexed: a page is included when it has a
+revision on the wiki or a saved local edit. Untouched placeholders — including
+pages pre-filled with unreviewed OCR text — are left out until you edit and save
+them. Opening a placeholder does not make it eligible.
+
+- **Refresh Work** re-reads the Index's page list and replaces the membership
+  snapshot. Removed pages leave the work; their open editors stay open. If the
+  refresh fails, the last snapshot is kept.
+- **Detach Work** removes only the project association. Backend content, open
+  editors and unsaved text are untouched.
+- Attaching the same Index again (directly or through one of its Pages)
+  updates the existing attachment rather than adding a duplicate.
+
+Attachments are stored in `.idea/wikisource-works.xml` with the backend address
+and database identity they were made against. Reopening the project restores
+them without contacting wtbot; eligibility is rechecked in the background. If
+you switch to a different backend or database, the attachment is not silently
+rebound: detach it and attach the work again.
+
+Find in Files over an attached work searches and replaces whole page text,
+including the `<noinclude>` header and footer of Page bodies; the proofread
+editor's protected regions do not apply there.

@@ -42,7 +42,7 @@ jobs:
 
       # Build plugin
       - name: Build plugin
-        run: ./gradlew :wikitext-language-plugin:buildPlugin :wikisource-remote-plugin:buildPlugin
+        run: ./gradlew :wikitext:wikitext-language-plugin:buildPlugin :wikisource:wikisource-remote-plugin:buildPlugin
 
 
   # Run tests and upload test reports on failure
@@ -121,7 +121,7 @@ jobs:
 
       # Run Verify Plugin task and IntelliJ Plugin Verifier tool
       - name: Run Plugin Verification tasks
-        run: ./gradlew :wikitext-language-plugin:verifyPlugin :wikisource-remote-plugin:verifyPlugin
+        run: ./gradlew :wikitext:wikitext-language-plugin:verifyPlugin :wikisource:wikisource-remote-plugin:verifyPlugin
 
       # Collect Plugin Verifier Result
       - name: Collect Plugin Verifier Result

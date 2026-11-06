@@ -36,7 +36,7 @@ Always use a workspace-local Gradle user home in this repo — set `GRADLE_USER_
 GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew build          # full build
 GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew :runIde          # launch sandbox IDE
 GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew test            # all tests
-GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew :wikitext-core:test   # single module's tests
+GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew :wikitext:wikitext-core:test   # single module's tests
 GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew generateLexer generateParser  # regenerate from .flex / .bnf (wikitext-core only)
 GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew check           # build + tests + spotless, run by the pre-commit hook
 ```
@@ -51,7 +51,7 @@ These become the `wtbot.baseUrl` / `wtbot.timeoutSeconds` system properties (`WT
 
 `runIde` opens a sandbox IDE against `../test-project` (a sibling directory of this repo root, not inside it — create it if it doesn't exist locally). The sandbox config in `sandbox-config/` (editor, look-and-feel, trusted paths, log categories) is copied into the sandbox on every `prepareSandbox` run. The target IDE release is pinned in `gradle.properties` (`intellijPlatformVersion`). Build, sandbox, and Starter integration tests share that target. Update the pin deliberately when adopting a GA release; do not use `latest`, snapshots, or version ranges. Patch releases do not automatically advance the target.
 
-A single test class/method can be run the normal Gradle way, e.g. `GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew :wikitext-core:test --tests "org.limepepper.lang.wikitext.lexer.WtLexerTest.testFooBar"`.
+A single test class/method can be run the normal Gradle way, e.g. `GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew :wikitext:wikitext-core:test --tests "org.limepepper.lang.wikitext.lexer.WtLexerTest.testFooBar"`.
 
 ### Python sidecar (wtbot)
 
@@ -96,19 +96,24 @@ cd viewer && npm run build
 
 ### Gradle modules
 
-| Module | Purpose |
-|--------|---------|
-| `wikitext-core` | Language fundamentals: lexer, parser, PSI types, facet |
-| `wikitext-vfs` | `wikisource-wtbot://` virtual file system + the `VfsBackend` client for the wtbot HTTP contract |
-| `wikitext-ui` | IDE UI: syntax highlighting, annotator, tool window, structure view, split-editor preview |
-| `src-py` | Python sidecar (`wtbot` package) |
+Modules are grouped by plugin under two parent directories; Gradle paths mirror the layout (e.g. `:wikitext:wikitext-core`).
 
-The root `build.gradle.kts` assembles the plugin (`pluginModule` for each of `wikitext-core`, `wikitext-vfs`, `wikitext-ui`) and launches the sandbox IDE; `wikitext-vfs` and `wikitext-ui` both depend on `wikitext-core`.
+| Gradle path | Purpose |
+|-------------|---------|
+| `:wikitext:wikitext-core` | Language fundamentals: lexer, parser, PSI types, facet |
+| `:wikitext:wikitext-language-ui` | Language IDE UI: highlighting, annotator, structure view, editing |
+| `:wikitext:wikitext-language-plugin` | Assembles the Wikitext language plugin (`pluginModule` for core + language-ui) |
+| `:wikisource:wikisource-remote-shared` | Code shared by the remote backend and frontend content modules |
+| `:wikisource:wikisource-remote-backend` | `wikisource-wtbot://` VFS + the `VfsBackend` client for the wtbot HTTP contract |
+| `:wikisource:wikisource-remote-frontend` | Tool window, browser, split-editor preview, ProofreadPage editors |
+| `:wikisource:wikisource-remote-plugin` | Assembles the Wikisource remote plugin (depends on the Wikitext plugin) |
+
+The root `build.gradle.kts` loads both plugins into the sandbox IDE (`localPlugin`) and owns the Starter integration tests (`src/integrationTest`).
 
 ### Lexer and parser (GrammarKit)
 
-- **Lexer**: `wikitext-core/src/main/kotlin/…/lexer/WikitextLexer.flex` → JFlex generates Java into `src/main/gen/…/lexer/`
-- **Parser**: `wikitext-core/src/main/kotlin/…/parser/Wikitext.bnf` → Grammar-Kit generates Java/Kotlin into `src/main/gen/…/psi/`
+- **Lexer**: `wikitext/wikitext-core/src/main/kotlin/…/lexer/WikitextLexer.flex` → JFlex generates Java into `src/main/gen/…/lexer/`
+- **Parser**: `wikitext/wikitext-core/src/main/kotlin/…/parser/Wikitext.bnf` → Grammar-Kit generates Java/Kotlin into `src/main/gen/…/psi/`
 
 Generated code is **not hand-edited**. After changing `.flex` or `.bnf` run `generateLexer` / `generateParser`.
 
@@ -116,9 +121,9 @@ Generated code is **not hand-edited**. After changing `.flex` or `.bnf` run `gen
 
 The lexer uses a frame/state stack to disambiguate context-dependent tokens (e.g. `TEMPLATE_PIPE` vs `LINK_PIPE` vs `TABLE_CELL_SEP` are all `|`, decided by `pipeTokenForContext()` based on the top-of-stack frame kind).
 
-`wikitext-core/src/main/kotlin/…/lexer/` and `…/parser/` also contain `.flex`/`.bnf` grammars for several embedded/adjacent languages (Handlebars, Markdown, Makefile, Prisma, Dart, raw HTML/XML) used for host-language interop inside wikitext content — these follow the same "generated code, not hand-edited" rule.
+`wikitext/wikitext-core/src/main/kotlin/…/lexer/` and `…/parser/` also contain `.flex`/`.bnf` grammars for several embedded/adjacent languages (Handlebars, Markdown, Makefile, Prisma, Dart, raw HTML/XML) used for host-language interop inside wikitext content — these follow the same "generated code, not hand-edited" rule.
 
-### Virtual file system (`wikitext-vfs`)
+### Virtual file system (`wikisource-remote-backend`)
 
 `WtManagedBackendFileSystem` implements `wikisource-wtbot://` using platform-managed
 persistent files with positive `VirtualFileWithId` identities. `WtWikiFiles` resolves
@@ -146,13 +151,13 @@ An `IndexableSetContributor` and per-work file scope provider share its backgrou
 resolved snapshots. Native file scopes do not enforce proofread editor guards;
 transcription-body replacement is separate work.
 
-### Split-editor preview (`wikitext-ui/.../preview/`)
+### Split-editor preview (`wikisource-remote-frontend/.../preview/`)
 
 `WtEditorWithPreview` pairs the raw wikitext editor with `WtRenderPreviewBrowser`, a live HTML preview rendered server-side. Rather than parsing wikitext client-side or hitting MediaWiki's `action=parse` directly from Kotlin, the preview is proxied through wtbot (`POST /preview/render`, see `src-py/wtbot/api/preview.py`) so that content-model awareness (plain `wikitext` vs ProofreadPage's `proofread-page`), credentials, and the LAN CA bundle all stay server-side. See `docs/reference/preview-design.md` for the full rationale and the two rejected alternatives (classic `EditPage` form-post preview, Parsoid). `WtProofreadPageEditor`/`WtProofreadIndexEditor` add ProofreadPage-specific chrome (page-quality header, reference scan pane via `ReferenceImagePane`, prev/next page navigation via `WtPageNavToolbar`).
 
 ### SQLite IPC contract
 
-The plugin (Kotlin/JDBC, via `wikitext-vfs`'s HTTP backend) and the Python sidecar communicate through wtbot's FastAPI HTTP endpoints, with SQLite (`database.db`) as the sidecar's own storage. Both sides that touch the database directly **must** set these pragmas on every connection:
+The plugin (Kotlin/JDBC, via `wikisource-remote-backend`'s HTTP backend) and the Python sidecar communicate through wtbot's FastAPI HTTP endpoints, with SQLite (`database.db`) as the sidecar's own storage. Both sides that touch the database directly **must** set these pragmas on every connection:
 
 ```sql
 PRAGMA journal_mode = WAL;
@@ -192,7 +197,7 @@ uv run wtbot drain --status                                    # queue depth
 
 ### Tests
 
-Tests live under `wikitext-core/src/test/`, `wikitext-vfs/src/test/`, and `wikitext-ui/src/test/`. Two base classes drive data-driven tests in `wikitext-core`:
+Unit tests live under each module's `src/test/` (e.g. `wikitext/wikitext-core/src/test/`); IDE integration tests live in the root `src/integrationTest/`. Two base classes drive data-driven tests in `wikitext-core`:
 
 - `WtLexerTestCase` — lexer tests: each `testFooBar()` method loads `src/test/testData/simple/fooBar.wt` as input and diffs against `fooBar.txt`
 - `WtParsingTextCase` — parser tests: loads `.wt` input, diffs against `.parse.txt` expected tree

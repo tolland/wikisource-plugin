@@ -9,13 +9,7 @@ import com.intellij.driver.sdk.*
 import com.intellij.driver.sdk.ui.components.UiComponent
 import com.intellij.driver.sdk.ui.components.common.ideFrame
 import com.intellij.driver.sdk.ui.components.common.popups.findInPathPopup
-import com.intellij.driver.sdk.ui.components.elements.button
-import com.intellij.driver.sdk.ui.components.elements.contentTabLabel
-import com.intellij.driver.sdk.ui.components.elements.tree
-import com.intellij.driver.sdk.ui.components.elements.popupMenu
-import com.intellij.driver.sdk.ui.components.elements.actionButton
-import com.intellij.driver.sdk.ui.components.elements.dialog
-import com.intellij.driver.sdk.ui.components.elements.DialogUiComponent
+import com.intellij.driver.sdk.ui.components.elements.*
 import com.intellij.driver.sdk.ui.enabled
 import com.intellij.driver.sdk.ui.present
 import com.intellij.driver.sdk.ui.shouldBe
@@ -31,22 +25,20 @@ import com.intellij.ide.starter.project.LocalProjectInfo
 import com.intellij.ide.starter.runner.Starter
 import com.intellij.platform.testFramework.teamCity.TeamCityReporter.SyntheticTestKind
 import com.intellij.tools.ide.starter.product.idea.ultimate.IdeaUltimate
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.extension.RegisterExtension
 import org.junit.jupiter.api.fail
 import org.junit.jupiter.api.io.TempDir
-import org.junit.jupiter.api.extension.RegisterExtension
 import org.kodein.di.DI
 import org.kodein.di.bindSingleton
-import java.nio.file.Path
 import org.limepepper.lang.wikitext.vfs.backend.HttpVfsBackend
+import java.nio.file.Path
 import kotlin.io.path.createDirectories
-import kotlin.io.path.writeText
-import kotlin.io.path.readText
 import kotlin.io.path.exists
+import kotlin.io.path.readText
+import kotlin.io.path.writeText
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
@@ -187,7 +179,8 @@ class PluginStartupTest {
         val marker = " Detached editor remains editable."
         var phase = 0
         var managedId = 0
-        withProject(projectDirectory, "wikitext-work-attachment", runs = 3,
+        withProject(
+            projectDirectory, "wikitext-work-attachment", runs = 3,
             afterRun = { run, _ ->
                 val settingsFile = projectDirectory.resolve(".idea/wikisource-works.xml")
                 val saved = if (settingsFile.exists()) settingsFile.readText() else ""
@@ -224,6 +217,7 @@ class PluginStartupTest {
                         tree.collectExpandedPaths().count { it.path.size == 3 && it.path[1] == "Attached works" } == 1
                     }
                 }
+
                 1 -> {
                     tree.doubleClickPath(*(work + "Index text"), fullMatch = false)
                     assertEquals(managedId, assertManagedEditor(path, original))
@@ -235,7 +229,8 @@ class PluginStartupTest {
                     ui.button("Detach Work").click()
                     assertEquals(managedId, assertManagedEditor(path, original + marker))
                     withContext(OnDispatcher.EDT) {
-                        val document = requireNotNull(service<FileEditorManager>(singleProject()).getSelectedTextEditor()).getDocument()
+                        val document =
+                            requireNotNull(service<FileEditorManager>(singleProject()).getSelectedTextEditor()).getDocument()
                         assertTrue(service<ManagedTestDocumentManager>().isDocumentUnsaved(document))
                     }
                     assertEquals(original, backend.readContent(path).decodeText())
@@ -244,6 +239,7 @@ class PluginStartupTest {
                         backend.readContent(path).decodeText() == original + marker
                     }
                 }
+
                 else -> {
                     tree.expandPath("Wikisource", "Attached works")
                     assertTrue(tree.collectExpandedPaths().none { it.path.size > 2 && it.path[1] == "Attached works" })
@@ -273,7 +269,10 @@ class PluginStartupTest {
             }
             val scope = attachedIndex.scopes().single()
             assertEquals("Wikisource: IDE integration.djvu", scope.getDisplayName())
-            assertTrue(service<ManagedTestEditorManager>(singleProject()).getOpenFiles().isEmpty(), "Indexing must work on unopened files")
+            assertTrue(
+                service<ManagedTestEditorManager>(singleProject()).getOpenFiles().isEmpty(),
+                "Indexing must work on unopened files"
+            )
             val fileIndex = utility<ManagedTestFileBasedIndex>().getInstance()
             val idIndex = requireNotNull(utility<ManagedTestIndexId>().findByName("IdIndex"))
             fun wordFiles(word: String, searchScope: ManagedTestGlobalScope = scope): Set<String> = withReadAction {
@@ -366,11 +365,14 @@ class PluginStartupTest {
             closeToolWindow("Project")
             openToolWindow("MyToolWindow")
             val tree = ui.tree("//div[@accessiblename='Wikisource Browser']")
-            val status = cast(ui.x("//div[@accessiblename='Wikisource Work Status']").component, ManagedTestLabel::class)
+            val status =
+                cast(ui.x("//div[@accessiblename='Wikisource Work Status']").component, ManagedTestLabel::class)
             val work = arrayOf("Wikisource", "Attached works", "IDE integration.djvu")
             tree.clickPath("Wikisource", "ide/en", "Index", "IDE integration.djvu")
             ui.button("Attach Work").click()
-            waitFor("Attach completes", 30.seconds) { status.getText().startsWith("Attached IDE integration.djvu: 3 files") }
+            waitFor("Attach completes", 30.seconds) {
+                status.getText().startsWith("Attached IDE integration.djvu: 3 files")
+            }
             tree.expandPath(*work, fullMatch = false)
             assertEquals(3, tree.collectExpandedPaths().count { it.path.size == 4 && it.path[1] == "Attached works" })
 
@@ -386,14 +388,18 @@ class PluginStartupTest {
             wtbot.stopServer()
             tree.clickPath(*work, fullMatch = false)
             ui.button("Refresh Work").click()
-            waitFor("Outage retains confirmed membership", 30.seconds) { status.getText().startsWith("Work unavailable:") }
+            waitFor("Outage retains confirmed membership", 30.seconds) {
+                status.getText().startsWith("Work unavailable:")
+            }
             tree.expandPath(*work, fullMatch = false)
             assertEquals(2, tree.collectExpandedPaths().count { it.path.size == 4 && it.path[1] == "Attached works" })
 
             wtbot.restartServer()
             tree.clickPath(*work, fullMatch = false)
             ui.button("Refresh Work").click()
-            waitFor("Same database recovers", 30.seconds) { status.getText().startsWith("Refreshed IDE integration.djvu: 2 files") }
+            waitFor("Same database recovers", 30.seconds) {
+                status.getText().startsWith("Refreshed IDE integration.djvu: 2 files")
+            }
 
             wtbot.replaceDatabase(8)
             tree.clickPath(*work, fullMatch = false)
@@ -449,17 +455,26 @@ class PluginStartupTest {
             tree.doubleClickPath(*index)
             assertManagedEditor("/ide/en/Index/IDE integration.djvu/@wikitext", "<pagelist")
             withContext(OnDispatcher.EDT) {
-                val file = requireNotNull(service<FileEditorManager>(singleProject()).getSelectedTextEditor()).getVirtualFile()
-                assertEquals("Proofread Index Editor", requireNotNull(service<ManagedTestEditorManager>(singleProject())
-                    .getSelectedEditor(file)).getName())
+                val file =
+                    requireNotNull(service<FileEditorManager>(singleProject()).getSelectedTextEditor()).getVirtualFile()
+                assertEquals(
+                    "Proofread Index Editor", requireNotNull(
+                        service<ManagedTestEditorManager>(singleProject())
+                            .getSelectedEditor(file)
+                    ).getName()
+                )
             }
 
             tree.rightClickPath(*index)
             ui.popupMenu().select("Show Properties")
             val propsPath = "/ide/en/Index/IDE integration.djvu/@props"
             assertManagedEditor(propsPath, "{")
-            assertTrue(!requireNotNull(service<ManagedTestVirtualFileManager>()
-                .findFileByUrl("wikisource-wtbot://$propsPath")).isWritable())
+            assertTrue(
+                !requireNotNull(
+                    service<ManagedTestVirtualFileManager>()
+                        .findFileByUrl("wikisource-wtbot://$propsPath")
+                ).isWritable()
+            )
 
             tree.doubleClickPath(*page, fullMatch = false)
             val firstPath = "/ide/en/Page/IDE integration.djvu/1/@wikitext"
@@ -514,7 +529,8 @@ class PluginStartupTest {
             assertTrue(backend.stat(path).dirty, "Saving must create a local journal edit")
 
             withContext(OnDispatcher.EDT) {
-                val file = requireNotNull(service<FileEditorManager>(singleProject()).getSelectedTextEditor()).getVirtualFile()
+                val file =
+                    requireNotNull(service<FileEditorManager>(singleProject()).getSelectedTextEditor()).getVirtualFile()
                 service<FileEditorManager>(singleProject()).closeFile(file)
             }
             tree.doubleClickPath(*index)
@@ -541,7 +557,8 @@ class PluginStartupTest {
             }
             assertTrue(backend.stat(pagePath).dirty)
             withContext(OnDispatcher.EDT) {
-                val file = requireNotNull(service<FileEditorManager>(singleProject()).getSelectedTextEditor()).getVirtualFile()
+                val file =
+                    requireNotNull(service<FileEditorManager>(singleProject()).getSelectedTextEditor()).getVirtualFile()
                 service<FileEditorManager>(singleProject()).closeFile(file)
             }
             tree.doubleClickPath(*page, fullMatch = false)
@@ -559,7 +576,8 @@ class PluginStartupTest {
             closeToolWindow("Project")
             openToolWindow("MyToolWindow")
             ui.tree("//div[@accessiblename='Wikisource Browser']").doubleClickPath(
-                "Wikisource", "ide/en", "Index", "IDE integration.djvu")
+                "Wikisource", "ide/en", "Index", "IDE integration.djvu"
+            )
             val id = assertManagedEditor(path, original)
             val revised = original.replace("to=\"2\"", "to=\"3\"")
             assertEquals(original.length, revised.length)
@@ -580,22 +598,29 @@ class PluginStartupTest {
         val revised = original.replace("to=\"2\"", "to=\"4\"")
         var phase = 0
         var firstId = 0
-        withProject(projectDirectory, "wikitext-managed-restart", runs = 2,
+        withProject(
+            projectDirectory, "wikitext-managed-restart", runs = 2,
             afterRun = { run, _ -> if (run == 0) wtbot.revise(path, revised, 303) }) {
             if (phase++ == 0) {
                 closeToolWindow("Project")
                 openToolWindow("MyToolWindow")
                 ui.tree("//div[@accessiblename='Wikisource Browser']").doubleClickPath(
-                    "Wikisource", "ide/en", "Index", "IDE integration.djvu")
+                    "Wikisource", "ide/en", "Index", "IDE integration.djvu"
+                )
                 firstId = assertManagedEditor(path, original)
                 invokeAction("SaveAll")
             } else {
                 assertEquals(firstId, assertManagedEditor(path, revised))
                 assertEquals(revised, backend.readContent(path).decodeText())
                 withContext(OnDispatcher.EDT) {
-                    val file = requireNotNull(service<FileEditorManager>(singleProject()).getSelectedTextEditor()).getVirtualFile()
-                    assertEquals("Proofread Index Editor", requireNotNull(service<ManagedTestEditorManager>(singleProject())
-                        .getSelectedEditor(file)).getName())
+                    val file =
+                        requireNotNull(service<FileEditorManager>(singleProject()).getSelectedTextEditor()).getVirtualFile()
+                    assertEquals(
+                        "Proofread Index Editor", requireNotNull(
+                            service<ManagedTestEditorManager>(singleProject())
+                                .getSelectedEditor(file)
+                        ).getName()
+                    )
                 }
             }
         }
@@ -612,7 +637,8 @@ class PluginStartupTest {
             closeToolWindow("Project")
             openToolWindow("MyToolWindow")
             ui.tree("//div[@accessiblename='Wikisource Browser']").doubleClickPath(
-                "Wikisource", "ide/en", "Index", "IDE integration.djvu")
+                "Wikisource", "ide/en", "Index", "IDE integration.djvu"
+            )
             assertManagedEditor(path, original)
             invokeAction("EditorTextEnd")
             ui.keyboard { typeText(" Unsaved local edit.") }
@@ -629,12 +655,14 @@ class PluginStartupTest {
             assertEquals(remote, backend.readContent(path).decodeText(), "Stale save must not overwrite remote content")
             waitFor("Failed save keeps the Document unsaved", 10.seconds) {
                 withContext(OnDispatcher.EDT) {
-                    val document = requireNotNull(service<FileEditorManager>(singleProject()).getSelectedTextEditor()).getDocument()
+                    val document =
+                        requireNotNull(service<FileEditorManager>(singleProject()).getSelectedTextEditor()).getDocument()
                     utility<ManagedTestDocumentManager>().getInstance().isDocumentUnsaved(document)
                 }
             }
             withContext(OnDispatcher.EDT) {
-                val document = requireNotNull(service<FileEditorManager>(singleProject()).getSelectedTextEditor()).getDocument()
+                val document =
+                    requireNotNull(service<FileEditorManager>(singleProject()).getSelectedTextEditor()).getDocument()
                 val manager = utility<ManagedTestDocumentManager>().getInstance()
                 assertTrue(manager.isDocumentUnsaved(document))
                 // Explicitly discard only this scenario's controlled local edit before shutdown.
@@ -675,14 +703,18 @@ class PluginStartupTest {
             assertManagedEditor(path, local)
             wtbot.stopServer()
             try {
-                assertTrue(runCatching { backend.stat(path) }.isFailure, "The owned HTTP server must really be unavailable")
+                assertTrue(
+                    runCatching { backend.stat(path) }.isFailure,
+                    "The owned HTTP server must really be unavailable"
+                )
                 ui.button("Refresh").click()
                 invokeAction("SaveAll")
                 closeSaveFailures("failed")
                 assertEquals(id, assertManagedEditor(path, local))
                 waitFor("Outage save keeps the Document unsaved", 10.seconds) {
                     withContext(OnDispatcher.EDT) {
-                        val document = requireNotNull(service<FileEditorManager>(singleProject()).getSelectedTextEditor()).getDocument()
+                        val document =
+                            requireNotNull(service<FileEditorManager>(singleProject()).getSelectedTextEditor()).getDocument()
                         utility<ManagedTestDocumentManager>().getInstance().isDocumentUnsaved(document)
                     }
                 }
@@ -690,7 +722,11 @@ class PluginStartupTest {
                 // Even an assertion failure must leave shutdown able to save this test's edits.
                 wtbot.restartServer()
             }
-            assertEquals(original, backend.readContent(path).decodeText(), "The rejected save must not reach the database")
+            assertEquals(
+                original,
+                backend.readContent(path).decodeText(),
+                "The rejected save must not reach the database"
+            )
             invokeAction("SaveAll")
             waitFor("Retry after service restart reaches the original database", 30.seconds) {
                 backend.readContent(path).decodeText() == local
@@ -744,13 +780,15 @@ class PluginStartupTest {
             assertManagedEditor(path, local)
             waitFor("Database rejection preserves unsaved text", 10.seconds) {
                 withContext(OnDispatcher.EDT) {
-                    val doc = requireNotNull(service<FileEditorManager>(singleProject()).getSelectedTextEditor()).getDocument()
+                    val doc =
+                        requireNotNull(service<FileEditorManager>(singleProject()).getSelectedTextEditor()).getDocument()
                     utility<ManagedTestDocumentManager>().getInstance().isDocumentUnsaved(doc)
                 }
             }
             withContext(OnDispatcher.EDT) {
                 utility<ManagedTestDocumentManager>().getInstance().reloadFromDisk(
-                    requireNotNull(service<FileEditorManager>(singleProject()).getSelectedTextEditor()).getDocument())
+                    requireNotNull(service<FileEditorManager>(singleProject()).getSelectedTextEditor()).getDocument()
+                )
             }
             assertEquals(id, assertManagedEditor(path, latest.decodeText()))
             ui.xx("//div[@class='EditorComponentImpl']", UiComponent::class.java).list()
@@ -790,11 +828,14 @@ class PluginStartupTest {
                 assertEquals(id, assertManagedEditor(path, original + " Retained through timeout."))
                 waitFor("Timed-out save remains unsaved", 10.seconds) {
                     withContext(OnDispatcher.EDT) {
-                        val doc = requireNotNull(service<FileEditorManager>(singleProject()).getSelectedTextEditor()).getDocument()
+                        val doc =
+                            requireNotNull(service<FileEditorManager>(singleProject()).getSelectedTextEditor()).getDocument()
                         utility<ManagedTestDocumentManager>().getInstance().isDocumentUnsaved(doc)
                     }
                 }
-            } finally { wtbot.stall() }
+            } finally {
+                wtbot.stall()
+            }
             assertEquals(original, backend.readContent(path).decodeText())
             invokeAction("SaveAll")
             waitFor("Retry succeeds after the timeout fault is cleared", 30.seconds) {
@@ -813,7 +854,8 @@ class PluginStartupTest {
         val marker = " Restored managed file."
         var phase = 0
         var id = 0
-        withProject(projectDirectory, "wikitext-managed-offline-restore", runs = 2,
+        withProject(
+            projectDirectory, "wikitext-managed-offline-restore", runs = 2,
             restoredFiles = listOf("wikisource-wtbot://$propsPath", "wikisource-wtbot://$path"),
             afterRun = { run, workspace ->
                 val xml = java.nio.file.Files.readString(workspace)
@@ -828,16 +870,22 @@ class PluginStartupTest {
                 if (phase == 1) assertTrue(runCatching { backend.stat(path) }.isFailure)
                 waitFor("Managed editor tabs restore", 30.seconds) {
                     withContext(OnDispatcher.EDT) {
-                        service<ManagedTestEditorManager>(singleProject()).getOpenFiles().map { it.getUrl() }.sorted() ==
+                        service<ManagedTestEditorManager>(singleProject()).getOpenFiles().map { it.getUrl() }
+                            .sorted() ==
                             listOf("wikisource-wtbot://$path", "wikisource-wtbot://$propsPath").sorted()
                     }
                 }
                 if (phase == 1) {
                     assertEquals(id, assertManagedEditor(path, original + marker))
                     withContext(OnDispatcher.EDT) {
-                        val file = requireNotNull(service<FileEditorManager>(singleProject()).getSelectedTextEditor()).getVirtualFile()
-                        assertEquals("Proofread Index Editor", requireNotNull(service<ManagedTestEditorManager>(singleProject())
-                            .getSelectedEditor(file)).getName())
+                        val file =
+                            requireNotNull(service<FileEditorManager>(singleProject()).getSelectedTextEditor()).getVirtualFile()
+                        assertEquals(
+                            "Proofread Index Editor", requireNotNull(
+                                service<ManagedTestEditorManager>(singleProject())
+                                    .getSelectedEditor(file)
+                            ).getName()
+                        )
                     }
                 }
             } finally {
@@ -957,7 +1005,10 @@ class PluginStartupTest {
                         // the subscription-mode transition and unrelated language plugins.
                         disableUltimateModule()
                         applyVMOptionsPatch {
-                            addSystemProperty("idea.load.plugins.id", "org.limepepper.lang.wikitext,org.limepepper.wikisource,com.jetbrains.performancePlugin")
+                            addSystemProperty(
+                                "idea.load.plugins.id",
+                                "org.limepepper.lang.wikitext,org.limepepper.wikisource,com.jetbrains.performancePlugin"
+                            )
                         }
                     }
                     val editorEntries = restoredFiles.joinToString("\n") { url ->
@@ -1041,15 +1092,24 @@ class PluginStartupTest {
                     .useDriverAndCloseIde {
                         try {
                             val licenseInfo = ui.dialog(title = "IDE")
-                            if (licenseInfo.present() && licenseInfo.getAllTexts().any { it.text == "Ultimate subscription" }) {
+                            if (licenseInfo.present() && licenseInfo.getAllTexts()
+                                    .any { it.text == "Ultimate subscription" }
+                            ) {
                                 licenseInfo.button("Close").click()
                             }
                             waitForIndicators(2.minutes)
                             println("IDE timing [$testName, run=${run + 1}]: ready=${elapsedSeconds(launchStarted)}s")
                             val scenarioStarted = System.nanoTime()
-                            try { scenario(fixtureText) }
-                            finally {
-                                println("IDE timing [$testName, run=${run + 1}]: scenario=${elapsedSeconds(scenarioStarted)}s")
+                            try {
+                                scenario(fixtureText)
+                            } finally {
+                                println(
+                                    "IDE timing [$testName, run=${run + 1}]: scenario=${
+                                        elapsedSeconds(
+                                            scenarioStarted
+                                        )
+                                    }s"
+                                )
                             }
                         } finally {
                             // Optional watched-run pause; keep it off the IDE's EDT.
@@ -1085,7 +1145,10 @@ interface ManagedTestFileSystem {
     fun getProtocol(): String
 }
 
-@Remote("org.limepepper.lang.wikitext.search.WtAttachedWorkIndex", plugin = "org.limepepper.wikisource/wikisource.wikisource-remote-frontend")
+@Remote(
+    "org.limepepper.lang.wikitext.search.WtAttachedWorkIndex",
+    plugin = "org.limepepper.wikisource/wikisource.wikisource-remote-frontend"
+)
 interface ManagedTestWorkIndex {
     fun files(): Array<ManagedTestVirtualFile>
     fun scopes(): Array<ManagedTestGlobalScope>
@@ -1099,7 +1162,11 @@ interface ManagedTestGlobalScope {
 @Remote("com.intellij.util.indexing.FileBasedIndex")
 interface ManagedTestFileBasedIndex {
     fun getInstance(): ManagedTestFileBasedIndex
-    fun getContainingFiles(index: ManagedTestIndexId, key: ManagedTestWordIndexEntry, scope: ManagedTestGlobalScope): Collection<ManagedTestVirtualFile>
+    fun getContainingFiles(
+        index: ManagedTestIndexId,
+        key: ManagedTestWordIndexEntry,
+        scope: ManagedTestGlobalScope
+    ): Collection<ManagedTestVirtualFile>
 }
 
 @Remote("com.intellij.util.indexing.ID")
