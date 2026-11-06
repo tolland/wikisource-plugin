@@ -4,11 +4,12 @@ This is a simple language plugin for wikitext, to support a wikisource editor pr
 
 ## Database migrations
 
-The Python backend uses Alembic for schema changes. From the repository root:
+The FastAPI backend and Docker test stack live in the sibling `wtbot` checkout.
+The Svelte viewer is in `wtbot/viewer`. To run Alembic from the backend checkout:
 
 ```bash
-./.venv/bin/alembic upgrade head
-./.venv/bin/alembic revision --autogenerate -m "describe change"
+uv run alembic upgrade head
+uv run alembic revision --autogenerate -m "describe change"
 ```
 
 Set `WTBOT_DATABASE_URL` to target a database other than `sqlite:///database.db`.

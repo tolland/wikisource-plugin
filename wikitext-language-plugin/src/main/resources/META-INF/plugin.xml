@@ -1,8 +1,8 @@
 <idea-plugin>
     <id>org.limepepper.lang.wikitext</id>
-    <name>Wikitext Language Support</name>
+    <name>Wikitext Language</name>
 
-    <vendor url="https://www.mycompany.com">The developer</vendor>
+    <vendor url="https://www.mycompany.com">Lime Pepper Ltd</vendor>
     <description><![CDATA[
     Wikitext language support including lexer, parser, PSI tree, syntax highlighting, annotators, live templates, and structure view.
     ]]></description>

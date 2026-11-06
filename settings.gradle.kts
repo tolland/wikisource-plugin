@@ -14,7 +14,6 @@ pluginManagement {
         id("org.jetbrains.kotlin.jvm") version "2.3.20"
         id("org.jetbrains.kotlin.plugin.serialization") version "2.3.20"
         id("com.diffplug.spotless") version ("8.7.0")
-        id("org.xerial.sqlite-jdbc") version ("3.53.2.0")
     }
 }
 
@@ -43,4 +42,3 @@ include("wikisource-remote-shared")
 include("wikisource-remote-backend")
 include("wikisource-remote-frontend")
 include("wikisource-remote-plugin")
-include("src-py")

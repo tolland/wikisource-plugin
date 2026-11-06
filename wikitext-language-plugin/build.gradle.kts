@@ -29,3 +29,5 @@ intellijPlatform {
         )
     }
 }
+
+tasks.runIde { enabled = false }

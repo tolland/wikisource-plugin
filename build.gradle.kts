@@ -17,7 +17,7 @@ val sandboxPluginDirectories = listOf(
 val intellijPlatformVersion = providers.gradleProperty("intellijPlatformVersion").get()
 
 // Which wtbot sidecar the sandbox IDE starts against, e.g.
-//   ./gradlew runIde -PwtbotBaseUrl=http://127.0.0.1:18584
+//   ./gradlew :runIde -PwtbotBaseUrl=http://127.0.0.1:18584
 // Unset means "whatever the sandbox has persisted", which is the plugin's own
 // default (http://127.0.0.1:18564, the workstation dev-convention port —
 // see docs/reference/logging.md) on a fresh sandbox. The property is read at
@@ -138,6 +138,10 @@ intellijPlatform {
 
 tasks {
 
+    buildPlugin {
+        enabled = false
+    }
+
     // Apply workstation preferences only to development IDE launches. Other
     // sandboxes retain the platform plugin's isolated directories and suffixes.
     withType<PrepareSandboxTask>().matching {
@@ -253,6 +257,7 @@ intellijPlatformTesting {
                         mustRunAfter("integrationTest")
                     }
                     dependsOn(":wikitext-language-plugin:buildPlugin", ":wikisource-remote-plugin:buildPlugin")
+                    archiveFile.set(project(":wikisource-remote-plugin").tasks.named<org.jetbrains.intellij.platform.gradle.tasks.BuildPluginTask>("buildPlugin").flatMap { it.archiveFile })
                     systemProperty("wikitext.test.idePath", platformPath.toString())
                     systemProperty("wikitext.test.pluginProfile", providers.gradleProperty("ideTestPluginProfile").getOrElse("platform"))
                     systemProperty("wikitext.test.pauseSeconds", providers.gradleProperty("ideTestPauseSeconds").getOrElse("0"))
@@ -260,6 +265,7 @@ intellijPlatformTesting {
                     systemProperty("wikisource.remote.plugin.archive", project(":wikisource-remote-plugin").layout.buildDirectory.file("distributions/wikisource-remote-plugin-1.0.0-SNAPSHOT.zip").get().asFile.absolutePath)
                     jvmArgs("--add-opens=java.base/sun.nio.fs=ALL-UNNAMED")
                     systemProperty("wtbot.test.baseUrl", "http://127.0.0.1:18594")
+                    systemProperty("wtbot.test.projectDir", project.file(providers.gradleProperty("wtbotProjectDir").getOrElse("../wtbot")).absolutePath)
                 }
             }
         }

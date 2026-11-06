@@ -29,11 +29,12 @@ class WtbotServerExtension : BeforeEachCallback, AfterEachCallback {
 
     override fun beforeEach(context: ExtensionContext) {
         val scenario = context.requiredTestMethod.getAnnotation(WithWtbot::class.java)?.scenario ?: return
-        val root = generateSequence(Path.of("").toAbsolutePath()) { it.parent }
-            .firstOrNull { it.resolve("src-py/wtbot/main.py").exists() }
-            ?: error("Run IDE tests with a working directory inside the repository")
+        val root = Path.of(System.getProperty("wtbot.test.projectDir", "../wtbot")).toAbsolutePath().normalize()
+        check(root.resolve("src/ide_test_support/__main__.py").exists()) {
+            "wtbot test support missing in $root. Set -PwtbotProjectDir to the wtbot checkout."
+        }
         val directory = java.nio.file.Files.createTempDirectory(
-            root.resolve("build/ide-backends").createDirectories(), "${context.requiredTestMethod.name}-",
+            Path.of("build/ide-backends").toAbsolutePath().createDirectories(), "${context.requiredTestMethod.name}-",
         )
         val log = directory.resolve("wtbot.log")
         // Fail instead of accidentally attaching to an existing developer/pytest API.
@@ -48,7 +49,7 @@ class WtbotServerExtension : BeforeEachCallback, AfterEachCallback {
             "--data-dir", directory.toString(), "--port", "18594", "--scenario", scenario,
         ).directory(root.toFile()).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.appendTo(log.toFile()))
         builder.environment().apply {
-            put("PYTHONPATH", root.resolve("src-py").toString())
+            put("PYTHONPATH", root.resolve("src").toString())
             put("WTBOT_DATABASE_URL", "sqlite:///${directory.resolve("wtbot.db")}")
             put("WTBOT_BLOB_ROOT", directory.resolve("blobs").toString())
             put("WTBOT_PORT", "18594")

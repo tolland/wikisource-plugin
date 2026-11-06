@@ -34,7 +34,7 @@ Always use a workspace-local Gradle user home in this repo — set `GRADLE_USER_
 
 ```bash
 GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew build          # full build
-GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew runIde          # launch sandbox IDE
+GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew :runIde          # launch sandbox IDE
 GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew test            # all tests
 GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew :wikitext-core:test   # single module's tests
 GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew generateLexer generateParser  # regenerate from .flex / .bnf (wikitext-core only)
@@ -44,7 +44,7 @@ GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew check           # build + tests 
 The sandbox's wtbot sidecar can be chosen per launch, so a session can be pointed at the docker harness instead of the workstation sidecar without editing settings by hand:
 
 ```bash
-GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew runIde -PwtbotBaseUrl=http://127.0.0.1:18584 [-PwtbotTimeoutSeconds=30]
+GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew :runIde -PwtbotBaseUrl=http://127.0.0.1:18584 [-PwtbotTimeoutSeconds=30]
 ```
 
 These become the `wtbot.baseUrl` / `wtbot.timeoutSeconds` system properties (`WTBOT_BASE_URL` / `WTBOT_TIMEOUT_SECONDS` env vars work too, for a non-sandbox IDE). They seed the setting at every launch rather than only on a fresh sandbox, and the running IDE can still be moved to another backend from Settings → Tools → WTBot (VFS backend) without restarting.

@@ -48,7 +48,7 @@ wtbot (18564) and optionally the viewer (18563) run on the dev machine.
 
 Where the defaults live: plugin → `WtbotAppSettings.DEFAULT_BASE_URL`
 (18564; changeable at runtime in Settings → Tools → WTBot, or per launch via
-`./gradlew runIde -PwtbotBaseUrl=…` — the docker harness on 18574 is the usual
+`./gradlew :runIde -PwtbotBaseUrl=…` — the docker harness on 18574 is the usual
 alternative); CLI → `wtbot/cli/deps.py` `DEFAULT_BASE_URL` or the
 `WTBOT_API_URL` env var; viewer → `viewer/vite.config.ts` (`server.port`
 18563, `/api` proxy → `WTBOT_API_URL` or 18564). Start the sidecar with:

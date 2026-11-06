@@ -227,10 +227,12 @@ For every managed test, `WtbotServerExtension` creates a new directory under
 and `WTBOT_PORT`, then launches:
 
 ```bash
-PYTHONPATH="$PWD/src-py" uv run --no-sync python -m ide_test_support --data-dir /absolute/new/scenario-directory --port 18594 --scenario browser
+PYTHONPATH="$PWD/src" uv run --no-sync python -m ide_test_support --data-dir /absolute/new/scenario-directory --port 18594 --scenario browser
 ```
 
-This command can also be run manually. The scenario module runs Alembic via
+Run the manual command from the wtbot checkout. Gradle defaults to the sibling
+`../wtbot` checkout. Use `-PwtbotProjectDir=/path/to/wtbot` to override it.
+The scenario module runs Alembic via
 `init_db`, seeds SQLModel/domain objects, and serves the real FastAPI app through
 Uvicorn. It refuses an existing database. The `browser` scenario contains site
 `ide/en`, index `Index:IDE integration.djvu`, and two proofread pages with quality

@@ -13,7 +13,6 @@ dependencies {
         intellijIdea(intellijPlatformVersion) {
             useCache = true
         }
-        localPlugin(project(":wikitext-language-plugin"))
         pluginModule(implementation(project(":wikisource-remote-shared")))
         pluginModule(implementation(project(":wikisource-remote-backend")))
         pluginModule(implementation(project(":wikisource-remote-frontend")))
@@ -29,3 +28,5 @@ intellijPlatform {
         failureLevel = listOf()
     }
 }
+
+tasks.runIde { enabled = false }
