@@ -151,7 +151,7 @@ compatible Language version policy before publication.
 All Gradle invocations use the repository-local user home, for example:
 
 ```bash
-GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew :wikitext-language-plugin:buildPlugin :wikisource-remote-plugin:buildPlugin
+GRADLE_USER_HOME="$PWD/.gradle-codex" ./gradlew :wikitext:wikitext-language-plugin:buildPlugin :wikisource:wikisource-remote-plugin:buildPlugin
 ```
 
 The project paths in this example become available after phase 2. No build or
